@@ -1,0 +1,25 @@
+[project]
+name = "project-nyx"
+version = "0.1.0"
+description = "NS Automation Framework"
+authors = [
+    {name = "niart120",email = "38847256+niart120@users.noreply.github.com"}
+]
+license = {text = "MIT License"}
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "opencv-python (>=4.11.0.86,<5.0.0.0)",
+    "pyserial (>=3.5,<4.0)",
+    "pillow (>=11.1.0,<12.0.0)"
+]
+
+[tool.poetry]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+ruff = "^0.11.2"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
