@@ -1,10 +1,10 @@
 import time
 from abc import ABC, abstractmethod
-from typing import Union, Tuple
+from typing import Union
 
 from framework.core.macro.constants import Button, Hat, LStick, RStick
 from framework.core.hardware.serial_comm import SerialManager
-from framework.core.hardware.protocol import SerialProtocol
+from framework.core.hardware.protocol import CH552SerialProtocol, SerialProtocolInterface
 
 # キーとして許容する型
 KeyType = Union[Button, Hat, LStick, RStick]
@@ -47,10 +47,9 @@ class DefaultCommand(Command):
     入力時間制御（dur, wait）はフレームワーク側の責務として、
     必要なタイミングで1回ずつ発行する形にしています。
     """
-    def __init__(self, serial_manager: SerialManager, protocol: SerialProtocol = None):
+    def __init__(self, serial_manager: SerialManager, protocol: SerialProtocolInterface = None):
         self.serial_manager = serial_manager
-        # 依存性注入を利用してテストや拡張に柔軟に対応
-        self.protocol = protocol if protocol is not None else SerialProtocol()
+        self.protocol = protocol if protocol is not None else CH552SerialProtocol()
 
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
         self.log(f"[DefaultCommand] Pressing keys: {keys}")
