@@ -78,16 +78,14 @@ def test_hold_operation(dummy_command):
 
 def test_release_operation(dummy_command):
     cmd, mock_protocol, mock_serial_manager = dummy_command
-    # まず、状態を変えるために press() を実行
-    cmd.press(Button.A, dur=0.1, wait=0.1)
-    # 次に、release() を呼び出す。ここでは特定のキーを指定
+
+    # release() を呼び出す。ここでは特定のキーを指定
     cmd.release(Button.A)
-    # モックの呼び出し履歴において、release() が2回呼ばれている可能性があるため、
-    # 最後の release 呼び出しが期待通りか確認する
-    assert mock_protocol.calls[-1][0] == 'release'
-    assert mock_protocol.calls[-1][1] == (Button.A,)
-    # SerialManager の送信は合計 3 件（press, release from press, release() の呼び出し）になっているはず
-    assert len(mock_serial_manager.sent_data) == 3
+    assert mock_protocol.calls[0][0] == 'release'
+    assert mock_protocol.calls[0][1] == (Button.A,)
+    assert len(mock_serial_manager.sent_data) == 1
+    assert mock_serial_manager.sent_data[0].startswith(b'release:')
+    
 
 def test_keyboard_operation(dummy_command):
     cmd, mock_protocol, mock_serial_manager = dummy_command
