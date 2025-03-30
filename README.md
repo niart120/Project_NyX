@@ -47,10 +47,6 @@ NyX は、Nintendo Switch をサポートするために設計された Python �
 ## ドキュメント
 
 詳細な設計およびプロトコル仕様については、`docs` ディレクトリ内のドキュメントを参照してください:
-- [CH552 プロトコル仕様](docs/protocol/ch552_protocol_spec.md)
-- [マクロフレームワーク設計](docs/macro_design.md)
-- [ハードウェア統合設計](docs/hardware_design.md)
-- [プロジェクトアーキテクチャ概要](docs/architecture.md)
 
 (ドキュメントの内容は予告なく変更・削除されることがあります。)
 
