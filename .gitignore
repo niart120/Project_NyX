@@ -1,0 +1,73 @@
+# Python バイトコード
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 仮想環境関連
+venv/
+.env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 環境構成ファイル
+.Python
+python-version
+
+# IDE・エディタ関連
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# macOS・Linux 特有の不要ファイル
+.DS_Store
+*.swp
+*~
+
+# ログ・キャッシュ
+logs/
+*.log
+*.out
+*.err
+*.cache
+.cache/
+.history
+
+# pytest / unittest で生成されるファイル
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+.pytest_cache/
+.cache/
+
+# build/配布関連
+build/
+dist/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Docker関連
+docker-compose.override.yml
+
+# MyPy, Pylint, Pyright などの型チェック・静的解析ツール
+.mypy_cache/
+pylint.log
+pyrightconfig.json
+
+# Flask/Django などのフレームワーク関連
+instance/
+*.sqlite3
+*.db
+
+# その他
+.envrc
+*.pem
+*.key
