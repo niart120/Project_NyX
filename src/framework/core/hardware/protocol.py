@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
-
-# 定数クラスのインポート（これらは framework/core/macro/constants.py に実装済み）
 from framework.core.macro.constants import Button, Hat, LStick, RStick
 
 # キー情報として許容する型
@@ -22,7 +20,6 @@ class SerialProtocolInterface(ABC):
     def build_keyboard_command(self, text: str) -> bytes:
         """キーボード入力操作のコマンドデータを生成する"""
         pass
-
 
 class CH552SerialProtocol(SerialProtocolInterface):
     """

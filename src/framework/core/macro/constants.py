@@ -1,6 +1,5 @@
 import math
 from enum import IntEnum
-from typing import Union
 
 class Button(IntEnum):
     Y = 0x0001

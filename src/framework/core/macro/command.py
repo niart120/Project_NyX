@@ -4,7 +4,7 @@ from typing import Union
 
 from framework.core.macro.constants import Button, Hat, LStick, RStick
 from framework.core.hardware.serial_comm import SerialManager
-from framework.core.hardware.protocol import CH552SerialProtocol, SerialProtocolInterface
+from framework.core.hardware.protocol import SerialProtocolInterface, CH552SerialProtocol
 
 # キーとして許容する型
 KeyType = Union[Button, Hat, LStick, RStick]
