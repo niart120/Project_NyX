@@ -1,55 +1,65 @@
 import pytest
 from loguru import logger
-from framework.core.logger.log_manager import log_manager
+from framework.core.logger.log_manager import LogManager
 
-@pytest.fixture(autouse=True)
-def capture_logs():
-    # すべてのロガーハンドラを一旦クリアし、一時的なシンク（出力先）を追加する。
-    # ここではログメッセージをリストに格納するシンクを使用。
-    captured_logs = []
-    def sink(message):
-        captured_logs.append(message.strip())
-    logger.remove()  # 既存のハンドラをすべて削除
-    logger.add(sink, level="DEBUG")  # DEBUG レベル以上のログをキャプチャするシンクを追加
-    yield captured_logs
-    # テスト終了後のクリーンアップ処理：一時的なシンクを削除し、他のテストに影響しないようにする。
-    logger.remove()
+class TestLogManager:
+    @pytest.fixture(autouse=True)
+    def setup_and_teardown(self):
+        # テストごとに新しい LogManager のインスタンスを生成する
+        self.log_manager = LogManager()
+        # カスタムハンドラのログ収集先リスト
+        self.log_records = []
+        yield
+        # テスト後に loguru のハンドラをすべて削除してクリーンアップ
+        logger.remove()
 
-def test_log_manager_console_logging(capture_logs):
-    # log_manager.log が適切なフォーマットでログを出力することを確認するテスト。
-    log_manager.log("INFO", "Test message", component="UnitTest")
-    # キャプチャされたログのいずれかが "[UnitTest]" を含み、かつ "Test message" を含んでいることを検証。
-    assert any("UnitTest" in msg and "Test message" in msg for msg in capture_logs)
-    ## キャプチャされたログのいずれかが "INFO" レベルであることを確認。
-    assert any("INFO" in msg for msg in capture_logs)
-    # キャプチャされたログのいずれかが "Test message" を含んでいることを確認。
-    assert any("Test message" in msg for msg in capture_logs)
+    def handler(self, record):
+        self.log_records.append(record)
+
+    def dummy_handler(self, record):
+            pass
+
+    def test_log_method(self):
+        # カスタムハンドラを追加して log() メソッドの出力を検証する
+        self.log_manager.add_handler(self.handler, level="DEBUG")
+        # ログメッセージを記録
+        self.log_manager.log("DEBUG", "debug message", "UnitTest")
+
+        # ハンドラによりメッセージが記録されることを検証
+        assert len(self.log_records) == 1
+        assert any("debug message" in msg and "UnitTest" in msg for msg in self.log_records)
+
+    def test_set_level_changes_all_handlers(self):
+        # カスタムハンドラを追加してログレベル設定の変更を検証
+        self.log_manager.add_handler(self.handler, level="DEBUG")
+        # すべてのハンドラのレベルを INFO に変更
+        self.log_manager.set_level("INFO")
+        # DEBUG レベルのメッセージは出力されないはず
+        self.log_manager.log("DEBUG", "デバッグメッセージ", "UnitTest")
+        self.log_manager.log("INFO", "情報メッセージ", "UnitTest")
+        # INFO レベルのメッセージは出力されるはず
+        assert not any("デバッグメッセージ" in m for m in self.log_records)
+        assert any("情報メッセージ" in m for m in self.log_records)
+
+    def test_set_custom_handler_level_error(self):
+        # 未登録のハンドラに対して例外が発生するか検証
+
+        # カスタムハンドラを追加
+        with pytest.raises(ValueError) as exc_info:
+            self.log_manager.set_custom_handler_level(self.dummy_handler, "INFO")
+        assert "指定されたハンドラは登録されていません" in str(exc_info.value)
+
+    def test_remove_handler(self):
+        # カスタムハンドラの削除動作を検証
     
-
-def test_log_manager_set_level(capture_logs):
-    # ログレベルを WARNING に設定し、DEBUG レベルのメッセージが出力されないことを確認する。
-    log_manager.set_level("WARNING") #Fixme: 内部的にロガーハンドラを削除しているため、期待した動作をしない。
-    log_manager.log("DEBUG", "This should NOT appear", component="UnitTest")  # このメッセージはキャプチャされないはず
-    log_manager.log("WARNING", "This should appear", component="UnitTest")  # このメッセージはキャプチャされるはず
-    # DEBUG レベルのメッセージがキャプチャされていないことを確認。
-    assert not any("This should NOT appear" in msg for msg in capture_logs)
-    # WARNING レベルのメッセージがキャプチャされていることを確認。
-    assert any("This should appear" in msg for msg in capture_logs)
-    # キャプチャされたログのいずれかが "WARNING" レベルであることを確認。
-    assert any("WARNING" in msg for msg in capture_logs)
-
-def test_log_manager_add_handler(capture_logs):
-    # add_handler を使用してカスタムのシンク（出力先）を追加し、
-    # そこにログが正しく送信されることを確認する。
-    custom_logs = []
-    def custom_sink(message):
-        custom_logs.append(message.strip())
-    log_manager.add_handler(custom_sink)  # カスタムシンクを追加
-    log_manager.log("INFO", "Custom sink test", component="UnitTest")
-    # キャプチャされたログのいずれかが "Custom sink test" を含んでいることを確認。
-    assert any("Custom sink test" in msg for msg in capture_logs)
-    # カスタムシンクに送信されたログのいずれかが "Custom sink test" を含んでいることを確認。
-    assert any("Custom sink test" in msg for msg in custom_logs)
-    # キャプチャされたログのいずれかが "UnitTest" を含んでいることを確認。
-    assert any("UnitTest" in msg for msg in capture_logs)
-    
+        # ハンドラを追加
+        self.log_manager.add_handler(self.handler, level="DEBUG")
+        # 追加後、メッセージがキャプチャできることを確認
+        self.log_manager.log("DEBUG", "初回メッセージ", "UnitTest")
+        assert any("初回メッセージ" in msg for msg in self.log_records)
+        # キャプチャしたログをクリアし、ハンドラを削除
+        self.log_records.clear()
+        self.log_manager.remove_handler(self.handler)
+        self.log_manager.log("DEBUG", "削除後メッセージ", "UnitTest")
+        # 削除後はハンドラが動作しないので、ログは記録されないはず
+        assert not self.log_records
