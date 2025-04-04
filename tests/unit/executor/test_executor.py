@@ -1,7 +1,7 @@
 import pytest
-from framework.core.macro.executor import MacroExecutor
-from framework.core.macro.command import Command
-from framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.macro.command import Command
+from nyxpy.framework.core.macro.base import MacroBase
 
 # テスト用のモッククラスを定義
 class MockCommand(Command):

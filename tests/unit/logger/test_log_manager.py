@@ -1,6 +1,6 @@
 import pytest
 from loguru import logger
-from framework.core.logger.log_manager import LogManager
+from nyxpy.framework.core.logger.log_manager import LogManager
 
 class TestLogManager:
     @pytest.fixture(autouse=True)
