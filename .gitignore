@@ -71,3 +71,4 @@ instance/
 .envrc
 *.pem
 *.key
+.coverage
