@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
-from framework.core.macro.constants import Button, Hat, LStick, RStick
+from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
 
 # キー情報として許容する型
 KeyType = Union[Button, Hat, LStick, RStick]

@@ -1,7 +1,7 @@
 import time
 import pytest
-from framework.core.macro.command import DefaultCommand
-from framework.core.macro.constants import Button
+from nyxpy.framework.core.macro.command import DefaultCommand
+from nyxpy.framework.core.macro.constants import Button
 
 # モックの SerialProtocol を定義
 class MockSerialProtocol:

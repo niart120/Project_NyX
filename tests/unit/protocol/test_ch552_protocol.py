@@ -1,6 +1,6 @@
 import pytest
-from framework.core.hardware.protocol import CH552SerialProtocol
-from framework.core.macro.constants import Button, Hat, LStick, RStick
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
+from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
 
 # テスト用にスティック操作のためのサブクラスが必要であれば、実装済みのものを利用
 # ここでは実際の LStick, RStick をそのまま利用します
