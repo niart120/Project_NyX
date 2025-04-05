@@ -1,28 +1,48 @@
 import cv2
+import threading
+import time
 
-class CaptureDevice:
+class AsyncCaptureDevice:
     """
-    キャプチャボードを抽象化するクラス。
-    OpenCVなどを利用してデバイスから映像フレームを取得する。
+    キャプチャデバイスの非同期スレッド実装。
+    内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
-    def __init__(self, device_index: int = 0):
+    def __init__(self, device_index: int = 0, interval: float = 0.03):
         self.device_index = device_index
         self.cap = None
+        self.latest_frame = None
+        self._running = False
+        self.interval = interval  # キャプチャ間隔（秒）
+        self._lock = threading.Lock()
+        self._thread = None
 
     def initialize(self) -> None:
         self.cap = cv2.VideoCapture(self.device_index)
         if not self.cap.isOpened():
-            raise RuntimeError(f"CaptureDevice: Device {self.device_index} could not be opened.")
+            raise RuntimeError(f"AsyncCaptureDevice: Device {self.device_index} could not be opened.")
+        self._running = True
+        self._thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._thread.start()
 
-    def get_frame(self):
-        if self.cap is None:
-            raise RuntimeError("CaptureDevice: Device not initialized.")
-        ret, frame = self.cap.read()
-        if not ret:
-            raise RuntimeError("CaptureDevice: Failed to capture frame.")
-        return frame
+    def _capture_loop(self) -> None:
+        while self._running:
+            ret, frame = self.cap.read()
+            if ret:
+                with self._lock:
+                    self.latest_frame = frame
+            time.sleep(self.interval)
+
+    def get_latest_frame(self):
+        """
+        キャッシュされた最新のフレームを取得します。
+        """
+        with self._lock:
+            return self.latest_frame
 
     def release(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join()
         if self.cap:
             self.cap.release()
             self.cap = None
@@ -30,13 +50,14 @@ class CaptureDevice:
 
 class CaptureManager:
     """
-    複数のキャプチャデバイスを管理し、利用するデバイスを切り替える仕組みを提供。
+    複数のキャプチャデバイスを管理し、利用するデバイスを切り替える仕組みを提供します。
+    非同期キャプチャ版として AsyncCaptureDevice を利用します。
     """
     def __init__(self):
         self.devices = {}
         self.active_device = None
 
-    def register_device(self, name: str, device: CaptureDevice) -> None:
+    def register_device(self, name: str, device: AsyncCaptureDevice) -> None:
         self.devices[name] = device
 
     def set_active(self, name: str) -> None:
@@ -48,7 +69,10 @@ class CaptureManager:
     def get_frame(self):
         if self.active_device is None:
             raise RuntimeError("CaptureManager: No active capture device.")
-        return self.active_device.get_frame()
+        frame = self.active_device.get_latest_frame()
+        if frame is None:
+            raise RuntimeError("CaptureManager: No frame available yet.")
+        return frame
 
     def release_active(self) -> None:
         if self.active_device:
