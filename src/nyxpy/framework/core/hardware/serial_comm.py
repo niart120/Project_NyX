@@ -16,10 +16,6 @@ class SerialCommInterface(ABC):
         pass
 
     @abstractmethod
-    def receive(self, timeout: float = None) -> bytes:
-        pass
-
-    @abstractmethod
     def close(self) -> None:
         pass
 
@@ -40,13 +36,6 @@ class SerialComm(SerialCommInterface):
         if self.ser is None or not self.ser.is_open:
             raise RuntimeError("SerialComm: Serial port not open.")
         self.ser.write(data)
-
-    def receive(self, timeout: float = None) -> bytes:
-        if self.ser is None or not self.ser.is_open:
-            raise RuntimeError("SerialComm: Serial port not open.")
-        if timeout is not None:
-            self.ser.timeout = timeout
-        return self.ser.read_all()
 
     def close(self) -> None:
         if self.ser and self.ser.is_open:
@@ -77,11 +66,6 @@ class SerialManager:
         if self.active_device is None:
             raise RuntimeError("SerialManager: No active serial device.")
         self.active_device.send(data)
-
-    def receive(self, timeout: float = None) -> bytes:
-        if self.active_device is None:
-            raise RuntimeError("SerialManager: No active serial device.")
-        return self.active_device.receive(timeout)
 
     def close_active(self) -> None:
         if self.active_device:
