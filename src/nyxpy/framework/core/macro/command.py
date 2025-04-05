@@ -6,7 +6,7 @@ from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface, CH552SerialProtocol
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
-from utils.helper import get_caller_class_name
+from nyxpy.utils.helper import get_caller_class_name
 
 # キーとして許容する型
 KeyType = Union[Button, Hat, LStick, RStick]
