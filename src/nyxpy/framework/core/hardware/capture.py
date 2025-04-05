@@ -7,10 +7,10 @@ class AsyncCaptureDevice:
     キャプチャデバイスの非同期スレッド実装。
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
-    def __init__(self, device_index: int = 0, interval: float = 0.03):
+    def __init__(self, device_index: int = 0, interval: float = 1.0/30.0) -> None:
         self.device_index = device_index
-        self.cap = None
-        self.latest_frame = None
+        self.cap:cv2.VideoCapture = None
+        self.latest_frame:cv2.typing.MatLike = None
         self._running = False
         self.interval = interval  # キャプチャ間隔（秒）
         self._lock = threading.Lock()
@@ -32,7 +32,7 @@ class AsyncCaptureDevice:
                     self.latest_frame = frame
             time.sleep(self.interval)
 
-    def get_latest_frame(self):
+    def get_latest_frame(self)->cv2.typing.MatLike:
         """
         キャッシュされた最新のフレームを取得します。
         """
@@ -47,7 +47,6 @@ class AsyncCaptureDevice:
             self.cap.release()
             self.cap = None
 
-
 class CaptureManager:
     """
     複数のキャプチャデバイスを管理し、利用するデバイスを切り替える仕組みを提供します。
@@ -55,7 +54,7 @@ class CaptureManager:
     """
     def __init__(self):
         self.devices = {}
-        self.active_device = None
+        self.active_device:AsyncCaptureDevice = None
 
     def register_device(self, name: str, device: AsyncCaptureDevice) -> None:
         self.devices[name] = device
@@ -66,7 +65,7 @@ class CaptureManager:
         self.active_device = self.devices[name]
         self.active_device.initialize()
 
-    def get_frame(self):
+    def get_frame(self)->cv2.typing.MatLike:
         if self.active_device is None:
             raise RuntimeError("CaptureManager: No active capture device.")
         frame = self.active_device.get_latest_frame()
