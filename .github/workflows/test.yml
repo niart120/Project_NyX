@@ -41,4 +41,4 @@ jobs:
         run: poetry install
 
       - name: テストの実行
-        run: poetry run pytest
+        run: poetry run pytest tests/unit tests/integration -v

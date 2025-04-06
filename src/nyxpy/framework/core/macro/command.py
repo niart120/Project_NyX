@@ -1,7 +1,9 @@
 import time
 from abc import ABC, abstractmethod
 from typing import Union
+import cv2
 
+from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface, CH552SerialProtocol
@@ -33,7 +35,7 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def capture(self):
+    def capture(self)->cv2.typing.MatLike:
         pass
 
     @abstractmethod
@@ -49,8 +51,9 @@ class DefaultCommand(Command):
     操作実行時のログ出力はデフォルトで DEBUG レベルにし、
     外部からログレベルを柔軟に変更できるようにしています。
     """
-    def __init__(self, serial_manager: SerialManager, protocol: SerialProtocolInterface = None):
+    def __init__(self, serial_manager: SerialManager, capture_manager: CaptureManager, protocol: SerialProtocolInterface = None):
         self.serial_manager = serial_manager
+        self.capture_manager = capture_manager
         self.protocol = protocol if protocol is not None else CH552SerialProtocol()
 
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -81,10 +84,14 @@ class DefaultCommand(Command):
         message = sep.join(map(str, values)) + end.rstrip("\n")
         log_manager.log(level, message, component=get_caller_class_name())
 
-    def capture(self):
+    def capture(self)->cv2.typing.MatLike:
         self.log("Capturing screen...", level="DEBUG")
-        # capture 操作はハードウェア側に委譲
-        return None
+        capture_data = self.capture_manager.get_frame()
+        if capture_data is not None:
+            self.log("Capture successful", level="DEBUG")
+            return capture_data
+        else:
+            self.log("Capture failed", level="ERROR")
 
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard input: {text}", level="DEBUG")

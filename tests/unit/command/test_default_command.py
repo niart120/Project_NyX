@@ -29,6 +29,14 @@ class MockSerialManager:
     def send(self, data: bytes) -> None:
         self.sent_data.append(data)
 
+# モックのCaptureManager を定義
+class MockCaptureManager:
+    def __init__(self):
+        self.latest_frame = None
+
+    def get_frame(self):
+        return self.latest_frame
+
 # ダミーの Command 用モック（ただし DefaultCommand で利用するため、こちらは SerialManager と Protocol のモックを注入する）
 @pytest.fixture
 def dummy_command(monkeypatch):
@@ -37,14 +45,16 @@ def dummy_command(monkeypatch):
 
     mock_protocol = MockSerialProtocol()
     mock_serial_manager = MockSerialManager()
-    cmd = DefaultCommand(serial_manager=mock_serial_manager, protocol=mock_protocol)
+    mock_capture_manager = MockCaptureManager()
+
+    cmd = DefaultCommand(serial_manager=mock_serial_manager, capture_manager=mock_capture_manager, protocol=mock_protocol)
     # return cmd と共にモックも返して、検証に利用できるようにする
-    return cmd, mock_protocol, mock_serial_manager
+    return cmd, mock_protocol, mock_serial_manager, mock_capture_manager
 
 # 各テストケース
 
 def test_press_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
     # テスト対象: press() メソッド
     # Button.A と Button.B を同時に押下する（Button は IntEnum のため、直接利用）
     cmd.press(Button.A, Button.B, dur=0.2, wait=0.1)
@@ -68,7 +78,7 @@ def test_press_operation(dummy_command):
     assert mock_serial_manager.sent_data[1].startswith(b'release:')
 
 def test_hold_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
     # hold() は、build_press_command() を一度呼び出す設計
     cmd.hold(Button.X)
     assert mock_protocol.calls[0][0] == 'press'
@@ -77,7 +87,7 @@ def test_hold_operation(dummy_command):
     assert mock_serial_manager.sent_data[0].startswith(b'press:')
 
 def test_release_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
 
     # release() を呼び出す。ここでは特定のキーを指定
     cmd.release(Button.A)
@@ -88,7 +98,7 @@ def test_release_operation(dummy_command):
     
 
 def test_keyboard_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
     cmd.keyboard("Test")
     assert mock_protocol.calls[0][0] == 'keyboard'
     assert mock_protocol.calls[0][1] == "Test"
@@ -96,7 +106,7 @@ def test_keyboard_operation(dummy_command):
     assert mock_serial_manager.sent_data[0].startswith(b'keyboard:')
 
 def test_wait_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
     # wait() メソッドは単純に time.sleep を呼ぶが、monkeypatch により実際の待機はスキップされる
     start = time.time()
     cmd.wait(0.5)
@@ -105,7 +115,7 @@ def test_wait_operation(dummy_command):
     assert end - start < 0.1
 
 def test_capture_operation(dummy_command):
-    cmd, mock_protocol, mock_serial_manager = dummy_command
+    cmd, mock_protocol, mock_serial_manager, mock_capture_manager = dummy_command
     result = cmd.capture()
     # capture() の実装例では単に None を返すため、それを確認
     assert result is None
