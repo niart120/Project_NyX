@@ -1,6 +1,8 @@
 import cv2
+from cv2_enumerate_cameras import enumerate_cameras
 import threading
 import time
+import platform
 
 class AsyncCaptureDevice:
     """
@@ -55,11 +57,59 @@ class CaptureManager:
     def __init__(self):
         self.devices = {}
         self.active_device:AsyncCaptureDevice = None
+    
+    def auto_register_devices(self) -> None:
+        """
+        キャプチャデバイスを自動検出して登録します。
+        """
+        # アクティブなデバイスをリリース
+        self.release_active()
+        # OS に応じてデバイスを登録
+        # Windows, Linux では enumerate_cameras() を利用 / macOS では手動で登録する必要がある
+        os_name = platform.system()
+        match os_name:
+            case "Windows" | "Linux":
+                for camera_info in enumerate_cameras():
+                    name = f'{camera_info.index}: {camera_info.name}'
+                    device = AsyncCaptureDevice(device_index=camera_info.index)
+                    self.register_device(name, device)
+            case "Darwin":
+                # macOS の場合の処理を追加することも可能
+                # HACK: macOS の場合は enumerate_cameras() が動作しないため、手動で登録する必要がある
+                # デバイス番号を0から20までの範囲で決め打ちで登録する
+                log_level = cv2.getLogLevel()
+                cv2.setLogLevel(0)  # ログレベルを無効化
+                # 0から20までのカメラを登録する（実際には存在しない場合もある）
+                for i in range(20):
+                    cap = cv2.VideoCapture(i)
+                    if cap.isOpened():
+                        cap.release()
+                        name = f"macOS Camera {i}"
+                        device = AsyncCaptureDevice(device_index=i)
+                        self.register_device(name, device)
+                
+                cv2.setLogLevel(log_level)
+        
+            case _:
+                raise RuntimeError(f"Unsupported OS: {os_name}.")
+            
+    def list_devices(self) -> list[str]:
+        """
+        登録されているキャプチャデバイスの名前一覧を返します。
+        """
+        return list(self.devices.keys())
 
     def register_device(self, name: str, device: AsyncCaptureDevice) -> None:
         self.devices[name] = device
 
     def set_active(self, name: str) -> None:
+        """
+        指定されたデバイスをアクティブにします。
+        """
+        # アクティブなデバイスをリリース
+        self.release_active()
+
+        # デバイスが登録されているか確認
         if name not in self.devices:
             raise ValueError(f"CaptureManager: Device '{name}' not registered.")
         self.active_device = self.devices[name]

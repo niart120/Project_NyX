@@ -1,5 +1,4 @@
 import serial
-from serial import Serial
 from abc import ABC, abstractmethod
 
 class SerialCommInterface(ABC):
@@ -8,7 +7,7 @@ class SerialCommInterface(ABC):
     DefaultCommand などからこのインターフェース経由で操作する。
     """
     @abstractmethod
-    def open(self, port: str, baudrate: int) -> None:
+    def open(self, baudrate: int) -> None:
         pass
 
     @abstractmethod
@@ -24,11 +23,12 @@ class SerialComm(SerialCommInterface):
     """
     pyserial を利用したシリアル通信の実装例。
     """
-    def __init__(self):
-        self.ser: Serial = None
+    def __init__(self, port: str):
+        self.ser: serial.Serial = None
+        self.port: str = port
 
-    def open(self, port: str, baudrate: int = 9600) -> None:
-        self.ser = serial.Serial(port, baudrate, timeout=1)
+    def open(self, baudrate: int = 9600) -> None:
+        self.ser = serial.Serial(self.port, baudrate, timeout=1)
         if not self.ser.is_open:
             self.ser.open()
 
@@ -51,15 +51,41 @@ class SerialManager:
     def __init__(self):
         self.devices = {}
         self.active_device: SerialCommInterface = None
+    
+    def auto_register_devices(self) -> None:
+        """
+        接続されているシリアルポートを検出し、デフォルト設定のシリアルデバイスとして登録します。
+        """
+
+        # アクティブなデバイスをリリース
+        self.close_active()
+        ports = serial.tools.list_ports.comports()
+        for port in ports:
+            device = SerialComm(port=port.device)
+            self.register_device(port.device, device)
+    
+    def list_devices(self) -> list[str]:
+        """
+        登録されているデバイスのリストを返します。
+        """
+        return list(self.devices.keys())
 
     def register_device(self, name: str, device: SerialCommInterface) -> None:
         self.devices[name] = device
 
-    def set_active(self, name: str, port: str, baudrate: int = 9600) -> None:
+    def set_active(self, name: str, baudrate: int = 9600) -> None:
+        """
+        指定されたデバイスをアクティブにします。
+        """
+
+        # アクティブなデバイスをリリース
+        self.close_active()
+
+        # デバイスが登録されているか確認
         if name not in self.devices:
             raise ValueError(f"SerialManager: Device '{name}' not registered.")
         device = self.devices[name]
-        device.open(port, baudrate)
+        device.open(baudrate)
         self.active_device = device
 
     def send(self, data: bytes) -> None:
