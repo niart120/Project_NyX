@@ -4,6 +4,8 @@ import threading
 import time
 import platform
 
+from nyxpy.framework.core import api
+
 class AsyncCaptureDevice:
     """
     キャプチャデバイスの非同期スレッド実装。
@@ -68,8 +70,13 @@ class CaptureManager:
         # Windows, Linux では enumerate_cameras() を利用 / macOS では手動で登録する必要がある
         os_name = platform.system()
         match os_name:
-            case "Windows" | "Linux":
-                for camera_info in enumerate_cameras():
+            case "Windows":
+                for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW): #windowsの場合のバックエンドはDirectShow
+                    name = f'{camera_info.index}: {camera_info.name}'
+                    device = AsyncCaptureDevice(device_index=camera_info.index)
+                    self.register_device(name, device)
+            case "Linux":
+                for camera_info in enumerate_cameras(cv2.CAP_V4L2): #Linuxの場合のバックエンドはV4L2
                     name = f'{camera_info.index}: {camera_info.name}'
                     device = AsyncCaptureDevice(device_index=camera_info.index)
                     self.register_device(name, device)
