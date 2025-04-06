@@ -13,6 +13,7 @@ dependencies = [
     "pyserial (>=3.5,<4.0)",
     "pillow (>=11.1.0,<12.0.0)",
     "loguru (>=0.7.3,<0.8.0)",
+    "cv2-enumerate-cameras (>=1.1.18.3,<2.0.0.0)",
 ]
 
 [tool.poetry]

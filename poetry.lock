@@ -90,6 +90,22 @@ files = [
 toml = ["tomli ; python_full_version <= \"3.11.0a6\""]
 
 [[package]]
+name = "cv2-enumerate-cameras"
+version = "1.1.18.3"
+description = "Enumerate / List / Find / Detect / Search index for opencv VideoCapture."
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "cv2_enumerate_cameras-1.1.18.3-cp32-abi3-win_amd64.whl", hash = "sha256:e81611708c55f2b734b01c6c0b9afccd4b1f99613c7f9ffd6bb2421453b07bc6"},
+    {file = "cv2_enumerate_cameras-1.1.18.3-py3-none-any.whl", hash = "sha256:e3774d0d7b01058461a453eef8fd0203e5e9f1a035857eed18140a8abe0104df"},
+    {file = "cv2_enumerate_cameras-1.1.18.3.tar.gz", hash = "sha256:73784f13e9d31d406db95c3843f44e3b135e5c3c5c159ebf0aaeb342d84e7978"},
+]
+
+[package.extras]
+linuxpy = ["linuxpy ; platform_system == \"Linux\""]
+
+[[package]]
 name = "iniconfig"
 version = "2.1.0"
 description = "brain-dead simple config-ini parsing"
@@ -424,4 +440,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "840b8bc96708bdb728d8180a077a893a8d1409679330cabbf3360c6e1717dbe7"
+content-hash = "bd2d43de6002ac820a558ec7a646d20cb5e09e5ade9c459a81aa775c243bd108"
