@@ -80,8 +80,8 @@ def integration_setup(monkeypatch):
     # 内部のシリアルデバイスを FakeSerialComm に差し替える
     fake_serial = FakeSerialComm()
     serial_manager.register_device("fake", fake_serial)
-    # アクティブなシリアルデバイスとして設定（port 等はダミー）
-    serial_manager.set_active("fake", port="COM_FAKE", baudrate=9600)
+    # アクティブなシリアルデバイスとして設定
+    serial_manager.set_active("fake", baudrate=9600)
 
     # 内部のキャプチャデバイスを FakeAsyncCaptureDevice に差し替える
     fake_capture = FakeAsyncCaptureDevice()
