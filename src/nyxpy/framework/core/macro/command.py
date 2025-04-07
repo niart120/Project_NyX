@@ -1,8 +1,10 @@
 import time
+import pathlib
 from abc import ABC, abstractmethod
 import cv2
 
 from nyxpy.framework.core.hardware.capture import CaptureManager
+from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.constants import KeyType
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface, CH552SerialProtocol
@@ -81,6 +83,30 @@ class Command(ABC):
         pass
 
     @abstractmethod
+    def save_img(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
+        """
+        画像を指定されたパスに保存します。
+        ディレクトリが存在しない場合は作成します。
+
+        :param filename: 保存先のファイル名 （例: "image.png"）
+        :param image: 保存する画像データ
+        """
+        pass
+
+    @abstractmethod
+    def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
+        """
+        指定されたパスから画像を読み込みます。
+        画像が存在しない場合は例外をスローします。
+
+        :param filename: 読み込む画像のファイル名 （例: "image.png"）
+        :param grayscale: グレースケール変換を行うかどうかのフラグ (デフォルト:False)
+        :raises FileNotFoundError: 画像ファイルが見つからない場合
+        :raises ValueError: filename が空の場合
+        """
+        pass
+
+    @abstractmethod
     def keyboard(self, text: str) -> None:
         """
         指定されたテキストをキーボード入力として送信します。
@@ -98,9 +124,10 @@ class DefaultCommand(Command):
     操作実行時のログ出力はデフォルトで DEBUG レベルにし、
     外部からログレベルを柔軟に変更できるようにしています。
     """
-    def __init__(self, serial_manager: SerialManager, capture_manager: CaptureManager, protocol: SerialProtocolInterface = None):
+    def __init__(self, serial_manager: SerialManager, capture_manager: CaptureManager, resource_io: StaticResourceIO, protocol: SerialProtocolInterface = None, ) -> None:
         self.serial_manager = serial_manager
         self.capture_manager = capture_manager
+        self.resource_io = resource_io
         self.protocol = protocol if protocol is not None else CH552SerialProtocol()
 
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -158,6 +185,14 @@ class DefaultCommand(Command):
 
         self.log("Capture successful", level="DEBUG")
         return frame
+    
+    def save_img(self, filename, image)-> None:
+        self.log(f"Saving image to {filename}", level="DEBUG")
+        self.resource_io.save_image(filename, image)
+    
+    def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
+        self.log(f"Loading image from {filename}", level="DEBUG")
+        return self.resource_io.load_image(filename, grayscale=grayscale)
 
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard input: {text}", level="DEBUG")
