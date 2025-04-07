@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 
 # インポートはプロジェクトのパッケージ構成に合わせる
+from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.hardware.serial_comm import SerialManager, SerialCommInterface
@@ -41,6 +42,20 @@ class FakeAsyncCaptureDevice(AsyncCaptureDevice):
     def release(self) -> None:
         self._running = False
         # スレッドの join は不要
+
+# --- Fake リソースIO実装 ---
+class FakeResourceIO(StaticResourceIO):
+    """FakeResourceIO で、画像の読み書きは行わず、メモリ上で管理する"""
+    def __init__(self):
+        self.saved_images = {}
+
+    def save_image(self, filename: str, image) -> None:
+        # 画像を保存せず、メモリ上で管理
+        self.saved_images[filename] = image
+
+    def load_image(self, filename: str, grayscale: bool = False):
+        # 保存された画像を返す
+        return self.saved_images.get(filename, None)
 
 # --- ダミーマクロの実装 ---
 
@@ -88,10 +103,14 @@ def integration_setup(monkeypatch):
     capture_manager.register_device("fake", fake_capture)
     capture_manager.set_active("fake")
 
+    # FakeResourceIO を作成
+    resource_io = FakeResourceIO()
+
     # DefaultCommand のインスタンス作成（CH552SerialProtocol を使用）
     cmd = DefaultCommand(
         serial_manager=serial_manager,
         capture_manager=capture_manager,
+        resource_io=resource_io,
         protocol=CH552SerialProtocol()
     )
 

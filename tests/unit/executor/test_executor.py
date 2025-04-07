@@ -26,6 +26,13 @@ class MockCommand(Command):
     def capture(self):
         self.logs.append("capture")
         return None
+    
+    def save_img(self, filename, image):
+        self.logs.append(f"save_img: {filename}, image={image}")
+    
+    def load_img(self, filename, grayscale=False):
+        self.logs.append(f"load_img: {filename}, grayscale={grayscale}")
+        return None
 
     def keyboard(self, text):
         self.logs.append(f"keyboard: {text}")
