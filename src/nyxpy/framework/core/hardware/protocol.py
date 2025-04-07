@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Union
-from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
-
-# キー情報として許容する型
-KeyType = Union[Button, Hat, LStick, RStick]
+from typing import Tuple
+from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick, KeyType
 
 class SerialProtocolInterface(ABC):
     @abstractmethod

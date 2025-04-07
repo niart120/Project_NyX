@@ -1,5 +1,6 @@
 import math
 from enum import IntEnum
+from typing import Union
 
 class Button(IntEnum):
     Y = 0x0001
@@ -80,3 +81,6 @@ RStick.DOWNLEFT = RStick((5/8)*math.tau, 1.0)
 RStick.DOWN = RStick((6/8)*math.tau, 1.0)
 RStick.DOWNRIGHT = RStick((7/8)*math.tau, 1.0)
 RStick.CENTER = RStick(0.0, 0.0)
+
+# キーとして許容する型
+KeyType = Union[Button, Hat, LStick, RStick]

@@ -127,10 +127,10 @@ def test_dummy_macro_normal(integration_setup):
     # press() 内で press と release の2件、さらに keyboard() で1件、finalize() の release() で1件 -> 合計4件以上送信される
     assert len(sent) >= 4, "Expected at least 4 send calls from press, keyboard and release operations"
 
-    # キャプチャが成功しているか（FakeAsyncCaptureDevice が返す画像は 100x100 の黒画像）
+    # キャプチャが成功しているか（FakeAsyncCaptureDevice が返す画像は 100x100 の黒画像だが、リスケールが走ることを確認する）
     frame = dummy_macro.captured_frame
     assert frame is not None
-    assert frame.shape == (100, 100, 3)
+    assert frame.shape == (720, 1280, 3) #height=720, width=1280, channels=3
     # すべてのピクセルが 0 であることを確認
     assert np.all(frame == 0)
 
