@@ -9,7 +9,10 @@ from nyxpy.framework.core.macro.constants import KeyType
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface, CH552SerialProtocol
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
-from nyxpy.utils.helper import get_caller_class_name
+from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.framework.core.macro.decorators import check_interrupt
+from nyxpy.framework.core.utils.helper import get_caller_class_name
 
 class Command(ABC):
     """
@@ -57,6 +60,14 @@ class Command(ABC):
         :param wait: 待機時間（秒）
         """
         pass
+
+    @abstractmethod
+    def stop(self)-> None:
+        """
+        マクロの実行を中断します。
+        これは、ユーザーが中断要求を行った場合に使用されます。
+        """
+        pass  
 
     @abstractmethod
     def log(self, *values, sep: str = ' ', end: str = '\n', level: str = "DEBUG") -> None:
@@ -124,12 +135,19 @@ class DefaultCommand(Command):
     操作実行時のログ出力はデフォルトで DEBUG レベルにし、
     外部からログレベルを柔軟に変更できるようにしています。
     """
-    def __init__(self, serial_manager: SerialManager, capture_manager: CaptureManager, resource_io: StaticResourceIO, protocol: SerialProtocolInterface = None, ) -> None:
+    def __init__(self, 
+                 serial_manager: SerialManager, 
+                 capture_manager: CaptureManager, 
+                 resource_io: StaticResourceIO, 
+                 protocol: SerialProtocolInterface = None, 
+                 ct: CancellationToken = None) -> None:
         self.serial_manager = serial_manager
         self.capture_manager = capture_manager
         self.resource_io = resource_io
         self.protocol = protocol if protocol is not None else CH552SerialProtocol()
+        self.ct = ct if ct is not None else CancellationToken()
 
+    @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
         self.log(f"Pressing keys: {keys}", level="DEBUG")
         press_data = self.protocol.build_press_command(keys)
@@ -140,24 +158,33 @@ class DefaultCommand(Command):
         self.serial_manager.send(release_data)
         time.sleep(wait)
 
+    @check_interrupt
     def hold(self, *keys: KeyType) -> None:
         self.log(f"Holding keys: {keys}", level="DEBUG")
         hold_data = self.protocol.build_press_command(keys)
         self.serial_manager.send(hold_data)
 
+    @check_interrupt
     def release(self, *keys: KeyType) -> None:
         self.log(f"Releasing keys: {keys}", level="DEBUG")
         release_data = self.protocol.build_release_command(keys)
         self.serial_manager.send(release_data)
 
+    @check_interrupt
     def wait(self, wait: float) -> None:
         self.log(f"Waiting for {wait} seconds", level="DEBUG")
         time.sleep(wait)
+
+    def stop(self) -> None:
+        self.log("Stopping macro execution", level="INFO")
+        self.ct.request_stop()
+        raise MacroStopException("Macro execution interrupted.")
 
     def log(self, *values, sep: str = ' ', end: str = '\n', level: str = "INFO") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         log_manager.log(level, message, component=get_caller_class_name())
 
+    @check_interrupt
     def capture(self, crop_region:tuple[int, int, int, int] = None, grayscale: bool = False)->cv2.typing.MatLike:
         # キャプチャマネージャを使用してスクリーンキャプチャを取得
         self.log("Capturing screen...", level="DEBUG")
@@ -186,14 +213,17 @@ class DefaultCommand(Command):
         self.log("Capture successful", level="DEBUG")
         return frame
     
+    @check_interrupt
     def save_img(self, filename, image)-> None:
         self.log(f"Saving image to {filename}", level="DEBUG")
         self.resource_io.save_image(filename, image)
     
+    @check_interrupt
     def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
         self.log(f"Loading image from {filename}", level="DEBUG")
         return self.resource_io.load_image(filename, grayscale=grayscale)
 
+    @check_interrupt
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard input: {text}", level="DEBUG")
         kb_data = self.protocol.build_keyboard_command(text)

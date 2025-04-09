@@ -1,3 +1,4 @@
+import threading
 import time
 import pytest
 import numpy as np
@@ -11,6 +12,8 @@ from nyxpy.framework.core.hardware.capture import CaptureManager, AsyncCaptureDe
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.macro.constants import Button
 from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 # --- Fake デバイス実装 ---
 
@@ -76,6 +79,30 @@ class DummyMacro(MacroBase):
         cmd.release(Button.A)
         cmd.log("Finalizing DummyMacro", level="INFO")
 
+class LongRunningMacro(MacroBase):
+    """
+    LongRunningMacro は、複数回の操作ループを実行します。
+    途中で CancellationToken による中断要求があれば、check_cancellation のデコレータが例外を発生させます。
+    """
+    def __init__(self):
+        self.finalized = False
+
+    def initialize(self, cmd):
+        cmd.log("Initializing LongRunningMacro", level="INFO")
+    
+    def run(self, cmd):
+        # 例えば10回ループし、各ループで press を実行
+        for i in range(10):
+            cmd.log(f"Running iteration {i}", level="DEBUG")
+            # 各操作前にデコレータが中断チェックを実施する
+            cmd.press(Button.A, dur=0.1, wait=0.05)
+            # 短い休止（sleep は monkeypatch でスキップできるが、ここでは実際の呼び出しとして記録）
+            time.sleep(0.05)
+    
+    def finalize(self, cmd):
+        cmd.log("Finalizing LongRunningMacro", level="INFO")
+        self.finalized = True
+
 logs = []  # ログを記録するリスト
 # --- ダミーのログハンドラのセットアップ ---
 def dummy_handler(msg):
@@ -85,8 +112,9 @@ def dummy_handler(msg):
 
 @pytest.fixture
 def integration_setup(monkeypatch):
-    # monkeypatch で time.sleep をスキップ
-    monkeypatch.setattr(time, "sleep", lambda x: None)
+
+    # CancellationToken の作成
+    token = CancellationToken()
 
     # 実際の SerialManager と CaptureManager を作成
     serial_manager = SerialManager()
@@ -111,13 +139,14 @@ def integration_setup(monkeypatch):
         serial_manager=serial_manager,
         capture_manager=capture_manager,
         resource_io=resource_io,
-        protocol=CH552SerialProtocol()
+        protocol=CH552SerialProtocol(),
+        ct=token
     )
 
     # ログ出力のため、log_manager に独自のログハンドラを設定
     log_manager.add_handler(dummy_handler, level="DEBUG")
 
-    yield cmd, fake_serial, fake_capture
+    yield cmd, fake_serial, fake_capture, token
 
     # テスト後にログハンドラを元に戻す
     log_manager.remove_handler(dummy_handler)
@@ -128,12 +157,12 @@ def integration_setup(monkeypatch):
 
     # ログをクリア
     logs.clear()
-    
+
 
 # --- 統合テストケース ---
 
 def test_dummy_macro_normal(integration_setup):
-    cmd, fake_serial, fake_capture = integration_setup
+    cmd, fake_serial, fake_capture, token = integration_setup
 
     # DummyMacro のライフサイクルを実行
     dummy_macro = DummyMacro()
@@ -160,9 +189,9 @@ def test_dummy_macro_normal(integration_setup):
 
 def test_dummy_macro_exception_handling(integration_setup):
     """
-    DummyMacro の run() で例外が発生した場合でも、finalize() が必ず呼ばれるかを検証する。
+    DummyMacro の run() で例外が発生した場合でも、ハンドリングによってfinalize() を呼ぶことが出来るかを検証する。
     """
-    cmd, fake_serial, fake_capture = integration_setup
+    cmd, fake_serial, fake_capture, token = integration_setup
 
     class ExceptionMacro(MacroBase):
         def initialize(self, cmd):
@@ -186,3 +215,58 @@ def test_dummy_macro_exception_handling(integration_setup):
     # ログに "Finalizing ExceptionMacro" が含まれているか検証
     assert any("Initializing ExceptionMacro" in m for m in logs)
     assert any("Finalizing ExceptionMacro" in m for m in logs)
+
+def test_macro_cancellation(integration_setup):
+    """
+    LongRunningMacro の実行中に外部から CancellationToken.cancel() を呼び出し、
+    マクロ実行が中断されることを検証する。
+    最終的に finalize() が呼ばれることも確認する。
+    """
+    cmd, fake_serial, fake_capture, token  = integration_setup
+    macro = LongRunningMacro()
+
+    # 別スレッドで中断要求を発行する
+    def cancel_after_delay():
+        # 数回の操作後にキャンセル要求（ここでは 0.3秒後とする）
+        time.sleep(0.3)
+        cmd.log("Cancellation requested from external event", level="INFO")
+        token.request_stop()
+    
+    cancel_thread = threading.Thread(target=cancel_after_delay)
+    cancel_thread.start()
+    
+    # マクロ実行を MacroExecutor でラップする場合：
+    # ここでは直接呼び出しを行い、run() 中にキャンセル例外が発生することを検証する
+    with pytest.raises(MacroStopException):
+        macro.initialize(cmd)
+        macro.run(cmd)
+    # 例外が発生した後、必ず finalize() を呼び出す
+    macro.finalize(cmd)
+    cancel_thread.join()
+
+    # キャンセル要求のログが含まれているか検証
+    assert any("Cancellation requested from external event" in m for m in logs)
+    # 外部要求によってキャンセルされたことを確認
+    assert token.stop_requested() is True
+    # 最終的に macro.finalize() が実行されたか確認
+    assert macro.finalized is True
+    # ログに "Finalizing LongRunningMacro" が含まれているか検証
+    assert any("Finalizing LongRunningMacro" in m for m in logs)
+
+def test_no_cancellation(integration_setup):
+    """
+    CancellationToken がキャンセルされていない場合、LongRunningMacro が最後まで実行されることを検証する。
+    """
+    cmd, fake_serial, fake_capture, token  = integration_setup
+    macro = LongRunningMacro()
+    
+    # 確実にキャンセルされないように token を初期状態のまま保持
+    token.clear()  # 余計なキャンセルフラグが立っていないか確認
+    
+    # 実行中に例外は発生しないはず
+    macro.initialize(cmd)
+    macro.run(cmd)
+    macro.finalize(cmd)
+    
+    # 実行が最後まで完了し、finalize() が呼ばれたはず
+    assert macro.finalized is True
