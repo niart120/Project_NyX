@@ -1,5 +1,7 @@
 import importlib
 from typing import Type
+
+from nyxpy.framework.core.macro.exceptions import MacroStopException
 from .base import MacroBase
 from .command import Command
 
@@ -31,6 +33,8 @@ class MacroExecutor:
             self.macro.initialize(cmd)
             cmd.log("MacroExecutor: Running macro...")
             self.macro.run(cmd)
+        except MacroStopException as e:
+            cmd.log("MacroExecutor: Macro execution interrupted:", e)
         except Exception as e:
             cmd.log("MacroExecutor: Exception occurred:", e)
         finally:
