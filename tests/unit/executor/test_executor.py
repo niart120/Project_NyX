@@ -20,6 +20,9 @@ class MockCommand(Command):
     def wait(self, wait):
         self.logs.append(f"wait: {wait}")
 
+    def stop(self):
+        self.logs.append("stop")
+
     def log(self, *values, sep=" ", end="\n"):
         self.logs.append(" ".join(map(str, values)))
 
