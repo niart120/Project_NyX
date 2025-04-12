@@ -1,7 +1,54 @@
 import pytest
+import textwrap
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.macro.base import MacroBase
+
+# ダミーマクロの実装を書いた Python ファイル用文字列
+DUMMY_MACRO_SOURCE = textwrap.dedent("""
+    from nyxpy.framework.core.macro.base import MacroBase
+    from nyxpy.framework.core.macro.command import Command
+
+    class DummyTestMacro(MacroBase):
+        def initialize(self, cmd: Command) -> None:
+            pass
+        def run(self, cmd: Command) -> None:
+            pass
+        def finalize(self) -> None:
+            pass
+""")
+
+@pytest.fixture
+def temp_macros_dir(tmp_path, monkeypatch):
+    # 一時ディレクトリ内に "macros" ディレクトリを作成
+    macros_dir = tmp_path / "macros"
+    macros_dir.mkdir()
+    # ダミーマクロのファイル作成
+    dummy_file = macros_dir / "dummy_macro.py"
+    dummy_file.write_text(DUMMY_MACRO_SOURCE)
+    # カレントディレクトリとして一時ディレクトリを設定
+    monkeypatch.chdir(tmp_path)
+    # 一時ディレクトリをsyspathに追加
+    monkeypatch.syspath_prepend(tmp_path)
+    return macros_dir
+
+def test_load_all_macros(temp_macros_dir):
+    executor = MacroExecutor()
+    # ダミーマクロ "DummyTestMacro" が macros に読み込まれているかを検証
+    assert "DummyTestMacro" in executor.macros
+    # 読み込まれたインスタンスが MacroBase のサブクラスであることも確認
+    macro_instance = executor.macros["DummyTestMacro"]
+    assert isinstance(macro_instance, MacroBase)
+
+def test_select_macro(temp_macros_dir, monkeypatch):
+    executor = MacroExecutor()
+    # 正常ケース: 既存のマクロ名で選択できる
+    executor.select_macro("DummyTestMacro")
+    assert executor.macro.__class__.__name__ == "DummyTestMacro"
+    # 異常ケース: 存在しないマクロを指定した場合はValueErrorが発生することを確認
+    with pytest.raises(ValueError) as exc_info:
+        executor.select_macro("NonExistentMacro")
+    assert "Macro 'NonExistentMacro' not found" in str(exc_info.value)
 
 # テスト用のモッククラスを定義
 class MockCommand(Command):
@@ -66,12 +113,22 @@ class FailingMacro(MacroBase):
 def mock_command():
     return MockCommand()
 
-def test_macro_executor_lifecycle(mock_command):
+@pytest.fixture
+def executor_with_dummy():
+    # Create an executor and override its macros with our dummy implementations.
+    executor = MacroExecutor()
+    executor.macros = {
+        "MockMacro": MockMacro(),
+        "FailingMacro": FailingMacro()
+    }
+    return executor
+
+def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
     """
     MacroExecutor のライフサイクル (initialize -> run -> finalize) をテスト
     """
-    executor = MacroExecutor(macro_module="tests.unit.executor.test_executor", macro_class="MockMacro")
-    executor.execute(mock_command)
+    executor_with_dummy.select_macro("MockMacro")
+    executor_with_dummy.execute(mock_command)
 
     # ログを確認
     assert mock_command.logs == [
@@ -83,14 +140,12 @@ def test_macro_executor_lifecycle(mock_command):
         "MockMacro: finalize",
     ]
 
-def test_macro_executor_exception_handling(mock_command):
+def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
     """
     MacroExecutor が run 中に例外が発生した場合でも finalize が呼び出されることをテスト
     """
-    executor = MacroExecutor(macro_module="tests.unit.executor.test_executor", macro_class="FailingMacro")
-
-    # 例外をキャッチして、ログを確認
-    executor.execute(mock_command)
+    executor_with_dummy.select_macro("FailingMacro")
+    executor_with_dummy.execute(mock_command)
 
     # 例外発生時のログを確認
     assert mock_command.logs == [
