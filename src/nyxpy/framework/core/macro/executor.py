@@ -1,27 +1,62 @@
 import importlib
-from typing import Type
+import inspect
+from pathlib import Path
 
 from nyxpy.framework.core.macro.exceptions import MacroStopException
-from .base import MacroBase
-from .command import Command
+from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.command import Command
+from nyxpy.framework.core.logger.log_manager import log_manager
+
 
 class MacroExecutor:
     """
-    MacroExecutorは、指定されたユーザー作成マクロを動的に読み込み、
-    ハリウッドの原則に従ってライフサイクル（initialize -> run -> finalize）を実行します。
+    MacroExecutorは、カレントディレクトリ直下のmacrosディレクトリから
+    MacroBaseを継承した全てのマクロを読み込み、実行可能マクロのリストとして保持します。
+    
+    ・load_all_macros() で利用可能なマクロを読み込みます。
+    ・select_macro() によって実行対象のマクロをセットします。
+    ・execute() によって選択されたマクロのライフサイクル関数（initialize -> run -> finalize）を呼び出します。
     """
-    def __init__(self, macro_module: str, macro_class: str):
-        """
-        :param macro_module: ユーザーマクロのモジュールパス（例："macros.sample_macro"）
-        :param macro_class: そのモジュール内のマクロ実装クラス名（例："SampleMacro"）
-        """
-        self.macro = self.load_macro(macro_module, macro_class)
+    def __init__(self):
+        self.macros: dict[str, MacroBase] = {}
+        self.macro: MacroBase = None
+        self.load_all_macros()
 
-    def load_macro(self, module_name: str, class_name: str) -> MacroBase:
-        module = importlib.import_module(module_name)
-        macro_class: Type[MacroBase] = getattr(module, class_name)
-        instance = macro_class()
-        return instance
+    def load_all_macros(self) -> None:
+        """
+        カレントディレクトリ直下の 'macros' フォルダ内の全Pythonモジュールを読み込み、
+        MacroBaseを継承したクラスのインスタンスを self.macros に追加します。
+        """
+        macros_dir = Path.cwd() / "macros"
+        if not macros_dir.is_dir():
+            # macrosディレクトリがない場合は何もしない
+            return
+        for file in macros_dir.iterdir():
+            if file.suffix == ".py" and file.name != "__init__.py":
+                module_name = f"macros.{file.stem}"
+                try:
+                    module = importlib.import_module(module_name)
+                    for name, obj in inspect.getmembers(module, inspect.isclass):
+                        if issubclass(obj, MacroBase) and obj is not MacroBase:
+                            instance = obj()
+                            self.macros[obj.__name__] = instance
+                except Exception as e:
+                    # ログ出力等、例外発生時の処理をここに実装可能
+                    log_manager.log("ERROR", f"Error loading macro:{file.name}, {e}", component="MacroExecutor")
+                    pass
+
+    def select_macro(self, macro_name: str) -> None:
+        """
+        利用可能マクロの中から、macro_name で指定されたマクロを実行対象として選択する。
+        
+        :param macro_name: 実行対象のマクロクラス名
+        :raises ValueError: 指定されたマクロ名が見つからなかった場合
+        """
+        if macro_name in self.macros:
+            self.macro = self.macros[macro_name]
+        else:
+            raise ValueError(f"Macro '{macro_name}' not found. Available macros: {list(self.macros.keys())}")
+
 
     def execute(self, cmd: Command) -> None:
         """
