@@ -6,6 +6,7 @@ from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.utils.helper import load_macro_settings
 
 
 class MacroExecutor:
@@ -57,15 +58,18 @@ class MacroExecutor:
         else:
             raise ValueError(f"Macro '{macro_name}' not found. Available macros: {list(self.macros.keys())}")
 
-
-    def execute(self, cmd: Command) -> None:
+    def execute(self, cmd: Command, exec_args:dict={}) -> None:
         """
         マクロのライフサイクルに従い、順次処理を実行する。
         例外が発生した場合はログ出力し、最終的に finalize を必ず呼び出す。
         """
         try:
+            cmd.log("MacroExecutor: Loading macro settings...")
+            file_args = load_macro_settings(self.macro.__class__)
             cmd.log("MacroExecutor: Initializing macro...")
-            self.macro.initialize(cmd)
+            # 引数をマージする。exec_argsが優先される。
+            args = {**file_args, **exec_args}
+            self.macro.initialize(cmd, args)
             cmd.log("MacroExecutor: Running macro...")
             self.macro.run(cmd)
         except MacroStopException as e:
