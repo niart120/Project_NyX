@@ -30,14 +30,18 @@ def parse_define_args(defines: list[str]) -> dict:
     コマンドライン引数で渡された定義を解析して辞書に変換する関数
     key=value 形式の文字列を受け取り、tomlパーサに従う形で辞書に変換する。
     例えば、以下のような引数が渡された場合:
-    -D key1=value1 -D key2.key3=value2
+
+    `-D key1=value1 -D key2.key3=value2`
+
     これを辞書に変換すると:
+    ```
     {
         "key1": "value1",
         "key2": {
             "key3": "value2"
         }
     }
+    ```
     となる。
 
     """
