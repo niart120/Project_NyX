@@ -1,3 +1,4 @@
+from calendar import c
 import pathlib
 import time
 import sys
@@ -5,6 +6,7 @@ import argparse
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroStopException
@@ -19,18 +21,24 @@ def cli_main(args: argparse.Namespace) -> None:
     # Configure logging based on --silence or --verbose options.
     if args.silence:
         print("Running in silent mode; logging is disabled.")
+        log_manager.set_level("ERROR")  # Set log level to ERROR to suppress output
         # In an actual implementation, disable logger output.
     elif args.verbose:
         print("Verbose logging enabled.")
+        log_manager.set_level("DEBUG")
 
     # オプション値に基づいてハードウェアコンポーネントを作成する
 
     # args.capture を使用して CaptureManager を初期化、args.protocol を設定
-    serial_manager = SerialManager(args.serial)  
+    serial_manager = SerialManager()  
+    serial_manager.auto_register_devices()  # 自動登録を実行
+    serial_manager.set_active(args.serial)  # アクティブデバイスを設定
+    
     # キャプチャデバイスの管理を行う CaptureManager を初期化
     capture_manager = CaptureManager()
     capture_manager.auto_register_devices()  # 自動登録を実行
-    capture_manager.set_active_device(args.capture)  # アクティブデバイスを設定
+    print(capture_manager.list_devices())  # 登録されているデバイスのリストを表示
+    capture_manager.set_active(args.capture)  # アクティブデバイスを設定
 
     # args.protocol に基づいてプロトコルを選択
     protocol = None 
@@ -59,7 +67,7 @@ def cli_main(args: argparse.Namespace) -> None:
     try:
         executor.select_macro(args.macro_name)
     except ValueError as ve:
-        print(ve)
+        log_manager.log("ERROR", str(ve), component="MacroExecutor")
         sys.exit(1)
 
     # Process the macro execution arguments provided via -D
