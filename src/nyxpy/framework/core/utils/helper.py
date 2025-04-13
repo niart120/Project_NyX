@@ -1,7 +1,10 @@
 from email.utils import parsedate
 import inspect
 import tomllib
+<<<<<<< Updated upstream
 from pathlib import Path
+=======
+>>>>>>> Stashed changes
 
 def get_caller_class_name():
     """呼び出し元のクラス名を取得する関数"""
@@ -9,6 +12,7 @@ def get_caller_class_name():
     self_var = frame.f_locals.get("self")  # 呼び出し元のローカル変数 `self`
     return type(self_var).__name__ if self_var else None
 
+<<<<<<< Updated upstream
 def load_macro_settings(macro_cls) -> dict:
     """
     指定されたマクロクラスに対応する設定ファイルを読み込み、辞書型のオブジェクトとして返却します。
@@ -26,6 +30,8 @@ def load_macro_settings(macro_cls) -> dict:
 
     return file_params
 
+=======
+>>>>>>> Stashed changes
 def parse_define_args(defines: list[str]) -> dict:
     """ 
     コマンドライン引数で渡された定義を解析して辞書に変換する関数
