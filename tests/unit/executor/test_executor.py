@@ -88,7 +88,7 @@ class MockCommand(Command):
         self.logs.append(f"keyboard: {text}")
 
 class MockMacro(MacroBase):
-    def initialize(self, cmd: Command) -> None:
+    def initialize(self, cmd: Command, args:dict) -> None:
         cmd.log("MockMacro: initialize")
 
     def run(self, cmd: Command) -> None:
@@ -98,7 +98,7 @@ class MockMacro(MacroBase):
         cmd.log("MockMacro: finalize")
 
 class FailingMacro(MacroBase):
-    def initialize(self, cmd: Command) -> None:
+    def initialize(self, cmd: Command, args:dict) -> None:
         cmd.log("FailingMacro: initialize")
 
     def run(self, cmd: Command) -> None:
@@ -132,6 +132,7 @@ def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
 
     # ログを確認
     assert mock_command.logs == [
+        "MacroExecutor: Loading macro settings...",
         "MacroExecutor: Initializing macro...",
         "MockMacro: initialize",
         "MacroExecutor: Running macro...",
@@ -149,6 +150,7 @@ def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
 
     # 例外発生時のログを確認
     assert mock_command.logs == [
+        "MacroExecutor: Loading macro settings...",
         "MacroExecutor: Initializing macro...",
         "FailingMacro: initialize",
         "MacroExecutor: Running macro...",

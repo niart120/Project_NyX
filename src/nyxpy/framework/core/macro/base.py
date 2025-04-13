@@ -3,7 +3,7 @@ from .command import Command
 
 class MacroBase(ABC):
     @abstractmethod
-    def initialize(self, cmd: Command) -> None:
+    def initialize(self, cmd: Command, args: dict) -> None:
         """
         マクロ実行前の初期化処理を実装する。
         """
