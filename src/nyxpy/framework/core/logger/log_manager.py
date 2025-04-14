@@ -1,6 +1,6 @@
 from loguru import logger
 import sys
-from typing import Callable, Any, Dict
+from typing import Callable, Any
 
 class LogManager:
     def __init__(self):
@@ -12,7 +12,7 @@ class LogManager:
         self.file_handler_id = logger.add("logs/logfile.log", level="DEBUG", rotation="1 MB")
 
         # Custom handlers storage
-        self.custom_handlers: Dict[Callable[..., Any], int] = {}
+        self.custom_handlers: dict[Callable[..., Any], int] = {}
 
     def log(self, level: str, message: str, component: str = "") -> None:
         formatted = f"[{component}] {message}" if component else message

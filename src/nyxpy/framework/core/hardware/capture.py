@@ -4,8 +4,6 @@ import threading
 import time
 import platform
 
-from nyxpy.framework.core import api
-
 class AsyncCaptureDevice:
     """
     キャプチャデバイスの非同期スレッド実装。

@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
 from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick, KeyType
 
 class SerialProtocolInterface(ABC):
     @abstractmethod
-    def build_press_command(self, keys: Tuple[KeyType, ...]) -> bytes:
+    def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー押下操作のコマンドデータを生成する"""
         pass
 
     @abstractmethod
-    def build_release_command(self, keys: Tuple[KeyType, ...]) -> bytes:
+    def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー解放操作のコマンドデータを生成する"""
         pass
 
@@ -49,7 +48,7 @@ class CH552SerialProtocol(SerialProtocolInterface):
             0x00        # key2
         ])
 
-    def build_press_command(self, keys: Tuple[KeyType, ...]) -> bytes:
+    def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
@@ -68,7 +67,7 @@ class CH552SerialProtocol(SerialProtocolInterface):
         # 生成された状態をそのままコマンドデータとして返す
         return bytes(self.key_state)
 
-    def build_release_command(self, keys: Tuple[KeyType, ...]) -> bytes:
+    def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
         # キーが指定されなければ、全体を初期状態にリセット
         if not keys:
             self._initialize_key_state()
