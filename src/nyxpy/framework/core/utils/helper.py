@@ -24,3 +24,31 @@ def load_macro_settings(macro_cls) -> dict:
         file_params = tomllib.load(settings_file)
 
     return file_params
+
+def parse_define_args(defines: list[str]) -> dict:
+    """ 
+    コマンドライン引数で渡された定義を解析して辞書に変換する関数
+    key=value 形式の文字列を受け取り、tomlパーサに従う形で辞書に変換する。
+    例えば、以下のような引数が渡された場合:
+
+    `-D key1=value1 -D key2.key3=value2`
+
+    これを辞書に変換すると:
+    ```
+    {
+        "key1": "value1",
+        "key2": {
+            "key3": "value2"
+        }
+    }
+    ```
+    となる。
+
+    """
+    
+    toml_str = "\n".join(defines)  # 引数を改行で結合
+    toml_str = toml_str.replace("=", " = ")  # 等号の前後にスペースを追加
+    exec_args = tomllib.loads(toml_str)  # toml形式で解析
+    
+    # 変換された辞書を返す
+    return exec_args
