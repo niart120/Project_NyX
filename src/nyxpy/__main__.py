@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from nyxpy.cli.main import cli_main  # Import the CLI main function from the cli module
+from nyxpy.cli.main import cli_main
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
