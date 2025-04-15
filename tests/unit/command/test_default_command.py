@@ -1,7 +1,8 @@
+from encodings.punycode import T
 import time
 import pytest
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.macro.constants import Button
+from nyxpy.framework.core.macro.constants import Button, KeyboardOp
 
 # Mock for HardwareFacade
 class MockHardwareFacade:
@@ -40,9 +41,9 @@ class MockProtocol:
         self.calls.append(('release', keys))
         return b'release:' + b'-'.join(str(k).encode() for k in keys)
 
-    def build_keyboard_command(self, text):
-        self.calls.append(('keyboard', text))
-        return b'keyboard:' + text.encode()
+    def build_keyboard_command(self, key: str, op: KeyboardOp):
+        self.calls.append(('keyboard', key, op))
+        return f"keyboard:{key}:{op.name}".encode()
 
 # Mock for CancellationToken
 class MockCancellationToken:
@@ -104,10 +105,91 @@ def test_stop(dummy_command):
     assert ct.stopped
 
 def test_keyboard(dummy_command):
-    cmd, hardware_facade, resource_io, protocol, ct = dummy_command
+    cmd, hardware_facade, _, protocol, _ = dummy_command
     cmd.keyboard("Hello")
+    
+    # 各文字ごとに押下→解放のシーケンスが実行されることを確認
+    assert len(protocol.calls) == 11  # "Hello"の5文字 × 2 (押下・解放) + 1 (ALL_RELEASE)
+    
+    # 最初の文字 'H' の押下
     assert protocol.calls[0][0] == 'keyboard'
-    assert hardware_facade.sent_data[0].startswith(b'keyboard:')
+    assert protocol.calls[0][1] == 'H'
+    assert protocol.calls[0][2] == KeyboardOp.PRESS
+    
+    # 最初の文字 'H' の解放
+    assert protocol.calls[1][0] == 'keyboard'
+    assert protocol.calls[1][1] == 'H'
+    assert protocol.calls[1][2] == KeyboardOp.RELEASE
+    
+    # 最後の文字 'o' の解放
+    assert protocol.calls[9][0] == 'keyboard'
+    assert protocol.calls[9][1] == 'o'
+    assert protocol.calls[9][2] == KeyboardOp.RELEASE
+    
+    # 最後の ALL_RELEASE コマンド
+    assert protocol.calls[10][0] == 'keyboard'
+    assert protocol.calls[10][1] == ''
+    assert protocol.calls[10][2] == KeyboardOp.ALL_RELEASE
+    
+    # 送信されたデータが正しいか確認
+    assert hardware_facade.sent_data[0].decode().startswith('keyboard:H:PRESS')
+
+def test_keyboard_empty_string(dummy_command):
+    """空文字列の場合、validate_keyboard_text が ValueErrorを発生させるはず"""
+    cmd, _, _, protocol, _ = dummy_command
+    
+    # 空文字列を渡すと例外が発生することを確認
+    with pytest.raises(ValueError, match="Input text is empty"):
+        cmd.keyboard("")
+        
+    # 呼び出しが行われていないことを確認
+    assert len(protocol.calls) == 0
+
+def test_keyboard_validation_called(dummy_command):
+    """validate_keyboard_text の動作確認（有効な入力文字）"""
+    cmd, _, _, protocol, _ = dummy_command
+    
+    # 通常のASCII文字が正しく処理されることを確認
+    cmd.keyboard("test123")
+    
+    # 各文字が適切に処理されていることを確認
+    assert len(protocol.calls) == 15  # 7文字 × 2 + ALL_RELEASE
+    
+    # 最初の文字 't' の押下
+    assert protocol.calls[0][0] == 'keyboard'
+    assert protocol.calls[0][1] == 't'
+    assert protocol.calls[0][2] == KeyboardOp.PRESS
+    
+    # 数字も正しく処理されていることを確認
+    assert protocol.calls[8][0] == 'keyboard'
+    assert protocol.calls[8][1] == '1'
+    assert protocol.calls[8][2] == KeyboardOp.PRESS
+
+    assert protocol.calls[12][0] == 'keyboard'
+    assert protocol.calls[12][1] == '3'
+    assert protocol.calls[12][2] == KeyboardOp.PRESS
+
+def test_keyboard_special_chars(dummy_command, monkeypatch):
+    """特殊文字の処理が正しく行われるか確認"""
+    cmd, _, _, protocol, _ = dummy_command
+    
+    # 特殊文字を含むテキストを送信
+    cmd.keyboard("\n\t")
+    
+    # 各文字ごとに適切なコマンドが呼ばれていることを確認
+    assert protocol.calls[0][1] == "\n"
+    assert protocol.calls[2][1] == "\t"
+
+def test_keyboard_invalid_character(dummy_command):
+    """無効な文字（制御文字など）を含む場合はエラーが発生することを確認"""
+    cmd, _, _, protocol, _ = dummy_command
+    
+    # 無効な文字（ここでは制御文字(ビープ)）を含むテキストでエラーになることを確認
+    with pytest.raises(ValueError, match="Unsupported character"):
+        cmd.keyboard("test\x07")
+        
+    # 最初のバリデーションチェックで止まるためプロトコル呼び出しは起こらない
+    assert len(protocol.calls) == 0
 
 def test_save_img_and_load_img(dummy_command):
     cmd, _, resource_io, _, _ = dummy_command

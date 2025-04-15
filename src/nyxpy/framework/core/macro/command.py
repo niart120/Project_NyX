@@ -5,13 +5,13 @@ import cv2
 
 from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.macro.constants import KeyType
+from nyxpy.framework.core.macro.constants import KeyType, KeyboardOp
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.decorators import check_interrupt
-from nyxpy.framework.core.utils.helper import get_caller_class_name
+from nyxpy.framework.core.utils.helper import get_caller_class_name, validate_keyboard_text
 
 class Command(ABC):
     """
@@ -119,7 +119,7 @@ class Command(ABC):
     @abstractmethod
     def keyboard(self, text: str) -> None:
         """
-        指定されたテキストをキーボード入力として送信します。
+        指定されたテキスト(英数字)をキーボード入力として送信します。
 
         :param text: 送信するテキスト
         """
@@ -149,11 +149,11 @@ class DefaultCommand(Command):
         self.log(f"Pressing keys: {keys}", level="DEBUG")
         press_data = self.protocol.build_press_command(keys)
         self.hardware_facade.send(press_data)
-        time.sleep(dur)
+        self.wait(dur)
         self.log(f"Releasing keys: {keys}", level="DEBUG")
         release_data = self.protocol.build_release_command(keys)
         self.hardware_facade.send(release_data)
-        time.sleep(wait)
+        self.wait(wait)
 
     @check_interrupt
     def hold(self, *keys: KeyType) -> None:
@@ -223,5 +223,16 @@ class DefaultCommand(Command):
     @check_interrupt
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard input: {text}", level="DEBUG")
-        kb_data = self.protocol.build_keyboard_command(text)
-        self.hardware_facade.send(kb_data)
+        text = validate_keyboard_text(text)
+        for char in text:
+            # 押下
+            kb_press = self.protocol.build_keyboard_command(char, KeyboardOp.PRESS)
+            self.hardware_facade.send(kb_press)
+            self.wait(0.02)  # 必要に応じて調整
+            # 解放
+            kb_release = self.protocol.build_keyboard_command(char, KeyboardOp.RELEASE)
+            self.hardware_facade.send(kb_release)
+            self.wait(0.01)  # 必要に応じて調整
+        # すべてのキーをリリース（念のため）
+        kb_all_release = self.protocol.build_keyboard_command("", KeyboardOp.ALL_RELEASE)
+        self.hardware_facade.send(kb_all_release)

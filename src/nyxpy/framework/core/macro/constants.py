@@ -84,3 +84,13 @@ RStick.CENTER = RStick(0.0, 0.0)
 
 # キーとして許容する型
 KeyType = Union[Button, Hat, LStick, RStick]
+
+# キーボード操作の種類を定義する列挙型
+class KeyboardOp(IntEnum):
+    PRESS = 1
+    RELEASE = 2
+    SPECIAL_PRESS = 3
+    SPECIAL_RELEASE = 4
+    ALL_RELEASE = 5
+    PUSH = 6 # UNUSED
+    SPECIAL_PUSH = 7 # UNUSED

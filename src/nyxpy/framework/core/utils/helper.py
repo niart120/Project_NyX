@@ -52,3 +52,31 @@ def parse_define_args(defines: list[str]) -> dict:
     
     # 変換された辞書を返す
     return exec_args
+
+def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
+    """
+    指定されたテキストがキーボード入力として有効かどうかを検証します。
+    有効な文字は、ASCIIの印刷可能な文字（0x20から0x7F）です。
+    特殊キーコードを許可する場合は、allow_specialをTrueに設定します。
+
+    :param text: 検証するテキスト
+    :param allow_special: 特殊キーコードを許可するかどうかのフラグ
+    :return: 検証されたテキスト
+    :raises ValueError: 無効な文字が含まれている場合
+    """
+
+    # 入力が空でないことを確認
+    if not text:
+        raise ValueError("Input text is empty.")
+
+    # ASCIIの印刷可能な文字を定義
+    valid_ascii = set(chr(i) for i in range(0x20, 0x7F))  # printable ASCII
+    if allow_special:
+        # 例: 特殊キーコードを追加
+        valid_ascii.update(['\n', '\t'])  # 必要に応じて
+
+    for c in text:
+        if c not in valid_ascii:
+            raise ValueError(f"Unsupported character for keyboard input: {repr(c)}")
+
+    return text
