@@ -1,8 +1,34 @@
+from typing import override
 import cv2
 from cv2_enumerate_cameras import enumerate_cameras
+from abc import ABC, abstractmethod
 import threading
 import time
 import platform
+
+import numpy as np
+
+class CaptureDeviceInterface(ABC):
+    @abstractmethod
+    def initialize(self) -> None:
+        """
+        デバイスの初期化を行う
+        """
+        pass
+
+    @abstractmethod
+    def get_frame(self)-> cv2.typing.MatLike:
+        """
+        最新のフレームを取得する
+        """
+        pass
+
+    @abstractmethod
+    def release(self) -> None:
+        """
+        デバイスの解放を行う
+        """
+        pass
 
 class AsyncCaptureDevice:
     """
@@ -34,11 +60,13 @@ class AsyncCaptureDevice:
                     self.latest_frame = frame
             time.sleep(self.interval)
 
-    def get_latest_frame(self)->cv2.typing.MatLike:
+    def get_frame(self)-> cv2.typing.MatLike:
         """
         キャッシュされた最新のフレームを取得します。
         """
         with self._lock:
+            if self.latest_frame is None:
+                raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
             return self.latest_frame
 
     def release(self) -> None:
@@ -48,6 +76,40 @@ class AsyncCaptureDevice:
         if self.cap:
             self.cap.release()
             self.cap = None
+
+class DummyCaptureDevice(CaptureDeviceInterface):
+    """
+    キャプチャデバイスのダミー実装。
+    実際のデバイスがない場合に使用される。
+    何もせず、常に黒画面を返す。
+    """
+
+    def __init__(self):
+        # DummyCaptureDevice の初期化を行う
+        # 返却用の黒画面(1280x720)を生成
+        self._frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    @override
+    def initialize(self) -> None:
+        """
+        ダミーキャプチャデバイスの初期化を行う。
+        """
+        pass
+    
+    @override
+    def get_frame(self) -> cv2.typing.MatLike:
+        """
+        ダミーキャプチャデバイスからフレームを取得する。
+        """
+        return self._frame
+
+    @override
+    def release(self) -> None:
+        """
+        ダミーキャプチャデバイスのリソースを解放する。
+        """
+        pass
+
 
 class CaptureManager:
     """
@@ -104,7 +166,7 @@ class CaptureManager:
         """
         return list(self.devices.keys())
 
-    def register_device(self, name: str, device: AsyncCaptureDevice) -> None:
+    def register_device(self, name: str, device: CaptureDeviceInterface) -> None:
         self.devices[name] = device
 
     def set_active(self, name: str) -> None:
@@ -120,13 +182,15 @@ class CaptureManager:
         self.active_device = self.devices[name]
         self.active_device.initialize()
 
-    def get_frame(self)->cv2.typing.MatLike:
+    def get_active_device(self):
+        """
+        現在アクティブなキャプチャデバイスを返します。
+        実際のフレーム取得は、このデバイスのメソッド（例: get_frame()）に委ねます。
+        もしアクティブなデバイスが存在しない場合は、RuntimeError を発生させます。
+        """
         if self.active_device is None:
             raise RuntimeError("CaptureManager: No active capture device.")
-        frame = self.active_device.get_latest_frame()
-        if frame is None:
-            raise RuntimeError("CaptureManager: No frame available yet.")
-        return frame
+        return self.active_device
 
     def release_active(self) -> None:
         if self.active_device:
