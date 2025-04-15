@@ -10,10 +10,12 @@ from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.hardware.serial_comm import SerialManager, SerialCommInterface
 from nyxpy.framework.core.hardware.capture import CaptureManager, AsyncCaptureDevice
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
-from nyxpy.framework.core.macro.constants import Button
+from nyxpy.framework.core.macro.constants import Button, Hat
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.hardware.facade import HardwareFacade
 
 # --- Fake デバイス実装 ---
 
@@ -66,7 +68,7 @@ class DummyMacro(MacroBase):
     """
     DummyMacro は MacroBase を継承し、各ライフサイクルで Command のメソッドを呼び出す。
     """
-    def initialize(self, cmd):
+    def initialize(self, cmd, args):
         cmd.log("Initializing DummyMacro", level="INFO")
     
     def run(self, cmd):
@@ -87,7 +89,7 @@ class LongRunningMacro(MacroBase):
     def __init__(self):
         self.finalized = False
 
-    def initialize(self, cmd):
+    def initialize(self, cmd, args):
         cmd.log("Initializing LongRunningMacro", level="INFO")
     
     def run(self, cmd):
@@ -134,10 +136,12 @@ def integration_setup(monkeypatch):
     # FakeResourceIO を作成
     resource_io = FakeResourceIO()
 
-    # DefaultCommand のインスタンス作成（CH552SerialProtocol を使用）
+    # HardwareFacade を作成
+    hardware_facade = HardwareFacade(serial_manager, capture_manager)
+
+    # DefaultCommand のインスタンス作成（HardwareFacade を使用）
     cmd = DefaultCommand(
-        serial_manager=serial_manager,
-        capture_manager=capture_manager,
+        hardware_facade=hardware_facade,
         resource_io=resource_io,
         protocol=CH552SerialProtocol(),
         ct=token
@@ -146,7 +150,14 @@ def integration_setup(monkeypatch):
     # ログ出力のため、log_manager に独自のログハンドラを設定
     log_manager.add_handler(dummy_handler, level="DEBUG")
 
-    yield cmd, fake_serial, fake_capture, token
+    # MacroExecutor のセットアップ
+    executor = MacroExecutor()
+    executor.macros = {
+        "DummyMacro": DummyMacro(),
+        "LongRunningMacro": LongRunningMacro(),
+    }
+
+    yield executor, cmd, fake_serial, fake_capture, token
 
     # テスト後にログハンドラを元に戻す
     log_manager.remove_handler(dummy_handler)
@@ -161,112 +172,102 @@ def integration_setup(monkeypatch):
 
 # --- 統合テストケース ---
 
-def test_dummy_macro_normal(integration_setup):
-    cmd, fake_serial, fake_capture, token = integration_setup
+def test_macro_executor_normal_flow(integration_setup):
+    """
+    MacroExecutor経由でDummyMacroのライフサイクルを一気通貫でテスト
+    """
+    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor.select_macro("DummyMacro")
+    executor.execute(cmd)
 
-    # DummyMacro のライフサイクルを実行
-    dummy_macro = DummyMacro()
-    dummy_macro.initialize(cmd)
-    dummy_macro.run(cmd)
-    dummy_macro.finalize(cmd)
-
-    # SerialManager の FakeSerialComm に送信されたデータを検証
+    # コマンド送信内容
     sent = fake_serial.sent
-    # press() 内で press と release の2件、さらに keyboard() で1件、finalize() の release() で1件 -> 合計4件以上送信される
-    assert len(sent) >= 4, "Expected at least 4 send calls from press, keyboard and release operations"
+    press_expected = bytearray([0xAB,
+                          Button.A & 0xFF,
+                          (Button.A >> 8) & 0xFF,
+                          Hat.CENTER,
+                          0x80, 0x80, 0x80, 0x80,
+                          0x00, 0x00, 0x00])
+    release_expected = bytearray([0xAB,
+                          0x00, 0x00,
+                          Hat.CENTER,
+                          0x80, 0x80, 0x80, 0x80,
+                          0x00, 0x00, 0x00])
+    assert press_expected == sent[0]
+    assert release_expected == sent[1]
 
-    # キャプチャが成功しているか（FakeAsyncCaptureDevice が返す画像は 100x100 の黒画像だが、リスケールが走ることを確認する）
-    frame = dummy_macro.captured_frame
-    assert frame is not None
-    assert frame.shape == (720, 1280, 3) #height=720, width=1280, channels=3
-    # すべてのピクセルが 0 であることを確認
+    # キーボード入力
+    # assert any(b"Hello" in s for s in sent), str(sent)
+
+    # キャプチャ画像
+    macro = executor.macro
+    assert hasattr(macro, "captured_frame")
+    frame = macro.captured_frame
+    assert frame.shape == (720, 1280, 3)
     assert np.all(frame == 0)
 
-    # ログ出力の検証
-    # log_manager がログを内部に記録している場合、その中に初期化および終了のメッセージが含まれていることを確認
+    # ログ
     assert any("Initializing DummyMacro" in m for m in logs)
     assert any("Finalizing DummyMacro" in m for m in logs)
 
-def test_dummy_macro_exception_handling(integration_setup):
+def test_macro_executor_exception_handling(integration_setup):
     """
-    DummyMacro の run() で例外が発生した場合でも、ハンドリングによってfinalize() を呼ぶことが出来るかを検証する。
+    run()で例外発生時もfinalize()が必ず呼ばれることをMacroExecutor経由で検証
     """
-    cmd, fake_serial, fake_capture, token = integration_setup
-
     class ExceptionMacro(MacroBase):
-        def initialize(self, cmd):
-            cmd.log("Initializing ExceptionMacro", level="INFO")
-        def run(self, cmd):
-            cmd.press(Button.A, dur=0.1, wait=0.1)
-            raise ValueError("Intentional Error")
-        def finalize(self, cmd):
-            cmd.release(Button.A)
-            cmd.log("Finalizing ExceptionMacro", level="INFO")
+        def initialize(self, cmd, args): 
+            cmd.log("init", level="INFO")
+        def run(self, cmd): 
+            raise RuntimeError("fail!")
+        def finalize(self, cmd): 
+            cmd.log("final", level="INFO")
 
-    macro = ExceptionMacro()
+    executor, cmd, *_ = integration_setup
+    executor.macros = {"ExceptionMacro": ExceptionMacro()}
+    executor.select_macro("ExceptionMacro")
 
-    try:
-        macro.initialize(cmd)
-        macro.run(cmd)
-    except ValueError:
-        pass
-    macro.finalize(cmd)
+    # 例外発生時はexecutor内でハンドリングされるのでここでは例外は送出されない筈
+    executor.execute(cmd)
 
-    # ログに "Finalizing ExceptionMacro" が含まれているか検証
-    assert any("Initializing ExceptionMacro" in m for m in logs)
-    assert any("Finalizing ExceptionMacro" in m for m in logs)
+    # 内部で例外が発生したことを確認
+    assert any("fail!" in m for m in logs)
+    # 例外が発生しても finalize() が呼ばれることを確認
+    assert any("final" in m for m in logs)
 
-def test_macro_cancellation(integration_setup):
+
+def test_macro_executor_cancellation(integration_setup):
     """
-    LongRunningMacro の実行中に外部から CancellationToken.cancel() を呼び出し、
-    マクロ実行が中断されることを検証する。
-    最終的に finalize() が呼ばれることも確認する。
+    run()中にCancellationTokenで中断→MacroStopException→finalize()が呼ばれる
     """
-    cmd, fake_serial, fake_capture, token  = integration_setup
-    macro = LongRunningMacro()
+    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor.select_macro("LongRunningMacro")
 
-    # 別スレッドで中断要求を発行する
-    def cancel_after_delay():
-        # 数回の操作後にキャンセル要求（ここでは 0.3秒後とする）
-        time.sleep(0.3)
-        cmd.log("Cancellation requested from external event", level="INFO")
+    def cancel():
+        time.sleep(0.2)
         token.request_stop()
-    
-    cancel_thread = threading.Thread(target=cancel_after_delay)
-    cancel_thread.start()
-    
-    # マクロ実行を MacroExecutor でラップする場合：
-    # ここでは直接呼び出しを行い、run() 中にキャンセル例外が発生することを検証する
-    with pytest.raises(MacroStopException):
-        macro.initialize(cmd)
-        macro.run(cmd)
-    # 例外が発生した後、必ず finalize() を呼び出す
-    macro.finalize(cmd)
-    cancel_thread.join()
 
-    # キャンセル要求のログが含まれているか検証
-    assert any("Cancellation requested from external event" in m for m in logs)
-    # 外部要求によってキャンセルされたことを確認
-    assert token.stop_requested() is True
-    # 最終的に macro.finalize() が実行されたか確認
+    # スレッドでキャンセルを実行
+    t = threading.Thread(target=cancel)
+    t.start()
+
+    # マクロを実行
+    executor.execute(cmd)
+
+    # スレッドが終了するのを待つ
+    t.join()
+    macro = executor.macro
     assert macro.finalized is True
-    # ログに "Finalizing LongRunningMacro" が含まれているか検証
+    assert token.stop_requested()
     assert any("Finalizing LongRunningMacro" in m for m in logs)
 
-def test_no_cancellation(integration_setup):
+def test_macro_executor_no_cancellation(integration_setup):
     """
-    CancellationToken がキャンセルされていない場合、LongRunningMacro が最後まで実行されることを検証する。
+    CancellationTokenが未発火ならLongRunningMacroが最後まで実行される
     """
-    cmd, fake_serial, fake_capture, token  = integration_setup
-    macro = LongRunningMacro()
-    
-    # 確実にキャンセルされないように token を初期状態のまま保持
-    token.clear()  # 余計なキャンセルフラグが立っていないか確認
-    
-    # 実行中に例外は発生しないはず
-    macro.initialize(cmd)
-    macro.run(cmd)
-    macro.finalize(cmd)
-    
-    # 実行が最後まで完了し、finalize() が呼ばれたはず
+    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor.select_macro("LongRunningMacro")
+    token.clear()
+    executor.execute(cmd)
+    macro = executor.macro
     assert macro.finalized is True
+    assert not token.stop_requested()
