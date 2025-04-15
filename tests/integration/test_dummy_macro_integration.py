@@ -197,7 +197,10 @@ def test_macro_executor_normal_flow(integration_setup):
     assert release_expected == sent[1]
 
     # キーボード入力
-    # assert any(b"Hello" in s for s in sent), str(sent)
+    keyboard_data = sent[2]
+    assert keyboard_data[8] == 1  # kbdheader = 1 (PRESS)
+    assert keyboard_data[9] == ord("H")  # 'H' の ASCII コード
+    assert keyboard_data[10] == 0x00  # centinel は常に0
 
     # キャプチャ画像
     macro = executor.macro
