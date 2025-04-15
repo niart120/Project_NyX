@@ -43,6 +43,23 @@ class SerialComm(SerialCommInterface):
             self.ser.close()
             self.ser = None
 
+class DummySerialComm(SerialCommInterface):
+    """
+    ダミーのシリアル通信クラス。
+    実際の通信は行わない。
+    """
+
+    def __init__(self, port: str):
+        self.port = port
+
+    def open(self, baudrate: int) -> None:
+        pass
+
+    def send(self, data: bytes) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
 
 class SerialManager:
     """
@@ -89,10 +106,14 @@ class SerialManager:
         device.open(baudrate)
         self.active_device = device
 
-    def send(self, data: bytes) -> None:
+    def get_active_device(self) -> SerialCommInterface:
+        """
+        現在アクティブなシリアルデバイス（ドライバ）を返します。
+        送受信などの実際の操作は、このドライバのメソッドに委ねます。
+        """
         if self.active_device is None:
             raise RuntimeError("SerialManager: No active serial device.")
-        self.active_device.send(data)
+        return self.active_device
 
     def close_active(self) -> None:
         if self.active_device:

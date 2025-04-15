@@ -18,9 +18,9 @@ def test_continuous_frame_update():
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
     time.sleep(0.5)  # 初期化後、少し待機してフレームが取得できるようにする
-    initial_frame = capture_device.get_latest_frame()
+    initial_frame = capture_device.get_frame()
     time.sleep(0.5)  # 数秒待機してフレームが更新されるのを確認
-    updated_frame = capture_device.get_latest_frame()
+    updated_frame = capture_device.get_frame()
     capture_device.release()
     
     # フレーム更新が確認できる場合、変更されているかを比較（内容が同一でも問題なければログ出力などで確認）
@@ -44,7 +44,7 @@ def test_multithreaded_get_latest_frame():
     time.sleep(1.0)
     frames = []
     def worker():
-        frames.append(capture_device.get_latest_frame())
+        frames.append(capture_device.get_frame())
     
     threads = [threading.Thread(target=worker) for _ in range(5)]
     for t in threads:
