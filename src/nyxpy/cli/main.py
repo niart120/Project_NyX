@@ -9,6 +9,7 @@ from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.utils.helper import parse_define_args
 
 def cli_main(args: argparse.Namespace) -> None:
@@ -43,7 +44,6 @@ def cli_main(args: argparse.Namespace) -> None:
     protocol = None 
     match args.protocol.upper():
         case "CH552Serial" | "CH552":
-            from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
             protocol = CH552SerialProtocol()  # CH552プロトコルのインスタンスを作成
             
         case _:
