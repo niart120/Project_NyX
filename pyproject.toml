@@ -23,6 +23,10 @@ packages = [
     { include = "nyxpy", from = "src" }
 ]
 
+[tool.poetry.scripts]
+nyx-cli = "nyxpy.cli.run_cli:main"
+nyx-gui = "nyxpy.gui.run_gui:main"
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 pytest-cov = "^6.1.0"
