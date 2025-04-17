@@ -37,6 +37,9 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
+      
+      - name: 必要なライブラリのインストール
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1 libxi6 libgconf-2-4 libnss3 libxss1 libasound2 libgtk-3-0
 
       - name: 依存関係のインストール
         run: poetry install
