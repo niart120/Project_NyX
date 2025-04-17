@@ -38,11 +38,14 @@ jobs:
           restore-keys: |
             poetry-${{ runner.os }}-
       
-      - name: 必要なライブラリのインストール
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1
-
       - name: 依存関係のインストール
         run: poetry install
 
+      - name: 必要なGUIライブラリのインストール
+        run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
+
+      - name: 追加GUIライブラリのインストール
+        run: sudo apt-get install -y x11-xkb-utils x11-xserver-utils xserver-xorg-core xfonts-base x11-utils
+
       - name: テストの実行（GUI テストを含まない)
-        run: poetry run pytest tests/unit tests/integration -v
+        run: xvfb-run -a poetry run pytest tests/unit tests/integration -v
