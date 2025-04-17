@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 from .command import Command
 
 class MacroBase(ABC):
+    # GUI 用メタデータ: マクロの説明文とタグ
+    description: str = ""
+    tags: list[str] = []
+
     @abstractmethod
     def initialize(self, cmd: Command, args: dict) -> None:
         """

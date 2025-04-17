@@ -80,3 +80,12 @@ def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
             raise ValueError(f"Unsupported character for keyboard input: {repr(c)}")
 
     return text
+
+def extract_macro_tags(macros: dict[str, any]) -> list[str]:
+    """
+    マクロ辞書からユニークなタグリストを抽出します。GUIのタグフィルタ用に利用。
+    """
+    tags = set()
+    for m in macros.values():
+        tags.update(getattr(m, 'tags', []))
+    return sorted(tags)

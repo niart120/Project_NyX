@@ -1,7 +1,24 @@
 import argparse
 import sys
+import os
+from pathlib import Path
 
-from nyxpy.cli.main import cli_main
+from nyxpy.cli.run_cli import cli_main
+from nyxpy.gui.run_gui import main as gui_main
+
+def init_app() -> int:
+    """
+    Initialize the workspace for GUI/CLI: create macros, snapshots, static folders.
+    """
+    dirs = ["macros", "snapshots", "static"]
+    for d in dirs:
+        Path(d).mkdir(exist_ok=True)
+    # Ensure macros is a package
+    init_file = Path("macros") / "__init__.py"
+    if not init_file.exists():
+        init_file.write_text("")
+    print(f"Initialized directories: {', '.join(dirs)}")
+    return 0
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -71,7 +88,19 @@ def parse_arguments() -> argparse.Namespace:
         help="Name of macro to execute"
     )
     
-    # 将来: ここに他のサブコマンドを追加（例: gui, server）
+    # GUI/CLI 初期化および GUI 起動コマンド
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Initialize workspace (create macros, snapshots, static folders)"
+    )
+    
+    # GUI 起動サブコマンド
+    gui_parser = subparsers.add_parser(
+        "gui",
+        help="Launch the graphical user interface"
+    )
+    
+    # 将来: ここに他のサブコマンドを追加（例: server）
     
     return parser.parse_args()
 
@@ -88,8 +117,14 @@ def main() -> int:
         
         if args.command == "cli":
             return cli_main(args)
+        elif args.command == "init":
+            return init_app()
+        elif args.command == "gui":
+            # Launch GUI and start Qt event loop
+            gui_main()
+            return 0
         else:
-            # subparsersの'required'フラグのため、これは発生しないはず
+            # subparsers required のためここは実行されない
             print(f"Unknown command: {args.command}")
             return 1
             
