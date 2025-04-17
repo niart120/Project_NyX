@@ -42,7 +42,7 @@ jobs:
         run: poetry install
 
       - name: 必要なGUIライブラリのインストール
-        run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
+        run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev libxcb-xinerama0 libxrender1 libfontconfig1 libxext6 libx11-6 libxkbcommon0 libxkbcommon-x11-0 libxcb-xinerama0
 
       - name: 追加GUIライブラリのインストール
         run: sudo apt-get install -y xfonts-base x11-utils xfonts-encodings xfonts-utils x11-common x11-xkb-utils x11-utils x11-xserver-utils xserver-xorg-core xfonts-base x11-utils
