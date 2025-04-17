@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from nyxpy.cli.main import cli_main
+from nyxpy.cli.run_cli import cli_main
 
 def parse_arguments() -> argparse.Namespace:
     """

@@ -3,7 +3,7 @@ import pathlib
 import unittest.mock
 from unittest.mock import MagicMock
 
-from nyxpy.cli.main import (
+from nyxpy.cli.run_cli import (
     configure_logging,
     create_protocol,
     create_hardware_components,
