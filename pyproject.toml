@@ -31,6 +31,7 @@ nyx-gui = "nyxpy.gui.run_gui:main"
 pytest = "^8.3.5"
 pytest-cov = "^6.1.0"
 ruff = "^0.11.2"
+pytest-qt = "^4.4.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
