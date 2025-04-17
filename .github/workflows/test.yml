@@ -40,8 +40,14 @@ jobs:
       - name: 依存関係のインストール
         run: poetry install
 
-      - name: 必要なライブラリのインストール
-        run: sudo apt-get update && sudo apt-get install -y xvfb libegl1
+      - name: 必要なGUIライブラリのインストール
+        run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
+
+      - name: Xvfb機能の検証
+        run: |
+          Xvfb :99 -screen 0 1024x768x16 &
+          export DISPLAY=:99
+          xrandr
 
       - name: テストの実行（GUI テスト含む）
         run: xvfb-run -a poetry run pytest tests/unit tests/integration -v
