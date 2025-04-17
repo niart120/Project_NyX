@@ -45,7 +45,7 @@ jobs:
         run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
 
       - name: 追加GUIライブラリのインストール
-        run: sudo apt-get install -y x11-xkb-utils x11-xserver-utils xserver-xorg-core xfonts-base x11-utils
+        run: sudo apt-get install -y xfonts-base x11-utils xfonts-encodings xfonts-utils x11-common x11-xkb-utils x11-utils x11-xserver-utils xserver-xorg-core xfonts-base x11-utils
 
       - name: Xvfb機能の検証
         run: |
