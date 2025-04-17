@@ -40,8 +40,8 @@ jobs:
       - name: 依存関係のインストール
         run: poetry install
 
-      - name: Xvfb インストール
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: 必要なライブラリのインストール
+        run: sudo apt-get update && sudo apt-get install -y xvfb libegl1
 
       - name: テストの実行（GUI テスト含む）
         run: xvfb-run -a poetry run pytest tests/unit tests/integration -v
