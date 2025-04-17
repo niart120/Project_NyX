@@ -42,11 +42,19 @@ jobs:
 
       - name: 必要なGUIライブラリのインストール
         run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
+      
+      - name: xvfb-runのインストール確認
+        run: sudo apt-get install -y xvfb
+
+      - name: 追加GUIライブラリのインストール
+        run: sudo apt-get install -y x11-xkb-utils xserver-xorg-core xfonts-base x11-utils
 
       - name: Xvfb機能の検証
         run: |
+          sudo apt-get install -y xvfb
           Xvfb :99 -screen 0 1024x768x16 &
           export DISPLAY=:99
+          sleep 3
           xrandr
 
       - name: テストの実行（GUI テスト含む）
