@@ -151,9 +151,9 @@ class MainWindow(QMainWindow):
             visible = match_keyword and match_tags
             self.table.setRowHidden(row, not visible)
 
-    def append_log(self):
-        self.log_counter += 1
-        self.log_view.append(f"[{self.log_counter:03d}] ログメッセージ例: Macro処理中…")
+    def append_log(self, message: str):
+        # Append log message to view
+        self.log_view.append(message)
 
     def open_settings(self):
         dlg = SettingsDialog(self)
