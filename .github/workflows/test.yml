@@ -4,16 +4,16 @@ on:
   push:
     branches:
       - master
-      - feature/*
   pull_request:
     branches:
-      - master
       - feature/*
-
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: リポジトリのチェックアウト
@@ -40,5 +40,8 @@ jobs:
       - name: 依存関係のインストール
         run: poetry install
 
-      - name: テストの実行
-        run: poetry run pytest tests/unit tests/integration -v
+      - name: Xvfb インストール
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: テストの実行（GUI テスト含む）
+        run: xvfb-run -a poetry run pytest tests/unit tests/integration -v
