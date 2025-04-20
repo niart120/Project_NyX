@@ -64,7 +64,7 @@ class PreviewPane(QWidget):
             if not frame.flags['C_CONTIGUOUS']:
                 frame = np.ascontiguousarray(frame)
         
-        resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
         image = QImage(resized.data, target_w, target_h, target_w*3, QImage.Format_BGR888)
         pix = QPixmap.fromImage(image)
         self.label.setPixmap(pix)
@@ -81,7 +81,7 @@ class PreviewPane(QWidget):
         if pix is not None:
              # resize to 1280x720
             target_w, target_h = 1280, 720
-            pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+            pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_AREA)
             # save image
             cv2.imwrite(str(filepath), pix)
             msg = f"スナップショット保存: {filepath.name}"

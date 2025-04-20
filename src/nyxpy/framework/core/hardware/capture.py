@@ -55,6 +55,12 @@ class AsyncCaptureDevice:
         except Exception:
             pass
         try:
+            # set the frame width and height to 1920x1080
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        except Exception:
+            pass
+        try:
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception:
             pass

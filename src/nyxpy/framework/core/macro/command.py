@@ -192,7 +192,7 @@ class DefaultCommand(Command):
         
         # リスケール処理を実行
         target_resolution = (1280, 720)  # HD解像度
-        frame = cv2.resize(capture_data, target_resolution, interpolation=cv2.INTER_LINEAR)
+        frame = cv2.resize(capture_data, target_resolution, interpolation=cv2.INTER_AREA)
 
         # クロップ処理を実行
         if crop_region is not None:
