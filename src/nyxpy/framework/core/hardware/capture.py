@@ -35,7 +35,7 @@ class AsyncCaptureDevice:
     キャプチャデバイスの非同期スレッド実装。
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
-    def __init__(self, device_index: int = 0, interval: float = 1.0/30.0) -> None:
+    def __init__(self, device_index: int = 0, interval: float = 1.0/60.0) -> None:
         self.device_index = device_index
         self.cap:cv2.VideoCapture = None
         self.latest_frame:cv2.typing.MatLike = None
@@ -48,6 +48,15 @@ class AsyncCaptureDevice:
         self.cap = cv2.VideoCapture(self.device_index)
         if not self.cap.isOpened():
             raise RuntimeError(f"AsyncCaptureDevice: Device {self.device_index} could not be opened.")
+        # Try to set FPS and buffer size if supported
+        try:
+            self.cap.set(cv2.CAP_PROP_FPS, 1.0/self.interval)
+        except Exception:
+            pass
+        try:
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
@@ -67,7 +76,9 @@ class AsyncCaptureDevice:
         with self._lock:
             if self.latest_frame is None:
                 raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
-            return self.latest_frame
+            # Return a copy of the latest
+            return self.latest_frame.copy()
+
 
     def release(self) -> None:
         self._running = False

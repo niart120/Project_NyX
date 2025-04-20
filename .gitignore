@@ -67,6 +67,12 @@ instance/
 *.sqlite3
 *.db
 
+# nyxpy関連
+.nyxpy/
+macros/
+snapshots/
+static/
+
 # その他
 .envrc
 *.pem

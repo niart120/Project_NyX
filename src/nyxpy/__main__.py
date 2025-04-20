@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nyxpy.cli.run_cli import cli_main
 from nyxpy.gui.run_gui import main as gui_main
+from nyxpy.framework.core.global_settings import GlobalSettings
 
 def init_app() -> int:
     """
@@ -17,7 +18,9 @@ def init_app() -> int:
     init_file = Path("macros") / "__init__.py"
     if not init_file.exists():
         init_file.write_text("")
-    print(f"Initialized directories: {', '.join(dirs)}")
+    # Initialize global settings directory and default config
+    GlobalSettings()
+    print(f"Initialized directories: {', '.join(dirs)}, .nyxpy")
     return 0
 
 def parse_arguments() -> argparse.Namespace:

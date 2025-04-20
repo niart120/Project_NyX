@@ -1,6 +1,5 @@
 import pytest
 from nyxpy.gui.main_window import WorkerThread
-from nyxpy.framework.core.macro.exceptions import MacroStopException
 
 class DummyExecutor:
     def __init__(self, should_fail=False):
