@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, Signal, QPointF, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath, QBrush, QPaintEvent, QMouseEvent
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QHBoxLayout, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QHBoxLayout, QSizePolicy
 
 import math
 from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick, KeyType
@@ -11,16 +11,16 @@ from nyxpy.framework.core.logger.log_manager import log_manager
 
 class ControllerButton(QPushButton):
     """カスタムスタイルのコントローラーボタン"""
-    def __init__(self, text="", parent=None, button_type=None, size=(30, 30), radius=15, is_rectangular=False, color="#444"):
+    def __init__(self, text="", parent=None, button_type=None, size=(30, 30), radius=15, is_rectangular=False):
         super().__init__(text, parent)
         self.button_type = button_type
         self.setFixedSize(size[0], size[1])
         
         # 四角形か円形かによってスタイルを変更
         if is_rectangular:
-            self.setStyleSheet(f"""
+            self.setStyleSheet("""
                 QPushButton {{
-                    background-color: {color};
+                    background-color: #444;
                     color: white;
                     border-radius: 5px;
                     border: 2px solid #555;
@@ -35,7 +35,7 @@ class ControllerButton(QPushButton):
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {color};
+                    background-color: #444;
                     color: white;
                     border-radius: {radius}px;
                     border: 2px solid #555;
@@ -52,7 +52,6 @@ class ControllerButton(QPushButton):
 class AnalogStick(QWidget):
     """アナログスティックウィジェット"""
     valueChanged = Signal(float, float)  # 角度と強さのシグナル
-    clicked = Signal()  # スティック押し込み用シグナル
     
     def __init__(self, parent=None, is_left=True):
         super().__init__(parent)
@@ -62,7 +61,7 @@ class AnalogStick(QWidget):
         self.dragging = False
         self.setMouseTracking(True)
         
-        # スティックの色 (左: 青、右: 赤)
+        # スティックの色
         self.stick_color = QColor(0, 120, 215) if is_left else QColor(215, 0, 0)
     
     def paintEvent(self, event: QPaintEvent):
@@ -83,16 +82,8 @@ class AnalogStick(QWidget):
     
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
-            # スティックの中心付近をクリックした場合は押し込み操作として扱う
-            center = QPointF(30, 30)
-            vector = QPointF(event.pos().x() - center.x(), event.pos().y() - center.y())
-            distance = math.sqrt(vector.x() * vector.x() + vector.y() * vector.y())
-            
-            if distance < 10:  # 中心から10ピクセル以内なら押し込み
-                self.clicked.emit()
-            else:
-                self.dragging = True
-                self.updateStickPosition(event.pos())
+            self.dragging = True
+            self.updateStickPosition(event.pos())
     
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.dragging:
@@ -273,12 +264,6 @@ class VirtualControllerPane(QWidget):
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(2)
         
-        # タイトルラベル
-        title_label = QLabel("仮想コントローラー")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-weight: bold; color: #ccc; font-size: 10px;")
-        main_layout.addWidget(title_label)
-        
         # メインコントローラーレイアウト
         controller_layout = QHBoxLayout()
         controller_layout.setSpacing(5)
@@ -286,18 +271,6 @@ class VirtualControllerPane(QWidget):
         # 左側のレイアウト
         left_layout = QVBoxLayout()
         left_layout.setSpacing(2)
-        
-        # 左上部のボタン (-, Capture)
-        left_top_layout = QHBoxLayout()
-        left_top_layout.setSpacing(2)
-        
-        self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(25, 20), radius=10, color="#444")
-        self.btn_capture = ControllerButton("CAP", self, Button.CAP, size=(25, 20), radius=10, color="#444")
-        
-        left_top_layout.addWidget(self.btn_minus)
-        left_top_layout.addStretch(1)
-        left_top_layout.addWidget(self.btn_capture)
-        left_layout.addLayout(left_top_layout)
         
         # 左トリガーボタン (ZL, L)
         trigger_layout_left = QHBoxLayout()
@@ -314,16 +287,15 @@ class VirtualControllerPane(QWidget):
         # 左側のメインコントロール (左スティックと方向パッド)
         left_main_layout = QHBoxLayout()
         
-        # 左スティック
+        # 左スティックと押し込みボタン
         left_stick_container = QVBoxLayout()
         left_stick_container.setSpacing(2)
         
         self.left_stick = AnalogStick(self, is_left=True)
         self.left_stick.valueChanged.connect(self.onLeftStickChanged)
-        self.left_stick.clicked.connect(lambda: self.onButtonPressed(Button.LS))
         
         # LS（左スティック押し込み）ボタン
-        self.btn_ls = ControllerButton("LS", self, Button.LS, size=(25, 20), radius=10, color="#333")
+        self.btn_ls = ControllerButton("LS", self, Button.LS, size=(30, 20), is_rectangular=True)
         
         left_stick_container.addWidget(self.left_stick, alignment=Qt.AlignCenter)
         left_stick_container.addWidget(self.btn_ls, alignment=Qt.AlignCenter)
@@ -336,23 +308,23 @@ class VirtualControllerPane(QWidget):
         left_main_layout.addWidget(self.dpad)
         
         left_layout.addLayout(left_main_layout)
+        
+        # ボタンを横に一列配置 (-, Capture)
+        system_layout_left = QHBoxLayout()
+        
+        self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(35, 25), radius=12)
+        self.btn_capture = ControllerButton("CAP", self, Button.CAP, size=(35, 25), radius=12)
+        
+        system_layout_left.addWidget(self.btn_minus)
+        system_layout_left.addWidget(self.btn_capture)
+        
+        left_layout.addLayout(system_layout_left)
+        
         controller_layout.addLayout(left_layout)
         
         # 右側のレイアウト
         right_layout = QVBoxLayout()
         right_layout.setSpacing(2)
-        
-        # 右上部のボタン (Home, +)
-        right_top_layout = QHBoxLayout()
-        right_top_layout.setSpacing(2)
-        
-        self.btn_home = ControllerButton("H", self, Button.HOME, size=(25, 20), radius=10, color="#444")
-        self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(25, 20), radius=10, color="#444")
-        
-        right_top_layout.addWidget(self.btn_home)
-        right_top_layout.addStretch(1)
-        right_top_layout.addWidget(self.btn_plus)
-        right_layout.addLayout(right_top_layout)
         
         # 右トリガーボタン (R, ZR)
         trigger_layout_right = QHBoxLayout()
@@ -373,41 +345,50 @@ class VirtualControllerPane(QWidget):
         button_grid = QGridLayout()
         button_grid.setSpacing(2)
         
-        # 実際のコントローラーの配置に合わせる
-        self.btn_x = ControllerButton("X", self, Button.X, size=(25, 25), radius=12, color="#1e88e5")  # 青
-        self.btn_y = ControllerButton("Y", self, Button.Y, size=(25, 25), radius=12, color="#43a047")  # 緑
-        self.btn_a = ControllerButton("A", self, Button.A, size=(25, 25), radius=12, color="#e53935")  # 赤
-        self.btn_b = ControllerButton("B", self, Button.B, size=(25, 25), radius=12, color="#fdd835")  # 黄
+        self.btn_x = ControllerButton("X", self, Button.X, size=(25, 25), radius=12)
+        self.btn_y = ControllerButton("Y", self, Button.Y, size=(25, 25), radius=12)
+        self.btn_a = ControllerButton("A", self, Button.A, size=(25, 25), radius=12)
+        self.btn_b = ControllerButton("B", self, Button.B, size=(25, 25), radius=12)
         
         button_grid.addWidget(self.btn_y, 0, 1)
         button_grid.addWidget(self.btn_x, 1, 0)
         button_grid.addWidget(self.btn_b, 1, 2)
         button_grid.addWidget(self.btn_a, 2, 1)
         
-        # 右スティック
+        # 右スティックと押し込みボタン
         right_stick_container = QVBoxLayout()
         right_stick_container.setSpacing(2)
         
         self.right_stick = AnalogStick(self, is_left=False)
         self.right_stick.valueChanged.connect(self.onRightStickChanged)
-        self.right_stick.clicked.connect(lambda: self.onButtonPressed(Button.RS))
         
         # RS（右スティック押し込み）ボタン
-        self.btn_rs = ControllerButton("RS", self, Button.RS, size=(25, 20), radius=10, color="#333")
+        self.btn_rs = ControllerButton("RS", self, Button.RS, size=(30, 20), is_rectangular=True)
         
         right_stick_container.addWidget(self.right_stick, alignment=Qt.AlignCenter)
         right_stick_container.addWidget(self.btn_rs, alignment=Qt.AlignCenter)
         
-        right_main_layout.addWidget(QWidget(), 1)  # スペーサー
         right_main_layout.addLayout(button_grid)
         right_main_layout.addLayout(right_stick_container)
         
         right_layout.addLayout(right_main_layout)
+        
+        # ボタンを横に一列配置 (Home, +)
+        system_layout_right = QHBoxLayout()
+        
+        self.btn_home = ControllerButton("H", self, Button.HOME, size=(35, 25), radius=12)
+        self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(35, 25), radius=12)
+        
+        system_layout_right.addWidget(self.btn_home)
+        system_layout_right.addWidget(self.btn_plus)
+        
+        right_layout.addLayout(system_layout_right)
+        
         controller_layout.addLayout(right_layout)
         
         main_layout.addLayout(controller_layout)
         
-        # ボタンを押した時のイベント設定（スティック押し込みボタンも含む）
+        # ボタンを押した時のイベント設定
         for btn in [self.btn_a, self.btn_b, self.btn_x, self.btn_y, 
                    self.btn_l, self.btn_r, self.btn_zl, self.btn_zr,
                    self.btn_minus, self.btn_plus, self.btn_home, self.btn_capture,
