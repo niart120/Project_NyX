@@ -15,6 +15,7 @@ dependencies = [
     "loguru (>=0.7.3,<0.8.0)",
     "cv2-enumerate-cameras (>=1.1.18.3,<2.0.0.0)",
     "pyside6 (>=6.9.0,<7.0.0)",
+    "tomlkit (>=0.13.2,<0.14.0)",
 ]
 
 [tool.poetry]
