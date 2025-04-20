@@ -153,15 +153,14 @@ class MainWindow(QMainWindow):
         resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = CH552SerialProtocol()
         ct = CancellationToken()
-        facade = HardwareFacade(self.serial_manager, self.preview_pane.capture_manager)
+        facade = HardwareFacade(self.serial_manager, self.capture_manager)
         cmd = DefaultCommand(facade, resource_io, protocol, ct)
 
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
-        self.worker.progress.connect(self.append_log)
         self.worker.finished.connect(self.on_finished)
 
         self.control_pane.run_btn.setEnabled(False)
-        self.control_pane.settings_btn2.setEnabled(False)
+        self.control_pane.settings_btn.setEnabled(False)
         self.control_pane.cancel_btn.setEnabled(True)
         self.status_label.setText("実行中")
         self.worker.start()
@@ -174,7 +173,7 @@ class MainWindow(QMainWindow):
     def on_finished(self, status: str):
         self.status_label.setText(status)
         self.control_pane.run_btn.setEnabled(True)
-        self.control_pane.settings_btn2.setEnabled(True)
+        self.control_pane.settings_btn.setEnabled(True)
         self.control_pane.cancel_btn.setEnabled(False)
         if status.startswith("エラー"):
             dlg = QMessageBox(self)
