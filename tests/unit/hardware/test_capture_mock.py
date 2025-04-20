@@ -1,4 +1,6 @@
 import time
+import cv2
+import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
 from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice, CaptureManager
@@ -13,13 +15,13 @@ class DummyVideoCapture:
     def isOpened(self):
         return self._is_opened
 
-    def read(self):
-        # 最初の1回目のみ有効なフレームを返す
+    def read(self) -> tuple[bool, cv2.typing.MatLike]:
+        # 最初の1回目のみ有効なフレームを返す(黒画面)
         self.read_count += 1
         if self.read_count == 1:
-            return True, f"frame_{self.device_index}"
+            return True, np.zeros((720, 1280, 3), dtype=np.uint8)
         # 2回目以降は常に成功しても同じ値を返す
-        return True, f"frame_{self.device_index}"
+        return True, np.zeros((720, 1280, 3), dtype=np.uint8)
 
     def release(self):
         self._is_opened = False
@@ -33,13 +35,16 @@ def test_async_capture_device_initialize_and_get_frame():
         # 最初のフレームが取得できていることを確認
         time.sleep(0.05)
         frame1 = device.get_frame()
-        assert frame1 == "frame_5"
+        assert isinstance(frame1, np.ndarray)
+        assert frame1.shape == (720, 1280, 3)
+
         
         # 内部のread_countをリセットして動作確認
         device.cap.read_count = 0
         time.sleep(0.05)
         frame2 = device.get_frame()
-        assert frame2 == "frame_5"
+        assert isinstance(frame2, np.ndarray)
+        assert frame2.shape == (720, 1280, 3)
         
         device.release()
         assert device.cap is None
@@ -82,7 +87,9 @@ def test_capture_manager_operations():
         # 待機してフレーム取得
         time.sleep(0.05)
         frame = manager.get_active_device().get_frame()
-        assert frame == "frame_3"
+        assert isinstance(frame, np.ndarray)
+        assert frame.shape == (720, 1280, 3)
+        # アクティブデバイスの確認
         manager.release_active()
         assert manager.active_device is None
 

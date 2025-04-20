@@ -1,6 +1,6 @@
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,QMessageBox, QLabel, QTableWidgetItem, QDialog
+from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,QMessageBox, QLabel, QDialog
 
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
