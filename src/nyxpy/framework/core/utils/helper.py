@@ -90,3 +90,15 @@ def extract_macro_tags(macros: dict[str, any]) -> list[str]:
     for m in macros.values():
         tags.update(getattr(m, 'tags', []))
     return sorted(tags)
+
+def calc_aspect_size(size, aspect_w=16, aspect_h=9):
+    """
+    Calculate target width and height to fit within given size while maintaining aspect ratio.
+    """
+    w, h = size.width(), size.height()
+    target_w = w
+    target_h = int(w * aspect_h / aspect_w)
+    if target_h > h:
+        target_h = h
+        target_w = int(h * aspect_w / aspect_h)
+    return target_w, target_h
