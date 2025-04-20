@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QSizePolicy, QHeaderView
 from PySide6.QtCore import Qt, Signal
 from nyxpy.framework.core.utils.helper import extract_macro_tags
 
@@ -12,8 +12,7 @@ class MacroBrowserPane(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5,5,5,5)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        self.setMinimumWidth(280)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         self.search_box = QLineEdit(self)
         self.search_box.setPlaceholderText("検索…（マクロ名／タグ）")
@@ -24,6 +23,8 @@ class MacroBrowserPane(QWidget):
 
         self.table = QTableWidget(0, 3, self)
         self.table.setHorizontalHeaderLabels(["マクロ名", "説明文", "タグ"])
+        # Allow table columns to be resized interactively and shrink
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         layout.addWidget(self.table)
 
         self.executor = executor

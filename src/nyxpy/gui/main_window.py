@@ -6,12 +6,12 @@ from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.gui.settings_dialog import SettingsDialog
+from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.gui.device_settings_dialog import DeviceSettingsDialog
+from nyxpy.gui.dialogs.device_settings_dialog import DeviceSettingsDialog
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.control_pane import ControlPane
 from pathlib import Path
@@ -69,8 +69,9 @@ class MainWindow(QMainWindow):
             pass
 
     def setup_ui(self):
-        self.setWindowTitle("Switch Automation Macro GUI - Prototype")
+        self.setWindowTitle("NyxPy GUI")
         self.resize(1000, 600)
+        self.setMinimumSize(800, 400)
 
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.open_settings)
@@ -85,7 +86,9 @@ class MainWindow(QMainWindow):
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
         self.macro_browser = MacroBrowserPane(self.executor, self)
-        left_layout.addWidget(self.macro_browser)
+        # Give macro_browser vertical stretch so it fills the pane
+        left_layout.addWidget(self.macro_browser, 1)
+        # Control pane at bottom with default stretch
         self.control_pane = ControlPane(self)
         left_layout.addWidget(self.control_pane)
         main_layout.addWidget(left_container)
@@ -97,12 +100,13 @@ class MainWindow(QMainWindow):
         right_layout.setSpacing(0)
         # Preview pane replaces direct label
         self.preview_pane = PreviewPane(settings_service=self.settings_service, parent=self)
-        right_layout.addWidget(self.preview_pane)
+        right_layout.addWidget(self.preview_pane, stretch=1)
 
         # Log pane
         self.log_pane = LogPane(self)
+        right_layout.addWidget(self.log_pane, stretch=1)
 
-        right_layout.addWidget(self.log_pane)
+        # Set stretch for log pane to fill remaining space
         main_layout.addWidget(right_container, stretch=1)
 
         # status bar
