@@ -29,7 +29,7 @@ class DummyVideoCapture:
 # テストケース１: AsyncCaptureDevice の正常な初期化、フレーム取得、クローズ
 def test_async_capture_device_initialize_and_get_frame():
     with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
-        device = AsyncCaptureDevice(device_index=5, interval=0.01)
+        device = AsyncCaptureDevice(device_index=5, fps=100.0)
         device.initialize()
         
         # 最初のフレームが取得できていることを確認
@@ -69,7 +69,7 @@ def test_async_capture_device_initialize_failure():
 # テストケース３: get_latest_frame がフレーム未更新の場合の動作確認
 def test_get_latest_frame_no_update():
     with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
-        device = AsyncCaptureDevice(device_index=2, interval=0.05)
+        device = AsyncCaptureDevice(device_index=2, fps=20.0)
         device.initialize()
         # 強制的に latest_frame を None
         device.latest_frame = None
@@ -81,7 +81,7 @@ def test_get_latest_frame_no_update():
 def test_capture_manager_operations():
     with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
         manager = CaptureManager()
-        device = AsyncCaptureDevice(device_index=3, interval=0.01)
+        device = AsyncCaptureDevice(device_index=3, fps=100.0)
         manager.register_device("cam1", device)
         manager.set_active("cam1")
         # 待機してフレーム取得
@@ -105,7 +105,7 @@ class DummyDeviceNoFrame(AsyncCaptureDevice):
     def initialize(self):
         self.cap = MagicMock()
         self._running = True
-    def get_latest_frame(self):
+    def get_frame(self):
         raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
     def release(self):
         self.cap = None

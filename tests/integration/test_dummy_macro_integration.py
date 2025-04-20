@@ -36,8 +36,8 @@ class FakeSerialComm(SerialCommInterface):
 
 class FakeAsyncCaptureDevice(AsyncCaptureDevice):
     """Fake AsyncCaptureDevice で、固定の黒画像を返す"""
-    def __init__(self, device_index: int = 0, interval: float = 1.0/30.0):
-        super().__init__(device_index, interval)
+    def __init__(self, device_index: int = 0, fps: float = 30.0):
+        super().__init__(device_index, fps)
 
     def initialize(self) -> None:
         # 初期化は通常通り行い、代わりに固定フレームを設定
