@@ -17,7 +17,7 @@ def setup_and_teardown():
 @pytest.mark.realdevice
 def test_serial_comm_open_and_close():
     """実デバイスに対する open() と close() のテスト"""
-    port = "COM255"  # 使用するポート名 (setup fixture uses COM255)
+    port = "COM127"  # 使用するポート名 ("COM127")
     baudrate = 9600
 
     # デバイスを構築しオープン
@@ -32,7 +32,7 @@ def test_serial_comm_open_and_close():
 @pytest.mark.realdevice
 def test_serial_comm_send():
     """実デバイスに対する send() のテスト"""
-    port = "COM255"  # 使用するポート名 (setup fixture uses COM255)
+    port = "COM127"  # 使用するポート名 ("COM127")
     baudrate = 9600
 
     # デバイスを構築しオープン
