@@ -33,12 +33,12 @@ def test_update_preview_success(window):
     frame = np.full((10, 20, 3), 128, dtype=np.uint8)
     window.capture_manager.get_active_device = lambda: DummyDevice(frame)
     # Before update, pixmap may be None
-    initial_pix = window.preview_label.pixmap()
+    initial_pix = window.preview_pane.label.pixmap()
     # Initial pixmap may be a null pixmap
     assert initial_pix is None or initial_pix.isNull()
-    # Call update_preview
-    window.update_preview()
-    pix = window.preview_label.pixmap()
+    # Call update_preview on pane
+    window.preview_pane.update_preview()
+    pix = window.preview_pane.label.pixmap()
     assert isinstance(pix, QPixmap)
     # Pixmap dimensions should be non-zero
     size = pix.size()
@@ -52,9 +52,9 @@ def test_update_preview_failure(window):
     window.capture_manager.get_active_device = lambda: BadDevice()
     # Should not raise
     try:
-        window.update_preview()
+        window.preview_pane.update_preview()
     except Exception:
         pytest.fail("update_preview raised exception on failure")
     # Pixmap stays None or unchanged
-    final_pix = window.preview_label.pixmap()
+    final_pix = window.preview_pane.label.pixmap()
     assert final_pix is None or final_pix.isNull()
