@@ -1,5 +1,5 @@
 import inspect
-import tomllib
+import tomlkit
 from pathlib import Path
 
 def get_caller_class_name():
@@ -21,7 +21,8 @@ def load_macro_settings(macro_cls) -> dict:
     settings_file = Path.cwd() / "static" / macro_name / "settings.toml"
     file_params = {}
     if settings_file.exists():
-        file_params = tomllib.load(settings_file)
+        text = settings_file.read_text(encoding="utf-8")
+        file_params = tomlkit.loads(text)
 
     return file_params
 
@@ -48,7 +49,7 @@ def parse_define_args(defines: list[str]) -> dict:
     
     toml_str = "\n".join(defines)  # 引数を改行で結合
     toml_str = toml_str.replace("=", " = ")  # 等号の前後にスペースを追加
-    exec_args = tomllib.loads(toml_str)  # toml形式で解析
+    exec_args = tomlkit.loads(toml_str)  # toml形式で解析
     
     # 変換された辞書を返す
     return exec_args
