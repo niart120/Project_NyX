@@ -76,7 +76,7 @@ class AsyncCaptureDevice:
         with self._lock:
             if self.latest_frame is None:
                 raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
-            # Return a copy of the latest
+            # Return a copy of the latest or the latest frame
             return self.latest_frame.copy()
 
 
