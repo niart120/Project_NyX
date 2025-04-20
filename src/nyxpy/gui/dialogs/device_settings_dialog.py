@@ -1,23 +1,27 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, QMessageBox
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 
 class DeviceSettingsDialog(QDialog):
-    def __init__(self, parent=None, settings: GlobalSettings=None):
+    def __init__(self, parent=None, settings: GlobalSettings=None, capture_manager=None, serial_manager=None):
         super().__init__(parent)
         self.settings = settings or GlobalSettings()
         self.setWindowTitle("デバイス設定")
         self.resize(400, 200)
+        
+        # 既存のマネージャを使用するか、新しく作成する
+        self.capture_manager = capture_manager or CaptureManager()
+        self.serial_manager = serial_manager or SerialManager()
 
         layout = QVBoxLayout(self)
 
-        # Capture device settings
+        # キャプチャデバイス設定
         cap_form = QFormLayout()
         self.cap_device = QComboBox()
-        cap_mgr = CaptureManager()
-        cap_mgr.auto_register_devices()
-        devices = cap_mgr.list_devices()
+        # 既存のキャプチャマネージャを使用
+        self.capture_manager.auto_register_devices()
+        devices = self.capture_manager.list_devices()
         self.cap_device.addItems(devices)
         current_cap = self.settings.get("capture_device", "")
         if current_cap in devices:
@@ -36,12 +40,12 @@ class DeviceSettingsDialog(QDialog):
         cap_form.addRow("FPS:", self.cap_fps)
         layout.addLayout(cap_form)
 
-        # Serial device settings
+        # シリアルデバイス設定
         ser_form = QFormLayout()
         self.ser_device = QComboBox()
-        ser_mgr = SerialManager()
-        ser_mgr.auto_register_devices()
-        serials = ser_mgr.list_devices()
+        # 既存のシリアルマネージャを使用
+        self.serial_manager.auto_register_devices()
+        serials = self.serial_manager.list_devices()
         self.ser_device.addItems(serials)
         current_ser = self.settings.get("serial_device", "")
         if current_ser in serials:
@@ -60,7 +64,23 @@ class DeviceSettingsDialog(QDialog):
         ser_form.addRow("ボーレート:", self.ser_baud)
         layout.addLayout(ser_form)
 
-        # Buttons
+        # デバイスが見つからない場合の警告
+        if not devices and not serials:
+            QMessageBox.warning(
+                self,
+                "デバイス検出エラー",
+                "キャプチャデバイスとシリアルデバイスが見つかりませんでした。\n"
+                "デバイスが接続されていることを確認してください。"
+            )
+        elif not serials:
+            QMessageBox.warning(
+                self,
+                "デバイス検出エラー",
+                "シリアルデバイスが見つかりませんでした。\n"
+                "シリアルデバイスが接続されていることを確認してください。"
+            )
+
+        # ボタン
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
