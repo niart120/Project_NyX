@@ -67,13 +67,15 @@ class PreviewPane(QWidget):
         snaps_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = snaps_dir / f"{timestamp}.png"
-        pix = self.capture_manager.get_active_device().get_frame()
-        # resize to 1280x720
-        target_w, target_h = 1280, 720
-        pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-        # save to file        
-        if pix is not None:
-            cv2.imwrite(str(filepath), pix)
+        frame = self.capture_manager.get_active_device().get_frame()
+
+        # Check if pixmap is valid       
+        if frame is not None:
+            # resize to 1280x720
+            target_w, target_h = 1280, 720
+            frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+            # Save the image
+            cv2.imwrite(str(filepath), frame)
             msg = f"スナップショット保存: {filepath.name}"
         else:
             msg = "プレビューがありません。スナップショットに失敗しました。"
