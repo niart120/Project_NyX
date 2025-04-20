@@ -14,19 +14,15 @@ def setup_and_teardown():
     recv_device.close()
     assert not recv_device.is_open, "Failed to close the serial port."
 
-@pytest.fixture
-def serial_comm():
-    """SerialComm のインスタンスを返す"""
-    return SerialComm()
-
 @pytest.mark.realdevice
-def test_serial_comm_open_and_close(serial_comm):
+def test_serial_comm_open_and_close():
     """実デバイスに対する open() と close() のテスト"""
-    port = "COM127"  # 実際のデバイスのポート名に変更してください
+    port = "COM255"  # 使用するポート名 (setup fixture uses COM255)
     baudrate = 9600
 
-    # デバイスをオープン
-    serial_comm.open(port, baudrate)
+    # デバイスを構築しオープン
+    serial_comm = SerialComm(port=port)
+    serial_comm.open(baudrate)
     assert serial_comm.ser.is_open
 
     # デバイスをクローズ
@@ -34,13 +30,14 @@ def test_serial_comm_open_and_close(serial_comm):
     assert serial_comm.ser is None
 
 @pytest.mark.realdevice
-def test_serial_comm_send(serial_comm):
+def test_serial_comm_send():
     """実デバイスに対する send() のテスト"""
-    port = "COM127"  # 実際のデバイスのポート名に変更してください
+    port = "COM255"  # 使用するポート名 (setup fixture uses COM255)
     baudrate = 9600
 
-    # デバイスをオープン
-    serial_comm.open(port, baudrate)
+    # デバイスを構築しオープン
+    serial_comm = SerialComm(port=port)
+    serial_comm.open(baudrate)
 
     # データ送信
     test_data = b"Hello, Serial!"
