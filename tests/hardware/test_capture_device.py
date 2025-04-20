@@ -12,11 +12,12 @@ def test_continuous_frame_update():
     実際のキャプチャデバイスを起動して、出力映像が変化するようにする必要があります。
     """
     device_index = 0  # 実際のデバイスに合わせる
-    capture_device = AsyncCaptureDevice(device_index=device_index, interval=1/60)  # 60fps
+    capture_device = AsyncCaptureDevice(device_index=device_index, fps=60.0)  # 60fps
     try:
         capture_device.initialize()
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
+    
     time.sleep(0.5)  # 初期化後、少し待機してフレームが取得できるようにする
     initial_frame = capture_device.get_frame()
     time.sleep(0.5)  # 数秒待機してフレームが更新されるのを確認
@@ -34,7 +35,7 @@ def test_multithreaded_get_latest_frame():
     スレッドセーフに動作するかを検証するテスト。
     """
     device_index = 0
-    capture_device = AsyncCaptureDevice(device_index=device_index, interval=0.1)
+    capture_device = AsyncCaptureDevice(device_index=device_index, fps=10.0)  # 10fps
     try:
         capture_device.initialize()
     except RuntimeError as e:
@@ -59,19 +60,21 @@ def test_multithreaded_get_latest_frame():
 @pytest.mark.realdevice
 def test_release_idempotence():
     """
-    release() を複数回呼んでも例外が発生せず、
-    device の内部リソースが正しく解放されるかをテストする。
+    release() が複数回呼び出されても問題ないことを確認するテスト。
     """
     device_index = 0
-    capture_device = AsyncCaptureDevice(device_index=device_index, interval=0.1)
+    capture_device = AsyncCaptureDevice(device_index=device_index, fps=30.0)
     try:
         capture_device.initialize()
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
-
-    time.sleep(1.0)
+    
+    # 正常にリリース
     capture_device.release()
-    # 2回目の release() 呼び出しでも問題がないことを検証
-    capture_device.release()
-    # 内部リソースが解放され、cap が None になっていることを確認
-    assert capture_device.cap is None, "cap が正しく解放されていません。"
+    assert capture_device.cap is None
+    
+    # 2回目のリリース（エラーが発生しないことを確認）
+    try:
+        capture_device.release()
+    except Exception as e:
+        pytest.fail(f"2回目のリリースでエラーが発生: {e}")

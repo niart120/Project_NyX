@@ -47,16 +47,24 @@ class PreviewPane(QWidget):
         self.update_preview()
 
     def update_preview(self):
+
         try:
             frame = self.capture_manager.get_active_device().get_frame()
-        except Exception:
+            if frame is None:
+                return
+        except RuntimeError:
             return
+
         # Calculate target size based on label aspect ratio
         size = self.label.size()
         target_w, target_h = calc_aspect_size(size, self.label.aspect_w, self.label.aspect_h)
-        if not frame.flags['C_CONTIGUOUS']:
-            frame = np.ascontiguousarray(frame)
-        resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        
+        # np.arrayの場合のみflagsにアクセス
+        if hasattr(frame, 'flags') and hasattr(frame.flags, '__getitem__'):
+            if not frame.flags['C_CONTIGUOUS']:
+                frame = np.ascontiguousarray(frame)
+        
+        resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
         image = QImage(resized.data, target_w, target_h, target_w*3, QImage.Format_BGR888)
         pix = QPixmap.fromImage(image)
         self.label.setPixmap(pix)
@@ -67,9 +75,15 @@ class PreviewPane(QWidget):
         snaps_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = snaps_dir / f"{timestamp}.png"
-        pix = self.label.pixmap()
-        if pix:
-            pix.save(str(filepath), 'PNG')
+        pix = self.capture_manager.get_active_device().get_frame()
+       
+        # save to file        
+        if pix is not None:
+             # resize to 1280x720
+            target_w, target_h = 1280, 720
+            pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_AREA)
+            # save image
+            cv2.imwrite(str(filepath), pix)
             msg = f"スナップショット保存: {filepath.name}"
         else:
             msg = "プレビューがありません。スナップショットに失敗しました。"

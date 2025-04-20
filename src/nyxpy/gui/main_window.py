@@ -57,16 +57,28 @@ class MainWindow(QMainWindow):
 
     def init_managers(self):
         # Load settings and initialize hardware managers
+        # シリアルデバイスの初期化
         ser_list = self.serial_manager.list_devices()
         default_ser = self.global_settings.get("serial_device", "")
         default_baud = self.global_settings.get("serial_baud", 9600)
+        serial_initialized = False
+        
+        # より堅牢なエラーハンドリング
         try:
             if default_ser and default_ser in ser_list:
                 self.serial_manager.set_active(default_ser, default_baud)
+                serial_initialized = True
             elif ser_list:
                 self.serial_manager.set_active(ser_list[0], default_baud)
-        except Exception:
+                serial_initialized = True
+        except Exception as e:
+            log_manager.log("ERROR", f"シリアルデバイス初期化エラー: {e}", "MainWindow")
+            # デバイス設定を初期化せずにGUIを表示させる（後で設定ダイアログから設定可能）
             pass
+            
+        # デバイス初期化結果をステータスバーに表示
+        if not serial_initialized:
+            log_manager.log("WARN", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -127,20 +139,29 @@ class MainWindow(QMainWindow):
         log_manager.add_handler(lambda record: self.log_pane.append(str(record)), level="DEBUG")
 
     def open_settings(self):
-        dlg = DeviceSettingsDialog(self, self.global_settings)
+        # 更新したDialogに既存のマネージャを渡す
+        dlg = DeviceSettingsDialog(self, self.global_settings, 
+                                  capture_manager=self.capture_manager,
+                                  serial_manager=self.serial_manager)
         if dlg.exec() != QDialog.Accepted:
             return
+            
+        # 設定が保存された場合に各マネージャを更新
         new_cap = self.global_settings.get("capture_device")
         try:
             self.preview_pane.set_active_device(new_cap)
-        except Exception:
-            pass
+            log_manager.log("INFO", f"キャプチャデバイスを切り替えました: {new_cap}", "MainWindow")
+        except Exception as e:
+            log_manager.log("ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow")
+            
         new_ser = self.global_settings.get("serial_device")
         new_baud = self.global_settings.get("serial_baud", 9600)
         try:
             self.serial_manager.set_active(new_ser, new_baud)
-        except Exception:
-            pass
+            log_manager.log("INFO", f"シリアルデバイスを設定しました: {new_ser} ({new_baud}bps)", "MainWindow")
+        except Exception as e:
+            log_manager.log("ERROR", f"シリアルデバイス設定エラー: {e}", "MainWindow")
+            
         self.preview_pane.apply_fps()
 
     def start_macro(self):
@@ -153,15 +174,14 @@ class MainWindow(QMainWindow):
         resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = CH552SerialProtocol()
         ct = CancellationToken()
-        facade = HardwareFacade(self.serial_manager, self.preview_pane.capture_manager)
+        facade = HardwareFacade(self.serial_manager, self.capture_manager)
         cmd = DefaultCommand(facade, resource_io, protocol, ct)
 
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
-        self.worker.progress.connect(self.append_log)
         self.worker.finished.connect(self.on_finished)
 
         self.control_pane.run_btn.setEnabled(False)
-        self.control_pane.settings_btn2.setEnabled(False)
+        self.control_pane.settings_btn.setEnabled(False)
         self.control_pane.cancel_btn.setEnabled(True)
         self.status_label.setText("実行中")
         self.worker.start()
@@ -174,7 +194,7 @@ class MainWindow(QMainWindow):
     def on_finished(self, status: str):
         self.status_label.setText(status)
         self.control_pane.run_btn.setEnabled(True)
-        self.control_pane.settings_btn2.setEnabled(True)
+        self.control_pane.settings_btn.setEnabled(True)
         self.control_pane.cancel_btn.setEnabled(False)
         if status.startswith("エラー"):
             dlg = QMessageBox(self)

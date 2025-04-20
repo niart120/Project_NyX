@@ -35,12 +35,13 @@ class AsyncCaptureDevice:
     キャプチャデバイスの非同期スレッド実装。
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
-    def __init__(self, device_index: int = 0, interval: float = 1.0/60.0) -> None:
+    def __init__(self, device_index: int = 0, fps: float = 60.0) -> None:
         self.device_index = device_index
         self.cap:cv2.VideoCapture = None
         self.latest_frame:cv2.typing.MatLike = None
         self._running = False
-        self.interval = interval  # キャプチャ間隔（秒）
+        self.fps = fps  # キャプチャのフレームレート
+        self._interval = 1.0 / fps if fps > 0 else 1.0/60.0  # キャプチャ間隔（秒）
         self._lock = threading.Lock()
         self._thread = None
 
@@ -50,7 +51,13 @@ class AsyncCaptureDevice:
             raise RuntimeError(f"AsyncCaptureDevice: Device {self.device_index} could not be opened.")
         # Try to set FPS and buffer size if supported
         try:
-            self.cap.set(cv2.CAP_PROP_FPS, 1.0/self.interval)
+            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+        except Exception:
+            pass
+        try:
+            # set the frame width and height to 1920x1080
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         except Exception:
             pass
         try:
@@ -67,7 +74,7 @@ class AsyncCaptureDevice:
             if ret:
                 with self._lock:
                     self.latest_frame = frame
-            time.sleep(self.interval)
+            time.sleep(self._interval)
 
     def get_frame(self)-> cv2.typing.MatLike:
         """
@@ -144,12 +151,12 @@ class CaptureManager:
             case "Windows":
                 for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW): #windowsの場合のバックエンドはDirectShow
                     name = f'{camera_info.index}: {camera_info.name}'
-                    device = AsyncCaptureDevice(device_index=camera_info.index)
+                    device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
                     self.register_device(name, device)
             case "Linux":
                 for camera_info in enumerate_cameras(cv2.CAP_V4L2): #Linuxの場合のバックエンドはV4L2
                     name = f'{camera_info.index}: {camera_info.name}'
-                    device = AsyncCaptureDevice(device_index=camera_info.index)
+                    device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
                     self.register_device(name, device)
             case "Darwin":
                 # macOS の場合の処理を追加することも可能
@@ -163,7 +170,7 @@ class CaptureManager:
                     if cap.isOpened():
                         cap.release()
                         name = f"macOS Camera {i}"
-                        device = AsyncCaptureDevice(device_index=i)
+                        device = AsyncCaptureDevice(device_index=i, fps=60.0)
                         self.register_device(name, device)
                 
                 cv2.setLogLevel(log_level)
