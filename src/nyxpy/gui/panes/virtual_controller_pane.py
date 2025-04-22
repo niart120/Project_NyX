@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, Signal, QPointF, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath, QBrush, QPaintEvent, QMouseEvent
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QHBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QHBoxLayout, QSizePolicy
 
 import math
 from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick, KeyType
@@ -11,16 +11,16 @@ from nyxpy.framework.core.logger.log_manager import log_manager
 
 class ControllerButton(QPushButton):
     """カスタムスタイルのコントローラーボタン"""
-    def __init__(self, text="", parent=None, button_type=None, size=(30, 30), radius=15, is_rectangular=False):
+    def __init__(self, text="", parent=None, button_type=None, size=(30, 30), radius=15, is_rectangular=False, color="#444"):
         super().__init__(text, parent)
         self.button_type = button_type
         self.setFixedSize(size[0], size[1])
         
         # 四角形か円形かによってスタイルを変更
         if is_rectangular:
-            self.setStyleSheet("""
+            self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: #444;
+                    background-color: {color};
                     color: white;
                     border-radius: 5px;
                     border: 2px solid #555;
@@ -35,7 +35,7 @@ class ControllerButton(QPushButton):
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: #444;
+                    background-color: {color};
                     color: white;
                     border-radius: {radius}px;
                     border: 2px solid #555;
@@ -52,11 +52,12 @@ class ControllerButton(QPushButton):
 class AnalogStick(QWidget):
     """アナログスティックウィジェット"""
     valueChanged = Signal(float, float)  # 角度と強さのシグナル
+    clicked = Signal()  # スティック押し込み用シグナル
     
     def __init__(self, parent=None, is_left=True):
         super().__init__(parent)
         self.is_left = is_left
-        self.setFixedSize(60, 60)  # サイズを小さく
+        self.setFixedSize(60, 60)
         self.position = QPointF(30, 30)  # 中央位置
         self.dragging = False
         self.setMouseTracking(True)
@@ -69,21 +70,29 @@ class AnalogStick(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         
         # ベース円の描画
-        base_rect = QRectF(5, 5, 50, 50)  # サイズ調整
+        base_rect = QRectF(5, 5, 50, 50)
         painter.setPen(QPen(QColor(80, 80, 80), 2))
         painter.setBrush(QBrush(QColor(50, 50, 50)))
         painter.drawEllipse(base_rect)
         
         # スティックの描画
-        stick_rect = QRectF(self.position.x() - 10, self.position.y() - 10, 20, 20)  # サイズ調整
+        stick_rect = QRectF(self.position.x() - 10, self.position.y() - 10, 20, 20)
         painter.setPen(QPen(QColor(100, 100, 100), 2))
         painter.setBrush(QBrush(self.stick_color))
         painter.drawEllipse(stick_rect)
     
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
-            self.dragging = True
-            self.updateStickPosition(event.pos())
+            # スティックの中心付近をクリックした場合は押し込み操作として扱う
+            center = QPointF(30, 30)
+            vector = QPointF(event.pos().x() - center.x(), event.pos().y() - center.y())
+            distance = math.sqrt(vector.x() * vector.x() + vector.y() * vector.y())
+            
+            if distance < 10:  # 中心から10ピクセル以内なら押し込み
+                self.clicked.emit()
+            else:
+                self.dragging = True
+                self.updateStickPosition(event.pos())
     
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.dragging:
@@ -93,18 +102,18 @@ class AnalogStick(QWidget):
         if event.button() == Qt.LeftButton and self.dragging:
             self.dragging = False
             # スティックを中央に戻す
-            self.position = QPointF(30, 30)  # 中央位置を調整
+            self.position = QPointF(30, 30)
             self.update()
             self.valueChanged.emit(0, 0)  # 角度0、強さ0を送信
     
     def updateStickPosition(self, pos):
         # スティック範囲内に収める
-        center = QPointF(30, 30)  # 中央位置を調整
+        center = QPointF(30, 30)
         vector = QPointF(pos.x() - center.x(), pos.y() - center.y())
         
         # 距離を計算
         distance = math.sqrt(vector.x() * vector.x() + vector.y() * vector.y())
-        max_distance = 20  # 最大距離を調整
+        max_distance = 20
         
         # 最大範囲に制限
         if distance > max_distance:
@@ -131,7 +140,7 @@ class DPad(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(70, 70)  # サイズを小さく
+        self.setFixedSize(70, 70)
         self.current_direction = Hat.CENTER
         self.pressed = False
     
@@ -144,23 +153,23 @@ class DPad(QWidget):
         painter.setBrush(QBrush(QColor(60, 60, 60)))
         
         # 中央円
-        painter.drawEllipse(27, 27, 16, 16)  # サイズ調整
+        painter.drawEllipse(27, 27, 16, 16)
         
         # 上方向
         up_path = QPainterPath()
-        up_path.addRoundedRect(27, 5, 16, 25, 5, 5)  # サイズ調整
+        up_path.addRoundedRect(27, 5, 16, 25, 5, 5)
         
         # 右方向
         right_path = QPainterPath()
-        right_path.addRoundedRect(40, 27, 25, 16, 5, 5)  # サイズ調整
+        right_path.addRoundedRect(40, 27, 25, 16, 5, 5)
         
         # 下方向
         down_path = QPainterPath()
-        down_path.addRoundedRect(27, 40, 16, 25, 5, 5)  # サイズ調整
+        down_path.addRoundedRect(27, 40, 16, 25, 5, 5)
         
         # 左方向
         left_path = QPainterPath()
-        left_path.addRoundedRect(5, 27, 25, 16, 5, 5)  # サイズ調整
+        left_path.addRoundedRect(5, 27, 25, 16, 5, 5)
         
         # 押されている方向の色を変更
         if self.current_direction != Hat.CENTER:
@@ -211,11 +220,11 @@ class DPad(QWidget):
             self.directionChanged.emit(Hat.CENTER)
     
     def updateDirection(self, pos):
-        center_x, center_y = 35, 35  # 中央位置を調整
+        center_x, center_y = 35, 35
         x, y = pos.x() - center_x, pos.y() - center_y
         
         # 押された位置に基づいて方向を判定
-        if abs(x) < 8 and abs(y) < 8:  # 中央エリア調整
+        if abs(x) < 8 and abs(y) < 8:  # 中央エリア
             direction = Hat.CENTER
         else:
             angle = math.atan2(y, x)
@@ -262,91 +271,113 @@ class VirtualControllerPane(QWidget):
     def initUI(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(2)  # スペースを小さく
+        main_layout.setSpacing(2)
         
-        title_layout = QHBoxLayout()
-        
-        # タイトルと特殊ボタンを含む上部セクション
+        # タイトルラベル
         title_label = QLabel("仮想コントローラー")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-weight: bold; color: #ccc; font-size: 10px;")
-        title_layout.addWidget(title_label)
+        main_layout.addWidget(title_label)
         
-        # 特殊ボタンを上部に配置
-        special_buttons_layout = QHBoxLayout()
-        special_buttons_layout.setSpacing(2)
-        
-        self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(25, 25), radius=12)
-        self.btn_capture = ControllerButton("CAP", self, Button.CAP, size=(25, 25), radius=12)
-        self.btn_home = ControllerButton("H", self, Button.HOME, size=(25, 25), radius=12)
-        self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(25, 25), radius=12)
-        
-        special_buttons_layout.addWidget(self.btn_minus)
-        special_buttons_layout.addWidget(self.btn_capture)
-        special_buttons_layout.addWidget(self.btn_home)
-        special_buttons_layout.addWidget(self.btn_plus)
-        
-        title_layout.addLayout(special_buttons_layout)
-        main_layout.addLayout(title_layout)
-        
-        # メインコントローラ部分
+        # メインコントローラーレイアウト
         controller_layout = QHBoxLayout()
         controller_layout.setSpacing(5)
         
-        # 左側のレイアウト (L/ZL ボタン、左スティック、方向パッド)
+        # 左側のレイアウト
         left_layout = QVBoxLayout()
         left_layout.setSpacing(2)
         
-        # L/ZL トリガーボタン
-        trigger_layout_left = QHBoxLayout()
-        self.btn_l = ControllerButton("L", self, Button.L, size=(30, 20), is_rectangular=True)
-        self.btn_zl = ControllerButton("ZL", self, Button.ZL, size=(30, 20), is_rectangular=True)
+        # 左上部のボタン (-, Capture)
+        left_top_layout = QHBoxLayout()
+        left_top_layout.setSpacing(2)
         
-        trigger_layout_left.addWidget(self.btn_l)
+        self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(25, 20), radius=10, color="#444")
+        self.btn_capture = ControllerButton("CAP", self, Button.CAP, size=(25, 20), radius=10, color="#444")
+        
+        left_top_layout.addWidget(self.btn_minus)
+        left_top_layout.addStretch(1)
+        left_top_layout.addWidget(self.btn_capture)
+        left_layout.addLayout(left_top_layout)
+        
+        # 左トリガーボタン (ZL, L)
+        trigger_layout_left = QHBoxLayout()
+        trigger_layout_left.setSpacing(2)
+        
+        # 外側にZLを配置
+        self.btn_zl = ControllerButton("ZL", self, Button.ZL, size=(30, 20), is_rectangular=True)
+        self.btn_l = ControllerButton("L", self, Button.L, size=(30, 20), is_rectangular=True)
+        
         trigger_layout_left.addWidget(self.btn_zl)
+        trigger_layout_left.addWidget(self.btn_l)
         left_layout.addLayout(trigger_layout_left)
         
-        # 左スティックと方向パッド
-        stick_dpad_layout = QHBoxLayout()
+        # 左側のメインコントロール (左スティックと方向パッド)
+        left_main_layout = QHBoxLayout()
         
         # 左スティック
+        left_stick_container = QVBoxLayout()
+        left_stick_container.setSpacing(2)
+        
         self.left_stick = AnalogStick(self, is_left=True)
         self.left_stick.valueChanged.connect(self.onLeftStickChanged)
+        self.left_stick.clicked.connect(lambda: self.onButtonPressed(Button.LS))
+        
+        # LS（左スティック押し込み）ボタン
+        self.btn_ls = ControllerButton("LS", self, Button.LS, size=(25, 20), radius=10, color="#333")
+        
+        left_stick_container.addWidget(self.left_stick, alignment=Qt.AlignCenter)
+        left_stick_container.addWidget(self.btn_ls, alignment=Qt.AlignCenter)
         
         # 方向パッド
         self.dpad = DPad(self)
         self.dpad.directionChanged.connect(self.onDPadChanged)
         
-        stick_dpad_layout.addWidget(self.left_stick)
-        stick_dpad_layout.addWidget(self.dpad)
+        left_main_layout.addLayout(left_stick_container)
+        left_main_layout.addWidget(self.dpad)
         
-        left_layout.addLayout(stick_dpad_layout)
+        left_layout.addLayout(left_main_layout)
         controller_layout.addLayout(left_layout)
         
-        # 右側のレイアウト (右スティック、A/B/X/Y ボタン、R/ZR ボタン)
+        # 右側のレイアウト
         right_layout = QVBoxLayout()
         right_layout.setSpacing(2)
         
-        # R/ZR トリガーボタン
-        trigger_layout_right = QHBoxLayout()
-        self.btn_zr = ControllerButton("ZR", self, Button.ZR, size=(30, 20), is_rectangular=True)
-        self.btn_r = ControllerButton("R", self, Button.R, size=(30, 20), is_rectangular=True)
+        # 右上部のボタン (Home, +)
+        right_top_layout = QHBoxLayout()
+        right_top_layout.setSpacing(2)
         
-        trigger_layout_right.addWidget(self.btn_zr)
+        self.btn_home = ControllerButton("H", self, Button.HOME, size=(25, 20), radius=10, color="#444")
+        self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(25, 20), radius=10, color="#444")
+        
+        right_top_layout.addWidget(self.btn_home)
+        right_top_layout.addStretch(1)
+        right_top_layout.addWidget(self.btn_plus)
+        right_layout.addLayout(right_top_layout)
+        
+        # 右トリガーボタン (R, ZR)
+        trigger_layout_right = QHBoxLayout()
+        trigger_layout_right.setSpacing(2)
+        
+        # 外側にZRを配置
+        self.btn_r = ControllerButton("R", self, Button.R, size=(30, 20), is_rectangular=True)
+        self.btn_zr = ControllerButton("ZR", self, Button.ZR, size=(30, 20), is_rectangular=True)
+        
         trigger_layout_right.addWidget(self.btn_r)
+        trigger_layout_right.addWidget(self.btn_zr)
         right_layout.addLayout(trigger_layout_right)
         
-        # 右スティックとA/B/X/Yボタン
-        stick_buttons_layout = QHBoxLayout()
+        # 右側のメインコントロール (A/B/X/Y ボタンと右スティック)
+        right_main_layout = QHBoxLayout()
         
-        # A, B, X, Y ボタン
+        # A/B/X/Y ボタン
         button_grid = QGridLayout()
-        button_grid.setSpacing(0)
+        button_grid.setSpacing(2)
         
-        self.btn_y = ControllerButton("Y", self, Button.Y, size=(25, 25), radius=12)
-        self.btn_x = ControllerButton("X", self, Button.X, size=(25, 25), radius=12)
-        self.btn_b = ControllerButton("B", self, Button.B, size=(25, 25), radius=12)
-        self.btn_a = ControllerButton("A", self, Button.A, size=(25, 25), radius=12)
+        # 実際のコントローラーの配置に合わせる
+        self.btn_x = ControllerButton("X", self, Button.X, size=(25, 25), radius=12, color="#1e88e5")  # 青
+        self.btn_y = ControllerButton("Y", self, Button.Y, size=(25, 25), radius=12, color="#43a047")  # 緑
+        self.btn_a = ControllerButton("A", self, Button.A, size=(25, 25), radius=12, color="#e53935")  # 赤
+        self.btn_b = ControllerButton("B", self, Button.B, size=(25, 25), radius=12, color="#fdd835")  # 黄
         
         button_grid.addWidget(self.btn_y, 0, 1)
         button_grid.addWidget(self.btn_x, 1, 0)
@@ -354,21 +385,33 @@ class VirtualControllerPane(QWidget):
         button_grid.addWidget(self.btn_a, 2, 1)
         
         # 右スティック
+        right_stick_container = QVBoxLayout()
+        right_stick_container.setSpacing(2)
+        
         self.right_stick = AnalogStick(self, is_left=False)
         self.right_stick.valueChanged.connect(self.onRightStickChanged)
+        self.right_stick.clicked.connect(lambda: self.onButtonPressed(Button.RS))
         
-        stick_buttons_layout.addLayout(button_grid)
-        stick_buttons_layout.addWidget(self.right_stick)
+        # RS（右スティック押し込み）ボタン
+        self.btn_rs = ControllerButton("RS", self, Button.RS, size=(25, 20), radius=10, color="#333")
         
-        right_layout.addLayout(stick_buttons_layout)
+        right_stick_container.addWidget(self.right_stick, alignment=Qt.AlignCenter)
+        right_stick_container.addWidget(self.btn_rs, alignment=Qt.AlignCenter)
+        
+        right_main_layout.addWidget(QWidget(), 1)  # スペーサー
+        right_main_layout.addLayout(button_grid)
+        right_main_layout.addLayout(right_stick_container)
+        
+        right_layout.addLayout(right_main_layout)
         controller_layout.addLayout(right_layout)
         
         main_layout.addLayout(controller_layout)
         
-        # ボタンを押した時のイベント設定
+        # ボタンを押した時のイベント設定（スティック押し込みボタンも含む）
         for btn in [self.btn_a, self.btn_b, self.btn_x, self.btn_y, 
                    self.btn_l, self.btn_r, self.btn_zl, self.btn_zr,
-                   self.btn_minus, self.btn_plus, self.btn_home, self.btn_capture]:
+                   self.btn_minus, self.btn_plus, self.btn_home, self.btn_capture,
+                   self.btn_ls, self.btn_rs]:
             btn.pressed.connect(lambda b=btn: self.onButtonPressed(b.button_type))
             btn.released.connect(lambda b=btn: self.onButtonReleased(b.button_type))
     
