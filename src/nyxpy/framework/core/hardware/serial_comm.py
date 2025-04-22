@@ -106,6 +106,15 @@ class SerialManager:
         device.open(baudrate)
         self.active_device = device
 
+    def is_active(self) -> bool:
+        """
+        アクティブなシリアルデバイスが設定されているかを返します。
+        
+        Returns:
+            bool: アクティブなデバイスが存在する場合はTrue、それ以外はFalse
+        """
+        return self.active_device is not None
+
     def get_active_device(self) -> SerialCommInterface:
         """
         現在アクティブなシリアルデバイス（ドライバ）を返します。
