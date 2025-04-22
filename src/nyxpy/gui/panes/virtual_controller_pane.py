@@ -123,10 +123,10 @@ class VirtualControllerPane(QWidget):
         self.btn_a = ControllerButton("A", self, Button.A, size=(25, 25), radius=12)
         self.btn_b = ControllerButton("B", self, Button.B, size=(25, 25), radius=12)
         
-        button_grid.addWidget(self.btn_y, 0, 1)
-        button_grid.addWidget(self.btn_x, 1, 0)
-        button_grid.addWidget(self.btn_b, 1, 2)
-        button_grid.addWidget(self.btn_a, 2, 1)
+        button_grid.addWidget(self.btn_y, 1, 0)
+        button_grid.addWidget(self.btn_x, 0, 1)
+        button_grid.addWidget(self.btn_b, 2, 1)
+        button_grid.addWidget(self.btn_a, 1, 2)
         
         # 右スティックと押し込みボタン
         right_stick_container = QVBoxLayout()
