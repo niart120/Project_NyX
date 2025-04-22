@@ -50,24 +50,47 @@ class VirtualControllerModel(QObject):
         
     def set_hat_direction(self, direction: Hat) -> None:
         """方向パッドの方向を設定"""
+        previous_direction = self.current_hat
         self.current_hat = direction
-        self.update_controller_state()
+        
+        # CENTERに戻る場合は解放コマンドを送信
+        if direction == Hat.CENTER and previous_direction != Hat.CENTER:
+            self.send_release_command((previous_direction,))
+        # それ以外の場合は押下コマンドを送信
+        else:
+            self.send_press_command((direction,))
         
     def set_left_stick(self, angle: float, strength: float) -> None:
         """左スティックの状態を設定"""
-        if strength > 0:
+        previous_stick = self.current_l_stick
+        
+        # スティックの強度が0.1以上の場合、スティックを押下状態にする
+        # それ以外の場合はスティックを中央に戻す
+        if strength > 0.1:
             self.current_l_stick = LStick(angle, strength)
+            self.send_press_command((self.current_l_stick,))
         else:
+            # スティックを戻す場合、以前の状態が中央でなければ解放コマンドを送信
+            if previous_stick != LStick.CENTER:
+                self.send_release_command((previous_stick,))
             self.current_l_stick = LStick.CENTER
-        self.update_controller_state()
+
         
     def set_right_stick(self, angle: float, strength: float) -> None:
         """右スティックの状態を設定"""
-        if strength > 0:
+        previous_stick = self.current_r_stick
+        
+        # スティックの強度が0.1以上の場合、スティックを押下状態にする
+        # それ以外の場合はスティックを中央に戻す
+        if strength > 0.1:
             self.current_r_stick = RStick(angle, strength)
+            self.send_press_command((self.current_r_stick,))
         else:
+            # スティックを戻す場合、以前の状態が中央でなければ解放コマンドを送信
+            if previous_stick != RStick.CENTER:
+                self.send_release_command((previous_stick,))
             self.current_r_stick = RStick.CENTER
-        self.update_controller_state()
+            
         
     def send_release_command(self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]) -> None:
         """特定のキーの解放コマンドをシリアルデバイスに送信"""
@@ -79,6 +102,7 @@ class VirtualControllerModel(QObject):
             self.serial_manager.get_active_device().send(command_data)
         except Exception as e:
             log_manager.log("ERROR", f"コントローラー解放コマンド送信エラー: {e}", "VirtualController")
+            raise e
     
     def send_press_command(self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]) -> None:
         """特定のキーの押下コマンドをシリアルデバイスに送信"""
@@ -90,35 +114,4 @@ class VirtualControllerModel(QObject):
             self.serial_manager.get_active_device().send(command_data)
         except Exception as e:
             log_manager.log("ERROR", f"コントローラー押下コマンド送信エラー: {e}", "VirtualController")
-    
-    def update_controller_state(self) -> None:
-        """現在のコントローラ状態をシリアルデバイスに送信する
-        
-        内部状態に保持されている全ての入力（ボタン、方向パッド、スティック）を
-        まとめてプレスコマンドとして生成・送信します。
-        """
-        if not self.serial_manager or not self.serial_manager.is_active():
-            return
-        
-        # 入力キーのリストを作成
-        keys: List[Union[Button, Hat, LStick, RStick]] = list(self.pressed_buttons)
-        
-        # 方向パッド
-        if self.current_hat != Hat.CENTER:
-            keys.append(self.current_hat)
-            
-        # 左右スティック
-        if self.current_l_stick != LStick.CENTER:
-            keys.append(self.current_l_stick)
-        if self.current_r_stick != RStick.CENTER:
-            keys.append(self.current_r_stick)
-        
-        # プレスコマンドを生成
-        try:
-            command_data = self.protocol.build_press_command(tuple(keys))
-            self.serial_manager.get_active_device().send(command_data)
-        except Exception as e:
-            log_manager.log("ERROR", f"コントローラー状態更新エラー: {e}", "VirtualController")
-        
-        # 状態変更を通知
-        self.stateChanged.emit()
+            raise e
