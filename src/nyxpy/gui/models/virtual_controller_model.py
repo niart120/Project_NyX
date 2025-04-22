@@ -2,7 +2,7 @@ from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.logger.log_manager import log_manager
 from PySide6.QtCore import QObject, Signal
-from typing import Optional, Set, List, Tuple, Union, Any
+from typing import Optional, Set, List, Union, Any
 
 
 class VirtualControllerModel(QObject):

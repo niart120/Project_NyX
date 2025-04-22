@@ -1,9 +1,8 @@
 from PySide6.QtCore import Qt, Signal, QPointF, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QPaintEvent, QMouseEvent
 from PySide6.QtWidgets import QWidget
-from typing import Optional, Tuple, cast
+from typing import Optional
 import math
-from nyxpy.framework.core.macro.constants import LStick, RStick
 
 class AnalogStick(QWidget):
     """アナログスティックウィジェット"""
