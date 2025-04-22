@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout
+from typing import Optional, Any
 
 from nyxpy.framework.core.macro.constants import Button
 from nyxpy.gui.widgets.controller.analog_stick import AnalogStick
@@ -11,12 +12,12 @@ from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
 class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
     
-    def __init__(self, parent=None, serial_manager=None):
+    def __init__(self, parent: Optional[QWidget] = None, serial_manager: Optional[Any] = None) -> None:
         super().__init__(parent)
         self.model = VirtualControllerModel(serial_manager)
         self.initUI()
     
-    def initUI(self):
+    def initUI(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(2)
@@ -157,6 +158,6 @@ class VirtualControllerPane(QWidget):
             btn.pressed.connect(lambda b=btn: self.model.button_press(b.button_type))
             btn.released.connect(lambda b=btn: self.model.button_release(b.button_type))
     
-    def set_serial_manager(self, serial_manager):
+    def set_serial_manager(self, serial_manager: Any) -> None:
         """シリアルマネージャーを設定"""
         self.model.set_serial_manager(serial_manager)

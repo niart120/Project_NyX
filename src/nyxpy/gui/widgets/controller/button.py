@@ -1,9 +1,13 @@
 from PySide6.QtWidgets import QPushButton
 from nyxpy.framework.core.macro.constants import Button
+from typing import Optional, Tuple, Union
+
 
 class ControllerButton(QPushButton):
     """カスタムスタイルのコントローラーボタン"""
-    def __init__(self, text:str="", parent=None, button_type:Button=None, size:tuple[int,int]=(30, 30), radius:int=15, is_rectangular:bool=False):
+    def __init__(self, text: str = "", parent: Optional[QPushButton] = None, 
+                 button_type: Optional[Button] = None, size: Tuple[int, int] = (30, 30), 
+                 radius: int = 15, is_rectangular: bool = False) -> None:
         super().__init__(text, parent)
         self.button_type = button_type
         self.setFixedSize(size[0], size[1])
