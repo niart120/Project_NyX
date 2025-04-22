@@ -19,6 +19,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.framework.core.settings_service import SettingsService
+from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
 class AspectRatioLabel(QLabel):
     """
@@ -94,15 +95,27 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout(central)
         self.setCentralWidget(central)
 
-        # Left container: macro browser and controls
+        # Left container: macro browser, controls, and virtual controller
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
         self.macro_browser = MacroBrowserPane(self.executor, self)
         # Give macro_browser vertical stretch so it fills the pane
         left_layout.addWidget(self.macro_browser, 1)
+        
+        # 仮想コントローラーペインを作成
+        self.virtual_controller = VirtualControllerPane(self, self.serial_manager)
+        
+        # Control pane and Virtual Controller in lower section
+        lower_section = QVBoxLayout()
+        
         # Control pane at bottom with default stretch
         self.control_pane = ControlPane(self)
-        left_layout.addWidget(self.control_pane)
+        lower_section.addWidget(self.control_pane)
+        
+        # 仮想コントローラーを下部に追加
+        lower_section.addWidget(self.virtual_controller)
+        
+        left_layout.addLayout(lower_section)
         main_layout.addWidget(left_container)
 
         # Right pane: preview and log
