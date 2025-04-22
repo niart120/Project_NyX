@@ -284,18 +284,18 @@ class VirtualControllerPane(QWidget):
         trigger_layout_left.addWidget(self.btn_l)
         left_layout.addLayout(trigger_layout_left)
 
-        # ボタンを横に一列配置 (-, Capture)
+        # ボタンを横に一列配置 (-, Capture) - 右寄せに配置
         system_layout_left = QHBoxLayout()
-        
+        system_layout_left.setAlignment(Qt.AlignRight)  # 右寄せに設定
+        system_layout_left.setSpacing(4)
+
         self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(35, 25), radius=12)
-        self.btn_capture = ControllerButton("CAP", self, Button.CAP, size=(35, 25), radius=12)
+        self.btn_capture = ControllerButton("📷", self, Button.CAP, size=(35, 25), radius=12)
         
         system_layout_left.addWidget(self.btn_minus)
         system_layout_left.addWidget(self.btn_capture)
         
         left_layout.addLayout(system_layout_left)
-        
-        controller_layout.addLayout(left_layout)
         
         # 左側のメインコントロール (左スティックと方向パッド)
         left_main_layout = QHBoxLayout()
@@ -321,7 +321,8 @@ class VirtualControllerPane(QWidget):
         left_main_layout.addWidget(self.dpad)
         
         left_layout.addLayout(left_main_layout)
-
+        
+        controller_layout.addLayout(left_layout)
         
         # 右側のレイアウト
         right_layout = QVBoxLayout()
@@ -338,20 +339,22 @@ class VirtualControllerPane(QWidget):
         trigger_layout_right.addWidget(self.btn_r)
         trigger_layout_right.addWidget(self.btn_zr)
         right_layout.addLayout(trigger_layout_right)
-
-        # ボタンを横に一列配置 (Home, +)
-        system_layout_right = QHBoxLayout()
         
-        self.btn_home = ControllerButton("H", self, Button.HOME, size=(35, 25), radius=12)
+        # 右側のメインコントロール (A/B/X/Y ボタンと右スティック)
+        right_main_layout = QHBoxLayout()
+
+        # ボタンを横に一列配置 (Home, +) - 左寄せに配置
+        system_layout_right = QHBoxLayout()
+        system_layout_right.setAlignment(Qt.AlignLeft)  # 左寄せに設定
+        system_layout_right.setSpacing(4)
+
+        self.btn_home = ControllerButton("🏠", self, Button.HOME, size=(35, 25), radius=12)
         self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(35, 25), radius=12)
         
         system_layout_right.addWidget(self.btn_home)
         system_layout_right.addWidget(self.btn_plus)
         
         right_layout.addLayout(system_layout_right)
-        
-        # 右側のメインコントロール (A/B/X/Y ボタンと右スティック)
-        right_main_layout = QHBoxLayout()
         
         # A/B/X/Y ボタン
         button_grid = QGridLayout()
@@ -384,7 +387,6 @@ class VirtualControllerPane(QWidget):
         right_main_layout.addLayout(right_stick_container)
         
         right_layout.addLayout(right_main_layout)
-    
         
         controller_layout.addLayout(right_layout)
         
