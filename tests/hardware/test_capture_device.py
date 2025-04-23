@@ -18,7 +18,7 @@ def test_continuous_frame_update():
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
     
-    time.sleep(0.5)  # 初期化後、少し待機してフレームが取得できるようにする
+    time.sleep(1.5)  # 初期化後、少し待機してフレームが取得できるようにする
     initial_frame = capture_device.get_frame()
     time.sleep(0.5)  # 数秒待機してフレームが更新されるのを確認
     updated_frame = capture_device.get_frame()
