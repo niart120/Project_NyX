@@ -74,7 +74,7 @@ class TestPreviewPane:
         # Verify
         expected_path = Path.cwd() / SNAPSHOT_DIR / f"{mock_timestamp}.png"
         assert os.path.exists(Path.cwd() / SNAPSHOT_DIR)
-        mock_cv2.resize.assert_called_once_with(test_frame, (1280, 720), interpolation=mock_cv2.INTER_LINEAR)
+        mock_cv2.resize.assert_called_once_with(test_frame, (1280, 720), interpolation=mock_cv2.INTER_AREA)
         mock_cv2.imwrite.assert_called_once_with(str(expected_path), test_frame)
         signal_mock.emit.assert_called_once_with(f"スナップショット保存: {mock_timestamp}.png")
         assert result == f"スナップショット保存: {mock_timestamp}.png"
