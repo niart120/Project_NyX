@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from PySide6.QtCore import Qt
 from nyxpy.gui.main_window import MainWindow
 
@@ -14,9 +15,32 @@ def dummy_executor(monkeypatch):
     yield
 
 @pytest.fixture
-def window(qtbot, dummy_executor):
+def patched_managers():
+    # キャプチャマネージャとシリアルマネージャの非同期動作をパッチ
+    with patch('nyxpy.framework.core.hardware.capture.CaptureManager') as mock_cap_mgr:
+        with patch('nyxpy.framework.core.hardware.serial_comm.SerialManager') as mock_ser_mgr:
+            # 同期的にデバイス検出するように動作を変更
+            mock_cap_mgr.return_value.auto_register_devices.side_effect = lambda: None
+            mock_ser_mgr.return_value.auto_register_devices.side_effect = lambda: None
+            yield mock_cap_mgr, mock_ser_mgr
+
+@pytest.fixture
+def window(qtbot, dummy_executor, patched_managers):
+    # パッチされたマネージャーを使用
+    mock_cap_mgr, mock_ser_mgr = patched_managers
+    
+    # モックのキャプチャマネージャを設定
+    mock_cap_mgr.return_value.list_devices.return_value = ["ダミーデバイス"]
+    
     w = MainWindow()
     qtbot.addWidget(w)
+    
+    # 非同期初期化を手動で完了させる
+    w.deferred_init()
+    
+    # ステータスラベルを準備完了に手動で更新
+    w.status_label.setText("準備完了")
+    
     return w
 
 def test_initial_ui_state(window):
