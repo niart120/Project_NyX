@@ -1,6 +1,5 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QSizePolicy, QHeaderView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QTableWidget, QTableWidgetItem, QSizePolicy, QHeaderView
 from PySide6.QtCore import Qt, Signal
-from nyxpy.framework.core.utils.helper import extract_macro_tags
 
 class MacroBrowserPane(QWidget):
     """
@@ -18,9 +17,6 @@ class MacroBrowserPane(QWidget):
         self.search_box.setPlaceholderText("検索…（マクロ名／タグ）")
         layout.addWidget(self.search_box)
 
-        self.tag_list = QListWidget(self)
-        layout.addWidget(self.tag_list)
-
         self.table = QTableWidget(0, 3, self)
         self.table.setHorizontalHeaderLabels(["マクロ名", "説明文", "タグ"])
         # Allow table columns to be resized interactively and shrink
@@ -30,16 +26,10 @@ class MacroBrowserPane(QWidget):
         self.executor = executor
         self.macros = self.executor.macros
         self.reload_macros()
-        self.tag_list.clear()
-        for tag in extract_macro_tags(self.macros):
-            item = QListWidgetItem(tag)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Unchecked)
-            self.tag_list.addItem(item)
 
         # connect filter and selection within pane
         self.search_box.textChanged.connect(self.filter_macros)
-        self.tag_list.itemChanged.connect(self.filter_macros)
+
         # emit selection changes
         self.table.selectionModel().selectionChanged.connect(
             lambda: self.selection_changed.emit(self.table.selectionModel().hasSelection())
@@ -56,13 +46,11 @@ class MacroBrowserPane(QWidget):
 
     def filter_macros(self):
         keyword = self.search_box.text().lower()
-        checked = [self.tag_list.item(i).text() 
-                   for i in range(self.tag_list.count()) 
-                   if self.tag_list.item(i).checkState() == Qt.Checked]
+        
 
         for row in range(self.table.rowCount()):
             name = self.table.item(row, 0).text().lower()
             tags = self.table.item(row, 2).text().split(", ")
             match_keyword = (keyword in name) or any(keyword in t.lower() for t in tags)
-            match_tags = all(tag in tags for tag in checked)
-            self.table.setRowHidden(row, not (match_keyword and match_tags))
+
+            self.table.setRowHidden(row, not (match_keyword))
