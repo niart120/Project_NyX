@@ -85,19 +85,15 @@ PokeConSerialProtocolは以下のいずれかのフォーマットからなる�
     - 例3: `0x2 ...` - 左スティックのみ値を適用
 
 #### **押下 (hold)**
-1. `<hex_btns>` フィールド（下位8ビット）に対して `Button` 値の **下位バイト** を OR 演算で追加
-2. `<hex_btns>` フィールド（上位8ビット）に対して `Button` 値の **上位バイト** を OR 演算で追加
-3. `<hex_btns>` を左に2ビットシフト（`<<= 2`）して`0x3` を OR演算で追加
-4. `<hex_hat>` フィールドを、対応する `Hat` の値で上書き
-5. `<hex_pc_lx>`, `<hex_pc_ly>`, `<hex_pc_rx>`, `<hex_pc_ry>` に対して指定されたスティックの角度と強さに応じた値を計算し格納
+1. `<hex_btns>` フィールドに対して `Button` 値を左に2ビットシフト（`<<= 2`）して OR 演算で追加
+2. `<hex_btns>` フィールドに対して`0x3` を OR演算で追加
+3. `<hex_hat>` フィールドを、対応する `Hat` の値で上書き
+4. `<hex_pc_lx>`, `<hex_pc_ly>`, `<hex_pc_rx>`, `<hex_pc_ry>` に対して指定されたスティックの角度と強さに応じた値を計算し格納
 
 #### **解放 (release)**
-1. `<hex_btns>` を右に2ビットシフト(`>>=2`)
-2. `<hex_btns>` フィールドから対象ボタン (`Button`) の **下位バイト** をクリア（AND NOT 演算）
-3. `<hex_btns>` フィールドから対象ボタン (`Button`) の **上位バイト** をクリア（AND NOT 演算）
-4. `<hex_btns>` を左に2ビットシフト（`<<= 2`）して`0x3` を OR演算で追加
-5. `<hex_hat>` フィールドを `Hat.CENTER` (`0x08`) にリセット
-6. `<hex_pc_lx>`, `<hex_pc_ly>`, `<hex_pc_rx>`, `<hex_pc_ry>` を`LStick.CENTER` / `RStick.CENTER` (`0x80`) にリセット
+1. `<hex_btns>` フィールドから対象ボタン (`Button`) 値を左に2ビットシフト（`<<= 2`）してクリア（AND NOT 演算）
+2. `<hex_hat>` フィールドを `Hat.CENTER` (`0x08`) にリセット
+3. `<hex_pc_lx>`, `<hex_pc_ly>`, `<hex_pc_rx>`, `<hex_pc_ry>` を`LStick.CENTER` / `RStick.CENTER` (`0x80`) にリセット
 
 ### 2.2 文字列送信
 ```
