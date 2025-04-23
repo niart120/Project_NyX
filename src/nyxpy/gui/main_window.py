@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
             
         # デバイス初期化結果をステータスバーに表示
         if not serial_initialized:
-            log_manager.log("WARN", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
+            log_manager.log("WARNING", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
