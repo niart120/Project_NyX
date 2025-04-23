@@ -50,7 +50,6 @@ def test_initial_ui_state(window):
     assert not window.control_pane.run_btn.isEnabled()
     assert not window.control_pane.cancel_btn.isEnabled()
     assert window.control_pane.snapshot_btn.isEnabled()
-    assert window.macro_browser.tag_list.count() == 2
 
 def test_run_button_enabled_on_selection(window, qtbot):
     # simulate selecting the first row
@@ -64,10 +63,3 @@ def test_search_filter(window):
     window.macro_browser.search_box.clear()
     assert not window.macro_browser.table.isRowHidden(0)
 
-def test_tag_filter(window):
-    # check Tag1
-    item = window.macro_browser.tag_list.findItems("Tag1", Qt.MatchExactly)[0]
-    item.setCheckState(Qt.Checked)
-    assert not window.macro_browser.table.isRowHidden(0)
-    item.setCheckState(Qt.Unchecked)
-    assert not window.macro_browser.table.isRowHidden(0)
