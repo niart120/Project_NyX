@@ -10,28 +10,27 @@ class SettingsService:
     def __init__(self):
         # Load or create global settings
         self.global_settings = GlobalSettings()
-        # Initialize capture manager and select default device
+        
+        # Initialize capture manager
         self.capture_manager = CaptureManager()
-        self.capture_manager.auto_register_devices()
-        devices = self.capture_manager.list_devices()
         default_capture = self.global_settings.get("capture_device", "")
-        try:
-            if default_capture and default_capture in devices:
-                self.capture_manager.set_active(default_capture)
-            elif devices:
-                self.capture_manager.set_active(devices[0])
-        except Exception:
-            pass
-        # Initialize serial manager and select default device
+        
+        # デフォルトのキャプチャデバイスが設定されていれば適用する
+        if default_capture:
+            self.capture_manager.set_default_device(default_capture)
+        
+        # バックグラウンドでデバイス検出開始
+        self.capture_manager.auto_register_devices()
+                
+        # Initialize serial manager and configure default device
         self.serial_manager = SerialManager()
-        self.serial_manager.auto_register_devices()
-        serials = self.serial_manager.list_devices()
         default_serial = self.global_settings.get("serial_device", "")
         default_baud = self.global_settings.get("serial_baud", 9600)
-        try:
-            if default_serial and default_serial in serials:
-                self.serial_manager.set_active(default_serial, default_baud)
-            elif serials:
-                self.serial_manager.set_active(serials[0], default_baud)
-        except Exception:
-            pass
+        
+        # 設定されているデフォルトシリアルデバイスがあれば、
+        # 検出後に自動的に適用されるように設定する
+        if default_serial:
+            self.serial_manager.set_default_device(default_serial, default_baud)
+        
+        # デバイス検出を開始（バックグラウンドで実行）
+        self.serial_manager.auto_register_devices()

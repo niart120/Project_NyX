@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
-from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice, CaptureManager
+from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice, CaptureManager, DummyCaptureDevice
 
 # ダミーの VideoCapture クラス
 class DummyVideoCapture:
@@ -93,11 +93,24 @@ def test_capture_manager_operations():
         manager.release_active()
         assert manager.active_device is None
 
-# テストケース５: CaptureManager.get_frame() でアクティブなデバイスが未設定の場合
-def test_capture_manager_get_frame_without_active():
+# テストケース５: CaptureManagerでアクティブデバイスがない場合はダミーデバイスが自動的に設定される
+def test_capture_manager_auto_dummy_device():
     manager = CaptureManager()
-    with pytest.raises(RuntimeError, match="CaptureManager: No active capture device."):
-        manager.get_active_device().get_frame()
+    # 確実にアクティブデバイスがないことを確認
+    manager.active_device = None
+    
+    # get_active_deviceを呼び出すとダミーデバイスが自動設定されることを確認
+    device = manager.get_active_device()
+    assert device is not None
+    assert isinstance(device, DummyCaptureDevice)
+    
+    # デバイスからフレームが取得できることを確認
+    frame = device.get_frame()
+    assert isinstance(frame, np.ndarray)
+    assert frame.shape == (720, 1280, 3)
+    
+    # 後始末
+    manager.release_active()
 
 # テストケース６: CaptureManager.get_frame() でフレームが取得できない場合
 # ここではダミーのデバイスの get_latest_frame() をオーバーライドして None を返す

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from nyxpy.framework.core.hardware.serial_comm import SerialComm, SerialManager
+from nyxpy.framework.core.hardware.serial_comm import SerialComm, SerialManager, DummySerialComm
 
 @pytest.fixture
 def mock_serial():
@@ -73,10 +73,17 @@ def test_serial_manager_set_active_unregistered_device(serial_manager):
     with pytest.raises(ValueError, match="'unknown_device'"):
         serial_manager.set_active("unknown_device", 9600)
 
-def test_serial_manager_send_without_active_device(serial_manager):
-    """SerialManager.send() の異常系テスト: アクティブデバイスなし"""
-    with pytest.raises(RuntimeError, match="SerialManager: No active serial device."):
-        serial_manager.get_active_device()
+def test_serial_manager_auto_dummy_device(serial_manager):
+    """アクティブデバイスがない場合にダミーデバイスが自動設定されることを確認"""
+    # 初期状態でアクティブデバイスをクリア (通常は不要だがテスト確実性のため)
+    serial_manager.close_active()
+    assert serial_manager.active_device is None
+    
+    # get_active_deviceを呼び出すとダミーデバイスが自動設定されることを確認
+    device = serial_manager.get_active_device()
+    assert device is not None
+    assert isinstance(device, DummySerialComm)
+    assert serial_manager.active_device == device
 
 def test_serial_manager_close_without_active_device(serial_manager):
     """SerialManager.close_active() の異常系テスト: アクティブデバイスなし"""
@@ -104,4 +111,4 @@ def test_serial_manager_get_device_names(serial_manager):
     device_names = serial_manager.list_devices()
     assert "device1" in device_names
     assert "device2" in device_names
-    assert len(device_names) == 2
+    assert len(device_names) == 3 # ダミーデバイスも含まれるため、3つになる

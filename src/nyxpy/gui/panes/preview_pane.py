@@ -24,30 +24,26 @@ class PreviewPane(QWidget):
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setMinimumHeight(100)
         layout.addWidget(self.label)
-        # Capture device init and timer
+        
+        # Use passed capture manager instead of initializing again
         self.capture_manager = settings_service.capture_manager
         self.settings = settings_service.global_settings
-        self.capture_manager.auto_register_devices()
-        # set default or first device
-        devices = self.capture_manager.list_devices()
-        default_cap = self.settings.get("capture_device", "")
-        try:
-            if default_cap and default_cap in devices:
-                self.capture_manager.set_active(default_cap)
-            elif devices:
-                self.capture_manager.set_active(devices[0])
-        except Exception:
-            pass
+        
+        # No need to register devices or set active device again - already done in SettingsService
+        
         # use QTimer to periodically update preview
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_preview)
         # Start timer immediately to ensure preview updates even if showEvent isn't called
         self.apply_fps()
-        # Initial frame render
-        self.update_preview()
+        # Initial frame render - but don't force it immediately
+        QTimer.singleShot(500, self.update_preview)
 
     def update_preview(self):
-
+        # Only try to update if widget is visible
+        if not self.isVisible():
+            return
+            
         try:
             frame = self.capture_manager.get_active_device().get_frame()
             if frame is None:
@@ -103,10 +99,14 @@ class PreviewPane(QWidget):
         fps = self.settings.get("capture_fps", 30)
         interval = int(1000 / fps) if fps > 0 else 1000
         self.timer.start(interval)
-        # Immediately trigger one update to reflect current size
-        self.update_preview()
-
+        # Don't immediately trigger update to avoid blocking UI
+        
     def showEvent(self, event):
         super().showEvent(event)
         # Start timer when pane is shown
         self.apply_fps()
+        
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        # Stop timer when pane is hidden to save resources
+        self.timer.stop()
