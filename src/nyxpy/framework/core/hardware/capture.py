@@ -137,47 +137,89 @@ class CaptureManager:
     def __init__(self):
         self.devices = {}
         self.active_device:AsyncCaptureDevice = None
+        self._default_device = ""
+        # Add dummy device by default for faster startup
+        self.register_device("ダミーデバイス", DummyCaptureDevice())
     
     def auto_register_devices(self) -> None:
         """
         キャプチャデバイスを自動検出して登録します。
         """
-        # アクティブなデバイスをリリース
-        self.release_active()
+        # Start a background thread to detect devices to avoid blocking the UI
+        thread = threading.Thread(target=self._detect_devices_thread, daemon=True)
+        thread.start()
+    
+    def set_default_device(self, device_name: str) -> None:
+        """
+        デフォルトのデバイス設定を保存します。デバイス検出後に自動的に適用されます。
+        """
+        self._default_device = device_name
+            
+    def _detect_devices_thread(self) -> None:
+        """
+        バックグラウンドでデバイスを検出するスレッド処理。
+        UIをブロックせずにデバイスを検出します。
+        """
         # OS に応じてデバイスを登録
         # Windows, Linux では enumerate_cameras() を利用 / macOS では手動で登録する必要がある
         os_name = platform.system()
-        match os_name:
-            case "Windows":
-                for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW): #windowsの場合のバックエンドはDirectShow
-                    name = f'{camera_info.index}: {camera_info.name}'
-                    device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
+        try:
+            match os_name:
+                case "Windows":
+                    self._detect_windows_devices()
+                case "Linux":
+                    self._detect_linux_devices()
+                case "Darwin":
+                    self._detect_macos_devices()
+                case _:
+                    # Just use dummy device for unsupported platforms
+                    pass
+                    
+            # デバイス検出が完了したら、デフォルト設定を適用
+            if self._default_device and self._default_device in self.devices:
+                self.set_active(self._default_device)
+            elif len(self.devices) > 1:  # ダミーデバイス以外が存在する場合
+                # ダミーデバイス以外の最初のデバイスを選択
+                non_dummy_devices = [name for name in self.devices.keys() if name != "ダミーデバイス"]
+                if non_dummy_devices:
+                    self.set_active(non_dummy_devices[0])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Ensure we always have at least the dummy device
+            if "ダミーデバイス" not in self.devices:
+                self.register_device("ダミーデバイス", DummyCaptureDevice())
+    
+    def _detect_windows_devices(self):
+        # Windows uses DirectShow
+        for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW):
+            name = f'{camera_info.index}: {camera_info.name}'
+            device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
+            self.register_device(name, device)
+    
+    def _detect_linux_devices(self):
+        # Linux uses V4L2
+        for camera_info in enumerate_cameras(cv2.CAP_V4L2):
+            name = f'{camera_info.index}: {camera_info.name}'
+            device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
+            self.register_device(name, device)
+    
+    def _detect_macos_devices(self):
+        # macOS: Optimize by checking only first 5 indices instead of 20
+        log_level = cv2.getLogLevel()
+        cv2.setLogLevel(0)  # ログレベルを無効化
+        try:
+            # Reduce the search range from 20 to 5
+            for i in range(5):
+                cap = cv2.VideoCapture(i)
+                if cap.isOpened():
+                    cap.release()
+                    name = f"macOS Camera {i}"
+                    device = AsyncCaptureDevice(device_index=i, fps=30.0)
                     self.register_device(name, device)
-            case "Linux":
-                for camera_info in enumerate_cameras(cv2.CAP_V4L2): #Linuxの場合のバックエンドはV4L2
-                    name = f'{camera_info.index}: {camera_info.name}'
-                    device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
-                    self.register_device(name, device)
-            case "Darwin":
-                # macOS の場合の処理を追加することも可能
-                # HACK: macOS の場合は enumerate_cameras() が動作しないため、手動で登録する必要がある
-                # デバイス番号を0から20までの範囲で決め打ちで登録する
-                log_level = cv2.getLogLevel()
-                cv2.setLogLevel(0)  # ログレベルを無効化
-                # 0から20までのカメラを登録する（実際には存在しない場合もある）
-                for i in range(20):
-                    cap = cv2.VideoCapture(i)
-                    if cap.isOpened():
-                        cap.release()
-                        name = f"macOS Camera {i}"
-                        device = AsyncCaptureDevice(device_index=i, fps=60.0)
-                        self.register_device(name, device)
-                
-                cv2.setLogLevel(log_level)
-        
-            case _:
-                raise RuntimeError(f"Unsupported OS: {os_name}.")
-            
+        finally:
+            cv2.setLogLevel(log_level)
+
     def list_devices(self) -> list[str]:
         """
         登録されているキャプチャデバイスの名前一覧を返します。
@@ -207,7 +249,8 @@ class CaptureManager:
         もしアクティブなデバイスが存在しない場合は、RuntimeError を発生させます。
         """
         if self.active_device is None:
-            raise RuntimeError("CaptureManager: No active capture device.")
+            # Use dummy device instead of raising an error
+            self.set_active("ダミーデバイス")
         return self.active_device
 
     def release_active(self) -> None:

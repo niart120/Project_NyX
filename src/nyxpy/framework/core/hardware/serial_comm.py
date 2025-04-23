@@ -1,5 +1,6 @@
 import serial
 import serial.tools.list_ports
+import threading
 from abc import ABC, abstractmethod
 
 class SerialCommInterface(ABC):
@@ -69,18 +70,51 @@ class SerialManager:
     def __init__(self):
         self.devices = {}
         self.active_device: SerialCommInterface = None
+        self._default_serial = ""
+        self._default_baud = 9600
+        # Add a dummy device by default for faster startup
+        self.register_device("ダミーデバイス", DummySerialComm("dummy"))
     
     def auto_register_devices(self) -> None:
         """
         接続されているシリアルポートを検出し、デフォルト設定のシリアルデバイスとして登録します。
         """
-
-        # アクティブなデバイスをリリース
-        self.close_active()
-        ports = serial.tools.list_ports.comports()
-        for port in ports:
-            device = SerialComm(port=port.device)
-            self.register_device(port.device, device)
+        # Start a background thread to detect devices to avoid blocking the UI
+        thread = threading.Thread(target=self._detect_devices_thread, daemon=True)
+        thread.start()
+        
+    def set_default_device(self, device_name: str, baudrate: int = 9600) -> None:
+        """
+        デフォルトのデバイス設定を保存します。デバイス検出後に自動的に適用されます。
+        """
+        self._default_serial = device_name
+        self._default_baud = baudrate
+    
+    def _detect_devices_thread(self) -> None:
+        """
+        バックグラウンドでデバイスを検出するスレッド処理。
+        UIをブロックせずにデバイスを検出します。
+        """
+        try:
+            ports = serial.tools.list_ports.comports()
+            for port in ports:
+                device = SerialComm(port=port.device)
+                self.register_device(port.device, device)
+                
+            # デバイス検出が完了したら、デフォルト設定を適用
+            if self._default_serial and self._default_serial in self.devices:
+                self.set_active(self._default_serial, self._default_baud)
+            elif len(self.devices) > 1:  # ダミーデバイス以外が存在する場合
+                # ダミーデバイス以外の最初のデバイスを選択
+                non_dummy_devices = [name for name in self.devices.keys() if name != "ダミーデバイス"]
+                if non_dummy_devices:
+                    self.set_active(non_dummy_devices[0], self._default_baud)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Make sure we always have at least the dummy device
+            if "ダミーデバイス" not in self.devices:
+                self.register_device("ダミーデバイス", DummySerialComm("dummy"))
     
     def list_devices(self) -> list[str]:
         """
@@ -121,7 +155,8 @@ class SerialManager:
         送受信などの実際の操作は、このドライバのメソッドに委ねます。
         """
         if self.active_device is None:
-            raise RuntimeError("SerialManager: No active serial device.")
+            # Use dummy device instead of raising error
+            self.set_active("ダミーデバイス", 9600)
         return self.active_device
 
     def close_active(self) -> None:

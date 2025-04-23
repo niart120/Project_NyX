@@ -49,37 +49,25 @@ class MainWindow(QMainWindow):
         # Initialize macro executor for browser pane
         self.executor = MacroExecutor()
 
-        self.init_managers()
+        # Set up the basic UI first to show it quickly
         self.setup_ui()
         
+        # Use Qt's event queue to initialize the rest after UI appears
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self.deferred_init)
+
+    def deferred_init(self):
+        """Perform initialization that can be deferred until after UI appears"""
+        self.init_managers()
         self.setup_logging() # Setup logging for the GUI
         self.setup_connections() # Setup signal connections between UI components
 
-
     def init_managers(self):
         # Load settings and initialize hardware managers
-        # シリアルデバイスの初期化
-        ser_list = self.serial_manager.list_devices()
-        default_ser = self.global_settings.get("serial_device", "")
-        default_baud = self.global_settings.get("serial_baud", 9600)
-        serial_initialized = False
-        
-        # より堅牢なエラーハンドリング
-        try:
-            if default_ser and default_ser in ser_list:
-                self.serial_manager.set_active(default_ser, default_baud)
-                serial_initialized = True
-            elif ser_list:
-                self.serial_manager.set_active(ser_list[0], default_baud)
-                serial_initialized = True
-        except Exception as e:
-            log_manager.log("ERROR", f"シリアルデバイス初期化エラー: {e}", "MainWindow")
-            # デバイス設定を初期化せずにGUIを表示させる（後で設定ダイアログから設定可能）
-            pass
-            
-        # デバイス初期化結果をステータスバーに表示
-        if not serial_initialized:
-            log_manager.log("WARN", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
+        # シリアルデバイスの初期化 (already started in background by SettingsService)
+        # Just log status
+        if not self.serial_manager.is_active():
+            log_manager.log("WARNING", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -135,7 +123,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(right_container, stretch=1)
 
         # status bar
-        self.status_label = QLabel("準備完了")
+        self.status_label = QLabel("準備中...")
         self.statusBar().addWidget(self.status_label)
 
     def setup_connections(self):
@@ -147,6 +135,9 @@ class MainWindow(QMainWindow):
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
         self.preview_pane.snapshot_taken.connect(self.status_label.setText)
         self.control_pane.settings_requested.connect(self.open_settings)
+        
+        # Set status to ready
+        self.status_label.setText("準備完了")
 
     def setup_logging(self):
         log_manager.add_handler(lambda record: self.log_pane.append(str(record)), level="DEBUG")
