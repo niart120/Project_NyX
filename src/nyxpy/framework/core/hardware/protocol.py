@@ -116,3 +116,79 @@ class CH552SerialProtocol(SerialProtocolInterface):
             self.key_state[9] = encoded[0] if len(encoded) > 0 else 0x00
 
         return bytes(self.key_state)
+
+class PokeConSerialProtocol(SerialProtocolInterface):
+    """
+    PokeConSerialProtocol は、PokeCon用プログラムが実装された Arduino デバイス向けの通信プロトコルを実装します。
+    内部状態（key_state）は以下の構成になっています：
+    [hex_btns, hex_hat, hex_pc_lx, hex_pc_ly, hex_pc_rx, hex_pc_ry]
+    - hex_btns: ボタンの状態（下位／上位8ビット）
+    - hex_hat: 方向パッドの状態（押下時は対応する値、解放時は Hat.CENTER）
+    - hex_pc_lx, hex_pc_ly: 左スティックの X, Y 座標（中央は 0x80）
+    - hex_pc_rx, hex_pc_ry: 右スティックの X, Y 座標（中央は 0x80）
+    """
+    def __init__(self):
+        self._initialize_key_state()
+
+    def _initialize_key_state(self) -> None:
+        # 初期状態：キーはすべて未押下、スティックは中央位置、Hat は CENTER
+        self.key_state:list[int] = list([
+            0x0003,       # hex_btns (16ビット)
+            Hat.CENTER, # hex_hat
+            0x80,       # hex_pc_lx (左スティックX中央)
+            0x80,       # hex_pc_ly (左スティックY中央)
+            0x80,       # hex_pc_rx (右スティックX中央)
+            0x80        # hex_pc_ry (右スティックY中央)
+        ])
+
+    def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # 各キーに対して、内部状態を更新する
+        for key in keys:
+            if isinstance(key, Button):
+                # ボタンは16ビット（hex_btns）にわたってマスクする
+                self.key_state[0] |= ((key<<2) & 0xFFFF)  # Update to use hex_btns
+            elif isinstance(key, Hat):
+                self.key_state[1] = key
+            elif isinstance(key, LStick):
+                self.key_state[2] = key.x
+                self.key_state[3] = key.y
+            elif isinstance(key, RStick):
+                self.key_state[4] = key.x
+                self.key_state[5] = key.y
+
+        # 生成された状態を16進数の文字列に変換後、バイト列として返す
+        hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
+        # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
+        return hex_string.encode('utf-8')
+
+    def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # キーが指定されなければ、全体を初期状態にリセット
+        if not keys:
+            self._initialize_key_state()
+        else:
+            for key in keys:
+                if isinstance(key, Button):
+                    self.key_state[0] &= (~((key<<2) & 0xFFFF)) & 0xFFFF
+                elif isinstance(key, Hat):
+                    self.key_state[1] = Hat.CENTER
+                elif isinstance(key, LStick):
+                    self.key_state[2] = 0x80
+                    self.key_state[3] = 0x80
+                elif isinstance(key, RStick):
+                    self.key_state[4] = 0x80
+                    self.key_state[5] = 0x80
+        # 生成された状態を16進数の文字列に変換後、バイト列として返す
+        hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
+        # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
+        return hex_string.encode('utf-8')
+
+    def build_keyboard_command(self, key: str, op: KeyboardOp) -> bytes:
+        # キーボード入力の種類に応じて、コマンドを生成する
+        match op:
+            case KeyboardOp.TEXT:
+                # テキスト入力操作のコマンドを生成する
+                # 文字列をバイト列に変換して返す
+                encoded = f'"{key}"'.encode('utf-8', errors='ignore')
+                return encoded + b'\r\n'
+            case _:
+                raise ValueError("Unsupported keyboard operation type")

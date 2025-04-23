@@ -94,3 +94,4 @@ class KeyboardOp(IntEnum):
     ALL_RELEASE = 5
     PUSH = 6 # UNUSED
     SPECIAL_PUSH = 7 # UNUSED
+    TEXT = 8 # for PokeConSerialProtocol
