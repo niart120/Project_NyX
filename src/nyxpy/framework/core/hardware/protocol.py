@@ -9,8 +9,6 @@ class SerialProtocolInterface(ABC):
         :param keys: 押下するキーのタプル
         :return: コマンドデータ
         """
-        
-        
         pass
 
     @abstractmethod
@@ -23,13 +21,25 @@ class SerialProtocolInterface(ABC):
         pass
 
     @abstractmethod
-    def build_keyboard_command(self, key: str, op: KeyboardOp) -> bytes:
+    def build_keyboard_command(self, key: str) -> bytes:
         """
-        キーボード入力操作のコマンドデータを生成する
-
-        :param key: キーの文字
+        キーボード文字列入力操作のコマンドデータを生成する
+        
+        :param key: 入力する文字列
+        :return: コマンドデータ
+        :raises NotImplementedError: プロトコルが対応していない場合
+        """
+        pass
+        
+    @abstractmethod
+    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+        """
+        キーボード個別キー操作のコマンドデータを生成する
+        
+        :param key: 操作するキーの文字
         :param op: KeyboardOp キーボード操作の種類
         :return: コマンドデータ
+        :raises NotImplementedError: プロトコルが対応していない場合
         """
         pass
 
@@ -103,8 +113,12 @@ class CH552SerialProtocol(SerialProtocolInterface):
 
         return bytes(self.key_state)
 
-    def build_keyboard_command(self, key: str, op: KeyboardOp) -> bytes:
-        # キーボード操作の状態を更新する
+    def build_keyboard_command(self, key: str) -> bytes:
+        # CH552はテキスト入力をサポートしていないため、すべての操作でエラーを発生させる
+        raise NotImplementedError("CH552 protocol does not support text mode keyboard input. Use build_keytype_command instead.")
+        
+    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+        # キーボード個別キー操作の状態を更新する
         # キーボード操作のヘッダーを設定
         self.key_state[8] = int(op)
 
@@ -182,13 +196,26 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
         return hex_string.encode('utf-8')
 
-    def build_keyboard_command(self, key: str, op: KeyboardOp) -> bytes:
-        # キーボード入力の種類に応じて、コマンドを生成する
+    def build_keyboard_command(self, key: str) -> bytes:
+        # テキスト入力操作のコマンドを生成する
+        # 文字列をバイト列に変換して返す
+        encoded = f'"{key}"'.encode('utf-8', errors='ignore')
+        return encoded + b'\r\n'
+                
+    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+        # キーボード個別キー操作の種類に応じて、コマンドを生成する
         match op:
-            case KeyboardOp.TEXT:
-                # テキスト入力操作のコマンドを生成する
-                # 文字列をバイト列に変換して返す
-                encoded = f'"{key}"'.encode('utf-8', errors='ignore')
+            case KeyboardOp.PRESS:
+                # 個別キー押下操作のコマンドを生成する
+                encoded = f"PRESS {key}".encode('utf-8', errors='ignore')
                 return encoded + b'\r\n'
+            case KeyboardOp.RELEASE:
+                # 個別キー解放操作のコマンドを生成する
+                encoded = f"RELEASE {key}".encode('utf-8', errors='ignore')
+                return encoded + b'\r\n'
+            case KeyboardOp.ALL_RELEASE:
+                # すべてのキー解放操作のコマンドを生成する
+                # PokeConプロトコルはすべてのキー解放操作をサポートしないため、エラーを発生させる
+                raise NotImplementedError("PokeCon protocol does not support ALL_RELEASE operation.")
             case _:
                 raise ValueError("Unsupported keyboard operation type")

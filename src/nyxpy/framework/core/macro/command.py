@@ -120,8 +120,19 @@ class Command(ABC):
     def keyboard(self, text: str) -> None:
         """
         指定されたテキスト(英数字)をキーボード入力として送信します。
+        プロトコルが対応していない場合は、文字ごとに keytype に委譲されます。
 
         :param text: 送信するテキスト
+        """
+        pass
+
+    @abstractmethod
+    def keytype(self, key: str) -> None:
+        """
+        指定されたキーを個別のキーボード入力として送信します。
+        これは個々のキーの押下・解放操作を表します。
+
+        :param key: 送信するキー文字
         """
         pass
 
@@ -222,17 +233,42 @@ class DefaultCommand(Command):
 
     @check_interrupt
     def keyboard(self, text: str) -> None:
-        self.log(f"Sending keyboard input: {text}", level="DEBUG")
+        self.log(f"Sending keyboard text input: {text}", level="DEBUG")
         text = validate_keyboard_text(text)
-        for char in text:
-            # 押下
-            kb_press = self.protocol.build_keyboard_command(char, KeyboardOp.PRESS)
+        
+        try:
+            # まずテキスト入力としてプロトコルに処理を依頼
+            kb_data = self.protocol.build_keyboard_command(text, KeyboardOp.TEXT)
+            self.hardware_facade.send(kb_data)
+        except (ValueError, NotImplementedError):
+            # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
+            for char in text:
+                self.keytype(char)
+    
+    @check_interrupt
+    def keytype(self, key: str) -> None:
+        if not key:
+            self.log("Empty key specified for keytype", level="WARNING")
+            return
+            
+        self.log(f"Sending keyboard key input: {key}", level="DEBUG")
+        
+        try:
+            # キー押下
+            kb_press = self.protocol.build_keytype_command(key, KeyboardOp.PRESS)
             self.hardware_facade.send(kb_press)
             self.wait(0.02)  # 必要に応じて調整
-            # 解放
-            kb_release = self.protocol.build_keyboard_command(char, KeyboardOp.RELEASE)
+            
+            # キー解放
+            kb_release = self.protocol.build_keytype_command(key, KeyboardOp.RELEASE)
             self.hardware_facade.send(kb_release)
             self.wait(0.01)  # 必要に応じて調整
-        # すべてのキーをリリース（念のため）
-        kb_all_release = self.protocol.build_keyboard_command("", KeyboardOp.ALL_RELEASE)
-        self.hardware_facade.send(kb_all_release)
+        except NotImplementedError as e:
+            self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
+            
+        # すべてのキーを解放（念のため）
+        try:
+            kb_all_release = self.protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
+            self.hardware_facade.send(kb_all_release)
+        except NotImplementedError:
+            pass
