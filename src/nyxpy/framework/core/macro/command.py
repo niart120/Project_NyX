@@ -238,12 +238,19 @@ class DefaultCommand(Command):
         
         try:
             # まずテキスト入力としてプロトコルに処理を依頼
-            kb_data = self.protocol.build_keyboard_command(text, KeyboardOp.TEXT)
+            kb_data = self.protocol.build_keyboard_command(text)
             self.hardware_facade.send(kb_data)
         except (ValueError, NotImplementedError):
             # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
             for char in text:
                 self.keytype(char)
+        
+        # すべてのキーを解放（念のため）
+        try:
+            kb_all_release = self.protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
+            self.hardware_facade.send(kb_all_release)
+        except NotImplementedError:
+            pass
     
     @check_interrupt
     def keytype(self, key: str) -> None:
@@ -265,10 +272,3 @@ class DefaultCommand(Command):
             self.wait(0.01)  # 必要に応じて調整
         except NotImplementedError as e:
             self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
-            
-        # すべてのキーを解放（念のため）
-        try:
-            kb_all_release = self.protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
-            self.hardware_facade.send(kb_all_release)
-        except NotImplementedError:
-            pass
