@@ -59,9 +59,9 @@ def test_release_reset_all(protocol):
                           0x00, 0x00, 0x00])
     assert release_data == bytes(expected)
 
-def test_keyboard_command_press(protocol):
+def test_keytype_command_press(protocol):
     # 通常キー押下のテスト
-    kb_data = protocol.build_keyboard_command("H", KeyboardOp.PRESS)
+    kb_data = protocol.build_keytype_command("H", KeyboardOp.PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -71,9 +71,9 @@ def test_keyboard_command_press(protocol):
                           0x00])  # 末尾は常に0
     assert kb_data == bytes(expected)
 
-def test_keyboard_command_release(protocol):
+def test_keytype_command_release(protocol):
     # 通常キーリリースのテスト
-    kb_data = protocol.build_keyboard_command("H", KeyboardOp.RELEASE)
+    kb_data = protocol.build_keytype_command("H", KeyboardOp.RELEASE)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -83,9 +83,9 @@ def test_keyboard_command_release(protocol):
                           0x00])
     assert kb_data == bytes(expected)
 
-def test_keyboard_command_special_press(protocol):
+def test_keytype_command_special_press(protocol):
     # 特殊キー押下のテスト
-    kb_data = protocol.build_keyboard_command("A", KeyboardOp.SPECIAL_PRESS)
+    kb_data = protocol.build_keytype_command("A", KeyboardOp.SPECIAL_PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -95,9 +95,9 @@ def test_keyboard_command_special_press(protocol):
                           0x00])
     assert kb_data == bytes(expected)
 
-def test_keyboard_command_all_release(protocol):
+def test_keytype_command_all_release(protocol):
     # 全キーリリースのテスト
-    kb_data = protocol.build_keyboard_command("", KeyboardOp.ALL_RELEASE)
+    kb_data = protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -107,9 +107,9 @@ def test_keyboard_command_all_release(protocol):
                           0x00])
     assert kb_data == bytes(expected)
 
-def test_keyboard_command_empty_key(protocol):
+def test_keytype_command_empty_key(protocol):
     # 空文字で通常キー押下のテスト - 無視されるべき
-    kb_data = protocol.build_keyboard_command("", KeyboardOp.PRESS)
+    kb_data = protocol.build_keytype_command("", KeyboardOp.PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -129,3 +129,8 @@ def test_stick_values(protocol):
                           RStick.UP.x, RStick.UP.y,
                           0x00, 0x00, 0x00])
     assert press_data == bytes(expected)
+
+def test_keyboard_command(protocol):
+    # テキスト入力時のエラー確認テスト
+    with pytest.raises(NotImplementedError):
+        protocol.build_keyboard_command("Hello World")
