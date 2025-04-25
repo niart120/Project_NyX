@@ -1,4 +1,3 @@
-from encodings.punycode import T
 import time
 import pytest
 from nyxpy.framework.core.macro.command import DefaultCommand
