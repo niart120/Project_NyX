@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout
 from typing import Optional, Any
 
-from nyxpy.framework.core.macro.constants import Button
+from nyxpy.framework.core.constants import Button
 from nyxpy.gui.widgets.controller.analog_stick import AnalogStick
 from nyxpy.gui.widgets.controller.dpad import DPad
 from nyxpy.gui.widgets.controller.button import ControllerButton
