@@ -23,6 +23,7 @@ class GlobalSettings:
                 "serial_device": "",
                 "capture_fps": 30,
                 "serial_baud": 9600,
+                "serial_protocol": "CH552",  # デフォルトで CH552 プロトコルを使用
             }
             # create initial config file
             self.save()

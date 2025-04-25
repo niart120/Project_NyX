@@ -1,6 +1,8 @@
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 
 class SettingsService:
     """
@@ -34,3 +36,13 @@ class SettingsService:
         
         # デバイス検出を開始（バックグラウンドで実行）
         self.serial_manager.auto_register_devices()
+        
+    def get_protocol(self) -> SerialProtocolInterface:
+        """
+        設定から選択されたシリアルプロトコルのインスタンスを取得する
+        
+        :return: SerialProtocolInterface の実装
+        """
+        # global_settings から直接プロトコル名を取得する
+        protocol_name = self.global_settings.get("serial_protocol", "CH552")
+        return ProtocolFactory.create_protocol(protocol_name)
