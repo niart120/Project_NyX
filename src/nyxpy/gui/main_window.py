@@ -20,22 +20,6 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.framework.core.settings_service import SettingsService
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
-class AspectRatioLabel(QLabel):
-    """
-    QLabel that maintains a fixed aspect ratio based on its width.
-    """
-    def __init__(self, aspect_w=16, aspect_h=9, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.aspect_w = aspect_w
-        self.aspect_h = aspect_h
-
-    def hasHeightForWidth(self):
-        return True
-
-    def heightForWidth(self, width):
-        # Calculate height to maintain aspect ratio
-        return int(width * self.aspect_h / self.aspect_w)
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()

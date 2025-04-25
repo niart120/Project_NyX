@@ -157,7 +157,4 @@ class VirtualControllerPane(QWidget):
                    self.btn_ls, self.btn_rs]:
             btn.pressed.connect(lambda b=btn: self.model.button_press(b.button_type))
             btn.released.connect(lambda b=btn: self.model.button_release(b.button_type))
-    
-    def set_serial_manager(self, serial_manager: Any) -> None:
-        """シリアルマネージャーを設定"""
-        self.model.set_serial_manager(serial_manager)
+
