@@ -2,7 +2,7 @@ from encodings.punycode import T
 import time
 import pytest
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.macro.constants import Button, KeyboardOp
+from nyxpy.framework.core.macro.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
 
 # Mock for HardwareFacade
 class MockHardwareFacade:
@@ -45,7 +45,7 @@ class MockProtocol:
         self.calls.append(('keyboard_text', text))
         return f"keyboard_text:{text}".encode()
         
-    def build_keytype_command(self, key: str, op: KeyboardOp):
+    def build_keytype_command(self, key: KeyCode|SpecialKeyCode, op: KeyboardOp):
         self.calls.append(('keyboard', key, op))
         return f"keyboard:{key}:{op.name}".encode()
 
@@ -139,7 +139,7 @@ def test_keyboard_text_mode(dummy_command):
     assert protocol.calls[0][1] == 'Hello'
     
     assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == ''
+    assert protocol.calls[1][1] == KeyCode('')
     assert protocol.calls[1][2] == KeyboardOp.ALL_RELEASE
 
     # 送信されたデータが正しいか確認
@@ -155,26 +155,26 @@ def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
     
     # 最初の文字 'H' の押下
     assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == 'H'
+    assert protocol.calls[0][1] == KeyCode('H')
     assert protocol.calls[0][2] == KeyboardOp.PRESS
     
     # 最初の文字 'H' の解放
     assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == 'H'
+    assert protocol.calls[1][1] == KeyCode('H')
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
     
     # 最後の文字 'o' の解放
     assert protocol.calls[9][0] == 'keyboard'
-    assert protocol.calls[9][1] == 'o'
+    assert protocol.calls[9][1] == KeyCode('o')
     assert protocol.calls[9][2] == KeyboardOp.RELEASE
     
     # 最後の ALL_RELEASE コマンド
     assert protocol.calls[10][0] == 'keyboard'
-    assert protocol.calls[10][1] == ''
+    assert protocol.calls[10][1] == KeyCode('')
     assert protocol.calls[10][2] == KeyboardOp.ALL_RELEASE
     
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith('keyboard:H:PRESS')
+    assert hardware_facade.sent_data[0].decode().startswith(f'keyboard:{KeyCode("H")}:PRESS')
 
 def test_keyboard_empty_string(dummy_command):
     """空文字列の場合、validate_keyboard_text が ValueErrorを発生させるはず"""
@@ -199,16 +199,16 @@ def test_keyboard_validation_called(dummy_command_keyboard_not_supported):
     
     # 最初の文字 't' の押下
     assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == 't'
+    assert protocol.calls[0][1] == KeyCode('t')
     assert protocol.calls[0][2] == KeyboardOp.PRESS
     
     # 数字も正しく処理されていることを確認
     assert protocol.calls[8][0] == 'keyboard'
-    assert protocol.calls[8][1] == '1'
+    assert protocol.calls[8][1] == KeyCode('1')
     assert protocol.calls[8][2] == KeyboardOp.PRESS
-
+    
     assert protocol.calls[12][0] == 'keyboard'
-    assert protocol.calls[12][1] == '3'
+    assert protocol.calls[12][1] == KeyCode('3')
     assert protocol.calls[12][2] == KeyboardOp.PRESS
 
 def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
@@ -219,8 +219,12 @@ def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
     cmd.keyboard("\n\t")
     
     # 各文字ごとに適切なコマンドが呼ばれていることを確認
-    assert protocol.calls[0][1] == "\n"
-    assert protocol.calls[2][1] == "\t"
+
+    # press/release で1回ずつコマンドが発行されるはず
+    assert protocol.calls[0][1] == KeyCode("\n")
+    assert protocol.calls[1][1] == KeyCode("\n")
+    assert protocol.calls[2][1] == KeyCode("\t")
+    assert protocol.calls[3][1] == KeyCode("\t")
 
 def test_keyboard_invalid_character(dummy_command):
     """無効な文字（制御文字など）を含む場合はエラーが発生することを確認"""
@@ -272,16 +276,16 @@ def test_capture_crop_out_of_bounds(dummy_command):
 def test_keytype(dummy_command):
     """単一キータイプ操作のテスト"""
     cmd, hardware_facade, _, protocol, _ = dummy_command
-    cmd.keytype("X")
+    cmd.keytype(KeyCode("X"))
     
     # PRESS操作とRELEASE操作が実行されることを確認
     assert len(protocol.calls) == 2
     assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == 'X'
+    assert protocol.calls[0][1] == KeyCode('X')
     assert protocol.calls[0][2] == KeyboardOp.PRESS
     
     assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == 'X'
+    assert protocol.calls[1][1] == KeyCode('X')
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
     
     

@@ -1,6 +1,6 @@
 import pytest
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
-from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick, KeyboardOp
+from nyxpy.framework.core.macro.constants import Button, Hat, KeyCode, LStick, RStick, KeyboardOp, SpecialKeyCode
 
 # テスト用にスティック操作のためのサブクラスが必要であれば、実装済みのものを利用
 # ここでは実際の LStick, RStick をそのまま利用します
@@ -61,7 +61,7 @@ def test_release_reset_all(protocol):
 
 def test_keytype_command_press(protocol):
     # 通常キー押下のテスト
-    kb_data = protocol.build_keytype_command("H", KeyboardOp.PRESS)
+    kb_data = protocol.build_keytype_command(KeyCode("H"), KeyboardOp.PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -73,7 +73,7 @@ def test_keytype_command_press(protocol):
 
 def test_keytype_command_release(protocol):
     # 通常キーリリースのテスト
-    kb_data = protocol.build_keytype_command("H", KeyboardOp.RELEASE)
+    kb_data = protocol.build_keytype_command(KeyCode("H"), KeyboardOp.RELEASE)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -85,19 +85,19 @@ def test_keytype_command_release(protocol):
 
 def test_keytype_command_special_press(protocol):
     # 特殊キー押下のテスト
-    kb_data = protocol.build_keytype_command("A", KeyboardOp.SPECIAL_PRESS)
+    kb_data = protocol.build_keytype_command(SpecialKeyCode.ENTER, KeyboardOp.SPECIAL_PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
                           0x80, 0x80, 0x80, 0x80,
                           int(KeyboardOp.SPECIAL_PRESS),  # kbdheader = 3
-                          ord('A'),
+                          SpecialKeyCode.ENTER,
                           0x00])
     assert kb_data == bytes(expected)
 
 def test_keytype_command_all_release(protocol):
     # 全キーリリースのテスト
-    kb_data = protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
+    kb_data = protocol.build_keytype_command(KeyCode(""), KeyboardOp.ALL_RELEASE)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
@@ -109,7 +109,7 @@ def test_keytype_command_all_release(protocol):
 
 def test_keytype_command_empty_key(protocol):
     # 空文字で通常キー押下のテスト - 無視されるべき
-    kb_data = protocol.build_keytype_command("", KeyboardOp.PRESS)
+    kb_data = protocol.build_keytype_command(KeyCode(""), KeyboardOp.PRESS)
     expected = bytearray([0xAB,
                           0x00, 0x00,
                           Hat.CENTER,
