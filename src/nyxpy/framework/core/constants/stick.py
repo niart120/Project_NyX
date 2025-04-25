@@ -18,7 +18,7 @@ class LStick():
             magnification: スティックの傾き（0.0から1.0）
             is_degree: 角度が度数法（True）かラジアン（False）かを指定
         """
-        if is_degree == True: 
+        if is_degree: 
             rad = math.radians(rad) # 入力を度数法として解釈
         self.rad = rad
         self.mag = magnification
@@ -55,7 +55,7 @@ class RStick():
             magnification: スティックの傾き（0.0から1.0）
             is_degree: 角度が度数法（True）かラジアン（False）かを指定
         """
-        if is_degree == True: 
+        if is_degree: 
             rad = math.radians(rad) # 入力を度数法として解釈
         self.rad = rad
         self.mag = magnification
