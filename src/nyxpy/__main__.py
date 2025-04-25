@@ -91,13 +91,13 @@ def parse_arguments() -> argparse.Namespace:
     )
     
     # GUI/CLI 初期化および GUI 起動コマンド
-    init_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "init",
         help="Initialize workspace (create macros, snapshots, static folders)"
     )
     
     # GUI 起動サブコマンド
-    gui_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "gui",
         help="Launch the graphical user interface"
     )

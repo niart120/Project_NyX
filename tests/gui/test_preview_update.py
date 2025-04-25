@@ -35,7 +35,7 @@ def window(qtbot, tmp_cwd_and_dummy, patched_managers):
     # モックのキャプチャマネージャを設定
     mock_cap_mgr.return_value.list_devices.return_value = ["ダミーデバイス"]
     
-    app = QApplication.instance() or QApplication([])
+    QApplication.instance() or QApplication([])
     w = MainWindow()
     qtbot.addWidget(w)
     
