@@ -86,6 +86,9 @@ class MockCommand(Command):
 
     def keyboard(self, text):
         self.logs.append(f"keyboard: {text}")
+    
+    def keytype(self, key):
+        self.logs.append(f"keytype: {key}")
 
 class MockMacro(MacroBase):
     def initialize(self, cmd: Command, args:dict) -> None:

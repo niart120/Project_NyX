@@ -10,7 +10,7 @@ from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.hardware.serial_comm import SerialManager, SerialCommInterface
 from nyxpy.framework.core.hardware.capture import CaptureManager, AsyncCaptureDevice
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
-from nyxpy.framework.core.macro.constants import Button, Hat
+from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
@@ -139,7 +139,7 @@ def integration_setup(monkeypatch):
     # HardwareFacade を作成
     hardware_facade = HardwareFacade(serial_manager, capture_manager)
 
-    # DefaultCommand のインスタンス作成（HardwareFacade を使用）
+    # DefaultCommand のインスタンス作成（HardwareFacade を使用）    
     cmd = DefaultCommand(
         hardware_facade=hardware_facade,
         resource_io=resource_io,

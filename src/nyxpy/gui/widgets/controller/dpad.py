@@ -3,7 +3,7 @@ from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath, QBrush, QPaintEv
 from PySide6.QtWidgets import QWidget
 from typing import Optional
 import math
-from nyxpy.framework.core.macro.constants import Hat
+from nyxpy.framework.core.constants import Hat
 
 class DPad(QWidget):
     """方向パッド（十字キー）ウィジェット"""

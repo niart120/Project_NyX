@@ -1,5 +1,5 @@
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
-from nyxpy.framework.core.macro.constants import Button, Hat, LStick, RStick
+from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, SerialProtocolInterface
 from nyxpy.framework.core.logger.log_manager import log_manager
 from PySide6.QtCore import QObject, Signal
@@ -91,7 +91,7 @@ class VirtualControllerModel(QObject):
                 self.send_release_command((previous_stick,))
             self.current_r_stick = RStick.CENTER
             
-        
+
     def send_release_command(self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]) -> None:
         """特定のキーの解放コマンドをシリアルデバイスに送信"""
         if not self.serial_manager or not self.serial_manager.is_active():

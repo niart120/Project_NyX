@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from nyxpy.framework.core.macro.constants import Button, Hat, KeyCode, KeyboardOp, LStick, RStick, KeyType, SpecialKeyCode
+from nyxpy.framework.core.constants import Button, Hat, KeyCode, KeyboardOp, LStick, RStick, KeyType, SpecialKeyCode
 
 class SerialProtocolInterface(ABC):
     @abstractmethod

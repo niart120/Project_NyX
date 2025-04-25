@@ -5,7 +5,7 @@ import cv2
 
 from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.macro.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
+from nyxpy.framework.core.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
 from nyxpy.framework.core.macro.exceptions import MacroStopException

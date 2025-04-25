@@ -1,7 +1,7 @@
 import time
 import pytest
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.macro.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
+from nyxpy.framework.core.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
 
 # Mock for HardwareFacade
 class MockHardwareFacade:
@@ -286,7 +286,6 @@ def test_keytype(dummy_command):
     assert protocol.calls[1][0] == 'keyboard'
     assert protocol.calls[1][1] == KeyCode('X')
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
-    
     
     # 送信されたデータが正しいか確認
     assert hardware_facade.sent_data[0].decode().startswith('keyboard:X:PRESS')

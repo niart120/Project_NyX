@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QPushButton
-from nyxpy.framework.core.macro.constants import Button
-from typing import Optional, Tuple, Union
+from nyxpy.framework.core.constants import Button
+from typing import Optional, Tuple
 
 
 class ControllerButton(QPushButton):
@@ -14,7 +14,7 @@ class ControllerButton(QPushButton):
         
         # 四角形か円形かによってスタイルを変更
         if is_rectangular:
-            self.setStyleSheet("""
+            self.setStyleSheet("""        
                 QPushButton {{
                     background-color: #444;
                     color: white;
