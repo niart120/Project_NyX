@@ -120,14 +120,14 @@ class Command(ABC):
     def keyboard(self, text: str) -> None:
         """
         指定されたテキスト(英数字)をキーボード入力として送信します。
-        プロトコルが対応していない場合は、文字ごとに keytype に委譲されます。
+        プロトコルが対応していない場合は、文字ごとに typekey に委譲されます。
 
         :param text: 送信するテキスト
         """
         pass
 
     @abstractmethod
-    def keytype(self, key: str) -> None:
+    def type(self, key: str) -> None:
         """
         指定されたキーを個別のキーボード入力として送信します。
         これは個々のキーの押下・解放操作を表します。
@@ -243,7 +243,7 @@ class DefaultCommand(Command):
         except (ValueError, NotImplementedError):
             # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
             for char in text:
-                self.keytype(KeyCode(char))
+                self.type(KeyCode(char))
         
         # すべてのキーを解放（念のため）
         try:
@@ -253,7 +253,7 @@ class DefaultCommand(Command):
             pass
     
     @check_interrupt
-    def keytype(self, key: KeyCode|SpecialKeyCode) -> None:
+    def type(self, key: KeyCode|SpecialKeyCode) -> None:
         if not key:
             self.log("Empty key specified for keytype", level="WARNING")
             return

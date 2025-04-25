@@ -272,10 +272,10 @@ def test_capture_crop_out_of_bounds(dummy_command):
     with pytest.raises(ValueError):
         cmd.capture(crop_region=(1200, 700, 200, 200))
 
-def test_keytype(dummy_command):
-    """単一キータイプ操作のテスト"""
+def test_keyboard_type(dummy_command):
+    """単一キーのタイプ操作のテスト"""
     cmd, hardware_facade, _, protocol, _ = dummy_command
-    cmd.keytype(KeyCode("X"))
+    cmd.type(KeyCode("X"))
     
     # PRESS操作とRELEASE操作が実行されることを確認
     assert len(protocol.calls) == 2
