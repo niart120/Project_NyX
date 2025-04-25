@@ -2,6 +2,7 @@ import pytest
 from loguru import logger
 from nyxpy.framework.core.logger.log_manager import LogManager
 
+
 class TestLogManager:
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):
@@ -17,7 +18,7 @@ class TestLogManager:
         self.log_records.append(record)
 
     def dummy_handler(self, record):
-            pass
+        pass
 
     def test_log_method(self):
         # カスタムハンドラを追加して log() メソッドの出力を検証する
@@ -27,7 +28,9 @@ class TestLogManager:
 
         # ハンドラによりメッセージが記録されることを検証
         assert len(self.log_records) == 1
-        assert any("debug message" in msg and "UnitTest" in msg for msg in self.log_records)
+        assert any(
+            "debug message" in msg and "UnitTest" in msg for msg in self.log_records
+        )
 
     def test_set_level_changes_all_handlers(self):
         # カスタムハンドラを追加してログレベル設定の変更を検証
@@ -51,7 +54,7 @@ class TestLogManager:
 
     def test_remove_handler(self):
         # カスタムハンドラの削除動作を検証
-    
+
         # ハンドラを追加
         self.log_manager.add_handler(self.handler, level="DEBUG")
         # 追加後、メッセージがキャプチャできることを確認

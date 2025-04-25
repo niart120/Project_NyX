@@ -10,27 +10,31 @@ from nyxpy.gui.widgets import AspectRatioLabel
 
 SNAPSHOT_DIR = "snapshots"
 
+
 class PreviewPane(QWidget):
     snapshot_taken = Signal(str)
     """
     Pane for showing camera preview and handling snapshots.
     """
+
     def __init__(self, settings_service, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         # Preview label
-        self.label = AspectRatioLabel(settings_service.global_settings.get("capture_aspect_w",16),
-                                      settings_service.global_settings.get("capture_aspect_h",9))
+        self.label = AspectRatioLabel(
+            settings_service.global_settings.get("capture_aspect_w", 16),
+            settings_service.global_settings.get("capture_aspect_h", 9),
+        )
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setMinimumHeight(100)
         layout.addWidget(self.label)
-        
+
         # Use passed capture manager instead of initializing again
         self.capture_manager = settings_service.capture_manager
         self.settings = settings_service.global_settings
-        
+
         # No need to register devices or set active device again - already done in SettingsService
-        
+
         # use QTimer to periodically update preview
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_preview)
@@ -43,7 +47,7 @@ class PreviewPane(QWidget):
         # Only try to update if widget is visible
         if not self.isVisible():
             return
-            
+
         try:
             frame = self.capture_manager.get_active_device().get_frame()
             if frame is None:
@@ -53,15 +57,19 @@ class PreviewPane(QWidget):
 
         # Calculate target size based on label aspect ratio
         size = self.label.size()
-        target_w, target_h = calc_aspect_size(size, self.label.aspect_w, self.label.aspect_h)
-        
+        target_w, target_h = calc_aspect_size(
+            size, self.label.aspect_w, self.label.aspect_h
+        )
+
         # np.arrayの場合のみflagsにアクセス
-        if hasattr(frame, 'flags') and hasattr(frame.flags, '__getitem__'):
-            if not frame.flags['C_CONTIGUOUS']:
+        if hasattr(frame, "flags") and hasattr(frame.flags, "__getitem__"):
+            if not frame.flags["C_CONTIGUOUS"]:
                 frame = np.ascontiguousarray(frame)
-        
+
         resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
-        image = QImage(resized.data, target_w, target_h, target_w*3, QImage.Format_BGR888)
+        image = QImage(
+            resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888
+        )
         pix = QPixmap.fromImage(image)
         self.label.setPixmap(pix)
 
@@ -72,10 +80,10 @@ class PreviewPane(QWidget):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = snaps_dir / f"{timestamp}.png"
         pix = self.capture_manager.get_active_device().get_frame()
-       
-        # save to file        
+
+        # save to file
         if pix is not None:
-             # resize to 1280x720
+            # resize to 1280x720
             target_w, target_h = 1280, 720
             pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_AREA)
             # save image
@@ -100,12 +108,12 @@ class PreviewPane(QWidget):
         interval = int(1000 / fps) if fps > 0 else 1000
         self.timer.start(interval)
         # Don't immediately trigger update to avoid blocking UI
-        
+
     def showEvent(self, event):
         super().showEvent(event)
         # Start timer when pane is shown
         self.apply_fps()
-        
+
     def hideEvent(self, event):
         super().hideEvent(event)
         # Stop timer when pane is hidden to save resources

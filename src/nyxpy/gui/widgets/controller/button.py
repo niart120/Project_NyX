@@ -5,13 +5,20 @@ from typing import Optional, Tuple
 
 class ControllerButton(QPushButton):
     """カスタムスタイルのコントローラーボタン"""
-    def __init__(self, text: str = "", parent: Optional[QPushButton] = None, 
-                 button_type: Optional[Button] = None, size: Tuple[int, int] = (30, 30), 
-                 radius: int = 15, is_rectangular: bool = False) -> None:
+
+    def __init__(
+        self,
+        text: str = "",
+        parent: Optional[QPushButton] = None,
+        button_type: Optional[Button] = None,
+        size: Tuple[int, int] = (30, 30),
+        radius: int = 15,
+        is_rectangular: bool = False,
+    ) -> None:
         super().__init__(text, parent)
         self.button_type = button_type
         self.setFixedSize(size[0], size[1])
-        
+
         # 四角形か円形かによってスタイルを変更
         if is_rectangular:
             self.setStyleSheet("""        

@@ -1,4 +1,12 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QHBoxLayout, QGroupBox
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QHBoxLayout,
+    QGroupBox,
+)
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, macro_name: str = None):

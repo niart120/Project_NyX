@@ -1,9 +1,11 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPlainTextEdit, QSizePolicy
 
+
 class LogPane(QWidget):
     """
     Pane for displaying real-time logs in a read-only text view.
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)

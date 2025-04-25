@@ -1,10 +1,12 @@
 import tomlkit
 from pathlib import Path
 
+
 class GlobalSettings:
     """
     Manage global settings stored in .nyxpy/global.toml under the working directory.
     """
+
     def __init__(self):
         self.config_dir = Path.cwd() / ".nyxpy"
         self.config_dir.mkdir(exist_ok=True)

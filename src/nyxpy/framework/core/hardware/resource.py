@@ -1,6 +1,7 @@
 import pathlib
 import cv2
 
+
 class StaticResourceIO:
     """
     StaticResourceIO は、staticディレクトリ配下の静的リソースの入出力を管理するクラスです。
@@ -16,15 +17,17 @@ class StaticResourceIO:
             raise FileNotFoundError(f"Directory {root_dir_path} does not exist.")
         if not root_dir_path.is_dir():
             raise NotADirectoryError(f"{root_dir_path} is not a directory.")
-        
+
         # Bypass the static check.
         static_root = pathlib.Path.cwd() / "static"
         if not root_dir_path.resolve().is_relative_to(static_root):
             raise ValueError(f"root_dir_path must be a subdirectory of {static_root}.")
-        
+
         self.root_dir_path = root_dir_path
 
-    def save_image(self, filename: str | pathlib.Path, image:cv2.typing.MatLike) -> None:
+    def save_image(
+        self, filename: str | pathlib.Path, image: cv2.typing.MatLike
+    ) -> None:
         """
         画像を指定されたパスに保存します。
         ディレクトリが存在しない場合は作成します。
@@ -33,7 +36,7 @@ class StaticResourceIO:
         :param image: 保存する画像データ
         :raises ValueError: filename が空の場合
         """
-        
+
         file_path = pathlib.Path(self.root_dir_path) / filename
         if not filename:
             raise ValueError("filename must be specified.")
@@ -43,7 +46,9 @@ class StaticResourceIO:
             file_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(file_path), image)
 
-    def load_image(self, filename: pathlib.Path|str, grayscale: bool = False) -> cv2.typing.MatLike:
+    def load_image(
+        self, filename: pathlib.Path | str, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         """
         指定されたパスから画像を読み込みます。
         画像が存在しない場合は例外をスローします。
@@ -52,7 +57,6 @@ class StaticResourceIO:
         :raises FileNotFoundError: 画像ファイルが見つからない場合
         :raises ValueError: filename が空の場合
         """
-
 
         # 画像ファイルのパスを生成
         if not filename:

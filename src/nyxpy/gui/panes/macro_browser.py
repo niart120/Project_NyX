@@ -1,16 +1,26 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QTableWidget, QTableWidgetItem, QSizePolicy, QHeaderView
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QSizePolicy,
+    QHeaderView,
+)
 from PySide6.QtCore import Signal
+
 
 class MacroBrowserPane(QWidget):
     """
     Pane for displaying and filtering available macros, exposes selection change signal.
     """
+
     selection_changed = Signal(bool)
 
     def __init__(self, executor, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5,5,5,5)
+        layout.setContentsMargins(5, 5, 5, 5)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         self.search_box = QLineEdit(self)
@@ -32,7 +42,9 @@ class MacroBrowserPane(QWidget):
 
         # emit selection changes
         self.table.selectionModel().selectionChanged.connect(
-            lambda: self.selection_changed.emit(self.table.selectionModel().hasSelection())
+            lambda: self.selection_changed.emit(
+                self.table.selectionModel().hasSelection()
+            )
         )
 
     def reload_macros(self):
@@ -46,7 +58,6 @@ class MacroBrowserPane(QWidget):
 
     def filter_macros(self):
         keyword = self.search_box.text().lower()
-        
 
         for row in range(self.table.rowCount()):
             name = self.table.item(row, 0).text().lower()

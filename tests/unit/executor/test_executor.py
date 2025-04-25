@@ -18,6 +18,7 @@ DUMMY_MACRO_SOURCE = textwrap.dedent("""
             pass
 """)
 
+
 @pytest.fixture
 def temp_macros_dir(tmp_path, monkeypatch):
     # 一時ディレクトリ内に "macros" ディレクトリを作成
@@ -32,6 +33,7 @@ def temp_macros_dir(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(tmp_path)
     return macros_dir
 
+
 def test_load_all_macros(temp_macros_dir):
     executor = MacroExecutor()
     # ダミーマクロ "DummyTestMacro" が macros に読み込まれているかを検証
@@ -39,6 +41,7 @@ def test_load_all_macros(temp_macros_dir):
     # 読み込まれたインスタンスが MacroBase のサブクラスであることも確認
     macro_instance = executor.macros["DummyTestMacro"]
     assert isinstance(macro_instance, MacroBase)
+
 
 def test_select_macro(temp_macros_dir, monkeypatch):
     executor = MacroExecutor()
@@ -49,6 +52,7 @@ def test_select_macro(temp_macros_dir, monkeypatch):
     with pytest.raises(ValueError) as exc_info:
         executor.select_macro("NonExistentMacro")
     assert "Macro 'NonExistentMacro' not found" in str(exc_info.value)
+
 
 # テスト用のモッククラスを定義
 class MockCommand(Command):
@@ -76,22 +80,23 @@ class MockCommand(Command):
     def capture(self):
         self.logs.append("capture")
         return None
-    
+
     def save_img(self, filename, image):
         self.logs.append(f"save_img: {filename}, image={image}")
-    
+
     def load_img(self, filename, grayscale=False):
         self.logs.append(f"load_img: {filename}, grayscale={grayscale}")
         return None
 
     def keyboard(self, text):
         self.logs.append(f"keyboard: {text}")
-    
+
     def type(self, key):
         self.logs.append(f"keytype: {key}")
 
+
 class MockMacro(MacroBase):
-    def initialize(self, cmd: Command, args:dict) -> None:
+    def initialize(self, cmd: Command, args: dict) -> None:
         cmd.log("MockMacro: initialize")
 
     def run(self, cmd: Command) -> None:
@@ -100,8 +105,9 @@ class MockMacro(MacroBase):
     def finalize(self, cmd: Command) -> None:
         cmd.log("MockMacro: finalize")
 
+
 class FailingMacro(MacroBase):
-    def initialize(self, cmd: Command, args:dict) -> None:
+    def initialize(self, cmd: Command, args: dict) -> None:
         cmd.log("FailingMacro: initialize")
 
     def run(self, cmd: Command) -> None:
@@ -112,19 +118,19 @@ class FailingMacro(MacroBase):
     def finalize(self, cmd: Command) -> None:
         cmd.log("FailingMacro: finalize")
 
+
 @pytest.fixture
 def mock_command():
     return MockCommand()
+
 
 @pytest.fixture
 def executor_with_dummy():
     # Create an executor and override its macros with our dummy implementations.
     executor = MacroExecutor()
-    executor.macros = {
-        "MockMacro": MockMacro(),
-        "FailingMacro": FailingMacro()
-    }
+    executor.macros = {"MockMacro": MockMacro(), "FailingMacro": FailingMacro()}
     return executor
+
 
 def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
     """
@@ -143,6 +149,7 @@ def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
         "MacroExecutor: Finalizing macro...",
         "MockMacro: finalize",
     ]
+
 
 def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
     """

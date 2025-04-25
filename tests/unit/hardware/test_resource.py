@@ -4,10 +4,12 @@ import pytest
 import numpy as np
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 
+
 # First, tests for __init__ validation.
 def test_init_invalid_type():
     with pytest.raises(TypeError):
         StaticResourceIO("not a pathlib.Path object")
+
 
 def test_init_nonexistent_dir(tmp_path):
     non_existent = tmp_path / "static"
@@ -15,18 +17,23 @@ def test_init_nonexistent_dir(tmp_path):
     with pytest.raises(FileNotFoundError):
         StaticResourceIO(non_existent)
 
+
 def test_init_not_directory(tmp_path):
     file_path = tmp_path / "file.txt"
     file_path.write_text("content")
     with pytest.raises(NotADirectoryError):
         StaticResourceIO(file_path)
 
+
 def test_init_missing_static(tmp_path):
     # Create a directory that does not simulate being a subdirectory of static.
     invalid_dir = tmp_path / "nstatic_dir"
     invalid_dir.mkdir()
-    with pytest.raises(ValueError, match=r"root_dir_path must be a subdirectory of .*static"):
+    with pytest.raises(
+        ValueError, match=r"root_dir_path must be a subdirectory of .*static"
+    ):
         StaticResourceIO(invalid_dir)
+
 
 # For the remaining tests (save_image/load_image), we need a "valid" root directory.
 # The __init__ of StaticResourceIO requires that the root_dir_path contain pathlib.Path("/static/")
@@ -45,6 +52,7 @@ class DummyStaticResourceIO(StaticResourceIO):
         # Bypass the static check.
         self.root_dir_path = root_dir_path
 
+
 @pytest.fixture
 def resource(tmp_path):
     # Create a temporary directory to act as the static resource root.
@@ -52,6 +60,7 @@ def resource(tmp_path):
     valid_dir = tmp_path / "static"
     valid_dir.mkdir()
     return DummyStaticResourceIO(valid_dir)
+
 
 def test_save_image_creates_file(resource, tmp_path):
     # Create a dummy image (a white 10x10 RGB image).
@@ -72,6 +81,7 @@ def test_save_image_creates_file(resource, tmp_path):
     assert loaded is not None
     assert loaded.shape == img.shape
 
+
 def test_load_image_returns_correct_data(resource):
     # Create a dummy image.
     img = np.full((20, 20, 3), 128, dtype=np.uint8)
@@ -86,6 +96,7 @@ def test_load_image_returns_correct_data(resource):
     assert loaded is not None
     assert loaded.shape == img.shape
 
+
 def test_load_image_grayscale(resource):
     # Create a dummy image.
     img = np.full((15, 15, 3), 200, dtype=np.uint8)
@@ -99,14 +110,17 @@ def test_load_image_grayscale(resource):
     # Grayscale image should have 2 dimensions.
     assert len(loaded_gray.shape) == 2
 
+
 def test_save_image_empty_filename(resource):
     dummy_img = np.zeros((5, 5, 3), dtype=np.uint8)
     with pytest.raises(ValueError, match="filename must be specified"):
         resource.save_image("", dummy_img)
 
+
 def test_load_image_empty_filename(resource):
     with pytest.raises(ValueError, match="filename must be specified"):
         resource.load_image("")
+
 
 def test_load_image_nonexistent_file(resource):
     with pytest.raises(FileNotFoundError):

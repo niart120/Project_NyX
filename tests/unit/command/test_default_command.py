@@ -3,6 +3,7 @@ import pytest
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
 
+
 # Mock for HardwareFacade
 class MockHardwareFacade:
     def __init__(self):
@@ -16,6 +17,7 @@ class MockHardwareFacade:
         self.captured = True
         return self._frame if hasattr(self, "_frame") else None
 
+
 # Mock for ResourceIO
 class MockResourceIO:
     def __init__(self):
@@ -27,31 +29,36 @@ class MockResourceIO:
     def load_image(self, filename, grayscale=False):
         return self.saved_images.get(filename, None)
 
+
 # Mock for Protocol
 class MockProtocol:
     def __init__(self):
         self.calls = []
 
     def build_press_command(self, keys):
-        self.calls.append(('press', keys))
-        return b'press:' + b'-'.join(str(k).encode() for k in keys)
+        self.calls.append(("press", keys))
+        return b"press:" + b"-".join(str(k).encode() for k in keys)
 
     def build_release_command(self, keys):
-        self.calls.append(('release', keys))
-        return b'release:' + b'-'.join(str(k).encode() for k in keys)
+        self.calls.append(("release", keys))
+        return b"release:" + b"-".join(str(k).encode() for k in keys)
 
     def build_keyboard_command(self, text: str):
-        self.calls.append(('keyboard_text', text))
+        self.calls.append(("keyboard_text", text))
         return f"keyboard_text:{text}".encode()
-        
-    def build_keytype_command(self, key: KeyCode|SpecialKeyCode, op: KeyboardOp):
-        self.calls.append(('keyboard', key, op))
+
+    def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp):
+        self.calls.append(("keyboard", key, op))
         return f"keyboard:{key}:{op.name}".encode()
+
 
 # CH552のようにbuild_keyboard_commandが例外を投げるプロトコル用のモック
 class MockProtocolKeyboardNotSupported(MockProtocol):
     def build_keyboard_command(self, text: str):
-        raise NotImplementedError("Mock protocol does not support text mode keyboard input. Use build_keytype_command instead.")
+        raise NotImplementedError(
+            "Mock protocol does not support text mode keyboard input. Use build_keytype_command instead."
+        )
+
 
 # Mock for CancellationToken
 class MockCancellationToken:
@@ -60,9 +67,10 @@ class MockCancellationToken:
 
     def request_stop(self):
         self.stopped = True
-    
+
     def stop_requested(self):
         return self.stopped
+
 
 @pytest.fixture
 def dummy_command(monkeypatch):
@@ -75,9 +83,10 @@ def dummy_command(monkeypatch):
         hardware_facade=hardware_facade,
         resource_io=resource_io,
         protocol=protocol,
-        ct=ct
+        ct=ct,
     )
     return cmd, hardware_facade, resource_io, protocol, ct
+
 
 @pytest.fixture
 def dummy_command_keyboard_not_supported(monkeypatch):
@@ -90,29 +99,33 @@ def dummy_command_keyboard_not_supported(monkeypatch):
         hardware_facade=hardware_facade,
         resource_io=resource_io,
         protocol=protocol,
-        ct=ct
+        ct=ct,
     )
     return cmd, hardware_facade, resource_io, protocol, ct
+
 
 def test_press_and_release(dummy_command):
     cmd, hardware_facade, resource_io, protocol, ct = dummy_command
     cmd.press(Button.A, Button.B, dur=0.2, wait=0.1)
-    assert protocol.calls[0][0] == 'press'
-    assert protocol.calls[1][0] == 'release'
-    assert hardware_facade.sent_data[0].startswith(b'press:')
-    assert hardware_facade.sent_data[1].startswith(b'release:')
+    assert protocol.calls[0][0] == "press"
+    assert protocol.calls[1][0] == "release"
+    assert hardware_facade.sent_data[0].startswith(b"press:")
+    assert hardware_facade.sent_data[1].startswith(b"release:")
+
 
 def test_hold(dummy_command):
     cmd, hardware_facade, resource_io, protocol, ct = dummy_command
     cmd.hold(Button.X)
-    assert protocol.calls[0][0] == 'press'
-    assert hardware_facade.sent_data[0].startswith(b'press:')
+    assert protocol.calls[0][0] == "press"
+    assert hardware_facade.sent_data[0].startswith(b"press:")
+
 
 def test_release(dummy_command):
     cmd, hardware_facade, resource_io, protocol, ct = dummy_command
     cmd.release(Button.Y)
-    assert protocol.calls[0][0] == 'release'
-    assert hardware_facade.sent_data[0].startswith(b'release:')
+    assert protocol.calls[0][0] == "release"
+    assert hardware_facade.sent_data[0].startswith(b"release:")
+
 
 def test_wait(dummy_command):
     cmd, *_ = dummy_command
@@ -121,102 +134,114 @@ def test_wait(dummy_command):
     end = time.time()
     assert end - start < 0.1  # monkeypatchで即時
 
+
 def test_stop(dummy_command):
     cmd, _, _, _, ct = dummy_command
     with pytest.raises(Exception):
         cmd.stop()
     assert ct.stopped
 
+
 def test_keyboard_text_mode(dummy_command):
     """テキストモード対応プロトコルでのkeyboardメソッドのテスト"""
     cmd, hardware_facade, _, protocol, _ = dummy_command
     cmd.keyboard("Hello")
-    
+
     # build_keyboard_commandとbuild_keytype_commandの呼び出しが行われていることを確認
     assert len(protocol.calls) == 2
-    assert protocol.calls[0][0] == 'keyboard_text'
-    assert protocol.calls[0][1] == 'Hello'
-    
-    assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == KeyCode('')
+    assert protocol.calls[0][0] == "keyboard_text"
+    assert protocol.calls[0][1] == "Hello"
+
+    assert protocol.calls[1][0] == "keyboard"
+    assert protocol.calls[1][1] == KeyCode("")
     assert protocol.calls[1][2] == KeyboardOp.ALL_RELEASE
 
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith('keyboard_text:Hello')
+    assert hardware_facade.sent_data[0].decode().startswith("keyboard_text:Hello")
+
 
 def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
     """テキストモード非対応プロトコルでのkeyboardメソッドのテスト（keytype委譲）"""
     cmd, hardware_facade, _, protocol, _ = dummy_command_keyboard_not_supported
     cmd.keyboard("Hello")
-    
+
     # 各文字ごとに押下→解放のシーケンスが実行されることを確認
-    assert len(protocol.calls) == 11  # "Hello"の5文字 × 2 (押下・解放) + 1 (ALL_RELEASE)
-    
+    assert (
+        len(protocol.calls) == 11
+    )  # "Hello"の5文字 × 2 (押下・解放) + 1 (ALL_RELEASE)
+
     # 最初の文字 'H' の押下
-    assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == KeyCode('H')
+    assert protocol.calls[0][0] == "keyboard"
+    assert protocol.calls[0][1] == KeyCode("H")
     assert protocol.calls[0][2] == KeyboardOp.PRESS
-    
+
     # 最初の文字 'H' の解放
-    assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == KeyCode('H')
+    assert protocol.calls[1][0] == "keyboard"
+    assert protocol.calls[1][1] == KeyCode("H")
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
-    
+
     # 最後の文字 'o' の解放
-    assert protocol.calls[9][0] == 'keyboard'
-    assert protocol.calls[9][1] == KeyCode('o')
+    assert protocol.calls[9][0] == "keyboard"
+    assert protocol.calls[9][1] == KeyCode("o")
     assert protocol.calls[9][2] == KeyboardOp.RELEASE
-    
+
     # 最後の ALL_RELEASE コマンド
-    assert protocol.calls[10][0] == 'keyboard'
-    assert protocol.calls[10][1] == KeyCode('')
+    assert protocol.calls[10][0] == "keyboard"
+    assert protocol.calls[10][1] == KeyCode("")
     assert protocol.calls[10][2] == KeyboardOp.ALL_RELEASE
-    
+
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith(f'keyboard:{KeyCode("H")}:PRESS')
+    assert (
+        hardware_facade.sent_data[0]
+        .decode()
+        .startswith(f"keyboard:{KeyCode('H')}:PRESS")
+    )
+
 
 def test_keyboard_empty_string(dummy_command):
     """空文字列の場合、validate_keyboard_text が ValueErrorを発生させるはず"""
     cmd, _, _, protocol, _ = dummy_command
-    
+
     # 空文字列を渡すと例外が発生することを確認
     with pytest.raises(ValueError, match="Input text is empty"):
         cmd.keyboard("")
-        
+
     # 呼び出しが行われていないことを確認
     assert len(protocol.calls) == 0
+
 
 def test_keyboard_validation_called(dummy_command_keyboard_not_supported):
     """validate_keyboard_text の動作確認（有効な入力文字）"""
     cmd, _, _, protocol, _ = dummy_command_keyboard_not_supported
-    
+
     # 通常のASCII文字が正しく処理されることを確認
     cmd.keyboard("test123")
-    
+
     # 各文字が適切に処理されていることを確認
     assert len(protocol.calls) == 15  # 7文字 × 2 + ALL_RELEASE
-    
+
     # 最初の文字 't' の押下
-    assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == KeyCode('t')
+    assert protocol.calls[0][0] == "keyboard"
+    assert protocol.calls[0][1] == KeyCode("t")
     assert protocol.calls[0][2] == KeyboardOp.PRESS
-    
+
     # 数字も正しく処理されていることを確認
-    assert protocol.calls[8][0] == 'keyboard'
-    assert protocol.calls[8][1] == KeyCode('1')
+    assert protocol.calls[8][0] == "keyboard"
+    assert protocol.calls[8][1] == KeyCode("1")
     assert protocol.calls[8][2] == KeyboardOp.PRESS
-    
-    assert protocol.calls[12][0] == 'keyboard'
-    assert protocol.calls[12][1] == KeyCode('3')
+
+    assert protocol.calls[12][0] == "keyboard"
+    assert protocol.calls[12][1] == KeyCode("3")
     assert protocol.calls[12][2] == KeyboardOp.PRESS
+
 
 def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
     """特殊文字の処理が正しく行われるか確認"""
     cmd, _, _, protocol, _ = dummy_command_keyboard_not_supported
-    
+
     # 特殊文字を含むテキストを送信
     cmd.keyboard("\n\t")
-    
+
     # 各文字ごとに適切なコマンドが呼ばれていることを確認
 
     # press/release で1回ずつコマンドが発行されるはず
@@ -225,16 +250,18 @@ def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
     assert protocol.calls[2][1] == KeyCode("\t")
     assert protocol.calls[3][1] == KeyCode("\t")
 
+
 def test_keyboard_invalid_character(dummy_command):
     """無効な文字（制御文字など）を含む場合はエラーが発生することを確認"""
     cmd, _, _, protocol, _ = dummy_command
-    
+
     # 無効な文字（ここでは制御文字(ビープ)）を含むテキストでエラーになることを確認
     with pytest.raises(ValueError, match="Unsupported character"):
         cmd.keyboard("test\x07")
-        
+
     # 最初のバリデーションチェックで止まるためプロトコル呼び出しは起こらない
     assert len(protocol.calls) == 0
+
 
 def test_save_img_and_load_img(dummy_command):
     cmd, _, resource_io, _, _ = dummy_command
@@ -244,18 +271,22 @@ def test_save_img_and_load_img(dummy_command):
     loaded = cmd.load_img("foo.png")
     assert loaded == dummy_img
 
+
 def test_capture_success(monkeypatch, dummy_command):
     cmd, hardware_facade, _, _, _ = dummy_command
     import numpy as np
+
     # 1280x720x3 のダミーフレーム
     dummy_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
     hardware_facade._frame = dummy_frame
     result = cmd.capture()
     assert result.shape == (720, 1280, 3)
 
+
 def test_capture_crop_and_gray(monkeypatch, dummy_command):
     cmd, hardware_facade, _, _, _ = dummy_command
     import numpy as np
+
     dummy_frame = np.ones((720, 1280, 3), dtype=np.uint8) * 255
     hardware_facade._frame = dummy_frame
     # クロップ領域指定
@@ -264,29 +295,32 @@ def test_capture_crop_and_gray(monkeypatch, dummy_command):
     assert result.shape == (200, 200)
     assert result.dtype == dummy_frame.dtype
 
+
 def test_capture_crop_out_of_bounds(dummy_command):
     cmd, hardware_facade, _, _, _ = dummy_command
     import numpy as np
+
     dummy_frame = np.ones((720, 1280, 3), dtype=np.uint8)
     hardware_facade._frame = dummy_frame
     with pytest.raises(ValueError):
         cmd.capture(crop_region=(1200, 700, 200, 200))
 
+
 def test_keyboard_type(dummy_command):
     """単一キーのタイプ操作のテスト"""
     cmd, hardware_facade, _, protocol, _ = dummy_command
     cmd.type(KeyCode("X"))
-    
+
     # PRESS操作とRELEASE操作が実行されることを確認
     assert len(protocol.calls) == 2
-    assert protocol.calls[0][0] == 'keyboard'
-    assert protocol.calls[0][1] == KeyCode('X')
+    assert protocol.calls[0][0] == "keyboard"
+    assert protocol.calls[0][1] == KeyCode("X")
     assert protocol.calls[0][2] == KeyboardOp.PRESS
-    
-    assert protocol.calls[1][0] == 'keyboard'
-    assert protocol.calls[1][1] == KeyCode('X')
+
+    assert protocol.calls[1][0] == "keyboard"
+    assert protocol.calls[1][1] == KeyCode("X")
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
-    
+
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith('keyboard:X:PRESS')
-    assert hardware_facade.sent_data[1].decode().startswith('keyboard:X:RELEASE')
+    assert hardware_facade.sent_data[0].decode().startswith("keyboard:X:PRESS")
+    assert hardware_facade.sent_data[1].decode().startswith("keyboard:X:RELEASE")
