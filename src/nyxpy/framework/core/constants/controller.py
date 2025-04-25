@@ -3,12 +3,15 @@
 
 このモジュールはコントローラーのボタンおよびHAT（十字キー）関連の定数を定義します。
 """
+
 from enum import IntEnum
+
 
 class Button(IntEnum):
     """
     コントローラーのボタンを表す定数
     """
+
     Y = 0x0001
     B = 0x0002
     A = 0x0004
@@ -27,10 +30,12 @@ class Button(IntEnum):
     HOME = 0x1000
     CAP = 0x2000
 
+
 class Hat(IntEnum):
     """
     コントローラーの方向キー（HAT）を表す定数
     """
+
     UP = 0x00
     UPRIGHT = 0x01
     RIGHT = 0x02

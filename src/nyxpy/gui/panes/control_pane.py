@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PySide6.QtCore import Signal
 
+
 class ControlPane(QWidget):
     """
     Pane for macro control buttons: run, cancel, settings, snapshot.
     """
+
     run_requested = Signal()
     cancel_requested = Signal()
     settings_requested = Signal()

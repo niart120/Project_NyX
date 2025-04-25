@@ -1,16 +1,30 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, QMessageBox
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QFormLayout,
+    QComboBox,
+    QDialogButtonBox,
+    QMessageBox,
+)
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 
+
 class DeviceSettingsDialog(QDialog):
-    def __init__(self, parent=None, settings: GlobalSettings=None, capture_manager=None, serial_manager=None):
+    def __init__(
+        self,
+        parent=None,
+        settings: GlobalSettings = None,
+        capture_manager=None,
+        serial_manager=None,
+    ):
         super().__init__(parent)
         self.settings = settings or GlobalSettings()
         self.setWindowTitle("デバイス設定")
         self.resize(400, 250)  # 少し高さを増やす
-        
+
         # 既存のマネージャを使用するか、新しく作成する
         self.capture_manager = capture_manager or CaptureManager()
         self.serial_manager = serial_manager or SerialManager()
@@ -51,7 +65,7 @@ class DeviceSettingsDialog(QDialog):
         current_ser = self.settings.get("serial_device", "")
         if current_ser in serials:
             self.ser_device.setCurrentText(current_ser)
-            
+
         # シリアルプロトコル選択
         self.ser_protocol = QComboBox()
         protocol_options = ProtocolFactory.get_protocol_names()
@@ -61,10 +75,20 @@ class DeviceSettingsDialog(QDialog):
             self.ser_protocol.setCurrentText(current_protocol)
         else:
             self.ser_protocol.setCurrentText("CH552")
-            
+
         self.ser_baud = QComboBox()
         # Common serial baud rates
-        baud_options = ["1200", "2400", "4800", "9600", "14400", "19200", "38400", "57600", "115200"]
+        baud_options = [
+            "1200",
+            "2400",
+            "4800",
+            "9600",
+            "14400",
+            "19200",
+            "38400",
+            "57600",
+            "115200",
+        ]
         self.ser_baud.addItems(baud_options)
         # Set current baud rate
         current_baud = str(self.settings.get("serial_baud", 9600))
@@ -83,14 +107,14 @@ class DeviceSettingsDialog(QDialog):
                 self,
                 "デバイス検出エラー",
                 "キャプチャデバイスとシリアルデバイスが見つかりませんでした。\n"
-                "デバイスが接続されていることを確認してください。"
+                "デバイスが接続されていることを確認してください。",
             )
         elif not serials:
             QMessageBox.warning(
                 self,
                 "デバイス検出エラー",
                 "シリアルデバイスが見つかりませんでした。\n"
-                "シリアルデバイスが接続されていることを確認してください。"
+                "シリアルデバイスが接続されていることを確認してください。",
             )
 
         # ボタン

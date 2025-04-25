@@ -3,6 +3,7 @@
 
 このモジュールはシステム全体で使用される共通型を定義します。
 """
+
 from typing import Union
 from .controller import Button, Hat
 from .stick import LStick, RStick

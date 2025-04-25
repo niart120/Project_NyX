@@ -11,7 +11,11 @@ from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager �
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.decorators import check_interrupt
-from nyxpy.framework.core.utils.helper import get_caller_class_name, validate_keyboard_text
+from nyxpy.framework.core.utils.helper import (
+    get_caller_class_name,
+    validate_keyboard_text,
+)
+
 
 class Command(ABC):
     """
@@ -61,15 +65,17 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def stop(self)-> None:
+    def stop(self) -> None:
         """
         マクロの実行を中断します。
         これは、ユーザーが中断要求を行った場合に使用されます。
         """
-        pass  
+        pass
 
     @abstractmethod
-    def log(self, *values, sep: str = ' ', end: str = '\n', level: str = "DEBUG") -> None:
+    def log(
+        self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG"
+    ) -> None:
         """
         ログ出力を行います。
 
@@ -81,7 +87,9 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def capture(self, crop_region:tuple[int, int, int, int] = None, grayscale: bool = False)->cv2.typing.MatLike:
+    def capture(
+        self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         """
         キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
 
@@ -104,7 +112,9 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
+    def load_img(
+        self, filename: str | pathlib.Path, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         """
         指定されたパスから画像を読み込みます。
         画像が存在しない場合は例外をスローします。
@@ -136,6 +146,7 @@ class Command(ABC):
         """
         pass
 
+
 class DefaultCommand(Command):
     """
     DefaultCommand は、フレームワーク側で提供するコマンド実装です。
@@ -145,11 +156,14 @@ class DefaultCommand(Command):
     操作実行時のログ出力はデフォルトで DEBUG レベルにし、
     外部からログレベルを柔軟に変更できるようにしています。
     """
-    def __init__(self, hardware_facade:HardwareFacade, 
-                 resource_io:StaticResourceIO, 
-                 protocol:SerialProtocolInterface, 
-                 ct:CancellationToken) -> None:
 
+    def __init__(
+        self,
+        hardware_facade: HardwareFacade,
+        resource_io: StaticResourceIO,
+        protocol: SerialProtocolInterface,
+        ct: CancellationToken,
+    ) -> None:
         self.hardware_facade = hardware_facade
         self.resource_io = resource_io
         self.protocol = protocol
@@ -188,22 +202,28 @@ class DefaultCommand(Command):
         self.ct.request_stop()
         raise MacroStopException("Macro execution interrupted.")
 
-    def log(self, *values, sep: str = ' ', end: str = '\n', level: str = "INFO") -> None:
+    def log(
+        self, *values, sep: str = " ", end: str = "\n", level: str = "INFO"
+    ) -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         log_manager.log(level, message, component=get_caller_class_name())
 
     @check_interrupt
-    def capture(self, crop_region:tuple[int, int, int, int] = None, grayscale: bool = False)->cv2.typing.MatLike:
+    def capture(
+        self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         # キャプチャマネージャを使用してスクリーンキャプチャを取得
         self.log("Capturing screen...", level="DEBUG")
         capture_data = self.hardware_facade.capture()
         if capture_data is None:
             self.log("Capture failed", level="ERROR")
             return None
-        
+
         # リスケール処理を実行
         target_resolution = (1280, 720)  # HD解像度
-        frame = cv2.resize(capture_data, target_resolution, interpolation=cv2.INTER_AREA)
+        frame = cv2.resize(
+            capture_data, target_resolution, interpolation=cv2.INTER_AREA
+        )
 
         # クロップ処理を実行
         if crop_region is not None:
@@ -212,7 +232,7 @@ class DefaultCommand(Command):
             if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
                 raise ValueError("Crop region exceeds frame size")
             # クロップ領域がフレームサイズを超えない場合はクロップを実行
-            frame = frame[y:y+h, x:x+w]
+            frame = frame[y : y + h, x : x + w]
 
         # グレースケール変換を実行
         if grayscale:
@@ -220,12 +240,12 @@ class DefaultCommand(Command):
 
         self.log("Capture successful", level="DEBUG")
         return frame
-    
+
     @check_interrupt
-    def save_img(self, filename, image)-> None:
+    def save_img(self, filename, image) -> None:
         self.log(f"Saving image to {filename}", level="DEBUG")
         self.resource_io.save_image(filename, image)
-    
+
     @check_interrupt
     def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
         self.log(f"Loading image from {filename}", level="DEBUG")
@@ -235,7 +255,7 @@ class DefaultCommand(Command):
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard text input: {text}", level="DEBUG")
         text = validate_keyboard_text(text)
-        
+
         try:
             # まずテキスト入力としてプロトコルに処理を依頼
             kb_data = self.protocol.build_keyboard_command(text)
@@ -244,22 +264,24 @@ class DefaultCommand(Command):
             # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
             for char in text:
                 self.type(KeyCode(char))
-        
+
         # すべてのキーを解放（念のため）
         try:
-            kb_all_release = self.protocol.build_keytype_command(KeyCode(""), KeyboardOp.ALL_RELEASE)
+            kb_all_release = self.protocol.build_keytype_command(
+                KeyCode(""), KeyboardOp.ALL_RELEASE
+            )
             self.hardware_facade.send(kb_all_release)
         except NotImplementedError:
             pass
-    
+
     @check_interrupt
-    def type(self, key: KeyCode|SpecialKeyCode) -> None:
+    def type(self, key: KeyCode | SpecialKeyCode) -> None:
         if not key:
             self.log("Empty key specified for keytype", level="WARNING")
             return
-            
+
         self.log(f"Sending keyboard key input: {key}", level="DEBUG")
-        
+
         # キーの種類に応じて操作を分岐
         match key:
             case KeyCode():
@@ -270,13 +292,13 @@ class DefaultCommand(Command):
                 release_op = KeyboardOp.SPECIAL_RELEASE
             case _:
                 raise ValueError(f"Invalid key type: {type(key)}")
-        
+
         try:
             # キー押下
             kb_press = self.protocol.build_keytype_command(key, press_op)
             self.hardware_facade.send(kb_press)
             self.wait(0.02)  # 必要に応じて調整
-            
+
             # キー解放
             kb_release = self.protocol.build_keytype_command(key, release_op)
             self.hardware_facade.send(kb_release)

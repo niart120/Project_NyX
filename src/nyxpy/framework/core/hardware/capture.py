@@ -8,6 +8,7 @@ import platform
 
 import numpy as np
 
+
 class CaptureDeviceInterface(ABC):
     @abstractmethod
     def initialize(self) -> None:
@@ -17,7 +18,7 @@ class CaptureDeviceInterface(ABC):
         pass
 
     @abstractmethod
-    def get_frame(self)-> cv2.typing.MatLike:
+    def get_frame(self) -> cv2.typing.MatLike:
         """
         最新のフレームを取得する
         """
@@ -30,25 +31,29 @@ class CaptureDeviceInterface(ABC):
         """
         pass
 
+
 class AsyncCaptureDevice:
     """
     キャプチャデバイスの非同期スレッド実装。
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
+
     def __init__(self, device_index: int = 0, fps: float = 60.0) -> None:
         self.device_index = device_index
-        self.cap:cv2.VideoCapture = None
-        self.latest_frame:cv2.typing.MatLike = None
+        self.cap: cv2.VideoCapture = None
+        self.latest_frame: cv2.typing.MatLike = None
         self._running = False
         self.fps = fps  # キャプチャのフレームレート
-        self._interval = 1.0 / fps if fps > 0 else 1.0/60.0  # キャプチャ間隔（秒）
+        self._interval = 1.0 / fps if fps > 0 else 1.0 / 60.0  # キャプチャ間隔（秒）
         self._lock = threading.Lock()
         self._thread = None
 
     def initialize(self) -> None:
         self.cap = cv2.VideoCapture(self.device_index)
         if not self.cap.isOpened():
-            raise RuntimeError(f"AsyncCaptureDevice: Device {self.device_index} could not be opened.")
+            raise RuntimeError(
+                f"AsyncCaptureDevice: Device {self.device_index} could not be opened."
+            )
         # Try to set FPS and buffer size if supported
         try:
             self.cap.set(cv2.CAP_PROP_FPS, self.fps)
@@ -76,7 +81,7 @@ class AsyncCaptureDevice:
                     self.latest_frame = frame
             time.sleep(self._interval)
 
-    def get_frame(self)-> cv2.typing.MatLike:
+    def get_frame(self) -> cv2.typing.MatLike:
         """
         キャッシュされた最新のフレームを取得します。
         """
@@ -86,7 +91,6 @@ class AsyncCaptureDevice:
             # Return a copy of the latest or the latest frame
             return self.latest_frame.copy()
 
-
     def release(self) -> None:
         self._running = False
         if self._thread:
@@ -94,6 +98,7 @@ class AsyncCaptureDevice:
         if self.cap:
             self.cap.release()
             self.cap = None
+
 
 class DummyCaptureDevice(CaptureDeviceInterface):
     """
@@ -113,7 +118,7 @@ class DummyCaptureDevice(CaptureDeviceInterface):
         ダミーキャプチャデバイスの初期化を行う。
         """
         pass
-    
+
     @override
     def get_frame(self) -> cv2.typing.MatLike:
         """
@@ -134,13 +139,14 @@ class CaptureManager:
     複数のキャプチャデバイスを管理し、利用するデバイスを切り替える仕組みを提供します。
     非同期キャプチャ版として AsyncCaptureDevice を利用します。
     """
+
     def __init__(self):
         self.devices = {}
-        self.active_device:AsyncCaptureDevice = None
+        self.active_device: AsyncCaptureDevice = None
         self._default_device = ""
         # Add dummy device by default for faster startup
         self.register_device("ダミーデバイス", DummyCaptureDevice())
-    
+
     def auto_register_devices(self) -> None:
         """
         キャプチャデバイスを自動検出して登録します。
@@ -148,13 +154,13 @@ class CaptureManager:
         # Start a background thread to detect devices to avoid blocking the UI
         thread = threading.Thread(target=self._detect_devices_thread, daemon=True)
         thread.start()
-    
+
     def set_default_device(self, device_name: str) -> None:
         """
         デフォルトのデバイス設定を保存します。デバイス検出後に自動的に適用されます。
         """
         self._default_device = device_name
-            
+
     def _detect_devices_thread(self) -> None:
         """
         バックグラウンドでデバイスを検出するスレッド処理。
@@ -174,36 +180,39 @@ class CaptureManager:
                 case _:
                     # Just use dummy device for unsupported platforms
                     pass
-                    
+
             # デバイス検出が完了したら、デフォルト設定を適用
             if self._default_device and self._default_device in self.devices:
                 self.set_active(self._default_device)
             elif len(self.devices) > 1:  # ダミーデバイス以外が存在する場合
                 # ダミーデバイス以外の最初のデバイスを選択
-                non_dummy_devices = [name for name in self.devices.keys() if name != "ダミーデバイス"]
+                non_dummy_devices = [
+                    name for name in self.devices.keys() if name != "ダミーデバイス"
+                ]
                 if non_dummy_devices:
                     self.set_active(non_dummy_devices[0])
-        except Exception as e:
+        except Exception:
             import traceback
+
             traceback.print_exc()
             # Ensure we always have at least the dummy device
             if "ダミーデバイス" not in self.devices:
                 self.register_device("ダミーデバイス", DummyCaptureDevice())
-    
+
     def _detect_windows_devices(self):
         # Windows uses DirectShow
         for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW):
-            name = f'{camera_info.index}: {camera_info.name}'
+            name = f"{camera_info.index}: {camera_info.name}"
             device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
             self.register_device(name, device)
-    
+
     def _detect_linux_devices(self):
         # Linux uses V4L2
         for camera_info in enumerate_cameras(cv2.CAP_V4L2):
-            name = f'{camera_info.index}: {camera_info.name}'
+            name = f"{camera_info.index}: {camera_info.name}"
             device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
             self.register_device(name, device)
-    
+
     def _detect_macos_devices(self):
         # macOS: Optimize by checking only first 5 indices instead of 20
         log_level = cv2.getLogLevel()

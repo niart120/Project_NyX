@@ -2,6 +2,7 @@ import pytest
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
 from serial import Serial
 
+
 @pytest.fixture(autouse=True)
 def setup_and_teardown():
     """テストのセットアップとクリーンアップ"""
@@ -13,6 +14,7 @@ def setup_and_teardown():
     # テスト後のクリーンアップ
     recv_device.close()
     assert not recv_device.is_open, "Failed to close the serial port."
+
 
 @pytest.mark.realdevice
 def test_serial_comm_open_and_close():
@@ -28,6 +30,7 @@ def test_serial_comm_open_and_close():
     # デバイスをクローズ
     serial_comm.close()
     assert serial_comm.ser is None
+
 
 @pytest.mark.realdevice
 def test_serial_comm_send():

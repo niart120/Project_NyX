@@ -2,6 +2,7 @@ from loguru import logger
 import sys
 from typing import Callable, Any
 
+
 class LogManager:
     def __init__(self):
         # Remove any default loguru handlers
@@ -9,7 +10,9 @@ class LogManager:
 
         # Built-in handlers (console & file)
         self.console_handler_id = logger.add(sys.stdout, level="DEBUG", colorize=True)
-        self.file_handler_id = logger.add("logs/logfile.log", level="DEBUG", rotation="1 MB")
+        self.file_handler_id = logger.add(
+            "logs/logfile.log", level="DEBUG", rotation="1 MB"
+        )
 
         # Custom handlers storage
         self.custom_handlers: dict[Callable[..., Any], int] = {}
@@ -22,8 +25,12 @@ class LogManager:
         """すべてのログハンドラのログレベルを変更"""
         logger.remove(self.console_handler_id)
         logger.remove(self.file_handler_id)
-        self.console_handler_id = logger.add(sys.stdout, level=level.upper(), colorize=True)
-        self.file_handler_id = logger.add("logs/logfile.log", level=level.upper(), rotation="1 MB")
+        self.console_handler_id = logger.add(
+            sys.stdout, level=level.upper(), colorize=True
+        )
+        self.file_handler_id = logger.add(
+            "logs/logfile.log", level=level.upper(), rotation="1 MB"
+        )
 
         for handler, handler_id in self.custom_handlers.items():
             logger.remove(handler_id)
@@ -33,12 +40,16 @@ class LogManager:
     def set_console_level(self, level: str) -> None:
         """コンソール出力のログレベルのみを変更"""
         logger.remove(self.console_handler_id)
-        self.console_handler_id = logger.add(sys.stdout, level=level.upper(), colorize=True)
+        self.console_handler_id = logger.add(
+            sys.stdout, level=level.upper(), colorize=True
+        )
 
     def set_file_level(self, level: str) -> None:
         """ファイル出力のログレベルのみを変更"""
         logger.remove(self.file_handler_id)
-        self.file_handler_id = logger.add("logs/logfile.log", level=level.upper(), rotation="1 MB")
+        self.file_handler_id = logger.add(
+            "logs/logfile.log", level=level.upper(), rotation="1 MB"
+        )
 
     def add_handler(self, handler: Callable[..., Any], level: str = "DEBUG") -> None:
         """カスタムハンドラを追加"""
@@ -62,6 +73,7 @@ class LogManager:
             raise ValueError("指定されたハンドラは登録されていません")
         handler_id = self.custom_handlers.pop(handler)
         logger.remove(handler_id)
+
 
 # Create a global instance for use across the framework
 log_manager = LogManager()

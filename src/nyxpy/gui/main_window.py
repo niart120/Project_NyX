@@ -1,6 +1,14 @@
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,QMessageBox, QLabel, QDialog
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QMessageBox,
+    QLabel,
+    QDialog,
+)
 
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.command import DefaultCommand
@@ -20,6 +28,7 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.framework.core.settings_service import SettingsService
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -34,23 +43,28 @@ class MainWindow(QMainWindow):
 
         # Set up the basic UI first to show it quickly
         self.setup_ui()
-        
+
         # Use Qt's event queue to initialize the rest after UI appears
         from PySide6.QtCore import QTimer
+
         QTimer.singleShot(100, self.deferred_init)
 
     def deferred_init(self):
         """Perform initialization that can be deferred until after UI appears"""
         self.init_managers()
-        self.setup_logging() # Setup logging for the GUI
-        self.setup_connections() # Setup signal connections between UI components
+        self.setup_logging()  # Setup logging for the GUI
+        self.setup_connections()  # Setup signal connections between UI components
 
     def init_managers(self):
         # Load settings and initialize hardware managers
         # シリアルデバイスの初期化 (already started in background by SettingsService)
         # Just log status
         if not self.serial_manager.is_active():
-            log_manager.log("WARNING", "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。", "MainWindow")
+            log_manager.log(
+                "WARNING",
+                "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。",
+                "MainWindow",
+            )
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -72,20 +86,20 @@ class MainWindow(QMainWindow):
         self.macro_browser = MacroBrowserPane(self.executor, self)
         # Give macro_browser vertical stretch so it fills the pane
         left_layout.addWidget(self.macro_browser, 1)
-        
+
         # 仮想コントローラーペインを作成
         self.virtual_controller = VirtualControllerPane(self, self.serial_manager)
-        
+
         # Control pane and Virtual Controller in lower section
         lower_section = QVBoxLayout()
-        
+
         # Control pane at bottom with default stretch
         self.control_pane = ControlPane(self)
         lower_section.addWidget(self.control_pane)
-        
+
         # 仮想コントローラーを下部に追加
         lower_section.addWidget(self.virtual_controller)
-        
+
         left_layout.addLayout(lower_section)
         main_layout.addWidget(left_container)
 
@@ -95,7 +109,9 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         # Preview pane replaces direct label
-        self.preview_pane = PreviewPane(settings_service=self.settings_service, parent=self)
+        self.preview_pane = PreviewPane(
+            settings_service=self.settings_service, parent=self
+        )
         right_layout.addWidget(self.preview_pane, stretch=1)
 
         # Log pane
@@ -118,39 +134,52 @@ class MainWindow(QMainWindow):
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
         self.preview_pane.snapshot_taken.connect(self.status_label.setText)
         self.control_pane.settings_requested.connect(self.open_settings)
-        
+
         # Set status to ready
         self.status_label.setText("準備完了")
 
     def setup_logging(self):
-        log_manager.add_handler(lambda record: self.log_pane.append(str(record)), level="DEBUG")
+        log_manager.add_handler(
+            lambda record: self.log_pane.append(str(record)), level="DEBUG"
+        )
 
     def open_settings(self):
         # 更新したDialogに既存のマネージャを渡す
-        dlg = DeviceSettingsDialog(self, self.global_settings, 
-                                  capture_manager=self.capture_manager,
-                                  serial_manager=self.serial_manager)
+        dlg = DeviceSettingsDialog(
+            self,
+            self.global_settings,
+            capture_manager=self.capture_manager,
+            serial_manager=self.serial_manager,
+        )
         if dlg.exec() != QDialog.Accepted:
             return
-            
+
         # 設定が保存された場合に各マネージャを更新
         new_cap = self.global_settings.get("capture_device")
         try:
             self.preview_pane.set_active_device(new_cap)
-            log_manager.log("INFO", f"キャプチャデバイスを切り替えました: {new_cap}", "MainWindow")
+            log_manager.log(
+                "INFO", f"キャプチャデバイスを切り替えました: {new_cap}", "MainWindow"
+            )
         except Exception as e:
-            log_manager.log("ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow")
-            
+            log_manager.log(
+                "ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow"
+            )
+
         new_ser = self.global_settings.get("serial_device")
         new_baud = self.global_settings.get("serial_baud", 9600)
         try:
             self.serial_manager.set_active(new_ser, new_baud)
             # シリアルマネージャーを仮想コントローラにも設定して同期させる
             self.virtual_controller.model.set_serial_manager(self.serial_manager)
-            log_manager.log("INFO", f"シリアルデバイスを設定しました: {new_ser} ({new_baud}bps)", "MainWindow")
+            log_manager.log(
+                "INFO",
+                f"シリアルデバイスを設定しました: {new_ser} ({new_baud}bps)",
+                "MainWindow",
+            )
         except Exception as e:
             log_manager.log("ERROR", f"シリアルデバイス設定エラー: {e}", "MainWindow")
-        
+
         # プロトコル設定が変更されている場合は、仮想コントローラのプロトコルも更新
         try:
             # SettingsServiceから現在のプロトコルを取得
@@ -158,14 +187,20 @@ class MainWindow(QMainWindow):
             # 仮想コントローラにプロトコルを設定
             self.virtual_controller.model.set_protocol(protocol)
             protocol_name = self.global_settings.get("serial_protocol", "CH552")
-            log_manager.log("INFO", f"コントローラープロトコルを切り替えました: {protocol_name}", "MainWindow")
+            log_manager.log(
+                "INFO",
+                f"コントローラープロトコルを切り替えました: {protocol_name}",
+                "MainWindow",
+            )
         except Exception as e:
             log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
-            
+
         self.preview_pane.apply_fps()
 
     def start_macro(self):
-        macro_name = self.macro_browser.table.item(self.macro_browser.table.currentRow(), 0).text()
+        macro_name = self.macro_browser.table.item(
+            self.macro_browser.table.currentRow(), 0
+        ).text()
         dlg = SettingsDialog(self)
         if dlg.exec() != QDialog.Accepted:
             return
@@ -188,7 +223,7 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def cancel_macro(self):
-        if hasattr(self, 'worker'):
+        if hasattr(self, "worker"):
             self.worker.cmd.stop()
             self.control_pane.cancel_btn.setEnabled(False)
 
@@ -207,6 +242,7 @@ class MainWindow(QMainWindow):
                 self.start_macro()
             elif ret == QMessageBox.Close:
                 from PySide6.QtWidgets import QApplication
+
                 QApplication.instance().quit()
 
 
@@ -218,12 +254,14 @@ class WorkerThread(QThread):
         super().__init__()
         self.executor = executor
         self.cmd = cmd
-        orig_log = getattr(self.cmd, 'log', None)
-        def _log_override(*values, sep=' ', end='\n', level='INFO'):
-            msg = sep.join(map(str, values)) + end.rstrip('\n')
+        orig_log = getattr(self.cmd, "log", None)
+
+        def _log_override(*values, sep=" ", end="\n", level="INFO"):
+            msg = sep.join(map(str, values)) + end.rstrip("\n")
             self.progress.emit(msg)
             if orig_log:
                 orig_log(*values, sep=sep, end=end, level=level)
+
         self.cmd.log = _log_override
         self.macro_name = macro_name
         self.args = args

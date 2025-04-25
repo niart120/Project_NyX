@@ -1,11 +1,12 @@
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.capture import CaptureManager
 
+
 class HardwareFacade:
     """
     ハードウェア操作のためのシンプルなインターフェースを提供するファサードクラスで、
     アクティブなシリアルデバイスとキャプチャデバイスのドライバに処理を委譲します。
-    
+
     properties:
         serial_manager (SerialManager): シリアルデバイス通信を処理するマネージャ。
         capture_manager (CaptureManager): キャプチャデバイス操作を処理するマネージャ。
