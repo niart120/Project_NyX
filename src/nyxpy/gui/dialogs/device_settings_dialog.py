@@ -2,13 +2,14 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QComboBox, QDia
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 
 class DeviceSettingsDialog(QDialog):
     def __init__(self, parent=None, settings: GlobalSettings=None, capture_manager=None, serial_manager=None):
         super().__init__(parent)
         self.settings = settings or GlobalSettings()
         self.setWindowTitle("デバイス設定")
-        self.resize(400, 200)
+        self.resize(400, 250)  # 少し高さを増やす
         
         # 既存のマネージャを使用するか、新しく作成する
         self.capture_manager = capture_manager or CaptureManager()
@@ -50,6 +51,17 @@ class DeviceSettingsDialog(QDialog):
         current_ser = self.settings.get("serial_device", "")
         if current_ser in serials:
             self.ser_device.setCurrentText(current_ser)
+            
+        # シリアルプロトコル選択
+        self.ser_protocol = QComboBox()
+        protocol_options = ProtocolFactory.get_protocol_names()
+        self.ser_protocol.addItems(protocol_options)
+        current_protocol = self.settings.get("serial_protocol", "CH552")
+        if current_protocol in protocol_options:
+            self.ser_protocol.setCurrentText(current_protocol)
+        else:
+            self.ser_protocol.setCurrentText("CH552")
+            
         self.ser_baud = QComboBox()
         # Common serial baud rates
         baud_options = ["1200", "2400", "4800", "9600", "14400", "19200", "38400", "57600", "115200"]
@@ -61,6 +73,7 @@ class DeviceSettingsDialog(QDialog):
         else:
             self.ser_baud.setCurrentText("9600")
         ser_form.addRow("デバイス:", self.ser_device)
+        ser_form.addRow("プロトコル:", self.ser_protocol)
         ser_form.addRow("ボーレート:", self.ser_baud)
         layout.addLayout(ser_form)
 
@@ -87,10 +100,14 @@ class DeviceSettingsDialog(QDialog):
         layout.addWidget(buttons)
 
     def accept(self) -> None:
+        # 利用するキャプチャデバイスを保存
         self.settings.set("capture_device", self.cap_device.currentText())
-        # Set selected FPS from dropdown
+        # FPS設定を保存
         self.settings.set("capture_fps", int(self.cap_fps.currentText()))
+        # 利用するシリアルデバイスを保存
         self.settings.set("serial_device", self.ser_device.currentText())
-        # Set selected baud rate from dropdown
+        # プロトコル設定を保存
+        self.settings.set("serial_protocol", self.ser_protocol.currentText())
+        # ボーレート設定を保存
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
         super().accept()

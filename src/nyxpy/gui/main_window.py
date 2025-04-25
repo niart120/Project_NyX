@@ -2,7 +2,6 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,QMessageBox, QLabel, QDialog
 
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.utils.cancellation import CancellationToken
@@ -20,22 +19,6 @@ from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.framework.core.settings_service import SettingsService
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-
-class AspectRatioLabel(QLabel):
-    """
-    QLabel that maintains a fixed aspect ratio based on its width.
-    """
-    def __init__(self, aspect_w=16, aspect_h=9, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.aspect_w = aspect_w
-        self.aspect_h = aspect_h
-
-    def hasHeightForWidth(self):
-        return True
-
-    def heightForWidth(self, width):
-        # Calculate height to maintain aspect ratio
-        return int(width * self.aspect_h / self.aspect_w)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -162,9 +145,22 @@ class MainWindow(QMainWindow):
         new_baud = self.global_settings.get("serial_baud", 9600)
         try:
             self.serial_manager.set_active(new_ser, new_baud)
+            # シリアルマネージャーを仮想コントローラにも設定して同期させる
+            self.virtual_controller.model.set_serial_manager(self.serial_manager)
             log_manager.log("INFO", f"シリアルデバイスを設定しました: {new_ser} ({new_baud}bps)", "MainWindow")
         except Exception as e:
             log_manager.log("ERROR", f"シリアルデバイス設定エラー: {e}", "MainWindow")
+        
+        # プロトコル設定が変更されている場合は、仮想コントローラのプロトコルも更新
+        try:
+            # SettingsServiceから現在のプロトコルを取得
+            protocol = self.settings_service.get_protocol()
+            # 仮想コントローラにプロトコルを設定
+            self.virtual_controller.model.set_protocol(protocol)
+            protocol_name = self.global_settings.get("serial_protocol", "CH552")
+            log_manager.log("INFO", f"コントローラープロトコルを切り替えました: {protocol_name}", "MainWindow")
+        except Exception as e:
+            log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
             
         self.preview_pane.apply_fps()
 
@@ -176,7 +172,8 @@ class MainWindow(QMainWindow):
         params = dlg.param_edit.text()
         exec_args = parse_define_args(params)
         resource_io = StaticResourceIO(Path.cwd() / "static")
-        protocol = CH552SerialProtocol()
+        # 設定サービスから選択されたプロトコルを取得
+        protocol = self.settings_service.get_protocol()
         ct = CancellationToken()
         facade = HardwareFacade(self.serial_manager, self.capture_manager)
         cmd = DefaultCommand(facade, resource_io, protocol, ct)
@@ -211,6 +208,7 @@ class MainWindow(QMainWindow):
             elif ret == QMessageBox.Close:
                 from PySide6.QtWidgets import QApplication
                 QApplication.instance().quit()
+
 
 class WorkerThread(QThread):
     progress = Signal(str)

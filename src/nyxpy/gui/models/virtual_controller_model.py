@@ -1,9 +1,10 @@
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, SerialProtocolInterface
+from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.logger.log_manager import log_manager
 from PySide6.QtCore import QObject, Signal
-from typing import Optional, Set, List, Union
+from typing import Optional, Set, Union
 
 
 class VirtualControllerModel(QObject):
@@ -19,7 +20,8 @@ class VirtualControllerModel(QObject):
     ) -> None:
         super().__init__()
         self.serial_manager = serial_manager
-        self.protocol = protocol or CH552SerialProtocol()
+        # デフォルトでCH552プロトコルを使用（外部から変更される想定）
+        self.protocol = protocol or ProtocolFactory.create_protocol("CH552")
         
         # コントローラー状態
         self.pressed_buttons: Set[Button] = set()
@@ -31,23 +33,25 @@ class VirtualControllerModel(QObject):
         """シリアルマネージャーを設定"""
         self.serial_manager = serial_manager
     
-    def set_SerialProtocol(self, protocol: SerialProtocolInterface) -> None:
+    def set_protocol(self, protocol: SerialProtocolInterface) -> None:
         """シリアルプロトコルを設定"""
         self.protocol = protocol
+        # プロトコルが変更されたことをログに記録
+        log_manager.log("INFO", f"仮想コントローラーのプロトコルを変更: {protocol.__class__.__name__}", "VirtualController")
         
     def button_press(self, button: Button) -> None:
         """ボタンが押されたときの処理"""
         self.pressed_buttons.add(button)
         # ボタン押下の専用コマンドを送信
         self.send_press_command((button,))
-        
+    
     def button_release(self, button: Button) -> None:
         """ボタンが離されたときの処理"""
         if button in self.pressed_buttons:
             self.pressed_buttons.remove(button)
             # ボタン解放の専用コマンドを送信
             self.send_release_command((button,))
-        
+    
     def set_hat_direction(self, direction: Hat) -> None:
         """方向パッドの方向を設定"""
         previous_direction = self.current_hat
@@ -59,7 +63,7 @@ class VirtualControllerModel(QObject):
         # それ以外の場合は押下コマンドを送信
         else:
             self.send_press_command((direction,))
-        
+
     def set_left_stick(self, angle: float, strength: float) -> None:
         """左スティックの状態を設定"""
         previous_stick = self.current_l_stick
@@ -75,7 +79,6 @@ class VirtualControllerModel(QObject):
                 self.send_release_command((previous_stick,))
             self.current_l_stick = LStick.CENTER
 
-        
     def set_right_stick(self, angle: float, strength: float) -> None:
         """右スティックの状態を設定"""
         previous_stick = self.current_r_stick
@@ -90,8 +93,7 @@ class VirtualControllerModel(QObject):
             if previous_stick != RStick.CENTER:
                 self.send_release_command((previous_stick,))
             self.current_r_stick = RStick.CENTER
-            
-
+    
     def send_release_command(self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]) -> None:
         """特定のキーの解放コマンドをシリアルデバイスに送信"""
         if not self.serial_manager or not self.serial_manager.is_active():
