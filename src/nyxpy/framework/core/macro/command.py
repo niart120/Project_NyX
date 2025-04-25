@@ -5,7 +5,7 @@ import cv2
 
 from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.macro.constants import KeyType, KeyboardOp
+from nyxpy.framework.core.macro.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
 from nyxpy.framework.core.macro.exceptions import MacroStopException
@@ -243,31 +243,42 @@ class DefaultCommand(Command):
         except (ValueError, NotImplementedError):
             # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
             for char in text:
-                self.keytype(char)
+                self.keytype(KeyCode(char))
         
         # すべてのキーを解放（念のため）
         try:
-            kb_all_release = self.protocol.build_keytype_command("", KeyboardOp.ALL_RELEASE)
+            kb_all_release = self.protocol.build_keytype_command(KeyCode(""), KeyboardOp.ALL_RELEASE)
             self.hardware_facade.send(kb_all_release)
         except NotImplementedError:
             pass
     
     @check_interrupt
-    def keytype(self, key: str) -> None:
+    def keytype(self, key: KeyCode|SpecialKeyCode) -> None:
         if not key:
             self.log("Empty key specified for keytype", level="WARNING")
             return
             
         self.log(f"Sending keyboard key input: {key}", level="DEBUG")
         
+        # キーの種類に応じて操作を分岐
+        match key:
+            case KeyCode():
+                press_op = KeyboardOp.PRESS
+                release_op = KeyboardOp.RELEASE
+            case SpecialKeyCode():
+                press_op = KeyboardOp.SPECIAL_PRESS
+                release_op = KeyboardOp.SPECIAL_RELEASE
+            case _:
+                raise ValueError(f"Invalid key type: {type(key)}")
+        
         try:
             # キー押下
-            kb_press = self.protocol.build_keytype_command(key, KeyboardOp.PRESS)
+            kb_press = self.protocol.build_keytype_command(key, press_op)
             self.hardware_facade.send(kb_press)
             self.wait(0.02)  # 必要に応じて調整
             
             # キー解放
-            kb_release = self.protocol.build_keytype_command(key, KeyboardOp.RELEASE)
+            kb_release = self.protocol.build_keytype_command(key, release_op)
             self.hardware_facade.send(kb_release)
             self.wait(0.01)  # 必要に応じて調整
         except NotImplementedError as e:

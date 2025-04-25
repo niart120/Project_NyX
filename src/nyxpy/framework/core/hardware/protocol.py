@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from nyxpy.framework.core.macro.constants import Button, Hat, KeyboardOp, LStick, RStick, KeyType
+from nyxpy.framework.core.macro.constants import Button, Hat, KeyCode, KeyboardOp, LStick, RStick, KeyType, SpecialKeyCode
 
 class SerialProtocolInterface(ABC):
     @abstractmethod
@@ -21,18 +21,18 @@ class SerialProtocolInterface(ABC):
         pass
 
     @abstractmethod
-    def build_keyboard_command(self, key: str) -> bytes:
+    def build_keyboard_command(self, text: str) -> bytes:
         """
         キーボード文字列入力操作のコマンドデータを生成する
         
-        :param key: 入力する文字列
+        :param text: 入力する文字列
         :return: コマンドデータ
         :raises NotImplementedError: プロトコルが対応していない場合
         """
         pass
         
     @abstractmethod
-    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+    def build_keytype_command(self, key: KeyCode|SpecialKeyCode, op: KeyboardOp) -> bytes:
         """
         キーボード個別キー操作のコマンドデータを生成する
         
@@ -113,11 +113,11 @@ class CH552SerialProtocol(SerialProtocolInterface):
 
         return bytes(self.key_state)
 
-    def build_keyboard_command(self, key: str) -> bytes:
+    def build_keyboard_command(self, text: str) -> bytes:
         # CH552はテキスト入力をサポートしていないため、すべての操作でエラーを発生させる
         raise NotImplementedError("CH552 protocol does not support text mode keyboard input. Use build_keytype_command instead.")
         
-    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+    def build_keytype_command(self, key: KeyCode|SpecialKeyCode, op: KeyboardOp) -> bytes:
         # キーボード個別キー操作の状態を更新する
         # キーボード操作のヘッダーを設定
         self.key_state[8] = int(op)
@@ -126,8 +126,7 @@ class CH552SerialProtocol(SerialProtocolInterface):
         if op == KeyboardOp.ALL_RELEASE:
             self.key_state[9] = 0x00
         else:
-            encoded = key.encode('ascii', errors='ignore') 
-            self.key_state[9] = encoded[0] if len(encoded) > 0 else 0x00
+            self.key_state[9] = key
 
         return bytes(self.key_state)
 
@@ -202,17 +201,34 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         encoded = f'"{key}"'.encode('utf-8', errors='ignore')
         return encoded + b'\r\n'
                 
-    def build_keytype_command(self, key: str, op: KeyboardOp) -> bytes:
+    def build_keytype_command(self, key: KeyCode|SpecialKeyCode, op: KeyboardOp) -> bytes:
         # キーボード個別キー操作の種類に応じて、コマンドを生成する
         match op:
-            case KeyboardOp.PRESS:
-                # 個別キー押下操作のコマンドを生成する
-                encoded = f"PRESS {key}".encode('utf-8', errors='ignore')
-                return encoded + b'\r\n'
+
+            case KeyboardOp.SPECIAL_PUSH:
+                # 特殊キー打鍵操作のコマンドを生成する
+                encoded = f"KEY {int(key)}\r\n".encode('utf-8', errors='ignore')
+                return encoded
+            
+            case KeyboardOp.SPECIAL_PRESS:
+                # 特殊キー押下操作のコマンドを生成する
+                encoded = f"PRESS {int(key)}\r\n".encode('utf-8', errors='ignore')
+                return encoded
+            case KeyboardOp.SPECIAL_RELEASE:
+                # 特殊キー解放操作のコマンドを生成する
+                encoded = f"RELEASE {int(key)}\r\n".encode('utf-8', errors='ignore')
+                return encoded
+            
+            case KeyboardOp.PUSH | KeyboardOp.PRESS:
+                # 通常キー押下操作のコマンドを生成する
+                # PokeConプロトコルは、通常キーの押下操作をサポートしないため、テキスト入力形式のコマンドで代替する
+                encoded = f'"{str(key)}"\r\n'.encode('utf-8', errors='ignore')
+                return encoded
+
             case KeyboardOp.RELEASE:
-                # 個別キー解放操作のコマンドを生成する
-                encoded = f"RELEASE {key}".encode('utf-8', errors='ignore')
-                return encoded + b'\r\n'
+                # PokeConプロトコルは通常のキー操作の解放コマンドを持たないため、ここでは何もしない
+                pass
+
             case KeyboardOp.ALL_RELEASE:
                 # すべてのキー解放操作のコマンドを生成する
                 # PokeConプロトコルはすべてのキー解放操作をサポートしないため、エラーを発生させる
