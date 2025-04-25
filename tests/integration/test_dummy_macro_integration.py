@@ -12,7 +12,6 @@ from nyxpy.framework.core.hardware.capture import CaptureManager, AsyncCaptureDe
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.hardware.facade import HardwareFacade

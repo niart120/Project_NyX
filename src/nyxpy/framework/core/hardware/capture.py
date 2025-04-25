@@ -183,7 +183,7 @@ class CaptureManager:
                 non_dummy_devices = [name for name in self.devices.keys() if name != "ダミーデバイス"]
                 if non_dummy_devices:
                     self.set_active(non_dummy_devices[0])
-        except Exception as e:
+        except Exception:
             import traceback
             traceback.print_exc()
             # Ensure we always have at least the dummy device

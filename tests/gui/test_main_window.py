@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import patch
-from PySide6.QtCore import Qt
 from nyxpy.gui.main_window import MainWindow
 
 @pytest.fixture

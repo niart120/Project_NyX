@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QTableWidget, QTableWidgetItem, QSizePolicy, QHeaderView
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 
 class MacroBrowserPane(QWidget):
     """

@@ -1,6 +1,5 @@
 import argparse
 import sys
-import os
 from pathlib import Path
 
 from nyxpy.cli.run_cli import cli_main
