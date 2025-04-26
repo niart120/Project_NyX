@@ -128,7 +128,10 @@ class MainWindow(QMainWindow):
     def setup_connections(self):
         # Connect pane signals fully delegated
         self.macro_browser.selection_changed.connect(self.control_pane.set_selection)
-        self.control_pane.run_requested.connect(self.start_macro)
+        self.control_pane.run_requested.connect(self.execute_macro_immediate)
+        self.control_pane.run_with_params_requested.connect(
+            self.execute_macro_with_params
+        )
         self.control_pane.cancel_requested.connect(self.cancel_macro)
         # Delegate snapshot to PreviewPane and status via signal
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
@@ -174,11 +177,13 @@ class MainWindow(QMainWindow):
             self.virtual_controller.model.set_serial_manager(self.serial_manager)
             log_manager.log(
                 "INFO",
-                f"シリアルデバイスを設定しました: {new_ser} ({new_baud}bps)",
+                f"シリアルデバイスを切り替えました: {new_ser} ({new_baud} bps)",
                 "MainWindow",
             )
         except Exception as e:
-            log_manager.log("ERROR", f"シリアルデバイス設定エラー: {e}", "MainWindow")
+            log_manager.log(
+                "ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow"
+            )
 
         # プロトコル設定が変更されている場合は、仮想コントローラのプロトコルも更新
         try:
@@ -197,15 +202,35 @@ class MainWindow(QMainWindow):
 
         self.preview_pane.apply_fps()
 
-    def start_macro(self):
+    def execute_macro_immediate(self):
+        """即時実行モード：パラメータ入力なしでマクロを実行する"""
+        self._start_macro({})  # 空のパラメータ辞書を渡す
+
+    def execute_macro_with_params(self):
+        """パラメータ付き実行モード：パラメータ入力ダイアログを表示して実行する"""
         macro_name = self.macro_browser.table.item(
             self.macro_browser.table.currentRow(), 0
         ).text()
-        dlg = SettingsDialog(self)
+        dlg = SettingsDialog(self, macro_name)
         if dlg.exec() != QDialog.Accepted:
             return
+
+        # パラメータを解析して実行に渡す
         params = dlg.param_edit.text()
         exec_args = parse_define_args(params)
+        self._start_macro(exec_args)
+
+    def _start_macro(self, exec_args):
+        """
+        共通のマクロ実行処理
+
+        Args:
+            exec_args: マクロに渡す引数辞書
+        """
+        macro_name = self.macro_browser.table.item(
+            self.macro_browser.table.currentRow(), 0
+        ).text()
+
         resource_io = StaticResourceIO(Path.cwd() / "static")
         # 設定サービスから選択されたプロトコルを取得
         protocol = self.settings_service.get_protocol()
@@ -214,11 +239,10 @@ class MainWindow(QMainWindow):
         cmd = DefaultCommand(facade, resource_io, protocol, ct)
 
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
+        self.worker.progress.connect(self.log_pane.append)
         self.worker.finished.connect(self.on_finished)
 
-        self.control_pane.run_btn.setEnabled(False)
-        self.control_pane.settings_btn.setEnabled(False)
-        self.control_pane.cancel_btn.setEnabled(True)
+        self.control_pane.set_running(True)
         self.status_label.setText("実行中")
         self.worker.start()
 
@@ -229,9 +253,8 @@ class MainWindow(QMainWindow):
 
     def on_finished(self, status: str):
         self.status_label.setText(status)
-        self.control_pane.run_btn.setEnabled(True)
-        self.control_pane.settings_btn.setEnabled(True)
-        self.control_pane.cancel_btn.setEnabled(False)
+        self.control_pane.set_running(False)
+
         if status.startswith("エラー"):
             dlg = QMessageBox(self)
             dlg.setWindowTitle("エラー")
@@ -239,7 +262,7 @@ class MainWindow(QMainWindow):
             dlg.setStandardButtons(QMessageBox.Retry | QMessageBox.Close)
             ret = dlg.exec()
             if ret == QMessageBox.Retry:
-                self.start_macro()
+                self._start_macro({})
             elif ret == QMessageBox.Close:
                 from PySide6.QtWidgets import QApplication
 
