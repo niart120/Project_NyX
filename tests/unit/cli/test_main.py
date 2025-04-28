@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 from nyxpy.cli.run_cli import (
     configure_logging,
     create_protocol,
-    create_hardware_components,
     create_command,
     execute_macro,
     cli_main,
@@ -148,104 +147,41 @@ def test_create_protocol_unknown():
         create_protocol("UNKNOWN")
 
 
-# create_hardware_components のテスト
-def test_create_hardware_components_success(
-    monkeypatch, mock_serial_manager, mock_capture_manager
-):
-    monkeypatch.setattr("nyxpy.cli.run_cli.SerialManager", lambda: mock_serial_manager)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.CaptureManager", lambda: mock_capture_manager
-    )
-
-    facade = create_hardware_components("COM1", "Camera1")
-
-    assert facade.serial_manager == mock_serial_manager
-    assert facade.capture_manager == mock_capture_manager
-    assert mock_serial_manager.active_device is not None
-    assert mock_capture_manager.active_device is not None
-
-
-def test_create_hardware_components_no_serial_devices(monkeypatch):
-    empty_serial_manager = MockSerialManager()
-    monkeypatch.setattr("nyxpy.cli.run_cli.SerialManager", lambda: empty_serial_manager)
-
-    with pytest.raises(ValueError, match="No serial devices detected"):
-        create_hardware_components("COM1", "Camera1")
-
-
-def test_create_hardware_components_no_capture_devices(
-    monkeypatch, mock_serial_manager
-):
-    empty_capture_manager = MockCaptureManager()
-    monkeypatch.setattr("nyxpy.cli.run_cli.SerialManager", lambda: mock_serial_manager)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.CaptureManager", lambda: empty_capture_manager
-    )
-
-    with pytest.raises(ValueError, match="No capture devices detected"):
-        create_hardware_components("COM1", "Camera1")
-
-
-def test_create_hardware_components_unknown_serial(
-    monkeypatch, mock_serial_manager, mock_capture_manager
-):
-    monkeypatch.setattr("nyxpy.cli.run_cli.SerialManager", lambda: mock_serial_manager)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.CaptureManager", lambda: mock_capture_manager
-    )
-
-    with pytest.raises(ValueError, match="Serial port 'COM3' not found"):
-        create_hardware_components("COM3", "Camera1")
-
-
-def test_create_hardware_components_unknown_capture(
-    monkeypatch, mock_serial_manager, mock_capture_manager
-):
-    monkeypatch.setattr("nyxpy.cli.run_cli.SerialManager", lambda: mock_serial_manager)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.CaptureManager", lambda: mock_capture_manager
-    )
-
-    with pytest.raises(ValueError, match="Capture device 'Camera3' not found"):
-        create_hardware_components("COM1", "Camera3")
-
-
 # create_command のテスト
 def test_create_command_default_path(monkeypatch):
-    mock_facade = MagicMock()
     mock_protocol = MagicMock()
     mock_resource_io = MagicMock()
-
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io
     )
     monkeypatch.setattr(
+        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial"))
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
+    monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda hardware_facade, resource_io, protocol, ct: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct: "command",
     )
-
-    result = create_command(mock_facade, mock_protocol)
-
+    result = create_command(mock_protocol)
     assert result == "command"
 
 
 def test_create_command_custom_path(monkeypatch):
-    mock_facade = MagicMock()
     mock_protocol = MagicMock()
     mock_resource_io = MagicMock()
-
     custom_path = pathlib.Path("custom/path")
-
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io
     )
     monkeypatch.setattr(
+        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial"))
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
+    monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda hardware_facade, resource_io, protocol, ct: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct: "command",
     )
-
-    result = create_command(mock_facade, mock_protocol, resources_dir=custom_path)
-
+    result = create_command(mock_protocol, resources_dir=custom_path)
     assert result == "command"
 
 
@@ -293,7 +229,7 @@ def test_execute_macro_exception(mock_executor):
 
 
 # cli_main のテスト
-def test_cli_main_success(monkeypatch):
+def test_cli_main_success(monkeypatch, mock_serial_manager, mock_capture_manager):
     args = MagicMock()
     args.serial = "COM1"
     args.capture = "Camera1"
@@ -304,21 +240,16 @@ def test_cli_main_success(monkeypatch):
     args.define = []
 
     mock_configure = MagicMock()
-    mock_hardware = MagicMock()
     mock_protocol = MagicMock()
     mock_command = MagicMock()
     mock_exec = MagicMock()
 
+    # serial_manager/capture_managerを直接パッチ
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", mock_configure)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_hardware_components",
-        lambda serial_port, capture_device: mock_hardware,
-    )
     monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: mock_protocol)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_command",
-        lambda hardware_facade, protocol: mock_command,
-    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_command", lambda protocol: mock_command)
     monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
     monkeypatch.setattr("nyxpy.cli.run_cli.MacroExecutor", lambda: mock_exec)
     monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", MagicMock())
@@ -329,7 +260,7 @@ def test_cli_main_success(monkeypatch):
     mock_configure.assert_called_once()
 
 
-def test_cli_main_value_error(monkeypatch, mock_log_manager):
+def test_cli_main_value_error(monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager):
     args = MagicMock()
     args.serial = "COM3"  # 存在しないシリアルポート
     args.capture = "Camera1"
@@ -337,12 +268,8 @@ def test_cli_main_value_error(monkeypatch, mock_log_manager):
 
     monkeypatch.setattr("nyxpy.cli.run_cli.log_manager", mock_log_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_hardware_components",
-        lambda serial_port, capture_device: exec(
-            'raise ValueError("Device not found")'
-        ),
-    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
 
     result = cli_main(args)
 
@@ -350,15 +277,19 @@ def test_cli_main_value_error(monkeypatch, mock_log_manager):
     assert any(log[0] == "ERROR" for log in mock_log_manager.logs)
 
 
-def test_cli_main_exception(monkeypatch, mock_log_manager):
+def test_cli_main_exception(monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager):
     args = MagicMock()
+
+    args.serial = "COM1" 
+    args.capture = "Camera1"
+    args.protocol = "CH552"
 
     monkeypatch.setattr("nyxpy.cli.run_cli.log_manager", mock_log_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_hardware_components",
-        lambda serial_port, capture_device: exec('raise Exception("Unexpected error")'),
-    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
+    # create_protocolで例外を発生させる
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: (_ for _ in ()).throw(Exception("Unexpected error")))
 
     result = cli_main(args)
 
