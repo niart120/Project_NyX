@@ -8,18 +8,16 @@ from PySide6.QtWidgets import (
 )
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.gui.models.device_model import DeviceModel
+from nyxpy.framework.core.singletons import serial_manager, capture_manager
 
 
 class DeviceSettingsDialog(QDialog):
     def __init__(
         self,
         parent,
-        device_model: DeviceModel,
         settings: GlobalSettings,
     ):
         super().__init__(parent)
-        self.device_model = device_model
         self.settings = settings
         self.setWindowTitle("デバイス設定")
         self.resize(400, 250)
@@ -28,20 +26,19 @@ class DeviceSettingsDialog(QDialog):
         # キャプチャデバイス設定
         cap_form = QFormLayout()
         self.cap_device = QComboBox()
-        devices = self.device_model.get_capture_device_list()
+        devices = capture_manager.list_devices()
         self.cap_device.addItems(devices)
         current_cap = self.settings.get("capture_device", "")
         if current_cap in devices:
             self.cap_device.setCurrentText(current_cap)
-        self.cap_fps = QComboBox()
-        fps_options = ["15", "30", "60"]
-        self.cap_fps.addItems(fps_options)
-        current_fps = str(self.settings.get("capture_fps", 30))
-        if current_fps in fps_options:
-            self.cap_fps.setCurrentText(current_fps)
-        else:
-            self.cap_fps.setCurrentText("30")
+        
+        cap_form.addRow("Device:", self.cap_device)
+        layout.addLayout(cap_form)
+
+
         # プレビューFPS欄を追加
+        preview_form = QFormLayout()
+        fps_options = ["15", "30", "60"]
         self.preview_fps = QComboBox()
         self.preview_fps.addItems(fps_options)
         current_preview_fps = str(self.settings.get("preview_fps", 30))
@@ -49,15 +46,14 @@ class DeviceSettingsDialog(QDialog):
             self.preview_fps.setCurrentText(current_preview_fps)
         else:
             self.preview_fps.setCurrentText("30")
-        cap_form.addRow("Device:", self.cap_device)
-        cap_form.addRow("Device FPS:", self.cap_fps)
-        cap_form.addRow("Preview FPS:", self.preview_fps)
-        layout.addLayout(cap_form)
+
+        preview_form.addRow("Preview FPS:", self.preview_fps)
+        layout.addLayout(preview_form)
 
         # シリアルデバイス設定
         ser_form = QFormLayout()
         self.ser_device = QComboBox()
-        serials = self.device_model.get_serial_device_list()
+        serials = serial_manager.list_devices()
         self.ser_device.addItems(serials)
         current_ser = self.settings.get("serial_device", "")
         if current_ser in serials:
@@ -109,9 +105,8 @@ class DeviceSettingsDialog(QDialog):
     def accept(self) -> None:
         # 設定値の保存のみ担当（システム状態の変更は行わない）
         self.settings.set("capture_device", self.cap_device.currentText())
-        self.settings.set("capture_fps", int(self.cap_fps.currentText()))
+        self.settings.set("preview_fps", int(self.preview_fps.currentText()))
         self.settings.set("serial_device", self.ser_device.currentText())
         self.settings.set("serial_protocol", self.ser_protocol.currentText())
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
-        self.settings.set("preview_fps", int(self.preview_fps.currentText()))
         super().accept()
