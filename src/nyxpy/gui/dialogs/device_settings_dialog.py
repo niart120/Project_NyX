@@ -15,27 +15,23 @@ from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 class DeviceSettingsDialog(QDialog):
     def __init__(
         self,
-        parent=None,
-        settings: GlobalSettings = None,
-        capture_manager=None,
-        serial_manager=None,
+        parent,
+        settings: GlobalSettings,
+        capture_manager: CaptureManager,
+        serial_manager: SerialManager,
     ):
         super().__init__(parent)
-        self.settings = settings or GlobalSettings()
+        self.settings = settings
         self.setWindowTitle("デバイス設定")
-        self.resize(400, 250)  # 少し高さを増やす
-
-        # 既存のマネージャを使用するか、新しく作成する
-        self.capture_manager = capture_manager or CaptureManager()
-        self.serial_manager = serial_manager or SerialManager()
-
+        self.resize(400, 250)
+        self.capture_manager = capture_manager
+        self.serial_manager = serial_manager
         layout = QVBoxLayout(self)
 
         # キャプチャデバイス設定
         cap_form = QFormLayout()
         self.cap_device = QComboBox()
         # 既存のキャプチャマネージャを使用
-        self.capture_manager.auto_register_devices()
         devices = self.capture_manager.list_devices()
         self.cap_device.addItems(devices)
         current_cap = self.settings.get("capture_device", "")
@@ -59,7 +55,6 @@ class DeviceSettingsDialog(QDialog):
         ser_form = QFormLayout()
         self.ser_device = QComboBox()
         # 既存のシリアルマネージャを使用
-        self.serial_manager.auto_register_devices()
         serials = self.serial_manager.list_devices()
         self.ser_device.addItems(serials)
         current_ser = self.settings.get("serial_device", "")
