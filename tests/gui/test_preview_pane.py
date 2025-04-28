@@ -21,10 +21,6 @@ def app():
 @pytest.fixture
 def preview_pane(app):
     """Create a PreviewPane with mocked dependencies."""
-    # global_settingsとして辞書を直接渡す
-    global_settings = {
-        "capture_fps": 30,
-    }
     # Mock capture device
     device_mock = Mock()
     test_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -33,7 +29,7 @@ def preview_pane(app):
     with patch("nyxpy.gui.panes.preview_pane.cv2") as mock_cv2:
         mock_cv2.resize.return_value = test_frame
         mock_cv2.INTER_LINEAR = cv2.INTER_LINEAR
-        pane = PreviewPane(global_settings, capture_device=device_mock)
+        pane = PreviewPane(capture_device=device_mock, capture_fps=30)
     return pane
 
 
