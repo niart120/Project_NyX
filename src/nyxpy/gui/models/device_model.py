@@ -1,9 +1,12 @@
 from nyxpy.gui.events import EventBus, EventType
-from nyxpy.gui.singletons import serial_manager, capture_manager
+from nyxpy.gui.singletons import initialize_managers, serial_manager, capture_manager, global_settings
 
 class DeviceModel:
     """デバイス管理を担当するモデルクラス"""
     def __init__(self):
+        # シリアルマネージャとキャプチャマネージャを初期化
+        initialize_managers()
+
         self.event_bus = EventBus.get_instance()
         self._active_serial_device = None
         self._active_capture_device = None
@@ -48,3 +51,7 @@ class DeviceModel:
     def get_active_capture_device(self):
         """現在のアクティブなキャプチャデバイスを取得"""
         return self._active_capture_device
+
+    def get_capture_fps(self):
+        """現在のキャプチャFPS設定値を取得"""
+        return global_settings.get("capture_fps", 30)

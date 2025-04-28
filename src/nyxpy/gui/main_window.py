@@ -1,4 +1,4 @@
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -26,25 +26,25 @@ from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.models.device_model import DeviceModel
-from nyxpy.gui.singletons import initialize_managers, global_settings
+from nyxpy.gui.singletons import global_settings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.gui.events import EventBus, EventType
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        initialize_managers()
         self.global_settings = global_settings
         self.device_model = DeviceModel()
         self.executor = MacroExecutor()
         self.setup_ui()
-        from PySide6.QtCore import QTimer
         QTimer.singleShot(100, self.deferred_init)
 
     def deferred_init(self):
         """Perform initialization that can be deferred until after UI appears"""
         self.setup_logging()  # Setup logging for the GUI
         self.setup_connections()  # Setup signal connections between UI components
+        self.apply_device_settings()
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.macro_browser, 1)
 
         # 仮想コントローラーペインを作成
-        self.virtual_controller = VirtualControllerPane(self, self.device_model)
+        self.virtual_controller = VirtualControllerPane(self)
 
         # Control pane and Virtual Controller in lower section
         lower_section = QVBoxLayout()
@@ -89,11 +89,7 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         # Preview pane replaces direct label
-        self.preview_pane = PreviewPane(
-            settings_service=self.settings_service,
-            capture_device=self.device_model.active_capture_device,
-            parent=self
-        )
+        self.preview_pane = PreviewPane(parent=self)
         right_layout.addWidget(self.preview_pane, stretch=1)
 
         # Log pane
@@ -129,21 +125,21 @@ class MainWindow(QMainWindow):
         )
 
     def open_settings(self):
-        # 更新したDialogに既存のマネージャを渡す
         dlg = DeviceSettingsDialog(
             self,
-            self.global_settings,
-            capture_manager=None,  # DeviceModel経由に統一するため不要
-            serial_manager=None,
+            self.device_model,
+            global_settings,
         )
         if dlg.exec() != QDialog.Accepted:
             return
+        self.apply_device_settings()
 
-        # 設定が保存された場合に各マネージャを更新
+    def apply_device_settings(self):
+        """GlobalSettingsの現行値をDeviceModelやEventBus経由でシステムに反映"""
         new_cap = self.global_settings.get("capture_device")
         try:
             self.device_model.change_capture_device(new_cap)
-            self.preview_pane.set_capture_device(self.device_model.active_capture_device)
+            self.preview_pane.set_capture_device(self.device_model.get_active_capture_device())
             log_manager.log(
                 "INFO", f"キャプチャデバイスを切り替えました: {new_cap}", "MainWindow"
             )
@@ -156,7 +152,6 @@ class MainWindow(QMainWindow):
         new_baud = self.global_settings.get("serial_baud", 9600)
         try:
             self.device_model.change_serial_device(new_ser, new_baud)
-            self.virtual_controller.model.set_serial_device(self.device_model.active_serial_device)
             log_manager.log(
                 "INFO",
                 f"シリアルデバイスを切り替えました: {new_ser} ({new_baud} bps)",
@@ -167,10 +162,9 @@ class MainWindow(QMainWindow):
                 "ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow"
             )
 
-        # プロトコル設定が変更されている場合は、仮想コントローラのプロトコルも更新
         try:
             protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
-            self.virtual_controller.model.set_protocol(protocol)
+            EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
             protocol_name = self.global_settings.get("serial_protocol", "CH552")
             log_manager.log(
                 "INFO",
@@ -215,8 +209,8 @@ class MainWindow(QMainWindow):
         ct = CancellationToken()
         # HardwareFacadeは不要、DeviceModel経由でデバイスを直接渡す
         cmd = DefaultCommand(
-            serial_device=self.device_model.active_serial_device,
-            capture_device=self.device_model.active_capture_device,
+            serial_device=self.device_model.get_active_serial_device(),
+            capture_device=self.device_model.get_active_capture_device(),
             resource_io=resource_io,
             protocol=protocol,
             ct=ct,
