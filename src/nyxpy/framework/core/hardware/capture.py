@@ -184,13 +184,7 @@ class CaptureManager:
             # デバイス検出が完了したら、デフォルト設定を適用
             if self._default_device and self._default_device in self.devices:
                 self.set_active(self._default_device)
-            elif len(self.devices) > 1:  # ダミーデバイス以外が存在する場合
-                # ダミーデバイス以外の最初のデバイスを選択
-                non_dummy_devices = [
-                    name for name in self.devices.keys() if name != "ダミーデバイス"
-                ]
-                if non_dummy_devices:
-                    self.set_active(non_dummy_devices[0])
+        # Ensure we always have at least the dummy device
         except Exception:
             import traceback
 
@@ -203,14 +197,14 @@ class CaptureManager:
         # Windows uses DirectShow
         for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW):
             name = f"{camera_info.index}: {camera_info.name}"
-            device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
+            device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
             self.register_device(name, device)
 
     def _detect_linux_devices(self):
         # Linux uses V4L2
         for camera_info in enumerate_cameras(cv2.CAP_V4L2):
             name = f"{camera_info.index}: {camera_info.name}"
-            device = AsyncCaptureDevice(device_index=camera_info.index, fps=30.0)
+            device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
             self.register_device(name, device)
 
     def _detect_macos_devices(self):
@@ -224,7 +218,7 @@ class CaptureManager:
                 if cap.isOpened():
                     cap.release()
                     name = f"macOS Camera {i}"
-                    device = AsyncCaptureDevice(device_index=i, fps=30.0)
+                    device = AsyncCaptureDevice(device_index=i, fps=60.0)
                     self.register_device(name, device)
         finally:
             cv2.setLogLevel(log_level)

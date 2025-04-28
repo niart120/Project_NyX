@@ -61,14 +61,6 @@ def window(qtbot, tmp_cwd_and_dummy, patched_managers):
     return w
 
 
-class DummyDevice:
-    def __init__(self, frame):
-        self._frame = frame
-
-    def get_frame(self):
-        return self._frame
-
-
 def test_update_preview_success(window: MainWindow, qtbot):
     # ウィンドウが表示されていることを確認
     assert window.isVisible()
@@ -83,9 +75,11 @@ def test_update_preview_success(window: MainWindow, qtbot):
 
     # Prepare dummy frame 100x160x3 (より大きなサイズを使用)
     frame = np.full((100, 160, 3), 128, dtype=np.uint8)
-
-    # モックのデバイスを設定
-    window.capture_manager.get_active_device = lambda: DummyDevice(frame)
+    class DummyDevice:
+        def get_frame(self):
+            return frame
+    # 新設計: PreviewPaneに直接デバイスを注入
+    window.preview_pane.set_capture_device(DummyDevice())
 
     # 初期状態ではピクスマップがないかもしれないが、正常に動作させるための処理
     window.preview_pane.label.resize(320, 180)
@@ -93,12 +87,8 @@ def test_update_preview_success(window: MainWindow, qtbot):
 
     # 明示的にレイアウトを更新
     window.preview_pane.layout().activate()
-    qtbot.wait(100)  # レイアウト更新のための短い待機
-
-    # プレビュー更新を呼び出し
+    qtbot.wait(100)
     window.preview_pane.update_preview()
-
-    # テスト成功のために待機
     qtbot.wait(100)
 
     # 結果確認: ピクスマップが作成されているか
@@ -121,18 +111,16 @@ def test_update_preview_failure(window: MainWindow, qtbot):
     class BadDevice:
         def get_frame(self):
             raise RuntimeError("fail capture")
-
-    window.capture_manager.get_active_device = lambda: BadDevice()
-
-    # Should not raise
+    # 新設計: PreviewPaneに直接デバイスを注入
+    window.preview_pane.set_capture_device(BadDevice())
+    # 失敗前のPixmapを保存
+    before_pix = window.preview_pane.label.pixmap()
     try:
         window.preview_pane.update_preview()
     except Exception:
         pytest.fail("update_preview raised exception on failure")
-
-    # Ensure we wait for any potential asynchronous processing
     qtbot.wait(100)
-
-    # Pixmap stays None or unchanged
-    final_pix = window.preview_pane.label.pixmap()
-    assert final_pix is None or final_pix.isNull()
+    # 失敗後のPixmap
+    after_pix = window.preview_pane.label.pixmap()
+    # PixmapがNoneまたは変更されていないことを確認
+    assert after_pix is None or after_pix.cacheKey() == (before_pix.cacheKey() if before_pix else None)

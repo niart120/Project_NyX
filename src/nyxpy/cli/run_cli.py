@@ -2,10 +2,7 @@ import pathlib
 import argparse
 from typing import Optional, Any
 
-from nyxpy.framework.core.hardware.capture import CaptureManager
-from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.macro.command import DefaultCommand, Command
@@ -16,6 +13,7 @@ from nyxpy.framework.core.hardware.protocol import (
 )
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.gui.singletons import serial_manager, capture_manager
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> None:
@@ -59,60 +57,7 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
             raise ValueError(f"Unknown protocol: {protocol_name}")
 
 
-def create_hardware_components(serial_port: str, capture_device: str) -> HardwareFacade:
-    """
-    ハードウェアコンポーネントを作成して初期化します。
-
-    Args:
-        serial_port: 使用するシリアルポートの名前
-        capture_device: 使用するキャプチャデバイスの名前
-
-    Returns:
-        設定済みのHardwareFacadeインスタンス
-
-    Raises:
-        ValueError: 必要なハードウェアが初期化できない場合
-    """
-    # シリアルマネージャーの初期化
-    serial_manager = SerialManager()
-    serial_manager.auto_register_devices()
-
-    available_serial_devices = serial_manager.list_devices()
-    if not available_serial_devices:
-        raise ValueError("No serial devices detected")
-
-    if serial_port not in available_serial_devices:
-        available_devices_str = ", ".join(available_serial_devices)
-        raise ValueError(
-            f"Serial port '{serial_port}' not found. Available devices: {available_devices_str}"
-        )
-
-    serial_manager.set_active(serial_port)
-
-    # キャプチャマネージャーの初期化
-    capture_manager = CaptureManager()
-    capture_manager.auto_register_devices()
-
-    available_capture_devices = capture_manager.list_devices()
-    print(f"Available capture devices: {available_capture_devices}")
-
-    if not available_capture_devices:
-        raise ValueError("No capture devices detected")
-
-    if capture_device not in available_capture_devices:
-        available_devices_str = ", ".join(available_capture_devices)
-        raise ValueError(
-            f"Capture device '{capture_device}' not found. Available devices: {available_devices_str}"
-        )
-
-    capture_manager.set_active(capture_device)
-
-    # ハードウェアファサードの作成
-    return HardwareFacade(serial_manager, capture_manager)
-
-
 def create_command(
-    hardware_facade: HardwareFacade,
     protocol: SerialProtocolInterface,
     resources_dir: Optional[pathlib.Path] = None,
 ) -> Command:
@@ -120,7 +65,6 @@ def create_command(
     指定されたコンポーネントでCommandインスタンスを作成します。
 
     Args:
-        hardware_facade: 使用するハードウェアファサード
         protocol: 使用するプロトコル実装
         resources_dir: リソースI/O用のディレクトリ（デフォルトは'./static'）
 
@@ -133,8 +77,12 @@ def create_command(
     resource_io = StaticResourceIO(resources_dir)
     cancellation_token = CancellationToken()
 
+    serial_device = serial_manager.get_active_device()
+    capture_device = capture_manager.get_active_device()
+
     return DefaultCommand(
-        hardware_facade=hardware_facade,
+        serial_device=serial_device,
+        capture_device=capture_device,
         resource_io=resource_io,
         protocol=protocol,
         ct=cancellation_token,
@@ -190,14 +138,33 @@ def cli_main(args: argparse.Namespace) -> int:
         # ログの設定
         configure_logging(silence=args.silence, verbose=args.verbose)
 
-        # コンポーネントの作成と設定
-        hardware_facade = create_hardware_components(
-            serial_port=args.serial, capture_device=args.capture
-        )
+        # シングルトンの初期化
+        serial_manager.auto_register_devices()
+        capture_manager.auto_register_devices()
+
+        available_serial_devices = serial_manager.list_devices()
+        if not available_serial_devices:
+            raise ValueError("No serial devices detected")
+        if args.serial not in available_serial_devices:
+            available_devices_str = ", ".join(available_serial_devices)
+            raise ValueError(
+                f"Serial port '{args.serial}' not found. Available devices: {available_devices_str}"
+            )
+        serial_manager.set_active(args.serial)
+
+        available_capture_devices = capture_manager.list_devices()
+        print(f"Available capture devices: {available_capture_devices}")
+        if not available_capture_devices:
+            raise ValueError("No capture devices detected")
+        if args.capture not in available_capture_devices:
+            available_devices_str = ", ".join(available_capture_devices)
+            raise ValueError(
+                f"Capture device '{args.capture}' not found. Available devices: {available_devices_str}"
+            )
+        capture_manager.set_active(args.capture)
 
         protocol = create_protocol(args.protocol)
-
-        cmd = create_command(hardware_facade=hardware_facade, protocol=protocol)
+        cmd = create_command(protocol=protocol)
 
         # マクロ実行引数の解析
         exec_args = parse_define_args(args.define)

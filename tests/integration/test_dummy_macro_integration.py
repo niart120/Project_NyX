@@ -14,7 +14,6 @@ from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.executor import MacroExecutor
-from nyxpy.framework.core.hardware.facade import HardwareFacade
 
 # --- Fake デバイス実装 ---
 
@@ -131,56 +130,33 @@ def dummy_handler(msg):
 def integration_setup(monkeypatch):
     # CancellationToken の作成
     token = CancellationToken()
-
-    # 実際の SerialManager と CaptureManager を作成
     serial_manager = SerialManager()
     capture_manager = CaptureManager()
-
-    # 内部のシリアルデバイスを FakeSerialComm に差し替える
     fake_serial = FakeSerialComm()
     serial_manager.register_device("fake", fake_serial)
-    # アクティブなシリアルデバイスとして設定
     serial_manager.set_active("fake", baudrate=9600)
-
-    # 内部のキャプチャデバイスを FakeAsyncCaptureDevice に差し替える
     fake_capture = FakeAsyncCaptureDevice()
     capture_manager.register_device("fake", fake_capture)
     capture_manager.set_active("fake")
-
-    # FakeResourceIO を作成
     resource_io = FakeResourceIO()
-
-    # HardwareFacade を作成
-    hardware_facade = HardwareFacade(serial_manager, capture_manager)
-
-    # DefaultCommand のインスタンス作成（HardwareFacade を使用）
+    # HardwareFacadeは不要、DefaultCommandに直接デバイスを渡す
     cmd = DefaultCommand(
-        hardware_facade=hardware_facade,
+        serial_device=fake_serial,
+        capture_device=fake_capture,
         resource_io=resource_io,
         protocol=CH552SerialProtocol(),
         ct=token,
     )
-
-    # ログ出力のため、log_manager に独自のログハンドラを設定
     log_manager.add_handler(dummy_handler, level="DEBUG")
-
-    # MacroExecutor のセットアップ
     executor = MacroExecutor()
     executor.macros = {
         "DummyMacro": DummyMacro(),
         "LongRunningMacro": LongRunningMacro(),
     }
-
     yield executor, cmd, fake_serial, fake_capture, token
-
-    # テスト後にログハンドラを元に戻す
     log_manager.remove_handler(dummy_handler)
-    # シリアルデバイスとキャプチャデバイスを解放
-    # FakeSerialComm と FakeAsyncCaptureDevice は自動的に解放される
     serial_manager.active_device.close()
     capture_manager.active_device.release()
-
-    # ログをクリア
     logs.clear()
 
 

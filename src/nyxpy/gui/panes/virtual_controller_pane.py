@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout
-from typing import Optional, Any
+from typing import Optional
 
 from nyxpy.framework.core.constants import Button
 from nyxpy.gui.widgets.controller.analog_stick import AnalogStick
@@ -13,10 +13,10 @@ class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
 
     def __init__(
-        self, parent: Optional[QWidget] = None, serial_manager: Optional[Any] = None
+        self, parent: Optional[QWidget] = None
     ) -> None:
         super().__init__(parent)
-        self.model = VirtualControllerModel(serial_manager)
+        self.model = VirtualControllerModel()
         self.initUI()
 
     def initUI(self) -> None:
