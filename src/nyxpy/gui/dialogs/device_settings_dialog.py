@@ -41,8 +41,17 @@ class DeviceSettingsDialog(QDialog):
             self.cap_fps.setCurrentText(current_fps)
         else:
             self.cap_fps.setCurrentText("30")
+        # プレビューFPS欄を追加
+        self.preview_fps = QComboBox()
+        self.preview_fps.addItems(fps_options)
+        current_preview_fps = str(self.settings.get("preview_fps", 30))
+        if current_preview_fps in fps_options:
+            self.preview_fps.setCurrentText(current_preview_fps)
+        else:
+            self.preview_fps.setCurrentText("30")
         cap_form.addRow("デバイス:", self.cap_device)
         cap_form.addRow("FPS:", self.cap_fps)
+        cap_form.addRow("プレビューFPS:", self.preview_fps)
         layout.addLayout(cap_form)
 
         # シリアルデバイス設定
@@ -104,4 +113,5 @@ class DeviceSettingsDialog(QDialog):
         self.settings.set("serial_device", self.ser_device.currentText())
         self.settings.set("serial_protocol", self.ser_protocol.currentText())
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
+        self.settings.set("preview_fps", int(self.preview_fps.currentText()))
         super().accept()
