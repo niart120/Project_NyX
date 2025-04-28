@@ -13,7 +13,7 @@ from nyxpy.framework.core.hardware.protocol import (
 )
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.gui.singletons import serial_manager, capture_manager
+from nyxpy.framework.core.singletons import serial_manager, capture_manager
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> None:

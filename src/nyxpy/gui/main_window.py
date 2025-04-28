@@ -25,8 +25,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-from nyxpy.gui.models.device_model import DeviceModel
-from nyxpy.gui.singletons import global_settings
+from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, initialize_managers
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.gui.events import EventBus, EventType
 
@@ -34,9 +33,10 @@ from nyxpy.gui.events import EventBus, EventType
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        initialize_managers()
         self.global_settings = global_settings
-        self.device_model = DeviceModel()
         self.executor = MacroExecutor()
+        self._last_settings = {}
         self.setup_ui()
         QTimer.singleShot(100, self.deferred_init)
 
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         right_layout.setSpacing(0)
         # Preview pane replaces direct label
         self.preview_pane = PreviewPane(
-            capture_device=self.device_model.get_active_capture_device(),
+            capture_device=capture_manager.get_active_device(),
             parent=self,
             preview_fps=self.global_settings.get("preview_fps", 30)
         )
@@ -131,7 +131,6 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dlg = DeviceSettingsDialog(
             self,
-            self.device_model,
             global_settings,
         )
         if dlg.exec() != QDialog.Accepted:
@@ -139,49 +138,58 @@ class MainWindow(QMainWindow):
         self.apply_device_settings()
 
     def apply_device_settings(self):
-        """GlobalSettingsの現行値をDeviceModelやEventBus経由でシステムに反映"""
-        new_cap = self.global_settings.get("capture_device")
-        try:
-            self.device_model.change_capture_device(new_cap)
-            self.preview_pane.set_capture_device(self.device_model.get_active_capture_device())
-            log_manager.log(
-                "INFO", f"キャプチャデバイスを切り替えました: {new_cap}", "MainWindow"
-            )
-        except Exception as e:
-            log_manager.log(
-                "ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow"
-            )
-
-        new_ser = self.global_settings.get("serial_device")
-        new_baud = self.global_settings.get("serial_baud", 9600)
-        try:
-            self.device_model.change_serial_device(new_ser, new_baud)
-            log_manager.log(
-                "INFO",
-                f"シリアルデバイスを切り替えました: {new_ser} ({new_baud} bps)",
-                "MainWindow",
-            )
-        except Exception as e:
-            log_manager.log(
-                "ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow"
-            )
-
-        try:
-            protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
-            EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
-            protocol_name = self.global_settings.get("serial_protocol", "CH552")
-            log_manager.log(
-                "INFO",
-                f"コントローラープロトコルを切り替えました: {protocol_name}",
-                "MainWindow",
-            )
-        except Exception as e:
-            log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow"
-)
-
-        # プレビューFPSも反映
-        self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)
-        self.preview_pane.apply_fps()
+        prev = self._last_settings
+        cur = self.global_settings.data
+        diff_keys = {k for k in cur if prev.get(k) != cur.get(k)}
+        # 差分がある項目のみ反映・イベント発行
+        if "serial_device" in diff_keys or "serial_baud" in diff_keys:
+            try:
+                serial_manager.set_active(cur.get("serial_device"), cur.get("serial_baud", 9600))
+                EventBus.get_instance().publish(EventType.SERIAL_DEVICE_CHANGED, {
+                    'name': cur.get("serial_device"),
+                    'baudrate': cur.get("serial_baud", 9600),
+                    'device': serial_manager.get_active_device()
+                })
+                log_manager.log(
+                    "INFO",
+                    f"シリアルデバイスを切り替えました: {cur.get('serial_device')} ({cur.get('serial_baud', 9600)} bps)",
+                    "MainWindow",
+                )
+            except Exception as e:
+                log_manager.log(
+                    "ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow"
+                )
+        if "capture_device" in diff_keys:
+            try:
+                capture_manager.set_active(cur.get("capture_device"))
+                EventBus.get_instance().publish(EventType.CAPTURE_DEVICE_CHANGED, {
+                    'name': cur.get("capture_device"),
+                    'device': capture_manager.get_active_device()
+                })
+                log_manager.log(
+                    "INFO", f"キャプチャデバイスを切り替えました: {cur.get('capture_device')}", "MainWindow"
+                )
+            except Exception as e:
+                log_manager.log(
+                    "ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow"
+                )
+        if "serial_protocol" in diff_keys:
+            try:
+                protocol = ProtocolFactory.create_protocol(cur.get("serial_protocol", "CH552"))
+                EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
+                protocol_name = cur.get("serial_protocol", "CH552")
+                log_manager.log(
+                    "INFO",
+                    f"コントローラープロトコルを切り替えました: {protocol_name}",
+                    "MainWindow",
+                )
+            except Exception as e:
+                log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
+        if "preview_fps" in diff_keys:
+            self.preview_pane.preview_fps = cur.get("preview_fps", 30)
+            self.preview_pane.apply_fps()
+        # ...他の設定も必要に応じて追加...
+        self._last_settings = cur.copy()
 
     def execute_macro_immediate(self):
         """即時実行モード：パラメータ入力なしでマクロを実行する"""
@@ -214,10 +222,9 @@ class MainWindow(QMainWindow):
         resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
         ct = CancellationToken()
-        # HardwareFacadeは不要、DeviceModel経由でデバイスを直接渡す
         cmd = DefaultCommand(
-            serial_device=self.device_model.get_active_serial_device(),
-            capture_device=self.device_model.get_active_capture_device(),
+            serial_device=serial_manager.get_active_device(),
+            capture_device=capture_manager.get_active_device(),
             resource_io=resource_io,
             protocol=protocol,
             ct=ct,
