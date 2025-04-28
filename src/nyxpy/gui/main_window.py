@@ -24,16 +24,17 @@ from pathlib import Path
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
-from nyxpy.framework.core.settings_service import SettingsService
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.models.device_model import DeviceModel
+from nyxpy.gui.singletons import initialize_managers, global_settings
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.settings_service = SettingsService()
-        self.global_settings = self.settings_service.global_settings
+        initialize_managers()
+        self.global_settings = global_settings
         self.device_model = DeviceModel()
         self.executor = MacroExecutor()
         self.setup_ui()
@@ -168,9 +169,7 @@ class MainWindow(QMainWindow):
 
         # プロトコル設定が変更されている場合は、仮想コントローラのプロトコルも更新
         try:
-            # SettingsServiceから現在のプロトコルを取得
-            protocol = self.settings_service.get_protocol()
-            # 仮想コントローラにプロトコルを設定
+            protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
             self.virtual_controller.model.set_protocol(protocol)
             protocol_name = self.global_settings.get("serial_protocol", "CH552")
             log_manager.log(
@@ -212,7 +211,7 @@ class MainWindow(QMainWindow):
             self.macro_browser.table.currentRow(), 0
         ).text()
         resource_io = StaticResourceIO(Path.cwd() / "static")
-        protocol = self.settings_service.get_protocol()
+        protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
         ct = CancellationToken()
         # HardwareFacadeは不要、DeviceModel経由でデバイスを直接渡す
         cmd = DefaultCommand(
