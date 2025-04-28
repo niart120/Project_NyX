@@ -16,7 +16,6 @@ from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.helper import parse_define_args
-from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.gui.dialogs.device_settings_dialog import DeviceSettingsDialog
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
@@ -28,7 +27,6 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.framework.core.settings_service import SettingsService
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.models.device_model import DeviceModel
-from nyxpy.gui.events import EventBus, EventType
 
 
 class MainWindow(QMainWindow):
@@ -36,7 +34,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings_service = SettingsService()
         self.global_settings = self.settings_service.global_settings
-        # DeviceModelを生成し、全Paneで共有
         self.device_model = DeviceModel()
         self.executor = MacroExecutor()
         self.setup_ui()
@@ -45,20 +42,8 @@ class MainWindow(QMainWindow):
 
     def deferred_init(self):
         """Perform initialization that can be deferred until after UI appears"""
-        self.init_managers()
         self.setup_logging()  # Setup logging for the GUI
         self.setup_connections()  # Setup signal connections between UI components
-
-    def init_managers(self):
-        # Load settings and initialize hardware managers
-        # シリアルデバイスの初期化 (already started in background by SettingsService)
-        # Just log status
-        if not self.device_model.is_serial_active():
-            log_manager.log(
-                "WARNING",
-                "シリアルデバイスが見つからないか、初期化に失敗しました。設定ダイアログから再設定してください。",
-                "MainWindow",
-            )
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -226,18 +211,20 @@ class MainWindow(QMainWindow):
         macro_name = self.macro_browser.table.item(
             self.macro_browser.table.currentRow(), 0
         ).text()
-
         resource_io = StaticResourceIO(Path.cwd() / "static")
-        # 設定サービスから選択されたプロトコルを取得
         protocol = self.settings_service.get_protocol()
         ct = CancellationToken()
-        facade = HardwareFacade(self.device_model.serial_manager, self.device_model.capture_manager)
-        cmd = DefaultCommand(facade, resource_io, protocol, ct)
-
+        # HardwareFacadeは不要、DeviceModel経由でデバイスを直接渡す
+        cmd = DefaultCommand(
+            serial_device=self.device_model.active_serial_device,
+            capture_device=self.device_model.active_capture_device,
+            resource_io=resource_io,
+            protocol=protocol,
+            ct=ct,
+        )
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
         self.worker.progress.connect(self.log_pane.append)
         self.worker.finished.connect(self.on_finished)
-
         self.control_pane.set_running(True)
         self.status_label.setText("実行中")
         self.worker.start()
