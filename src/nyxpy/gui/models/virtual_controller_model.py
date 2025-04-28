@@ -1,8 +1,9 @@
-from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.gui.events import EventBus, EventType
 from PySide6.QtCore import QObject, Signal
 from typing import Optional, Set, Union
 
@@ -15,13 +16,15 @@ class VirtualControllerModel(QObject):
 
     def __init__(
         self,
-        serial_manager: Optional[SerialManager] = None,
+        serial_device: Optional[SerialCommInterface] = None,
         protocol: Optional[SerialProtocolInterface] = None,
     ) -> None:
         super().__init__()
-        self.serial_manager = serial_manager
-        # デフォルトでCH552プロトコルを使用（外部から変更される想定）
+        self.serial_device = serial_device
         self.protocol = protocol or ProtocolFactory.create_protocol("CH552")
+        self.event_bus = EventBus.get_instance()
+        self.event_bus.subscribe(EventType.SERIAL_DEVICE_CHANGED, self.on_serial_device_changed)
+        self.event_bus.subscribe(EventType.PROTOCOL_CHANGED, self.on_protocol_changed)
 
         # コントローラー状態
         self.pressed_buttons: Set[Button] = set()
@@ -29,9 +32,9 @@ class VirtualControllerModel(QObject):
         self.current_l_stick: LStick = LStick.CENTER
         self.current_r_stick: RStick = RStick.CENTER
 
-    def set_serial_manager(self, serial_manager: SerialManager) -> None:
-        """シリアルマネージャーを設定"""
-        self.serial_manager = serial_manager
+    def set_serial_device(self, serial_device: SerialCommInterface) -> None:
+        """シリアルデバイスを設定"""
+        self.serial_device = serial_device
 
     def set_protocol(self, protocol: SerialProtocolInterface) -> None:
         """シリアルプロトコルを設定"""
@@ -101,13 +104,11 @@ class VirtualControllerModel(QObject):
     def send_release_command(
         self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]
     ) -> None:
-        """特定のキーの解放コマンドをシリアルデバイスに送信"""
-        if not self.serial_manager or not self.serial_manager.is_active():
+        if not self.serial_device:
             return
-
         try:
             command_data = self.protocol.build_release_command(keys)
-            self.serial_manager.get_active_device().send(command_data)
+            self.serial_device.send(command_data)
         except Exception as e:
             log_manager.log(
                 "ERROR",
@@ -119,13 +120,11 @@ class VirtualControllerModel(QObject):
     def send_press_command(
         self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]
     ) -> None:
-        """特定のキーの押下コマンドをシリアルデバイスに送信"""
-        if not self.serial_manager or not self.serial_manager.is_active():
+        if not self.serial_device:
             return
-
         try:
             command_data = self.protocol.build_press_command(keys)
-            self.serial_manager.get_active_device().send(command_data)
+            self.serial_device.send(command_data)
         except Exception as e:
             log_manager.log(
                 "ERROR",
@@ -133,3 +132,9 @@ class VirtualControllerModel(QObject):
                 "VirtualController",
             )
             raise e
+
+    def on_serial_device_changed(self, data):
+        self.set_serial_device(data['device'])
+
+    def on_protocol_changed(self, data):
+        self.set_protocol(data['protocol'])
