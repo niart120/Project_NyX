@@ -17,20 +17,17 @@ class PreviewPane(QWidget):
     Pane for showing camera preview and handling snapshots.
     """
 
-    def __init__(self, settings_service, capture_device=None, parent=None):
+    def __init__(self, global_settings, capture_device=None, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         # Preview label
-        self.label = AspectRatioLabel(
-            settings_service.global_settings.get("capture_aspect_w", 16),
-            settings_service.global_settings.get("capture_aspect_h", 9),
-        )
+        self.label = AspectRatioLabel(16, 9)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setMinimumHeight(100)
         layout.addWidget(self.label)
 
         self.capture_device = capture_device
-        self.settings = settings_service.global_settings
+        self.settings = global_settings
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_preview)
