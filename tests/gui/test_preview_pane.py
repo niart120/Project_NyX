@@ -29,7 +29,10 @@ def preview_pane(app):
     with patch("nyxpy.gui.panes.preview_pane.cv2") as mock_cv2:
         mock_cv2.resize.return_value = test_frame
         mock_cv2.INTER_LINEAR = cv2.INTER_LINEAR
-        pane = PreviewPane(capture_device=device_mock, capture_fps=30)
+        pane = PreviewPane(
+            capture_device=device_mock,
+            preview_fps=20       # プレビュー用のみ
+        )
     return pane
 
 

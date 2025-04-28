@@ -18,7 +18,7 @@ class PreviewPane(QWidget):
     Pane for showing camera preview and handling snapshots.
     """
 
-    def __init__(self, capture_device=None, parent=None, capture_fps=60):
+    def __init__(self, capture_device=None, parent=None, preview_fps=30):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         self.label = AspectRatioLabel(16, 9)
@@ -27,7 +27,7 @@ class PreviewPane(QWidget):
         layout.addWidget(self.label)
 
         self.capture_device = capture_device
-        self.capture_fps = capture_fps
+        self.preview_fps = preview_fps      # プレビュー用のみ
         self.event_bus = EventBus.get_instance()
         self.event_bus.subscribe(EventType.CAPTURE_DEVICE_CHANGED, self.on_capture_device_changed)
 
@@ -86,7 +86,7 @@ class PreviewPane(QWidget):
         return msg
 
     def apply_fps(self):
-        interval = int(1000 / self.capture_fps) if self.capture_fps > 0 else 1000
+        interval = int(1000 / self.preview_fps) if self.preview_fps > 0 else 1000
         self.timer.start(interval)
 
     def showEvent(self, event):

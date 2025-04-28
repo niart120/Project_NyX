@@ -89,7 +89,11 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         # Preview pane replaces direct label
-        self.preview_pane = PreviewPane(parent=self)
+        self.preview_pane = PreviewPane(
+            capture_device=self.device_model.get_active_capture_device(),
+            parent=self,
+            preview_fps=self.global_settings.get("preview_fps", 30)
+        )
         right_layout.addWidget(self.preview_pane, stretch=1)
 
         # Log pane
@@ -172,8 +176,11 @@ class MainWindow(QMainWindow):
                 "MainWindow",
             )
         except Exception as e:
-            log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
+            log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow"
+)
 
+        # プレビューFPSも反映
+        self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)
         self.preview_pane.apply_fps()
 
     def execute_macro_immediate(self):

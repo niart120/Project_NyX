@@ -41,8 +41,17 @@ class DeviceSettingsDialog(QDialog):
             self.cap_fps.setCurrentText(current_fps)
         else:
             self.cap_fps.setCurrentText("30")
-        cap_form.addRow("デバイス:", self.cap_device)
-        cap_form.addRow("FPS:", self.cap_fps)
+        # プレビューFPS欄を追加
+        self.preview_fps = QComboBox()
+        self.preview_fps.addItems(fps_options)
+        current_preview_fps = str(self.settings.get("preview_fps", 30))
+        if current_preview_fps in fps_options:
+            self.preview_fps.setCurrentText(current_preview_fps)
+        else:
+            self.preview_fps.setCurrentText("30")
+        cap_form.addRow("Device:", self.cap_device)
+        cap_form.addRow("Device FPS:", self.cap_fps)
+        cap_form.addRow("Preview FPS:", self.preview_fps)
         layout.addLayout(cap_form)
 
         # シリアルデバイス設定
@@ -71,9 +80,9 @@ class DeviceSettingsDialog(QDialog):
             self.ser_baud.setCurrentText(current_baud)
         else:
             self.ser_baud.setCurrentText("9600")
-        ser_form.addRow("デバイス:", self.ser_device)
-        ser_form.addRow("プロトコル:", self.ser_protocol)
-        ser_form.addRow("ボーレート:", self.ser_baud)
+        ser_form.addRow("Device:", self.ser_device)
+        ser_form.addRow("Protocol:", self.ser_protocol)
+        ser_form.addRow("Baud Rate:", self.ser_baud)
         layout.addLayout(ser_form)
 
         # デバイスが見つからない場合の警告
@@ -104,4 +113,5 @@ class DeviceSettingsDialog(QDialog):
         self.settings.set("serial_device", self.ser_device.currentText())
         self.settings.set("serial_protocol", self.ser_protocol.currentText())
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
+        self.settings.set("preview_fps", int(self.preview_fps.currentText()))
         super().accept()
