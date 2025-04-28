@@ -25,7 +25,7 @@
 
 - `SerialManager` がシリアル通信デバイスを管理
 - `CaptureManager` がキャプチャデバイスを管理
-- `HardwareFacade` が上位層に対する統一インターフェースを提供
+- Managerインスタンスはシングルトンとして一元管理され、DeviceModel経由で参照・切替される (GUI)
 
 ### 2.3 通信プロトコル層
 高レベル操作命令をデバイス固有のバイナリプロトコルに変換します。
@@ -94,29 +94,35 @@ class MacroBase(ABC):
 #### 3.2.2 DefaultCommand
 `Command` インターフェースの標準実装です。
 
-- `HardwareFacade` を利用してハードウェア操作を実行
+- `serial_device`/`capture_device` を直接受け取り、各デバイス操作を実行
 - `SerialProtocolInterface` を利用してコマンドのバイナリ変換
 - タイミング制御（`dur`, `wait`）を担当
 
+```python
+class DefaultCommand(Command):
+    def __init__(self, serial_device, capture_device, resource_io, protocol, ct):
+        self.serial_device = serial_device
+        self.capture_device = capture_device
+        self.resource_io = resource_io
+        self.protocol = protocol
+        self.ct = ct
+    def press(self, *keys, dur=0.1, wait=0.1):
+        press_data = self.protocol.build_press_command(keys)
+        self.serial_device.send(press_data)
+        # ...
+    def capture(self, ...):
+        frame = self.capture_device.get_frame()
+        # ...
+```
+
 ### 3.3 ハードウェア管理
 
-#### 3.3.1 HardwareFacade
-ハードウェア操作の窓口となるファサードクラスで、`DefaultCommand` からのアクセスを仲介します。
+#### 3.3.1 DeviceModelとシングルトン設計
+ハードウェア操作の依存性を一元管理するため、Managerインスタンスは`singletons.py`でグローバルに生成され、
+DeviceModel経由で各Paneやコマンドに注入されます。(GUI)
 
-```python
-class HardwareFacade:
-    def __init__(self, serial_manager: SerialManager, capture_manager: CaptureManager):
-        self.serial_manager = serial_manager
-        self.capture_manager = capture_manager
-    
-    def send(self, data: bytes) -> None:
-        active_device = self.serial_manager.get_active_device()
-        active_device.send(data)
-    
-    def capture(self):
-        active_device = self.capture_manager.get_active_device()
-        return active_device.get_frame()
-```
+- `DeviceModel`がアクティブなデバイスの切替・参照・イベント発行を担当
+- 各GUIコンポーネントやコマンドはDeviceModel/Managerからデバイスを受け取って操作
 
 #### 3.3.2 SerialManager
 複数のシリアル通信デバイスを管理し、アクティブデバイスの切替を行います。
@@ -196,9 +202,9 @@ CH552デバイス向けの具体的なプロトコル実装です。
    ```
 
 3. **データ送信**:
-   - `HardwareFacade` 経由でシリアルデバイスに送信
+   - `serial_device` に直接送信
    ```python
-   self.hardware_facade.send(press_data)
+   self.serial_device.send(press_data)
    ```
 
 4. **タイミング制御**:
@@ -207,7 +213,7 @@ CH552デバイス向けの具体的なプロトコル実装です。
    ```python
    time.sleep(dur)
    release_data = self.protocol.build_release_command(keys)
-   self.hardware_facade.send(release_data)
+   self.serial_device.send(release_data)
    time.sleep(wait)
    ```
 
@@ -219,8 +225,7 @@ CH552デバイス向けの具体的なプロトコル実装です。
    ```
 
 2. **画像取得**:
-   - `DefaultCommand` が `HardwareFacade` 経由でキャプチャを実行
-   - キャプチャデバイスから最新フレームを取得
+   - `DefaultCommand` が `capture_device` から直接フレームを取得
 
 3. **画像処理**:
    - リサイズ処理（HD解像度 1280x720 に統一）
@@ -278,3 +283,11 @@ CH552デバイス向けの具体的なプロトコル実装です。
 - [通信プロトコル設計詳細](./protocol_design.md)
 - [CH552Protocol仕様書](./protocol/ch552_protocol_spec.md)
 - [ログ管理設計詳細](./logging_design.md)
+
+## 追加: GUIアーキテクチャの要点
+
+### DeviceModel/EventBus/シングルトン設計
+- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理
+- DeviceModelがアクティブデバイスの切替・参照・イベント発行を担当
+- GUIコンポーネントやコマンドはDeviceModel/Managerからデバイスを受け取り、直接操作
+- 状態変更はEventBusで伝播し、疎結合な設計を実現
