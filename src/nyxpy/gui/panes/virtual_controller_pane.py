@@ -1,32 +1,23 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout
-from typing import Optional, Any
+from typing import Optional
 
 from nyxpy.framework.core.constants import Button
 from nyxpy.gui.widgets.controller.analog_stick import AnalogStick
 from nyxpy.gui.widgets.controller.dpad import DPad
 from nyxpy.gui.widgets.controller.button import ControllerButton
 from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
-from nyxpy.gui.models.device_model import DeviceModel
-from nyxpy.gui.events import EventBus, EventType
 
 
 class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
 
     def __init__(
-        self, parent: Optional[QWidget] = None, serial_manager: Optional[Any] = None
+        self, parent: Optional[QWidget] = None
     ) -> None:
         super().__init__(parent)
-        self.device_model = DeviceModel()
-        self.event_bus = EventBus.get_instance()
-        self.event_bus.subscribe(EventType.SERIAL_DEVICE_CHANGED, self.on_serial_device_changed)
-        self.model = VirtualControllerModel(self.device_model.active_serial_device)
+        self.model = VirtualControllerModel()
         self.initUI()
-
-    def on_serial_device_changed(self, data):
-        self.device_model.update_active_devices()
-        self.model.set_serial_device(data['device'])
 
     def initUI(self) -> None:
         main_layout = QVBoxLayout(self)
