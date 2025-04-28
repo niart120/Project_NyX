@@ -4,18 +4,21 @@ from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
 
 
-# Mock for HardwareFacade
-class MockHardwareFacade:
+# Mock for SerialCommInterface
+class MockSerialDevice:
     def __init__(self):
         self.sent_data = []
-        self.captured = False
-
     def send(self, data):
         self.sent_data.append(data)
 
-    def capture(self):
+# Mock for CaptureDeviceInterface
+class MockCaptureDevice:
+    def __init__(self):
+        self._frame = None
+        self.captured = False
+    def get_frame(self):
         self.captured = True
-        return self._frame if hasattr(self, "_frame") else None
+        return self._frame
 
 
 # Mock for ResourceIO
@@ -75,56 +78,60 @@ class MockCancellationToken:
 @pytest.fixture
 def dummy_command(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda x: None)
-    hardware_facade = MockHardwareFacade()
+    serial_device = MockSerialDevice()
+    capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockProtocol()
     ct = MockCancellationToken()
     cmd = DefaultCommand(
-        hardware_facade=hardware_facade,
+        serial_device=serial_device,
+        capture_device=capture_device,
         resource_io=resource_io,
         protocol=protocol,
         ct=ct,
     )
-    return cmd, hardware_facade, resource_io, protocol, ct
+    return cmd, serial_device, capture_device, resource_io, protocol, ct
 
 
 @pytest.fixture
 def dummy_command_keyboard_not_supported(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda x: None)
-    hardware_facade = MockHardwareFacade()
+    serial_device = MockSerialDevice()
+    capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockProtocolKeyboardNotSupported()
     ct = MockCancellationToken()
     cmd = DefaultCommand(
-        hardware_facade=hardware_facade,
+        serial_device=serial_device,
+        capture_device=capture_device,
         resource_io=resource_io,
         protocol=protocol,
         ct=ct,
     )
-    return cmd, hardware_facade, resource_io, protocol, ct
+    return cmd, serial_device, capture_device, resource_io, protocol, ct
 
 
 def test_press_and_release(dummy_command):
-    cmd, hardware_facade, resource_io, protocol, ct = dummy_command
+    cmd, serial_device, capture_device, resource_io, protocol, ct = dummy_command
     cmd.press(Button.A, Button.B, dur=0.2, wait=0.1)
     assert protocol.calls[0][0] == "press"
     assert protocol.calls[1][0] == "release"
-    assert hardware_facade.sent_data[0].startswith(b"press:")
-    assert hardware_facade.sent_data[1].startswith(b"release:")
+    assert serial_device.sent_data[0].startswith(b"press:")
+    assert serial_device.sent_data[1].startswith(b"release:")
 
 
 def test_hold(dummy_command):
-    cmd, hardware_facade, resource_io, protocol, ct = dummy_command
+    cmd, serial_device, capture_device, resource_io, protocol, ct = dummy_command
     cmd.hold(Button.X)
     assert protocol.calls[0][0] == "press"
-    assert hardware_facade.sent_data[0].startswith(b"press:")
+    assert serial_device.sent_data[0].startswith(b"press:")
 
 
 def test_release(dummy_command):
-    cmd, hardware_facade, resource_io, protocol, ct = dummy_command
+    cmd, serial_device, capture_device, resource_io, protocol, ct = dummy_command
     cmd.release(Button.Y)
     assert protocol.calls[0][0] == "release"
-    assert hardware_facade.sent_data[0].startswith(b"release:")
+    assert serial_device.sent_data[0].startswith(b"release:")
 
 
 def test_wait(dummy_command):
@@ -136,7 +143,7 @@ def test_wait(dummy_command):
 
 
 def test_stop(dummy_command):
-    cmd, _, _, _, ct = dummy_command
+    cmd, _, _, _, _, ct = dummy_command
     with pytest.raises(Exception):
         cmd.stop()
     assert ct.stopped
@@ -144,7 +151,7 @@ def test_stop(dummy_command):
 
 def test_keyboard_text_mode(dummy_command):
     """テキストモード対応プロトコルでのkeyboardメソッドのテスト"""
-    cmd, hardware_facade, _, protocol, _ = dummy_command
+    cmd, serial_device, capture_device, resource_io, protocol, _ = dummy_command
     cmd.keyboard("Hello")
 
     # build_keyboard_commandとbuild_keytype_commandの呼び出しが行われていることを確認
@@ -157,12 +164,12 @@ def test_keyboard_text_mode(dummy_command):
     assert protocol.calls[1][2] == KeyboardOp.ALL_RELEASE
 
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith("keyboard_text:Hello")
+    assert serial_device.sent_data[0].decode().startswith("keyboard_text:Hello")
 
 
 def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
     """テキストモード非対応プロトコルでのkeyboardメソッドのテスト（keytype委譲）"""
-    cmd, hardware_facade, _, protocol, _ = dummy_command_keyboard_not_supported
+    cmd, serial_device, capture_device, resource_io, protocol, _ = dummy_command_keyboard_not_supported
     cmd.keyboard("Hello")
 
     # 各文字ごとに押下→解放のシーケンスが実行されることを確認
@@ -192,7 +199,7 @@ def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
 
     # 送信されたデータが正しいか確認
     assert (
-        hardware_facade.sent_data[0]
+        serial_device.sent_data[0]
         .decode()
         .startswith(f"keyboard:{KeyCode('H')}:PRESS")
     )
@@ -200,7 +207,7 @@ def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
 
 def test_keyboard_empty_string(dummy_command):
     """空文字列の場合、validate_keyboard_text が ValueErrorを発生させるはず"""
-    cmd, _, _, protocol, _ = dummy_command
+    cmd, _, _, resource_io, protocol, _ = dummy_command
 
     # 空文字列を渡すと例外が発生することを確認
     with pytest.raises(ValueError, match="Input text is empty"):
@@ -212,7 +219,7 @@ def test_keyboard_empty_string(dummy_command):
 
 def test_keyboard_validation_called(dummy_command_keyboard_not_supported):
     """validate_keyboard_text の動作確認（有効な入力文字）"""
-    cmd, _, _, protocol, _ = dummy_command_keyboard_not_supported
+    cmd, _, _, resource_io, protocol, _ = dummy_command_keyboard_not_supported
 
     # 通常のASCII文字が正しく処理されることを確認
     cmd.keyboard("test123")
@@ -237,7 +244,7 @@ def test_keyboard_validation_called(dummy_command_keyboard_not_supported):
 
 def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
     """特殊文字の処理が正しく行われるか確認"""
-    cmd, _, _, protocol, _ = dummy_command_keyboard_not_supported
+    cmd, _, _, resource_io, protocol, _ = dummy_command_keyboard_not_supported
 
     # 特殊文字を含むテキストを送信
     cmd.keyboard("\n\t")
@@ -253,7 +260,7 @@ def test_keyboard_special_chars(dummy_command_keyboard_not_supported):
 
 def test_keyboard_invalid_character(dummy_command):
     """無効な文字（制御文字など）を含む場合はエラーが発生することを確認"""
-    cmd, _, _, protocol, _ = dummy_command
+    cmd, _, _, resource_io, protocol, _ = dummy_command
 
     # 無効な文字（ここでは制御文字(ビープ)）を含むテキストでエラーになることを確認
     with pytest.raises(ValueError, match="Unsupported character"):
@@ -264,7 +271,7 @@ def test_keyboard_invalid_character(dummy_command):
 
 
 def test_save_img_and_load_img(dummy_command):
-    cmd, _, resource_io, _, _ = dummy_command
+    cmd, _, _, resource_io, _, _ = dummy_command
     dummy_img = b"img"
     cmd.save_img("foo.png", dummy_img)
     assert resource_io.saved_images["foo.png"] == dummy_img
@@ -273,22 +280,22 @@ def test_save_img_and_load_img(dummy_command):
 
 
 def test_capture_success(monkeypatch, dummy_command):
-    cmd, hardware_facade, _, _, _ = dummy_command
+    cmd, serial_device, capture_device, _, _, _ = dummy_command
     import numpy as np
 
     # 1280x720x3 のダミーフレーム
     dummy_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    hardware_facade._frame = dummy_frame
+    capture_device._frame = dummy_frame
     result = cmd.capture()
     assert result.shape == (720, 1280, 3)
 
 
 def test_capture_crop_and_gray(monkeypatch, dummy_command):
-    cmd, hardware_facade, _, _, _ = dummy_command
+    cmd, serial_device, capture_device, _, _, _ = dummy_command
     import numpy as np
 
     dummy_frame = np.ones((720, 1280, 3), dtype=np.uint8) * 255
-    hardware_facade._frame = dummy_frame
+    capture_device._frame = dummy_frame
     # クロップ領域指定
     crop = (100, 100, 200, 200)
     result = cmd.capture(crop_region=crop, grayscale=True)
@@ -297,18 +304,18 @@ def test_capture_crop_and_gray(monkeypatch, dummy_command):
 
 
 def test_capture_crop_out_of_bounds(dummy_command):
-    cmd, hardware_facade, _, _, _ = dummy_command
+    cmd, serial_device, capture_device, _, _, _ = dummy_command
     import numpy as np
 
     dummy_frame = np.ones((720, 1280, 3), dtype=np.uint8)
-    hardware_facade._frame = dummy_frame
+    capture_device._frame = dummy_frame
     with pytest.raises(ValueError):
         cmd.capture(crop_region=(1200, 700, 200, 200))
 
 
 def test_keyboard_type(dummy_command):
     """単一キーのタイプ操作のテスト"""
-    cmd, hardware_facade, _, protocol, _ = dummy_command
+    cmd, serial_device, capture_device, _, protocol, _ = dummy_command
     cmd.type(KeyCode("X"))
 
     # PRESS操作とRELEASE操作が実行されることを確認
@@ -322,5 +329,5 @@ def test_keyboard_type(dummy_command):
     assert protocol.calls[1][2] == KeyboardOp.RELEASE
 
     # 送信されたデータが正しいか確認
-    assert hardware_facade.sent_data[0].decode().startswith("keyboard:X:PRESS")
-    assert hardware_facade.sent_data[1].decode().startswith("keyboard:X:RELEASE")
+    assert serial_device.sent_data[0].decode().startswith("keyboard:X:PRESS")
+    assert serial_device.sent_data[1].decode().startswith("keyboard:X:RELEASE")
