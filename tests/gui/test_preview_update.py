@@ -113,11 +113,14 @@ def test_update_preview_failure(window: MainWindow, qtbot):
             raise RuntimeError("fail capture")
     # 新設計: PreviewPaneに直接デバイスを注入
     window.preview_pane.set_capture_device(BadDevice())
+    # 失敗前のPixmapを保存
+    before_pix = window.preview_pane.label.pixmap()
     try:
         window.preview_pane.update_preview()
     except Exception:
         pytest.fail("update_preview raised exception on failure")
     qtbot.wait(100)
-    # Pixmap stays None or unchanged
-    final_pix = window.preview_pane.label.pixmap()
-    assert final_pix is None or final_pix.isNull()
+    # 失敗後のPixmap
+    after_pix = window.preview_pane.label.pixmap()
+    # PixmapがNoneまたは変更されていないことを確認
+    assert after_pix is None or after_pix.cacheKey() == (before_pix.cacheKey() if before_pix else None)
