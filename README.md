@@ -112,6 +112,10 @@ class SampleMacro(MacroBase):
         # メイン処理
         cmd.press(KeyType.A, dur=0.1)
         cmd.wait(1.0)
+        # 例: 画面キャプチャ
+        img = cmd.capture()
+        # 例: キーボード入力
+        cmd.keyboard("Hello")
         
     def finalize(self, cmd):
         # 後処理
@@ -158,14 +162,9 @@ class SampleMacro(MacroBase):
 ## 7. 今後の予定
 
 - GUIの見直し
-    - マクロの検索・フィルタリング
     - マクロのリロード機能の追加
-    - 仮想コントローラの追加
     - ログ表示機能の拡充
     - etc
-- 内部処理の見直し
-    - `xxxManager` の要否を含めた抜本的な改修
-    - PokeController を含めた より多くのプロトコルサポート
 - パフォーマンス最適化
 
 ## 8. ライセンス
