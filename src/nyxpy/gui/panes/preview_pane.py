@@ -1,3 +1,4 @@
+from typing import Optional
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
@@ -5,6 +6,7 @@ import cv2
 import numpy as np
 from datetime import datetime
 from pathlib import Path
+from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.utils.helper import calc_aspect_size
 from nyxpy.gui.events import EventBus, EventType
 from nyxpy.gui.widgets import AspectRatioLabel
@@ -18,7 +20,7 @@ class PreviewPane(QWidget):
     Pane for showing camera preview and handling snapshots.
     """
 
-    def __init__(self, capture_device=None, parent=None, preview_fps=30):
+    def __init__(self, capture_device: Optional[CaptureDeviceInterface] = None, parent=None, preview_fps=30):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         self.label = AspectRatioLabel(16, 9)
@@ -26,7 +28,7 @@ class PreviewPane(QWidget):
         self.label.setMinimumHeight(100)
         layout.addWidget(self.label)
 
-        self.capture_device = capture_device
+        self.capture_device: CaptureDeviceInterface = capture_device
         self.preview_fps = preview_fps      # プレビュー用のみ
         self.event_bus = EventBus.get_instance()
         self.event_bus.subscribe(EventType.CAPTURE_DEVICE_CHANGED, self.on_capture_device_changed)
@@ -39,7 +41,7 @@ class PreviewPane(QWidget):
     def on_capture_device_changed(self, data):
         self.set_capture_device(data['device'])
 
-    def set_capture_device(self, device):
+    def set_capture_device(self, device: CaptureDeviceInterface):
         self.capture_device = device
         self.update_preview()
 
