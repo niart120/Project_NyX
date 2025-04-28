@@ -3,9 +3,11 @@ import pathlib
 from abc import ABC, abstractmethod
 import cv2
 
+from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
+from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.cancellation import CancellationToken
