@@ -24,6 +24,11 @@
   2. マクロ実行フロー（ステータス・ログ・プレビュー・スナップショット）  
   3. 実行設定画面  
 
+**設計要点**:
+- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理され、DeviceModel経由でGUI各所に注入される。
+- デバイス切替や状態変更はEventBusで伝播し、各Pane/Widgetは疎結合に保たれる。
+- PreviewPaneやVirtualControllerPane等は、アクティブなデバイスを外部から受け取り、それを主軸に操作する。
+
 ---
 
 ## 4. マクロ一覧画面
@@ -93,6 +98,7 @@
 - キャプチャデバイスをプルダウンで選択  
 - 同時出力は非対応  
 - FPS は設定画面から指定  
+- **デバイス切替はDeviceModel経由で行い、状態変更はEventBusで伝播する**
 
 ### 7.2 スナップショット
 - トリガー：「スナップショット」ボタン押下  
@@ -114,6 +120,7 @@
 - キャプチャデバイス：プルダウン形式（OpenCV）  
 - シリアルデバイス：プルダウン形式（PySerial）  
 - ボーレート／FPS 等は個別入力  
+- **設定変更時はDeviceModelのchange_xxx_device()を呼び、状態変更はEventBusで伝播する**
 
 ### 8.3 設定保存
 - ユーザー設定を永続化  
@@ -153,8 +160,9 @@
 
 ---
 
-> **セルフレビュー確認**  
-> - GUI要件は現行の `MacroExecutor`・`log_manager`・`pyproject.toml`（OpenCV/PySerial依存）と整合しています。  
-> - `MacroBase` にタグ追加の実装改修が必要な箇所を明示しました。  
-> - `docs/protocol` の内容はGUIに不要なため参照リンクのみに留めています。  
-> - 追加ヒアリングなしに、詳細設計フェーズに移行可能と判断します。
+## 追加: アーキテクチャ設計要点
+
+- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理
+- DeviceModelがアクティブデバイスの切替・参照・イベント発行を担当
+- GUIコンポーネントやコマンドはDeviceModel/Managerからデバイスを受け取り、直接操作
+- 状態変更はEventBusで伝播し、疎結合な設計を実現
