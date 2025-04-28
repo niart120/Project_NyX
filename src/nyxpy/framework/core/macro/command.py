@@ -3,7 +3,6 @@ import pathlib
 from abc import ABC, abstractmethod
 import cv2
 
-from nyxpy.framework.core.hardware.facade import HardwareFacade
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
@@ -159,12 +158,14 @@ class DefaultCommand(Command):
 
     def __init__(
         self,
-        hardware_facade: HardwareFacade,
+        serial_device: SerialCommInterface,
+        capture_device: CaptureDeviceInterface,
         resource_io: StaticResourceIO,
         protocol: SerialProtocolInterface,
         ct: CancellationToken,
     ) -> None:
-        self.hardware_facade = hardware_facade
+        self.serial_device = serial_device
+        self.capture_device = capture_device
         self.resource_io = resource_io
         self.protocol = protocol
         self.ct = ct
@@ -173,24 +174,24 @@ class DefaultCommand(Command):
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
         self.log(f"Pressing keys: {keys}", level="DEBUG")
         press_data = self.protocol.build_press_command(keys)
-        self.hardware_facade.send(press_data)
+        self.serial_device.send(press_data)
         self.wait(dur)
         self.log(f"Releasing keys: {keys}", level="DEBUG")
         release_data = self.protocol.build_release_command(keys)
-        self.hardware_facade.send(release_data)
+        self.serial_device.send(release_data)
         self.wait(wait)
 
     @check_interrupt
     def hold(self, *keys: KeyType) -> None:
         self.log(f"Holding keys: {keys}", level="DEBUG")
         hold_data = self.protocol.build_press_command(keys)
-        self.hardware_facade.send(hold_data)
+        self.serial_device.send(hold_data)
 
     @check_interrupt
     def release(self, *keys: KeyType) -> None:
         self.log(f"Releasing keys: {keys}", level="DEBUG")
         release_data = self.protocol.build_release_command(keys)
-        self.hardware_facade.send(release_data)
+        self.serial_device.send(release_data)
 
     @check_interrupt
     def wait(self, wait: float) -> None:
@@ -212,32 +213,22 @@ class DefaultCommand(Command):
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
     ) -> cv2.typing.MatLike:
-        # キャプチャマネージャを使用してスクリーンキャプチャを取得
         self.log("Capturing screen...", level="DEBUG")
-        capture_data = self.hardware_facade.capture()
+        capture_data = self.capture_device.get_frame()
         if capture_data is None:
             self.log("Capture failed", level="ERROR")
             return None
-
-        # リスケール処理を実行
-        target_resolution = (1280, 720)  # HD解像度
+        target_resolution = (1280, 720)
         frame = cv2.resize(
             capture_data, target_resolution, interpolation=cv2.INTER_AREA
         )
-
-        # クロップ処理を実行
         if crop_region is not None:
             x, y, w, h = crop_region
-            # クロップ領域がフレームサイズを超える場合は例外をスロー
             if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
                 raise ValueError("Crop region exceeds frame size")
-            # クロップ領域がフレームサイズを超えない場合はクロップを実行
             frame = frame[y : y + h, x : x + w]
-
-        # グレースケール変換を実行
         if grayscale:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
         self.log("Capture successful", level="DEBUG")
         return frame
 
@@ -255,22 +246,17 @@ class DefaultCommand(Command):
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard text input: {text}", level="DEBUG")
         text = validate_keyboard_text(text)
-
         try:
-            # まずテキスト入力としてプロトコルに処理を依頼
             kb_data = self.protocol.build_keyboard_command(text)
-            self.hardware_facade.send(kb_data)
+            self.serial_device.send(kb_data)
         except (ValueError, NotImplementedError):
-            # プロトコルがテキスト入力に対応していない場合は、1文字ずつkeytype処理に委譲
             for char in text:
                 self.type(KeyCode(char))
-
-        # すべてのキーを解放（念のため）
         try:
             kb_all_release = self.protocol.build_keytype_command(
                 KeyCode(""), KeyboardOp.ALL_RELEASE
             )
-            self.hardware_facade.send(kb_all_release)
+            self.serial_device.send(kb_all_release)
         except NotImplementedError:
             pass
 
@@ -296,12 +282,12 @@ class DefaultCommand(Command):
         try:
             # キー押下
             kb_press = self.protocol.build_keytype_command(key, press_op)
-            self.hardware_facade.send(kb_press)
+            self.serial_device.send(kb_press)
             self.wait(0.02)  # 必要に応じて調整
 
             # キー解放
             kb_release = self.protocol.build_keytype_command(key, release_op)
-            self.hardware_facade.send(kb_release)
+            self.serial_device.send(kb_release)
             self.wait(0.01)  # 必要に応じて調整
         except NotImplementedError as e:
             self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
