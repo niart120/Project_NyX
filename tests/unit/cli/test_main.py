@@ -161,7 +161,7 @@ def test_create_command_default_path(monkeypatch):
         "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda serial_device, capture_device, resource_io, protocol, ct: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: "command",
     )
     result = create_command(mock_protocol)
     assert result == "command"
@@ -180,7 +180,7 @@ def test_create_command_custom_path(monkeypatch):
         "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda serial_device, capture_device, resource_io, protocol, ct: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: "command",
     )
     result = create_command(mock_protocol, resources_dir=custom_path)
     assert result == "command"

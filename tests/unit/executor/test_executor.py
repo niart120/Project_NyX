@@ -56,43 +56,36 @@ def test_set_active_macro(temp_macros_dir, monkeypatch):
 
 # テスト用のモッククラスを定義
 class MockCommand(Command):
-    def __init__(self):
+    def __init__(self, notification_handler=None):
         self.logs = []
-
+        self.notification_handler = notification_handler
     def press(self, *keys, dur=0.1, wait=0.1):
         self.logs.append(f"press: {keys}")
-
     def hold(self, *keys):
         self.logs.append(f"hold: {keys}")
-
     def release(self, *keys):
         self.logs.append(f"release: {keys}")
-
     def wait(self, wait):
         self.logs.append(f"wait: {wait}")
-
     def stop(self):
         self.logs.append("stop")
-
     def log(self, *values, sep=" ", end="\n"):
         self.logs.append(" ".join(map(str, values)))
-
     def capture(self):
         self.logs.append("capture")
         return None
-
     def save_img(self, filename, image):
         self.logs.append(f"save_img: {filename}, image={image}")
-
     def load_img(self, filename, grayscale=False):
         self.logs.append(f"load_img: {filename}, grayscale={grayscale}")
         return None
-
     def keyboard(self, text):
         self.logs.append(f"keyboard: {text}")
-
     def type(self, key):
         self.logs.append(f"keytype: {key}")
+    def notify(self, text, img=None):
+        if self.notification_handler:
+            self.notification_handler.publish(text, img)
 
 
 class MockMacro(MacroBase):
