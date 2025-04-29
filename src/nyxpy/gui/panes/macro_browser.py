@@ -1,13 +1,17 @@
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,  # 追加
     QLineEdit,
+    QPushButton,   # 追加
     QTableWidget,
     QTableWidgetItem,
     QSizePolicy,
     QHeaderView,
 )
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QIcon  # 追加
+import os  # 追加
 
 
 class MacroBrowserPane(QWidget):
@@ -23,13 +27,26 @@ class MacroBrowserPane(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
+        # --- 検索ボックスとリロードボタンを横並びに配置 ---
+        search_reload_layout = QHBoxLayout()
         self.search_box = QLineEdit(self)
         self.search_box.setPlaceholderText("検索…（マクロ名／タグ）")
-        layout.addWidget(self.search_box)
+        search_reload_layout.addWidget(self.search_box)
+
+        self.reload_button = QPushButton(self)
+        self.reload_button.setToolTip("マクロを再読み込み")
+        # アイコンがあれば設定（なければテキスト）
+        icon_path = os.path.join(os.path.dirname(__file__), '../../assets/reload.png')
+        if os.path.exists(icon_path):
+            self.reload_button.setIcon(QIcon(icon_path))
+        else:
+            self.reload_button.setText("リロード")
+        search_reload_layout.addWidget(self.reload_button)
+        layout.addLayout(search_reload_layout)
+        # --- ここまで ---
 
         self.table = QTableWidget(0, 3, self)
         self.table.setHorizontalHeaderLabels(["マクロ名", "説明文", "タグ"])
-        # Allow table columns to be resized interactively and shrink
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         layout.addWidget(self.table)
 
@@ -37,15 +54,23 @@ class MacroBrowserPane(QWidget):
         self.macros = self.executor.macros
         self.reload_macros()
 
-        # connect filter and selection within pane
         self.search_box.textChanged.connect(self.filter_macros)
+        self.reload_button.clicked.connect(self.handle_reload_button)
 
-        # emit selection changes
         self.table.selectionModel().selectionChanged.connect(
             lambda: self.selection_changed.emit(
                 self.table.selectionModel().hasSelection()
             )
         )
+
+    def handle_reload_button(self):
+        # macrosを再取得し、テーブルを更新
+        if hasattr(self.executor, 'load_all_macros'):
+            self.executor.load_all_macros()  # リロード対応型load_all_macrosを呼ぶ
+            self.macros = self.executor.macros
+        else:
+            self.macros = self.executor.macros
+        self.reload_macros()
 
     def reload_macros(self):
         self.table.setRowCount(0)

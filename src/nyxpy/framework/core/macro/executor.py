@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import sys
 from pathlib import Path
 
 from nyxpy.framework.core.macro.exceptions import MacroStopException
@@ -26,24 +27,26 @@ class MacroExecutor:
 
     def load_all_macros(self) -> None:
         """
-        カレントディレクトリ直下の 'macros' フォルダ内の全Pythonモジュールを読み込み、
+        カレントディレクトリ直下の 'macros' フォルダ内の全Pythonモジュールをリロード対応で読み込み、
         MacroBaseを継承したクラスのインスタンスを self.macros に追加します。
         """
         macros_dir = Path.cwd() / "macros"
+        self.macros.clear()
         if not macros_dir.is_dir():
-            # macrosディレクトリがない場合は何もしない
             return
         for file in macros_dir.iterdir():
             if file.suffix == ".py" and file.name != "__init__.py":
                 module_name = f"macros.{file.stem}"
                 try:
-                    module = importlib.import_module(module_name)
+                    if module_name in sys.modules:
+                        module = importlib.reload(sys.modules[module_name])
+                    else:
+                        module = importlib.import_module(module_name)
                     for name, obj in inspect.getmembers(module, inspect.isclass):
                         if issubclass(obj, MacroBase) and obj is not MacroBase:
                             instance = obj()
                             self.macros[obj.__name__] = instance
                 except Exception as e:
-                    # ログ出力等、例外発生時の処理をここに実装可能
                     log_manager.log(
                         "ERROR",
                         f"Error loading macro:{file.name}, {e}",
