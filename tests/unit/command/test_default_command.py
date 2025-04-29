@@ -89,6 +89,7 @@ def dummy_command(monkeypatch):
         resource_io=resource_io,
         protocol=protocol,
         ct=ct,
+        notification_handler=None,  # ここを追加
     )
     return cmd, serial_device, capture_device, resource_io, protocol, ct
 
@@ -107,6 +108,7 @@ def dummy_command_keyboard_not_supported(monkeypatch):
         resource_io=resource_io,
         protocol=protocol,
         ct=ct,
+        notification_handler=None,  # ここを追加
     )
     return cmd, serial_device, capture_device, resource_io, protocol, ct
 
@@ -331,3 +333,37 @@ def test_keyboard_type(dummy_command):
     # 送信されたデータが正しいか確認
     assert serial_device.sent_data[0].decode().startswith("keyboard:X:PRESS")
     assert serial_device.sent_data[1].decode().startswith("keyboard:X:RELEASE")
+
+
+# Mock for NotificationHandler
+class MockNotificationHandler:
+    def __init__(self):
+        self.calls = []
+    def publish(self, text, img=None):
+        self.calls.append((text, img))
+
+
+def test_notify_calls_notification_handler(monkeypatch):
+    serial_device = MockSerialDevice()
+    capture_device = MockCaptureDevice()
+    resource_io = MockResourceIO()
+    protocol = MockProtocol()
+    ct = MockCancellationToken()
+    mock_notifier = MockNotificationHandler()
+    cmd = DefaultCommand(
+        serial_device=serial_device,
+        capture_device=capture_device,
+        resource_io=resource_io,
+        protocol=protocol,
+        ct=ct,
+        notification_handler=mock_notifier,
+    )
+    # テキストのみ
+    cmd.notify("通知テスト")
+    assert mock_notifier.calls[0][0] == "通知テスト"
+    assert mock_notifier.calls[0][1] is None
+    # 画像付き
+    dummy_img = b"dummy_img"
+    cmd.notify("画像付き通知", img=dummy_img)
+    assert mock_notifier.calls[1][0] == "画像付き通知"
+    assert mock_notifier.calls[1][1] == dummy_img

@@ -14,6 +14,8 @@ from nyxpy.framework.core.hardware.protocol import (
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
+from nyxpy.framework.core.global_settings import GlobalSettings
+from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> None:
@@ -80,12 +82,15 @@ def create_command(
     serial_device = serial_manager.get_active_device()
     capture_device = capture_manager.get_active_device()
 
+    global_settings = GlobalSettings()
+    notification_handler = create_notification_handler_from_settings(global_settings)
     return DefaultCommand(
         serial_device=serial_device,
         capture_device=capture_device,
         resource_io=resource_io,
         protocol=protocol,
         ct=cancellation_token,
+        notification_handler=notification_handler,
     )
 
 

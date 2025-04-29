@@ -5,6 +5,10 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialogButtonBox,
     QMessageBox,
+    QCheckBox,
+    QLineEdit,
+    QGroupBox,
+    QHBoxLayout,
 )
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
@@ -97,6 +101,26 @@ class DeviceSettingsDialog(QDialog):
                 "シリアルデバイスが接続されていることを確認してください。",
             )
 
+        # 通知設定セクション
+        notify_group = QGroupBox("通知設定")
+        notify_layout = QFormLayout()
+        # Discord
+        self.discord_enable = QCheckBox("Discord通知を有効化")
+        self.discord_enable.setChecked(self.settings.get("notification.discord.enabled", False))
+        self.discord_url = QLineEdit()
+        self.discord_url.setText(self.settings.get("notification.discord.webhook_url", ""))
+        notify_layout.addRow(self.discord_enable)
+        notify_layout.addRow("Discord Webhook URL:", self.discord_url)
+        # Bluesky
+        self.bluesky_enable = QCheckBox("Bluesky通知を有効化")
+        self.bluesky_enable.setChecked(self.settings.get("notification.bluesky.enabled", False))
+        self.bluesky_url = QLineEdit()
+        self.bluesky_url.setText(self.settings.get("notification.bluesky.webhook_url", ""))
+        notify_layout.addRow(self.bluesky_enable)
+        notify_layout.addRow("Bluesky Webhook URL:", self.bluesky_url)
+        notify_group.setLayout(notify_layout)
+        layout.addWidget(notify_group)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -109,4 +133,8 @@ class DeviceSettingsDialog(QDialog):
         self.settings.set("serial_device", self.ser_device.currentText())
         self.settings.set("serial_protocol", self.ser_protocol.currentText())
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
+        self.settings.set("notification.discord.enabled", self.discord_enable.isChecked())
+        self.settings.set("notification.discord.webhook_url", self.discord_url.text())
+        self.settings.set("notification.bluesky.enabled", self.bluesky_enable.isChecked())
+        self.settings.set("notification.bluesky.webhook_url", self.bluesky_url.text())
         super().accept()

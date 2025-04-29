@@ -3,6 +3,7 @@ import pathlib
 from abc import ABC, abstractmethod
 import cv2
 
+from nyxpy.framework.core.api.notification_handler import NotificationHandler
 from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.constants import KeyCode, KeyType, KeyboardOp, SpecialKeyCode
@@ -147,6 +148,13 @@ class Command(ABC):
         """
         pass
 
+    @abstractmethod
+    def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
+        """
+        外部サービスへ通知を送信する
+        """
+        pass
+
 
 class DefaultCommand(Command):
     """
@@ -165,12 +173,14 @@ class DefaultCommand(Command):
         resource_io: StaticResourceIO,
         protocol: SerialProtocolInterface,
         ct: CancellationToken,
+        notification_handler:NotificationHandler
     ) -> None:
         self.serial_device = serial_device
         self.capture_device = capture_device
         self.resource_io = resource_io
         self.protocol = protocol
         self.ct = ct
+        self.notification_handler = notification_handler
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -293,3 +303,11 @@ class DefaultCommand(Command):
             self.wait(0.01)  # 必要に応じて調整
         except NotImplementedError as e:
             self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
+
+    @check_interrupt
+    def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
+        """
+        外部サービスへ通知を送信する
+        """
+        if self.notification_handler:
+            self.notification_handler.publish(text, img)

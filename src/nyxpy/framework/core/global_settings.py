@@ -23,7 +23,6 @@ class GlobalSettings:
             self.data = {
                 "capture_device": "",
                 "serial_device": "",
-                "preview_fps": 30,
                 "serial_baud": 9600,
                 "serial_protocol": "CH552",  # デフォルトで CH552 プロトコルを使用
             }

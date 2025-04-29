@@ -15,6 +15,12 @@ from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.executor import MacroExecutor
 
+class MockNotificationHandler:
+    def __init__(self):
+        self.calls = []
+    def publish(self, text, img=None):
+        self.calls.append((text, img))
+
 # --- Fake デバイス実装 ---
 
 
@@ -139,13 +145,14 @@ def integration_setup(monkeypatch):
     capture_manager.register_device("fake", fake_capture)
     capture_manager.set_active("fake")
     resource_io = FakeResourceIO()
-    # HardwareFacadeは不要、DefaultCommandに直接デバイスを渡す
+    mock_notifier = MockNotificationHandler()
     cmd = DefaultCommand(
         serial_device=fake_serial,
         capture_device=fake_capture,
         resource_io=resource_io,
         protocol=CH552SerialProtocol(),
         ct=token,
+        notification_handler=mock_notifier,
     )
     log_manager.add_handler(dummy_handler, level="DEBUG")
     executor = MacroExecutor()
@@ -153,7 +160,7 @@ def integration_setup(monkeypatch):
         "DummyMacro": DummyMacro(),
         "LongRunningMacro": LongRunningMacro(),
     }
-    yield executor, cmd, fake_serial, fake_capture, token
+    yield executor, cmd, fake_serial, fake_capture, token, mock_notifier
     log_manager.remove_handler(dummy_handler)
     serial_manager.active_device.close()
     capture_manager.active_device.release()
@@ -167,7 +174,7 @@ def test_macro_executor_normal_flow(integration_setup):
     """
     MacroExecutor経由でDummyMacroのライフサイクルを一気通貫でテスト
     """
-    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor, cmd, fake_serial, fake_capture, token, mock_notifier = integration_setup
     executor.set_active_macro("DummyMacro")
     executor.execute(cmd)
 
@@ -244,7 +251,7 @@ def test_macro_executor_cancellation(integration_setup):
     """
     run()中にCancellationTokenで中断→MacroStopException→finalize()が呼ばれる
     """
-    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor, cmd, fake_serial, fake_capture, token, mock_handler = integration_setup
     executor.set_active_macro("LongRunningMacro")
 
     def cancel():
@@ -270,7 +277,7 @@ def test_macro_executor_no_cancellation(integration_setup):
     """
     CancellationTokenが未発火ならLongRunningMacroが最後まで実行される
     """
-    executor, cmd, fake_serial, fake_capture, token = integration_setup
+    executor, cmd, fake_serial, fake_capture, token, mock_handler = integration_setup
     executor.set_active_macro("LongRunningMacro")
     token.clear()
     executor.execute(cmd)

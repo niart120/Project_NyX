@@ -27,6 +27,7 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, initialize_managers
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.gui.events import EventBus, EventType
 
 
@@ -222,12 +223,14 @@ class MainWindow(QMainWindow):
         resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
         ct = CancellationToken()
+        notification_handler = create_notification_handler_from_settings(self.global_settings)
         cmd = DefaultCommand(
             serial_device=serial_manager.get_active_device(),
             capture_device=capture_manager.get_active_device(),
             resource_io=resource_io,
             protocol=protocol,
             ct=ct,
+            notification_handler=notification_handler,
         )
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
         self.worker.progress.connect(self.log_pane.append)
