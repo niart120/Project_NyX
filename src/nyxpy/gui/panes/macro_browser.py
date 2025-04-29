@@ -52,10 +52,10 @@ class MacroBrowserPane(QWidget):
 
         self.executor = executor
         self.macros = self.executor.macros
-        self.reload_macros()
+        self.update_macro_table()
 
-        self.search_box.textChanged.connect(self.filter_macros)
-        self.reload_button.clicked.connect(self.handle_reload_button)
+        self.search_box.textChanged.connect(self.apply_macro_filter)
+        self.reload_button.clicked.connect(self.on_reload_button_clicked)
 
         self.table.selectionModel().selectionChanged.connect(
             lambda: self.selection_changed.emit(
@@ -63,16 +63,16 @@ class MacroBrowserPane(QWidget):
             )
         )
 
-    def handle_reload_button(self):
+    def on_reload_button_clicked(self):
         # macrosを再取得し、テーブルを更新
-        if hasattr(self.executor, 'load_all_macros'):
-            self.executor.load_all_macros()  # リロード対応型load_all_macrosを呼ぶ
+        if hasattr(self.executor, 'reload_macros'):
+            self.executor.reload_macros()
             self.macros = self.executor.macros
         else:
             self.macros = self.executor.macros
-        self.reload_macros()
+        self.update_macro_table()
 
-    def reload_macros(self):
+    def update_macro_table(self):
         self.table.setRowCount(0)
         for name, macro in self.macros.items():
             row = self.table.rowCount()
@@ -81,12 +81,10 @@ class MacroBrowserPane(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(macro.description))
             self.table.setItem(row, 2, QTableWidgetItem(", ".join(macro.tags)))
 
-    def filter_macros(self):
+    def apply_macro_filter(self):
         keyword = self.search_box.text().lower()
-
         for row in range(self.table.rowCount()):
             name = self.table.item(row, 0).text().lower()
             tags = self.table.item(row, 2).text().split(", ")
             match_keyword = (keyword in name) or any(keyword in t.lower() for t in tags)
-
             self.table.setRowHidden(row, not (match_keyword))

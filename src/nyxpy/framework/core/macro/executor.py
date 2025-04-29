@@ -15,17 +15,17 @@ class MacroExecutor:
     MacroExecutorは、カレントディレクトリ直下のmacrosディレクトリから
     MacroBaseを継承した全てのマクロを読み込み、実行可能マクロのリストとして保持します。
 
-    ・load_all_macros() で利用可能なマクロを読み込みます。
-    ・select_macro() によって実行対象のマクロをセットします。
+    ・reload_macros() で利用可能なマクロを読み込みます。
+    ・set_active_macro() によって実行対象のマクロをセットします。
     ・execute() によって選択されたマクロのライフサイクル関数（initialize -> run -> finalize）を呼び出します。
     """
 
     def __init__(self):
         self.macros: dict[str, MacroBase] = {}
         self.macro: MacroBase = None
-        self.load_all_macros()
+        self.reload_macros()
 
-    def load_all_macros(self) -> None:
+    def reload_macros(self) -> None:
         """
         カレントディレクトリ直下の 'macros' フォルダ内の全Pythonモジュールをリロード対応で読み込み、
         MacroBaseを継承したクラスのインスタンスを self.macros に追加します。
@@ -54,10 +54,9 @@ class MacroExecutor:
                     )
                     pass
 
-    def select_macro(self, macro_name: str) -> None:
+    def set_active_macro(self, macro_name: str) -> None:
         """
         利用可能マクロの中から、macro_name で指定されたマクロを実行対象として選択する。
-
         :param macro_name: 実行対象のマクロクラス名
         :raises ValueError: 指定されたマクロ名が見つからなかった場合
         """
