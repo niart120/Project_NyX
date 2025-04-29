@@ -168,7 +168,7 @@ def test_macro_executor_normal_flow(integration_setup):
     MacroExecutor経由でDummyMacroのライフサイクルを一気通貫でテスト
     """
     executor, cmd, fake_serial, fake_capture, token = integration_setup
-    executor.select_macro("DummyMacro")
+    executor.set_active_macro("DummyMacro")
     executor.execute(cmd)
 
     # コマンド送信内容
@@ -229,7 +229,7 @@ def test_macro_executor_exception_handling(integration_setup):
 
     executor, cmd, *_ = integration_setup
     executor.macros = {"ExceptionMacro": ExceptionMacro()}
-    executor.select_macro("ExceptionMacro")
+    executor.set_active_macro("ExceptionMacro")
 
     # 例外発生時はexecutor内でハンドリングされるのでここでは例外は送出されない筈
     executor.execute(cmd)
@@ -245,7 +245,7 @@ def test_macro_executor_cancellation(integration_setup):
     run()中にCancellationTokenで中断→MacroStopException→finalize()が呼ばれる
     """
     executor, cmd, fake_serial, fake_capture, token = integration_setup
-    executor.select_macro("LongRunningMacro")
+    executor.set_active_macro("LongRunningMacro")
 
     def cancel():
         time.sleep(0.2)
@@ -271,7 +271,7 @@ def test_macro_executor_no_cancellation(integration_setup):
     CancellationTokenが未発火ならLongRunningMacroが最後まで実行される
     """
     executor, cmd, fake_serial, fake_capture, token = integration_setup
-    executor.select_macro("LongRunningMacro")
+    executor.set_active_macro("LongRunningMacro")
     token.clear()
     executor.execute(cmd)
     macro = executor.macro

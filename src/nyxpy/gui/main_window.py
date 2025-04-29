@@ -281,7 +281,7 @@ class WorkerThread(QThread):
 
     def run(self):
         try:
-            self.executor.select_macro(self.macro_name)
+            self.executor.set_active_macro(self.macro_name)
             self.executor.execute(self.cmd, self.args)
             self.finished.emit("完了")
         except MacroStopException:

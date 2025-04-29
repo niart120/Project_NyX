@@ -73,11 +73,12 @@ class MockMacroExecutor:
         self.executed = False
         self.exec_args = None
 
-    def select_macro(self, name):
-        if name not in self.macros:
+    def set_active_macro(self, name):
+        if name in self.macros:
+            self.selected_macro = name
+            self.macro = self.macros[name]
+        else:
             raise ValueError(f"Macro '{name}' not found")
-        self.macro = self.macros[name]
-        return True
 
     def execute(self, cmd, exec_args={}):
         self.executed = True

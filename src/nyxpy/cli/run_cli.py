@@ -105,10 +105,10 @@ def execute_macro(
         ValueError: マクロが見つからない場合
     """
     try:
-        executor.select_macro(macro_name)
+        executor.set_active_macro(macro_name)
     except ValueError as ve:
         log_manager.log("ERROR", str(ve), component="MacroExecutor")
-        raise
+        raise ve
 
     try:
         executor.execute(cmd, exec_args)
@@ -118,7 +118,7 @@ def execute_macro(
         cmd.log(
             "An unexpected error occurred during macro execution:", e, level="ERROR"
         )
-        raise
+        raise e
     finally:
         cmd.log("Macro execution completed.")
 

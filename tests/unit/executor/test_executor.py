@@ -43,14 +43,14 @@ def test_load_all_macros(temp_macros_dir):
     assert isinstance(macro_instance, MacroBase)
 
 
-def test_select_macro(temp_macros_dir, monkeypatch):
+def test_set_active_macro(temp_macros_dir, monkeypatch):
     executor = MacroExecutor()
     # 正常ケース: 既存のマクロ名で選択できる
-    executor.select_macro("DummyTestMacro")
+    executor.set_active_macro("DummyTestMacro")
     assert executor.macro.__class__.__name__ == "DummyTestMacro"
     # 異常ケース: 存在しないマクロを指定した場合はValueErrorが発生することを確認
     with pytest.raises(ValueError) as exc_info:
-        executor.select_macro("NonExistentMacro")
+        executor.set_active_macro("NonExistentMacro")
     assert "Macro 'NonExistentMacro' not found" in str(exc_info.value)
 
 
@@ -136,7 +136,7 @@ def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
     """
     MacroExecutor のライフサイクル (initialize -> run -> finalize) をテスト
     """
-    executor_with_dummy.select_macro("MockMacro")
+    executor_with_dummy.set_active_macro("MockMacro")
     executor_with_dummy.execute(mock_command)
 
     # ログを確認
@@ -155,7 +155,7 @@ def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
     """
     MacroExecutor が run 中に例外が発生した場合でも finalize が呼び出されることをテスト
     """
-    executor_with_dummy.select_macro("FailingMacro")
+    executor_with_dummy.set_active_macro("FailingMacro")
     executor_with_dummy.execute(mock_command)
 
     # 例外発生時のログを確認
