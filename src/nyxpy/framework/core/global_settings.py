@@ -34,8 +34,25 @@ class GlobalSettings:
         self.config_path.write_text(toml_str, encoding="utf-8")
 
     def get(self, key, default=None):
+        # ドット区切りキーでネストdictにも対応
+        if '.' in key:
+            parts = key.split('.')
+            d = self.data
+            for p in parts[:-1]:
+                d = d.get(p, {})
+            return d.get(parts[-1], default)
         return self.data.get(key, default)
 
     def set(self, key, value):
-        self.data[key] = value
+        # ドット区切りキーでネストdictにも対応
+        if '.' in key:
+            parts = key.split('.')
+            d = self.data
+            for p in parts[:-1]:
+                if p not in d or not isinstance(d[p], dict):
+                    d[p] = {}
+                d = d[p]
+            d[parts[-1]] = value
+        else:
+            self.data[key] = value
         self.save()
