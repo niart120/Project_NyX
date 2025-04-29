@@ -105,7 +105,7 @@ def execute_macro(
         ValueError: マクロが見つからない場合
     """
     try:
-        executor.select_macro(macro_name)
+        executor.set_active_macro(macro_name)
     except ValueError as ve:
         log_manager.log("ERROR", str(ve), component="MacroExecutor")
         raise
