@@ -14,7 +14,6 @@ from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.executor import MacroExecutor
-from nyxpy.framework.core.api.notification_handler import NotificationHandler
 
 class MockNotificationHandler:
     def __init__(self):
