@@ -7,8 +7,8 @@ class DummyExecutor:
         self.macros = {"Macro": None}
         self.should_fail = should_fail
 
-    def select_macro(self, name):
-        assert name == "Macro"
+    def set_active_macro(self, name):
+        self.selected_macro = name
 
     def execute(self, cmd, args):
         if self.should_fail:
