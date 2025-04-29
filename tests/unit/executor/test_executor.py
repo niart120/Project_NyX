@@ -136,7 +136,7 @@ def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
     """
     MacroExecutor のライフサイクル (initialize -> run -> finalize) をテスト
     """
-    executor_with_dummy.select_macro("MockMacro")
+    executor_with_dummy.set_active_macro("MockMacro")
     executor_with_dummy.execute(mock_command)
 
     # ログを確認
@@ -155,7 +155,7 @@ def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
     """
     MacroExecutor が run 中に例外が発生した場合でも finalize が呼び出されることをテスト
     """
-    executor_with_dummy.select_macro("FailingMacro")
+    executor_with_dummy.set_active_macro("FailingMacro")
     executor_with_dummy.execute(mock_command)
 
     # 例外発生時のログを確認
