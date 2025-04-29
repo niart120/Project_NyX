@@ -165,12 +165,14 @@ class DefaultCommand(Command):
         resource_io: StaticResourceIO,
         protocol: SerialProtocolInterface,
         ct: CancellationToken,
+        notification_handler=None,  # 追加: NotificationHandler型
     ) -> None:
         self.serial_device = serial_device
         self.capture_device = capture_device
         self.resource_io = resource_io
         self.protocol = protocol
         self.ct = ct
+        self.notification_handler = notification_handler
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -293,3 +295,10 @@ class DefaultCommand(Command):
             self.wait(0.01)  # 必要に応じて調整
         except NotImplementedError as e:
             self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
+
+    def notify(self, text: str, img: cv2.Mat = None) -> None:
+        """
+        外部サービスへ通知を送信する
+        """
+        if self.notification_handler:
+            self.notification_handler.publish(text, img)
