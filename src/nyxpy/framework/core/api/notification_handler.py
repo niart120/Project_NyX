@@ -9,7 +9,7 @@ class NotificationHandler:
     def add_notifier(self, notifier: NotificationInterface):
         self.notifiers.append(notifier)
 
-    def publish(self, text: str, img: Optional[cv2.Mat] = None) -> None:
+    def publish(self, text: str, img: Optional[cv2.typing.MatLike] = None) -> None:
         for notifier in self.notifiers:
             try:
                 notifier.notify(text, img)
