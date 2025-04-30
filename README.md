@@ -30,11 +30,18 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 - 対応OS: Windows/macOS/Linux
 - 必要なハードウェア接続済み (キャプチャデバイス, シリアルデバイス)
 
-### 方法1: Poetry (推奨・開発者向け)
+このプロジェクトは Python のパッケージ管理に [uv](https://github.com/astral-sh/uv) を使用しています。
 
-1. Poetryをインストール:
+
+### 方法1: pip (一般ユーザー向け)
+
+// TBA
+
+### 方法2: uv (フレームワーク開発者向け)
+
+1. uvをインストール:
    ```
-   pip install poetry
+   pip install uv
    ```
 
 2. リポジトリをクローン:
@@ -45,17 +52,14 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 3. 依存関係をインストール:
    ```
-   poetry install
+   uv pip install -e .
    ```
 
 4. GUIアプリケーションを起動:
    ```
-   poetry run nyx-gui
+   uv run nyx-gui
    ```
 
-### 方法2: pip (一般ユーザー向け)
-
-// TBA
 
 ## 3. 使用方法
 
@@ -92,8 +96,6 @@ nyxpy gui
 ## 4. マクロ開発
 
 マクロは `macros/` フォルダに配置されたPythonスクリプトです。
-
-// TODO: 後でもっと詳細化する
 
 ### 基本的なマクロ構造
 
@@ -162,7 +164,6 @@ class SampleMacro(MacroBase):
 ## 7. 今後の予定
 
 - GUIの見直し
-    - マクロのリロード機能の追加
     - ログ表示機能の拡充
     - etc
 - パフォーマンス最適化
