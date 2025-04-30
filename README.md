@@ -52,7 +52,7 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 3. 依存関係をインストール:
    ```
-   uv pip install -e .
+   uv sync
    ```
 
 4. GUIアプリケーションを起動:
