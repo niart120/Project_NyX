@@ -19,22 +19,21 @@ dependencies = [
     "requests (>=2.32.3,<3.0.0)",
 ]
 
-[tool.poetry]
-package-mode = true
-packages = [
-    { include = "nyxpy", from = "src" }
-]
-
-[tool.poetry.scripts]
+[project.scripts]
 nyx-cli = "nyxpy.cli.run_cli:main"
 nyx-gui = "nyxpy.gui.run_gui:main"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
-pytest-cov = "^6.1.0"
-ruff = "^0.11.2"
-pytest-qt = "^4.4.0"
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.0",
+    "ruff>=0.11.2",
+    "pytest-qt>=4.4.0"
+]
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+targets.wheel.packages = ["src/nyxpy"]

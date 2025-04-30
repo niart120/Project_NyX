@@ -25,21 +25,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Poetry のセットアップ
-        uses: abatilo/actions-poetry@v2
+      - name: uvのインストール
+        uses: astral-sh/setup-uv@v5
         with:
-          poetry-version: "2.1.1"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml,uv.lock"
 
-      - name: キャッシュの設定
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pypoetry
-          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            poetry-${{ runner.os }}-
-      
       - name: 依存関係のインストール
-        run: poetry install
+        run: uv sync --locked --all-extras --dev
 
       - name: 必要なGUIライブラリのインストール
         run: sudo apt-get install -y libxkbcommon-x11-0 libgl1-mesa-dev
@@ -48,4 +41,4 @@ jobs:
         run: sudo apt-get install -y x11-xkb-utils x11-xserver-utils xserver-xorg-core xfonts-base x11-utils
 
       - name: テストの実行（GUI テストを含まない)
-        run: xvfb-run -a poetry run pytest tests/unit tests/integration -v
+        run: xvfb-run -a uv run pytest tests/unit tests/integration -v
