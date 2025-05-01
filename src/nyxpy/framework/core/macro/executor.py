@@ -23,6 +23,9 @@ class MacroExecutor:
     def __init__(self):
         self.macros: dict[str, MacroBase] = {}
         self.macro: MacroBase = None
+        # カレントディレクトリをsys.pathに追加する
+        if str(Path.cwd()) not in sys.path:
+            sys.path.append(str(Path.cwd()))
         self.reload_macros()
 
     def reload_macros(self) -> None:
