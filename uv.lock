@@ -277,6 +277,14 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-qt" },
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "cv2-enumerate-cameras", specifier = ">=1.1.18.3,<2.0.0.0" },
@@ -293,6 +301,14 @@ requires-dist = [
     { name = "tomlkit", specifier = ">=0.13.2,<0.14.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "pytest-cov", specifier = ">=6.1.1" },
+    { name = "pytest-qt", specifier = ">=4.4.0" },
+    { name = "ruff", specifier = ">=0.11.7" },
+]
 
 [[package]]
 name = "pyserial"
