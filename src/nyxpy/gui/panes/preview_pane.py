@@ -58,14 +58,15 @@ class PreviewPane(QWidget):
         target_w, target_h = calc_aspect_size(
             size, self.label.aspect_w, self.label.aspect_h
         )
-        if hasattr(frame, "flags") and hasattr(frame.flags, "__getitem__"):
-            if not frame.flags["C_CONTIGUOUS"]:
-                frame = np.ascontiguousarray(frame)
+        target_w, target_h = int(target_w*self.devicePixelRatio()), int(target_h*self.devicePixelRatio())
+
+        frame = np.ascontiguousarray(frame)
         resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
         image = QImage(
             resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888
         )
         pix = QPixmap.fromImage(image)
+        pix.setDevicePixelRatio(self.devicePixelRatio())
         self.label.setPixmap(pix)
 
     def take_snapshot(self):
