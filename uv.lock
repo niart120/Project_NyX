@@ -269,7 +269,7 @@ dependencies = [
     { name = "tomlkit" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -285,14 +285,17 @@ requires-dist = [
     { name = "pillow", specifier = ">=11.1.0,<12.0.0" },
     { name = "pyserial", specifier = ">=3.5,<4.0" },
     { name = "pyside6", specifier = ">=6.9.0,<7.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.5" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.1.0" },
-    { name = "pytest-qt", marker = "extra == 'dev'", specifier = ">=4.4.0" },
     { name = "requests", specifier = ">=2.32.3,<3.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.2" },
     { name = "tomlkit", specifier = ">=0.13.2,<0.14.0" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "pytest-cov", specifier = ">=6.1.1" },
+    { name = "pytest-qt", specifier = ">=4.4.0" },
+    { name = "ruff", specifier = ">=0.11.7" },
+]
 
 [[package]]
 name = "pyserial"
