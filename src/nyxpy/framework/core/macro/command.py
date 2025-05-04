@@ -40,7 +40,8 @@ class Command(ABC):
     @abstractmethod
     def hold(self, *keys: KeyType) -> None:
         """
-        指定されたキーを押し続けます。
+        指定されたキーを押し続けます。より厳密には、現在のキー入力の内部状態を破棄し、指定されたキー入力に変更します。
+        これは、連続的な入力を必要とする場合に使用されます。
 
         :param keys: 押し続けるキーのリスト
         """
@@ -196,7 +197,7 @@ class DefaultCommand(Command):
     @check_interrupt
     def hold(self, *keys: KeyType) -> None:
         self.log(f"Holding keys: {keys}", level="DEBUG")
-        hold_data = self.protocol.build_press_command(keys)
+        hold_data = self.protocol.build_hold_command(keys)
         self.serial_device.send(hold_data)
 
     @check_interrupt

@@ -22,6 +22,15 @@ class SerialProtocolInterface(ABC):
         pass
 
     @abstractmethod
+    def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        """キー保持操作のコマンドデータを生成する
+
+        :param keys: ホールドするキーのタプル
+        :return: コマンドデータ
+        """
+        pass
+
+    @abstractmethod
     def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー解放操作のコマンドデータを生成する
 
@@ -91,6 +100,27 @@ class CH552SerialProtocol(SerialProtocolInterface):
         )
 
     def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # 各キーに対して、内部状態を更新する
+        for key in keys:
+            if isinstance(key, Button):
+                # ボタンは2バイト（btn1, btn2）にわたってマスクする
+                self.key_state[1] |= key & 0xFF
+                self.key_state[2] |= (key >> 8) & 0xFF
+            elif isinstance(key, Hat):
+                self.key_state[3] = key
+            elif isinstance(key, LStick):
+                self.key_state[4] = key.x
+                self.key_state[5] = key.y
+            elif isinstance(key, RStick):
+                self.key_state[6] = key.x
+                self.key_state[7] = key.y
+
+        # 生成された状態をそのままコマンドデータとして返す
+        return bytes(self.key_state)
+
+    def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # キー入力状態をリセット
+        self._initialize_key_state()
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
@@ -179,6 +209,28 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         )
 
     def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # 各キーに対して、内部状態を更新する
+        for key in keys:
+            if isinstance(key, Button):
+                # ボタンは16ビット（hex_btns）にわたってマスクする
+                self.key_state[0] |= (key << 2) & 0xFFFF  # Update to use hex_btns
+            elif isinstance(key, Hat):
+                self.key_state[1] = key
+            elif isinstance(key, LStick):
+                self.key_state[2] = key.x
+                self.key_state[3] = key.y
+            elif isinstance(key, RStick):
+                self.key_state[4] = key.x
+                self.key_state[5] = key.y
+
+        # 生成された状態を16進数の文字列に変換後、バイト列として返す
+        hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
+        # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
+        return hex_string.encode("utf-8")
+    
+    def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        # キー入力状態をリセット
+        self._initialize_key_state()
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
