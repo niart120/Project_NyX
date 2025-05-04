@@ -41,6 +41,10 @@ class MockProtocol:
     def build_press_command(self, keys):
         self.calls.append(("press", keys))
         return b"press:" + b"-".join(str(k).encode() for k in keys)
+    
+    def build_hold_command(self, keys):
+        self.calls.append(("hold", keys))
+        return b"hold:" + b"-".join(str(k).encode() for k in keys)
 
     def build_release_command(self, keys):
         self.calls.append(("release", keys))
@@ -125,8 +129,8 @@ def test_press_and_release(dummy_command):
 def test_hold(dummy_command):
     cmd, serial_device, capture_device, resource_io, protocol, ct = dummy_command
     cmd.hold(Button.X)
-    assert protocol.calls[0][0] == "press"
-    assert serial_device.sent_data[0].startswith(b"press:")
+    assert protocol.calls[0][0] == "hold"
+    assert serial_device.sent_data[0].startswith(b"hold:")
 
 
 def test_release(dummy_command):
