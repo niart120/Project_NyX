@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class SettingsDialog(QDialog):
+class MacroParamsDialog(QDialog):
     def __init__(self, parent=None, macro_name: str = None):
         super().__init__(parent)
         # Execution parameter dialog for macro run

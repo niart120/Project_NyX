@@ -4,7 +4,7 @@ from .settings.tab_widget import SettingsTabWidget
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
-class DeviceSettingsDialog(QDialog):
+class AppSettingsDialog(QDialog):
     settings_applied = Signal()
 
     def __init__(self, parent, settings:GlobalSettings=None, secrets:SecretsSettings=None):
