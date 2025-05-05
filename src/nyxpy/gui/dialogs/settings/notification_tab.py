@@ -1,11 +1,12 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QCheckBox, QLineEdit
+from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.secrets_settings import SecretsSettings
 
 class NotificationSettingsTab(QWidget):
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):
         super().__init__(parent)
         self.settings = settings
-        self.secrets = SecretsSettings()
+        self.secrets = secrets
         layout = QVBoxLayout(self)
         notify_form = QFormLayout()
         # Discord

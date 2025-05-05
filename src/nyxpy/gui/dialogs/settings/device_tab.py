@@ -1,11 +1,14 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox
+from nyxpy.framework.core.global_settings import GlobalSettings
+from nyxpy.framework.core.secrets_settings import SecretsSettings
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 
 class DeviceSettingsTab(QWidget):
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self.secrets = secrets
         layout = QVBoxLayout(self)
 
         # キャプチャデバイス設定

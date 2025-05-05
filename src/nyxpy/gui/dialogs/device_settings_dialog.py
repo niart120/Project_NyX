@@ -1,17 +1,19 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton
 from .settings.tab_widget import SettingsTabWidget
 from nyxpy.framework.core.global_settings import GlobalSettings
+from nyxpy.framework.core.secrets_settings import SecretsSettings
 
 class DeviceSettingsDialog(QDialog):
-    def __init__(self, parent, settings: GlobalSettings = None):
+    def __init__(self, parent, settings:GlobalSettings=None, secrets:SecretsSettings=None):
         super().__init__(parent)
         self.setWindowTitle("デバイス・通知・一般設定")
         self.resize(500, 400)
         self.settings = settings or GlobalSettings()
+        self.secrets = secrets or SecretsSettings()
         layout = QVBoxLayout(self)
 
         # タブウィジェット
-        self.tab_widget = SettingsTabWidget(self, self.settings)
+        self.tab_widget = SettingsTabWidget(self, self.settings, self.secrets)
         layout.addWidget(self.tab_widget)
 
         # ボタンレイアウト
