@@ -1,9 +1,12 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton
+from PySide6.QtCore import Signal
 from .settings.tab_widget import SettingsTabWidget
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.secrets_settings import SecretsSettings
 
 class DeviceSettingsDialog(QDialog):
+    settings_applied = Signal()
+
     def __init__(self, parent, settings:GlobalSettings=None, secrets:SecretsSettings=None):
         super().__init__(parent)
         self.setWindowTitle("デバイス・通知・一般設定")
@@ -34,6 +37,7 @@ class DeviceSettingsDialog(QDialog):
         self.tab_widget.general_tab.apply()
         self.tab_widget.device_tab.apply()
         self.tab_widget.notification_tab.apply()
+        self.settings_applied.emit()
 
     def accept(self):
         self.apply_settings()

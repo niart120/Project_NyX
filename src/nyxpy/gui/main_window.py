@@ -130,10 +130,8 @@ class MainWindow(QMainWindow):
         )
 
     def open_settings(self):
-        dlg = DeviceSettingsDialog(
-            self,
-            global_settings,
-        )
+        dlg = DeviceSettingsDialog(self, global_settings)
+        dlg.settings_applied.connect(self.apply_device_settings)
         if dlg.exec() != QDialog.Accepted:
             return
         self.apply_device_settings()
