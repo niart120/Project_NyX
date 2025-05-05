@@ -25,7 +25,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, initialize_managers
+from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, initialize_managers, secrets_settings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.gui.events import EventBus, EventType
@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         )
 
     def open_settings(self):
-        dlg = DeviceSettingsDialog(self, global_settings)
+        dlg = DeviceSettingsDialog(self, global_settings, secrets_settings)
         dlg.settings_applied.connect(self.apply_device_settings)
         if dlg.exec() != QDialog.Accepted:
             return
