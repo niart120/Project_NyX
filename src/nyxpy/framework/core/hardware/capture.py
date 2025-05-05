@@ -8,6 +8,8 @@ import platform
 
 import numpy as np
 
+from nyxpy.framework.core.logger.log_manager import log_manager
+
 
 class CaptureDeviceInterface(ABC):
     @abstractmethod
@@ -38,8 +40,9 @@ class AsyncCaptureDevice:
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
 
-    def __init__(self, device_index: int = 0, fps: float = 60.0) -> None:
+    def __init__(self, device_index: int = 0, api_pref: int = 0, fps: float = 60.0) -> None:
         self.device_index = device_index
+        self.api_pref = api_pref  # API preference
         self.cap: cv2.VideoCapture = None
         self.latest_frame: cv2.typing.MatLike = None
         self._running = False
@@ -49,7 +52,7 @@ class AsyncCaptureDevice:
         self._thread = None
 
     def initialize(self) -> None:
-        self.cap = cv2.VideoCapture(self.device_index)
+        self.cap = cv2.VideoCapture(self.device_index, self.api_pref)
         if not self.cap.isOpened():
             raise RuntimeError(
                 f"AsyncCaptureDevice: Device {self.device_index} could not be opened."
@@ -58,17 +61,17 @@ class AsyncCaptureDevice:
         try:
             self.cap.set(cv2.CAP_PROP_FPS, self.fps)
         except Exception:
-            pass
+            log_manager.log("ERROR", "Failed to set FPS.", component="AsyncCaptureDevice")
         try:
             # set the frame width and height to 1920x1080
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         except Exception:
-            pass
+            log_manager.log("ERROR", "Failed to set frame size.", component="AsyncCaptureDevice")
         try:
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception:
-            pass
+            log_manager.log("ERROR", "Failed to set buffer size.", component="AsyncCaptureDevice")
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
@@ -195,16 +198,16 @@ class CaptureManager:
 
     def _detect_windows_devices(self):
         # Windows uses DirectShow
-        for camera_info in enumerate_cameras(apiPreference=cv2.CAP_DSHOW):
+        for camera_info in enumerate_cameras(cv2.CAP_DSHOW):
             name = f"{camera_info.index}: {camera_info.name}"
-            device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
+            device = AsyncCaptureDevice(device_index=camera_info.index, api_pref=cv2.CAP_DSHOW, fps=60.0)
             self.register_device(name, device)
 
     def _detect_linux_devices(self):
         # Linux uses V4L2
         for camera_info in enumerate_cameras(cv2.CAP_V4L2):
             name = f"{camera_info.index}: {camera_info.name}"
-            device = AsyncCaptureDevice(device_index=camera_info.index, fps=60.0)
+            device = AsyncCaptureDevice(device_index=camera_info.index, api_pref=cv2.CAP_V4L2, fps=60.0)
             self.register_device(name, device)
 
     def _detect_macos_devices(self):
