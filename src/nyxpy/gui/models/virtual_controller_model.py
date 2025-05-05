@@ -39,12 +39,6 @@ class VirtualControllerModel(QObject):
     def set_protocol(self, protocol: SerialProtocolInterface) -> None:
         """シリアルプロトコルを設定"""
         self.protocol = protocol
-        # プロトコルが変更されたことをログに記録
-        log_manager.log(
-            "INFO",
-            f"仮想コントローラーのプロトコルを変更: {protocol.__class__.__name__}",
-            "VirtualController",
-        )
 
     def button_press(self, button: Button) -> None:
         """ボタンが押されたときの処理"""
