@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QPushButton
 from nyxpy.framework.core.global_settings import GlobalSettings
 from nyxpy.framework.core.secrets_settings import SecretsSettings
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
@@ -14,12 +14,12 @@ class DeviceSettingsTab(QWidget):
         # キャプチャデバイス設定
         cap_form = QFormLayout()
         self.cap_device = QComboBox()
-        devices = capture_manager.list_devices()
-        self.cap_device.addItems(devices)
-        current_cap = self.settings.get("capture_device", "")
-        if current_cap in devices:
-            self.cap_device.setCurrentText(current_cap)
+        self.refresh_capture_devices()
         cap_form.addRow("Device:", self.cap_device)
+        # デバイスリスト再取得ボタン
+        refresh_btn = QPushButton("リロード")
+        refresh_btn.clicked.connect(self.refresh_capture_devices)
+        cap_form.addRow("", refresh_btn)
         layout.addLayout(cap_form)
 
         # プレビューFPS欄
@@ -38,11 +38,12 @@ class DeviceSettingsTab(QWidget):
         # シリアルデバイス設定
         ser_form = QFormLayout()
         self.ser_device = QComboBox()
-        serials = serial_manager.list_devices()
-        self.ser_device.addItems(serials)
-        current_ser = self.settings.get("serial_device", "")
-        if current_ser in serials:
-            self.ser_device.setCurrentText(current_ser)
+        self.refresh_serial_devices()
+        ser_form.addRow("Device:", self.ser_device)
+        # シリアルデバイスリスト再取得ボタン
+        refresh_ser_btn = QPushButton("リロード")
+        refresh_ser_btn.clicked.connect(self.refresh_serial_devices)
+        ser_form.addRow("", refresh_ser_btn)
         self.ser_protocol = QComboBox()
         protocol_options = ProtocolFactory.get_protocol_names()
         self.ser_protocol.addItems(protocol_options)
@@ -61,10 +62,25 @@ class DeviceSettingsTab(QWidget):
             self.ser_baud.setCurrentText(current_baud)
         else:
             self.ser_baud.setCurrentText("9600")
-        ser_form.addRow("Device:", self.ser_device)
         ser_form.addRow("Protocol:", self.ser_protocol)
         ser_form.addRow("Baud Rate:", self.ser_baud)
         layout.addLayout(ser_form)
+
+    def refresh_capture_devices(self):
+        devices = capture_manager.list_devices()
+        self.cap_device.clear()
+        self.cap_device.addItems(devices)
+        current_cap = self.settings.get("capture_device", "")
+        if current_cap in devices:
+            self.cap_device.setCurrentText(current_cap)
+
+    def refresh_serial_devices(self):
+        serials = serial_manager.list_devices()
+        self.ser_device.clear()
+        self.ser_device.addItems(serials)
+        current_ser = self.settings.get("serial_device", "")
+        if current_ser in serials:
+            self.ser_device.setCurrentText(current_ser)
 
     def apply(self):
         self.settings.set("capture_device", self.cap_device.currentText())
