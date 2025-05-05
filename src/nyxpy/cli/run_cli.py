@@ -14,7 +14,7 @@ from nyxpy.framework.core.hardware.protocol import (
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
-from nyxpy.framework.core.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 
 

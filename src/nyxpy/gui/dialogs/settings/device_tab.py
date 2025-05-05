@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QPushButton, QGroupBox, QLabel, QHBoxLayout
-from nyxpy.framework.core.global_settings import GlobalSettings
-from nyxpy.framework.core.secrets_settings import SecretsSettings
+from nyxpy.framework.core.settings.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 

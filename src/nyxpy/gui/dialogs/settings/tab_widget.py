@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QTabWidget
 
-from nyxpy.framework.core.global_settings import GlobalSettings
-from nyxpy.framework.core.secrets_settings import SecretsSettings
+from nyxpy.framework.core.settings.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from .general_tab import GeneralSettingsTab
 from .device_tab import DeviceSettingsTab
 from .notification_tab import NotificationSettingsTab
