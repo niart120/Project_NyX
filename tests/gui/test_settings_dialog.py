@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
-from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
+from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 
@@ -24,7 +24,7 @@ def tmp_cwd(tmp_path, monkeypatch):
 
 def test_settings_dialog_defaults(tmp_cwd, qtbot):
     # When no existing settings, fields should have default values
-    dlg = SettingsDialog(None)
+    dlg = MacroParamsDialog(None)
     qtbot.addWidget(dlg)
     # Defaults
     assert dlg.param_edit.text() == ""

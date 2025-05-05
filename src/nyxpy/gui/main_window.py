@@ -13,11 +13,11 @@ from PySide6.QtWidgets import (
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
+from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.gui.dialogs.device_settings_dialog import DeviceSettingsDialog
+from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.control_pane import ControlPane
 from pathlib import Path
@@ -25,7 +25,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, initialize_managers
+from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, secrets_settings, initialize_managers
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.gui.events import EventBus, EventType
@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 400)
 
         settings_action = QAction("Settings", self)
-        settings_action.triggered.connect(self.open_settings)
+        settings_action.triggered.connect(self.open_app_settings)
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(settings_action)
 
@@ -119,7 +119,7 @@ class MainWindow(QMainWindow):
         # Delegate snapshot to PreviewPane and status via signal
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
         self.preview_pane.snapshot_taken.connect(self.status_label.setText)
-        self.control_pane.settings_requested.connect(self.open_settings)
+        self.control_pane.settings_requested.connect(self.open_app_settings)
 
         # Set status to ready
         self.status_label.setText("準備完了")
@@ -129,11 +129,9 @@ class MainWindow(QMainWindow):
             lambda record: self.log_pane.append(str(record)), level="DEBUG"
         )
 
-    def open_settings(self):
-        dlg = DeviceSettingsDialog(
-            self,
-            global_settings,
-        )
+    def open_app_settings(self):
+        dlg = AppSettingsDialog(self, global_settings, secrets_settings)
+        dlg.settings_applied.connect(self.apply_device_settings)
         if dlg.exec() != QDialog.Accepted:
             return
         self.apply_device_settings()
@@ -201,7 +199,7 @@ class MainWindow(QMainWindow):
         macro_name = self.macro_browser.table.item(
             self.macro_browser.table.currentRow(), 0
         ).text()
-        dlg = SettingsDialog(self, macro_name)
+        dlg = MacroParamsDialog(self, macro_name)
         if dlg.exec() != QDialog.Accepted:
             return
 

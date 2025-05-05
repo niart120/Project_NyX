@@ -1,7 +1,7 @@
 from typing import List, Optional
 import cv2
 from .notification_interface import NotificationInterface
-from nyxpy.framework.core.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from .discord_notification import DiscordNotification
 from .bluesky_notification import BlueskyNotification
 
