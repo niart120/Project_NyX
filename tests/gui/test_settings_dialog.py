@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
-from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
+from nyxpy.gui.dialogs.macro_params_dialog import SettingsDialog
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
 

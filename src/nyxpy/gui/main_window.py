@@ -13,11 +13,11 @@ from PySide6.QtWidgets import (
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.gui.dialogs.settings_dialog import SettingsDialog
+from nyxpy.gui.dialogs.macro_params_dialog import SettingsDialog
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.gui.dialogs.device_settings_dialog import DeviceSettingsDialog
+from nyxpy.gui.dialogs.app_settings_dialog import DeviceSettingsDialog
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.control_pane import ControlPane
 from pathlib import Path
