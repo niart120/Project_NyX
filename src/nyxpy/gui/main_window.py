@@ -21,6 +21,7 @@ from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.control_pane import ControlPane
 from pathlib import Path
+from copy import deepcopy
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.gui.panes.log_pane import LogPane
@@ -35,7 +36,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         initialize_managers()
-        self.global_settings = global_settings
         self.executor = MacroExecutor()
         self._last_settings = {}
         self.setup_ui()
@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         """Perform initialization that can be deferred until after UI appears"""
         self.setup_logging()  # Setup logging for the GUI
         self.setup_connections()  # Setup signal connections between UI components
-        self.apply_device_settings()
+        self.apply_app_settings()
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
@@ -93,7 +93,7 @@ class MainWindow(QMainWindow):
         self.preview_pane = PreviewPane(
             capture_device=capture_manager.get_active_device(),
             parent=self,
-            preview_fps=self.global_settings.get("preview_fps", 30)
+            preview_fps=global_settings.get("preview_fps", 30)
         )
         right_layout.addWidget(self.preview_pane, stretch=1)
 
@@ -131,14 +131,14 @@ class MainWindow(QMainWindow):
 
     def open_app_settings(self):
         dlg = AppSettingsDialog(self, global_settings, secrets_settings)
-        dlg.settings_applied.connect(self.apply_device_settings)
+        dlg.settings_applied.connect(self.apply_app_settings)
         if dlg.exec() != QDialog.Accepted:
             return
-        self.apply_device_settings()
+        self.apply_app_settings()
 
-    def apply_device_settings(self):
+    def apply_app_settings(self):
         prev = self._last_settings
-        cur = self.global_settings.data
+        cur = global_settings.data
         diff_keys = {k for k in cur if prev.get(k) != cur.get(k)}
         # 差分がある項目のみ反映・イベント発行
         if "serial_device" in diff_keys or "serial_baud" in diff_keys:
@@ -187,8 +187,38 @@ class MainWindow(QMainWindow):
         if "preview_fps" in diff_keys:
             self.preview_pane.preview_fps = cur.get("preview_fps", 30)
             self.preview_pane.apply_fps()
+        
+        # 通知設定の変更処理
+        notification_settings_changed = False
+        
+        # シークレット設定から通知関連の設定変更を確認
+        if secrets_settings.get("notification.discord.enabled") != prev.get("notification.discord.enabled") or \
+           secrets_settings.get("notification.bluesky.enabled") != prev.get("notification.bluesky.enabled"):
+            notification_settings_changed = True
+        
+        # 通知設定が変更された場合はログに出力
+        if notification_settings_changed:
+            enabled_services = []
+            if secrets_settings.get("notification.discord.enabled", False):
+                enabled_services.append("Discord")
+            if secrets_settings.get("notification.bluesky.enabled", False):
+                enabled_services.append("Bluesky")
+            
+            if enabled_services:
+                log_manager.log(
+                    "INFO",
+                    f"通知設定が変更されました。有効なサービス: {', '.join(enabled_services)}",
+                    "MainWindow"
+                )
+            else:
+                log_manager.log(
+                    "INFO",
+                    "通知設定が変更されました。全てのサービスが無効です。",
+                    "MainWindow"
+                )
+                
         # ...他の設定も必要に応じて追加...
-        self._last_settings = cur.copy()
+        self._last_settings = deepcopy(cur)
 
     def execute_macro_immediate(self):
         """即時実行モード：パラメータ入力なしでマクロを実行する"""
@@ -219,9 +249,9 @@ class MainWindow(QMainWindow):
             self.macro_browser.table.currentRow(), 0
         ).text()
         resource_io = StaticResourceIO(Path.cwd() / "static")
-        protocol = ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
+        protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
         ct = CancellationToken()
-        notification_handler = create_notification_handler_from_settings(self.global_settings)
+        notification_handler = create_notification_handler_from_settings(secrets_settings)
         cmd = DefaultCommand(
             serial_device=serial_manager.get_active_device(),
             capture_device=capture_manager.get_active_device(),
