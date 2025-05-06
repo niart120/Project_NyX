@@ -12,7 +12,7 @@ def test_create_notification_handler_from_settings():
     handler = create_notification_handler_from_settings(s)
     assert any(isinstance(n, DiscordNotification) for n in handler.notifiers)
     # Blueskyのみ
-    s = DummySettings({"notification.bluesky.enabled": True, "notification.bluesky.webhook_url": "url2"})
+    s = DummySettings({"notification.bluesky.enabled": True, "notification.bluesky.identifier": "id1", "notification.bluesky.password": "pass1"})
     handler = create_notification_handler_from_settings(s)
     assert any(isinstance(n, BlueskyNotification) for n in handler.notifiers)
     # どちらも無効
