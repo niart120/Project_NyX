@@ -1,6 +1,17 @@
 import requests
+from datetime import datetime, timezone
 from nyxpy.framework.core.api.bluesky_notification import BlueskyNotification
 from unittest.mock import patch, Mock, call
+
+# 固定の時刻をモックするためのクラス
+class MockDateTime:
+    @classmethod
+    def now(cls, tz=None):
+        # 固定の時刻を返す
+        mock_dt = datetime(2025, 5, 6, 0, 0, 0)
+        if tz is timezone.utc:
+            return mock_dt.replace(tzinfo=timezone.utc)
+        return mock_dt
 
 def test_bluesky_notification_authentication():
     with patch("requests.post") as mock_post:
@@ -28,7 +39,8 @@ def test_bluesky_notification_authentication():
         )
 
 def test_bluesky_notification_notify():
-    with patch("requests.post") as mock_post:
+    # datetimeモジュールをパッチ
+    with patch("nyxpy.framework.core.api.bluesky_notification.datetime", MockDateTime), patch("requests.post") as mock_post:
         # Mock responses
         auth_response = Mock()
         auth_response.status_code = 200
@@ -65,18 +77,20 @@ def test_bluesky_notification_notify():
         assert mock_post.call_args_list[1] == call(
             "https://bsky.social/xrpc/com.atproto.repo.createRecord",
             json={
+                "repo": "test_user",
                 "collection": "app.bsky.feed.post",
                 "record": {
                     "text": "Test message",
-                    "createdAt": "2025-05-06T00:00:00.000Z"
+                    "createdAt": "2025-05-06T00:00:00Z"
                 }
             },
-            headers={"Authorization": "Bearer mock_access_token"},
+            headers={"Authorization": "Bearer mock_access_token", "Content-Type": "application/json"},
             timeout=5
         )
 
 def test_token_refresh_on_401():
-    with patch("requests.post") as mock_post:
+    # datetimeモジュールをパッチ
+    with patch("nyxpy.framework.core.api.bluesky_notification.datetime", MockDateTime), patch("requests.post") as mock_post:
         # Authentication response
         auth_response = Mock()
         auth_response.status_code = 200
@@ -133,12 +147,13 @@ def test_token_refresh_on_401():
         assert mock_post.call_args_list[3] == call(
             "https://bsky.social/xrpc/com.atproto.repo.createRecord",
             json={
+                "repo": "test_user",
                 "collection": "app.bsky.feed.post",
                 "record": {
                     "text": "Test message",
-                    "createdAt": "2025-05-06T00:00:00.000Z"
+                    "createdAt": "2025-05-06T00:00:00Z"
                 }
             },
-            headers={"Authorization": "Bearer new_access_token"},
+            headers={"Authorization": "Bearer new_access_token", "Content-Type": "application/json"},
             timeout=5
         )
