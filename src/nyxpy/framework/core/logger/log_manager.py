@@ -13,7 +13,7 @@ class LogManager:
         # Built-in handlers (console & file)
         self.console_handler_id = logger.add(sys.stdout, level="INFO", colorize=True, format=self._log_format)
         self.file_handler_id = logger.add(
-            "logs/logfile.log", level="INFO", rotation="1 MB", format=self._log_format
+            "logs/logfile.log", level="DEBUG", rotation="1 MB", format=self._log_format
         )
 
         # Custom handlers storage
