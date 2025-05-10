@@ -33,7 +33,7 @@ class LogPane(QWidget):
         # Clearボタンのシグナル接続
         self.clear_button.clicked.connect(self.view.clear)
         # LogManagerにGUI用ハンドラを追加
-        log_manager.add_handler(self.append, level="DEBUG")
+        log_manager.add_handler(self.append, level="INFO")
         self.debug_checkbox.stateChanged.connect(self._on_debug_checkbox_changed)
 
     def append(self, message: str):
