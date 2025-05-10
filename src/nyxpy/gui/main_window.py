@@ -255,7 +255,6 @@ class MainWindow(QMainWindow):
             notification_handler=notification_handler,
         )
         self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
-        self.worker.progress.connect(self.log_pane.append)
         self.worker.finished.connect(self.on_finished)
         self.control_pane.set_running(True)
         self.status_label.setText("実行中")
@@ -285,7 +284,6 @@ class MainWindow(QMainWindow):
 
 
 class WorkerThread(QThread):
-    progress = Signal(str)
     finished = Signal(str)
 
     def __init__(self, executor, cmd, macro_name, args):
@@ -305,3 +303,4 @@ class WorkerThread(QThread):
             self.finished.emit("中断")
         except Exception as e:
             self.finished.emit(f"エラー: {e}")
+            raise e
