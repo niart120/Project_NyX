@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.macro.command import DefaultCommand
+from nyxpy.framework.core.macro.command import Command, DefaultCommand
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.framework.core.macro.exceptions import MacroStopException
@@ -43,7 +43,6 @@ class MainWindow(QMainWindow):
 
     def deferred_init(self):
         """Perform initialization that can be deferred until after UI appears"""
-        self.setup_logging()  # Setup logging for the GUI
         self.setup_connections()  # Setup signal connections between UI components
         self.apply_app_settings()
 
@@ -123,11 +122,6 @@ class MainWindow(QMainWindow):
 
         # Set status to ready
         self.status_label.setText("準備完了")
-
-    def setup_logging(self):
-        log_manager.add_handler(
-            lambda record: self.log_pane.append(str(record)), level="DEBUG"
-        )
 
     def open_app_settings(self):
         dlg = AppSettingsDialog(self, global_settings, secrets_settings)
@@ -296,17 +290,9 @@ class WorkerThread(QThread):
 
     def __init__(self, executor, cmd, macro_name, args):
         super().__init__()
-        self.executor = executor
-        self.cmd = cmd
-        orig_log = getattr(self.cmd, "log", None)
+        self.executor: MacroExecutor = executor
+        self.cmd: Command = cmd
 
-        def _log_override(*values, sep=" ", end="\n", level="INFO"):
-            msg = sep.join(map(str, values)) + end.rstrip("\n")
-            self.progress.emit(msg)
-            if orig_log:
-                orig_log(*values, sep=sep, end=end, level=level)
-
-        self.cmd.log = _log_override
         self.macro_name = macro_name
         self.args = args
 
