@@ -3,7 +3,6 @@ import cv2
 from cv2_enumerate_cameras import enumerate_cameras
 from abc import ABC, abstractmethod
 import threading
-import time
 import platform
 
 import numpy as np
@@ -82,7 +81,6 @@ class AsyncCaptureDevice:
             if ret:
                 with self._lock:
                     self.latest_frame = frame
-            time.sleep(self._interval)
 
     def get_frame(self) -> cv2.typing.MatLike:
         """
