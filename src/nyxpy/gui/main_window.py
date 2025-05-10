@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         initialize_managers()
         self.executor = MacroExecutor()
         self._last_settings = {}
+        self._last_secrets = {}
         self.setup_ui()
         QTimer.singleShot(100, self.deferred_init)
 
@@ -131,21 +132,29 @@ class MainWindow(QMainWindow):
         self.apply_app_settings()
 
     def apply_app_settings(self):
-        prev = self._last_settings
-        cur = global_settings.data
-        diff_keys = {k for k in cur if prev.get(k) != cur.get(k)}
+        prev_global, prev_secrets = self._last_settings, self._last_secrets
+        cur_global = global_settings.data
+        cur_secrets = secrets_settings.data
+
+        # 設定差分を取得
+        diff_keys = set()
+        # グローバル
+        diff_keys.update({k for k in cur_global if prev_global.get(k) != cur_global.get(k)})
+        # シークレット
+        diff_keys.update({k for k in cur_secrets if prev_secrets.get(k) != cur_secrets.get(k)})
+
         # 差分がある項目のみ反映・イベント発行
         if "serial_device" in diff_keys or "serial_baud" in diff_keys:
             try:
-                serial_manager.set_active(cur.get("serial_device"), cur.get("serial_baud", 9600))
+                serial_manager.set_active(cur_global.get("serial_device"), cur_global.get("serial_baud", 9600))
                 EventBus.get_instance().publish(EventType.SERIAL_DEVICE_CHANGED, {
-                    'name': cur.get("serial_device"),
-                    'baudrate': cur.get("serial_baud", 9600),
+                    'name': cur_global.get("serial_device"),
+                    'baudrate': cur_global.get("serial_baud", 9600),
                     'device': serial_manager.get_active_device()
                 })
                 log_manager.log(
                     "INFO",
-                    f"シリアルデバイスを切り替えました: {cur.get('serial_device')} ({cur.get('serial_baud', 9600)} bps)",
+                    f"シリアルデバイスを切り替えました: {cur_global.get('serial_device')} ({cur_global.get('serial_baud', 9600)} bps)",
                     "MainWindow",
                 )
             except Exception as e:
@@ -154,13 +163,13 @@ class MainWindow(QMainWindow):
                 )
         if "capture_device" in diff_keys:
             try:
-                capture_manager.set_active(cur.get("capture_device"))
+                capture_manager.set_active(cur_global.get("capture_device"))
                 EventBus.get_instance().publish(EventType.CAPTURE_DEVICE_CHANGED, {
-                    'name': cur.get("capture_device"),
+                    'name': cur_global.get("capture_device"),
                     'device': capture_manager.get_active_device()
                 })
                 log_manager.log(
-                    "INFO", f"キャプチャデバイスを切り替えました: {cur.get('capture_device')}", "MainWindow"
+                    "INFO", f"キャプチャデバイスを切り替えました: {cur_global.get('capture_device')}", "MainWindow"
                 )
             except Exception as e:
                 log_manager.log(
@@ -168,9 +177,9 @@ class MainWindow(QMainWindow):
                 )
         if "serial_protocol" in diff_keys:
             try:
-                protocol = ProtocolFactory.create_protocol(cur.get("serial_protocol", "CH552"))
+                protocol = ProtocolFactory.create_protocol(cur_global.get("serial_protocol", "CH552"))
                 EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
-                protocol_name = cur.get("serial_protocol", "CH552")
+                protocol_name = cur_global.get("serial_protocol", "CH552")
                 log_manager.log(
                     "INFO",
                     f"コントローラープロトコルを切り替えました: {protocol_name}",
@@ -179,19 +188,12 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
         if "preview_fps" in diff_keys:
-            self.preview_pane.preview_fps = cur.get("preview_fps", 30)
+            self.preview_pane.preview_fps = cur_global.get("preview_fps", 30)
             self.preview_pane.apply_fps()
         
-        # 通知設定の変更処理
-        notification_settings_changed = False
-        
         # シークレット設定から通知関連の設定変更を確認
-        if secrets_settings.get("notification.discord.enabled") != prev.get("notification.discord.enabled") or \
-           secrets_settings.get("notification.bluesky.enabled") != prev.get("notification.bluesky.enabled"):
-            notification_settings_changed = True
+        if "notification.discord.enabled" in diff_keys or "notification.bluesky.enabled" in diff_keys:
         
-        # 通知設定が変更された場合はログに出力
-        if notification_settings_changed:
             enabled_services = []
             if secrets_settings.get("notification.discord.enabled", False):
                 enabled_services.append("Discord")
@@ -212,7 +214,8 @@ class MainWindow(QMainWindow):
                 )
                 
         # ...他の設定も必要に応じて追加...
-        self._last_settings = deepcopy(cur)
+        self._last_settings = deepcopy(cur_global)
+        self._last_secrets = deepcopy(cur_secrets)
 
     def execute_macro_immediate(self):
         """即時実行モード：パラメータ入力なしでマクロを実行する"""
