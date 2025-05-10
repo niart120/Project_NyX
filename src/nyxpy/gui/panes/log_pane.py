@@ -1,3 +1,4 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPlainTextEdit, QSizePolicy, QHBoxLayout, QPushButton, QCheckBox
 from nyxpy.framework.core.logger.log_manager import log_manager
 
@@ -6,6 +7,8 @@ class LogPane(QWidget):
     """
     Pane for displaying real-time logs in a read-only text view.
     """
+
+    append_signal = Signal(str)  # ログ用Signal
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -32,12 +35,18 @@ class LogPane(QWidget):
         main_layout.addWidget(self.view)
         # Clearボタンのシグナル接続
         self.clear_button.clicked.connect(self.view.clear)
-        # LogManagerにGUI用ハンドラを追加
-        log_manager.add_handler(self.append, level="INFO")
+        # loguruにはself._emit_appendを登録
+        log_manager.add_handler(self._emit_append, level=("DEBUG" if self.debug_checkbox.isChecked() else "INFO"))
+        # Signal to append log messages to the view
+        self.append_signal.connect(self._append_to_view)
+        
         self.debug_checkbox.stateChanged.connect(self._on_debug_checkbox_changed)
 
-    def append(self, message: str):
-        """Append a new log message to the view."""
+    def _emit_append(self, message: str):
+        # どのスレッドからでもSignalでGUIスレッドに転送
+        self.append_signal.emit(message)
+
+    def _append_to_view(self, message: str):
         self.view.appendPlainText(message)
         if self.auto_scroll_checkbox.isChecked():
             self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().maximum())
@@ -51,6 +60,6 @@ class LogPane(QWidget):
         # チェックON: DEBUG, OFF: INFO
         level = "DEBUG" if self.debug_checkbox.isChecked() else "INFO"
         try:
-            log_manager.set_custom_handler_level(self.append, level)
+            log_manager.set_custom_handler_level(self._emit_append, level)
         except Exception:
             pass  # 初回登録前などは無視
