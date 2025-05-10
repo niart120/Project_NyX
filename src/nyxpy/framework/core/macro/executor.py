@@ -86,10 +86,10 @@ class MacroExecutor:
             self.macro.run(cmd)
         except MacroStopException as e:
             cmd.log("Macro execution interrupted:", e)
-            raise e
+            # マクロの実行が中断された場合は、何もしない。
         except Exception as e:
             cmd.log("An error occurred during macro execution:", e)
             raise e
         finally:
-            cmd.log("MacroExecutor: Finalizing macro...")
+            cmd.log("Finalizing macro...")
             self.macro.finalize(cmd)
