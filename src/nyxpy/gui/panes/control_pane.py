@@ -13,6 +13,7 @@ class ControlPane(QWidget):
     cancel_requested = Signal()
     settings_requested = Signal()
     snapshot_requested = Signal()
+    running_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -28,10 +29,6 @@ class ControlPane(QWidget):
         self.snapshot_btn = QPushButton("スナップショット", self)
         self.settings_btn = QPushButton("設定", self)
 
-        # Initial states
-        self.run_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(False)
-
         layout.addWidget(self.run_btn)
         layout.addWidget(self.cancel_btn)
         layout.addWidget(self.snapshot_btn)
@@ -44,14 +41,26 @@ class ControlPane(QWidget):
         self.settings_btn.clicked.connect(self.settings_requested)
         self.snapshot_btn.clicked.connect(self.snapshot_requested)
 
+        # 状態変数
+        self._selected = False
+        self._running = False
+        self.update_buttons()
+
     def _on_run_with_params(self):
         """Handler for the 'Run with parameters' dropdown option"""
         self.run_with_params_requested.emit()
 
-    def set_running(self, running: bool):
-        self.run_btn.setEnabled(not running)
-        self.settings_btn.setEnabled(not running)
-        self.cancel_btn.setEnabled(running)
-
     def set_selection(self, selected: bool):
-        self.run_btn.setEnabled(selected)
+        self._selected = selected
+        self.update_buttons()
+
+    def set_running(self, running: bool):
+        self._running = running
+        self.running_changed.emit(running)
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.run_btn.setEnabled(self._selected and not self._running)
+        self.settings_btn.setEnabled(not self._running)
+        self.cancel_btn.setEnabled(self._running)
+        # snapshotボタンは常時有効（必要に応じて条件追加可）

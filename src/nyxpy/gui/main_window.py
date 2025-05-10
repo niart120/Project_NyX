@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
     def cancel_macro(self):
         if hasattr(self, "worker"):
             self.worker.cmd.stop()
-            self.control_pane.cancel_btn.setEnabled(False)
+            self.control_pane.set_running(False)  # 状態管理に統一
 
     def on_finished(self, status: str):
         self.status_label.setText(status)
