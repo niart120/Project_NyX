@@ -76,18 +76,20 @@ class MacroExecutor:
         例外が発生した場合はログ出力し、最終的に finalize を必ず呼び出す。
         """
         try:
-            cmd.log("MacroExecutor: Loading macro settings...")
+            cmd.log("Loading macro settings...")
             file_args = load_macro_settings(self.macro.__class__)
-            cmd.log("MacroExecutor: Initializing macro...")
+            cmd.log("Initializing macro...")
             # 引数をマージする。exec_argsが優先される。
             args = {**file_args, **exec_args}
             self.macro.initialize(cmd, args)
-            cmd.log("MacroExecutor: Running macro...")
+            cmd.log("Running macro...")
             self.macro.run(cmd)
         except MacroStopException as e:
-            cmd.log("MacroExecutor: Macro execution interrupted:", e)
+            cmd.log("Macro execution interrupted:", e)
+            raise e
         except Exception as e:
-            cmd.log("MacroExecutor: Exception occurred:", e)
+            cmd.log("An error occurred during macro execution:", e)
+            raise e
         finally:
             cmd.log("MacroExecutor: Finalizing macro...")
             self.macro.finalize(cmd)
