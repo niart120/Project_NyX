@@ -90,26 +90,26 @@ class MockCommand(Command):
 
 class MockMacro(MacroBase):
     def initialize(self, cmd: Command, args: dict) -> None:
-        cmd.log("MockMacro: initialize")
+        cmd.log("initialize")
 
     def run(self, cmd: Command) -> None:
-        cmd.log("MockMacro: run")
+        cmd.log("run")
 
     def finalize(self, cmd: Command) -> None:
-        cmd.log("MockMacro: finalize")
+        cmd.log("finalize")
 
 
 class FailingMacro(MacroBase):
     def initialize(self, cmd: Command, args: dict) -> None:
-        cmd.log("FailingMacro: initialize")
+        cmd.log("initialize")
 
     def run(self, cmd: Command) -> None:
-        cmd.log("FailingMacro: run")
+        cmd.log("run")
         raise RuntimeError("Intentional Error")
-        cmd.log("FailingMacro: run (should not reach here)")
+        cmd.log("run (should not reach here)")
 
     def finalize(self, cmd: Command) -> None:
-        cmd.log("FailingMacro: finalize")
+        cmd.log("finalize")
 
 
 @pytest.fixture
@@ -134,13 +134,13 @@ def test_macro_executor_lifecycle(executor_with_dummy, mock_command):
 
     # ログを確認
     assert mock_command.logs == [
-        "MacroExecutor: Loading macro settings...",
-        "MacroExecutor: Initializing macro...",
-        "MockMacro: initialize",
-        "MacroExecutor: Running macro...",
-        "MockMacro: run",
-        "MacroExecutor: Finalizing macro...",
-        "MockMacro: finalize",
+        "Loading macro settings...",
+        "Initializing macro...",
+        "initialize",
+        "Running macro...",
+        "run",
+        "Finalizing macro...",
+        "finalize",
     ]
 
 
@@ -149,16 +149,21 @@ def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
     MacroExecutor が run 中に例外が発生した場合でも finalize が呼び出されることをテスト
     """
     executor_with_dummy.set_active_macro("FailingMacro")
-    executor_with_dummy.execute(mock_command)
+    
+    # 例外発生時は executor 内でハンドリングされるが再スローされる
+    # 例外が発生することを確認
+    with pytest.raises(RuntimeError):
+        executor_with_dummy.execute(mock_command)
+
 
     # 例外発生時のログを確認
     assert mock_command.logs == [
-        "MacroExecutor: Loading macro settings...",
-        "MacroExecutor: Initializing macro...",
-        "FailingMacro: initialize",
-        "MacroExecutor: Running macro...",
-        "FailingMacro: run",
-        "MacroExecutor: Exception occurred: Intentional Error",
-        "MacroExecutor: Finalizing macro...",
-        "FailingMacro: finalize",
+        "Loading macro settings...",
+        "Initializing macro...",
+        "initialize",
+        "Running macro...",
+        "run",
+        "An error occurred during macro execution: Intentional Error",
+        "Finalizing macro...",
+        "finalize",
     ]

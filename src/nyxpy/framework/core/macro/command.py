@@ -1,3 +1,4 @@
+from calendar import c
 import time
 import pathlib
 from abc import ABC, abstractmethod
@@ -220,7 +221,8 @@ class DefaultCommand(Command):
         self, *values, sep: str = " ", end: str = "\n", level: str = "INFO"
     ) -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
-        log_manager.log(level, message, component=get_caller_class_name())
+        caller_class = get_caller_class_name()
+        log_manager.log(level, message, component=caller_class)
 
     @check_interrupt
     def capture(

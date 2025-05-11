@@ -238,8 +238,10 @@ def test_macro_executor_exception_handling(integration_setup):
     executor.macros = {"ExceptionMacro": ExceptionMacro()}
     executor.set_active_macro("ExceptionMacro")
 
-    # 例外発生時はexecutor内でハンドリングされるのでここでは例外は送出されない筈
-    executor.execute(cmd)
+    # 例外発生時はexecutor内でハンドリングされるが再スローされる
+    # 例外が発生するかを確認
+    with pytest.raises(RuntimeError):
+        executor.execute(cmd)
 
     # 内部で例外が発生したことを確認
     assert any("fail!" in m for m in logs)
@@ -263,6 +265,7 @@ def test_macro_executor_cancellation(integration_setup):
     t.start()
 
     # マクロを実行
+    # 例外が発生するまで待つ
     executor.execute(cmd)
 
     # スレッドが終了するのを待つ

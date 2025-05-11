@@ -4,10 +4,17 @@ from pathlib import Path
 
 
 def get_caller_class_name():
-    """呼び出し元のクラス名を取得する関数"""
-    frame = inspect.currentframe().f_back  # 呼び出し元のフレーム
-    self_var = frame.f_locals.get("self")  # 呼び出し元のローカル変数 `self`
-    return type(self_var).__name__ if self_var else None
+    """呼び出し元のクラス名を取得する"""
+    stack = inspect.stack()
+    # 0: get_caller_class_name, 1: log, 2: 呼び出し元
+    if len(stack) > 2:
+        frame = stack[2]
+        class_name = None
+        self_obj = frame.frame.f_locals.get("self")
+        if self_obj:
+            class_name = type(self_obj).__name__
+            return class_name
+    return None
 
 
 def load_macro_settings(macro_cls) -> dict:
