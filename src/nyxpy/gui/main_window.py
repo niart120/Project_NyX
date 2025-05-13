@@ -49,7 +49,7 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         self.setWindowTitle("NyxPy GUI")
-        self.resize(1000, 600)
+        self.resize(1280, 720)
         self.setMinimumSize(800, 400)
 
         settings_action = QAction("Settings", self)

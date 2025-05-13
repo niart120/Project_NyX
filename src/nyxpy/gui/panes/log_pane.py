@@ -47,6 +47,7 @@ class LogPane(QWidget):
         self.append_signal.emit(message)
 
     def _append_to_view(self, message: str):
+        message = message.rstrip()
         self.view.appendPlainText(message)
         if self.auto_scroll_checkbox.isChecked():
             self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().maximum())

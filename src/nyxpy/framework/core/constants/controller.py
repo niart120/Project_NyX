@@ -30,6 +30,9 @@ class Button(IntEnum):
     HOME = 0x1000
     CAP = 0x2000
 
+    def __repr__(self):
+        return f"Button.{self.name}"
+
 
 class Hat(IntEnum):
     """
@@ -45,3 +48,6 @@ class Hat(IntEnum):
     LEFT = 0x06
     UPLEFT = 0x07
     CENTER = 0x08
+
+    def __repr__(self):
+        return f"Hat.{self.name}"
