@@ -35,6 +35,9 @@ class LStick:
         self.y = 255 - math.ceil(
             127.5 * math.sin(rad) * self.mag + 127.5
         )  # y軸のみ反転を考慮する
+    
+    def __repr__(self):
+        return f"LStick(x={self.x}, y={self.y})"
 
 
 # 一般的なスティック位置の定義
@@ -77,6 +80,9 @@ class RStick:
         self.y = 255 - math.ceil(
             127.5 * math.sin(rad) * self.mag + 127.5
         )  # y軸のみ反転を考慮する
+    
+    def __repr__(self):
+        return f"RStick(x={self.x}, y={self.y})"
 
 
 # 一般的なスティック位置の定義
