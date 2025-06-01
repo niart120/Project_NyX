@@ -1,3 +1,4 @@
+import time
 from typing import override
 import cv2
 from cv2_enumerate_cameras import enumerate_cameras
@@ -77,10 +78,14 @@ class AsyncCaptureDevice:
 
     def _capture_loop(self) -> None:
         while self._running:
+            begin = time.perf_counter()
             ret, frame = self.cap.read()
             if ret:
                 with self._lock:
                     self.latest_frame = frame
+            elapsed = time.perf_counter() - begin
+            if elapsed < self._interval:
+                time.sleep(self._interval - elapsed)  # Wait for the next frame
 
     def get_frame(self) -> cv2.typing.MatLike:
         """
