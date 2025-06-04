@@ -34,7 +34,7 @@ class OCRProcessor:
             
             # PaddleOCRの初期化（ログを無効化）
             self._ocr_engine = PaddleOCR(
-                use_angle_cls=True, 
+                use_angle_cls=False, 
                 lang=paddle_lang, 
                 show_log=False
             )
@@ -54,7 +54,7 @@ class OCRProcessor:
             return []
             
         try:
-            results = self._ocr_engine.ocr(image, cls=True)
+            results = self._ocr_engine.ocr(image, cls=False)
             
             ocr_results = []
             if results and len(results) > 0 and results[0]:
