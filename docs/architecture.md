@@ -276,6 +276,18 @@ CH552デバイス向けの具体的なプロトコル実装です。
 ### 6.3 プロトコル拡張
 新たなデバイスへの対応は、`SerialProtocolInterface` の新規実装で容易に追加可能です。
 
+### 6.4 通知システム拡張 ✅ **実装済み**
+外部通知システムが実装され、以下の機能を提供:
+
+- **NotificationInterface**: 通知システムの抽象インターフェース
+- **Discord通知**: Webhook経由での通知送信
+- **Bluesky通知**: AT Protocolを使用した投稿機能
+- **NotificationHandler**: 複数通知サービスの統合管理
+
+**拡張ポイント:**
+- 新しい通知プラットフォームは `NotificationInterface` を実装することで追加可能
+- 認証情報は `SecretsSettings` で安全に管理
+
 ## 7. 参考資料
 
 - [ハードウェア連携設計詳細](./hardware_design.md)
@@ -283,6 +295,7 @@ CH552デバイス向けの具体的なプロトコル実装です。
 - [通信プロトコル設計詳細](./protocol_design.md)
 - [CH552Protocol仕様書](./protocol/ch552_protocol_spec.md)
 - [ログ管理設計詳細](./logging_design.md)
+- [通知システム設計詳細](./notification_system.md)
 
 ## 追加: GUIアーキテクチャの要点
 

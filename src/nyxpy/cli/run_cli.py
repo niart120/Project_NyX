@@ -15,7 +15,9 @@ from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.singletons import serial_manager, capture_manager
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
-from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
+from nyxpy.framework.core.api.notification_handler import (
+    create_notification_handler_from_settings,
+)
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> None:
@@ -153,7 +155,8 @@ def cli_main(args: argparse.Namespace) -> int:
         if args.serial not in available_serial_devices:
             available_devices_str = ", ".join(available_serial_devices)
             raise ValueError(
-                f"Serial port '{args.serial}' not found. Available devices: {available_devices_str}"
+                f"Serial port '{args.serial}' not found. "
+                f"Available devices: {available_devices_str}"
             )
         serial_manager.set_active(args.serial)
 
@@ -164,7 +167,8 @@ def cli_main(args: argparse.Namespace) -> int:
         if args.capture not in available_capture_devices:
             available_devices_str = ", ".join(available_capture_devices)
             raise ValueError(
-                f"Capture device '{args.capture}' not found. Available devices: {available_devices_str}"
+                f"Capture device '{args.capture}' not found. "
+                f"Available devices: {available_devices_str}"
             )
         capture_manager.set_active(args.capture)
 
@@ -193,3 +197,36 @@ def cli_main(args: argparse.Namespace) -> int:
         log_manager.log("ERROR", f"Unhandled exception: {e}", component="CLI")
         print(f"Unexpected error: {e}")
         return 2  # 重大なエラー時の終了コード
+
+
+def main():
+    """
+    CLIのメインエントリーポイント
+    コマンドライン引数を解析してcli_mainを呼び出します
+    """
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="NyX CLI - Nintendo Switch Automation Tool"
+    )
+    parser.add_argument("macro_name", help="実行するマクロ名")
+    parser.add_argument("--serial", required=True, help="シリアルデバイス名")
+    parser.add_argument("--capture", required=True, help="キャプチャデバイス名")
+    parser.add_argument(
+        "--protocol", default="ch552", help="通信プロトコル (default: ch552)"
+    )
+    parser.add_argument(
+        "--silence", action="store_true", help="ログ出力を最小限に抑制"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="詳細なログ出力を有効化"
+    )
+    parser.add_argument(
+        "--define",
+        action="append",
+        help="マクロ実行時の変数定義 (key=value形式)",
+    )
+    
+    args = parser.parse_args()
+    exit_code = cli_main(args)
+    exit(exit_code)
