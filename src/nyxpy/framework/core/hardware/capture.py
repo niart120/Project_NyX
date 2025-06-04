@@ -66,6 +66,13 @@ class AsyncCaptureDevice:
             # set the frame width and height to 1920x1080
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            if not (self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) == 1920 and
+                    self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT) == 1080):
+                log_manager.log("WARNING", "Failed to set frame size to 1920x1080. Device may not support this resolution.",
+                                component="AsyncCaptureDevice")
+                # Try setting to a lower resolution
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         except Exception:
             log_manager.log("ERROR", "Failed to set frame size.", component="AsyncCaptureDevice")
         try:
