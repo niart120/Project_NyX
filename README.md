@@ -12,11 +12,14 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ### 主な機能
 - PySide6を使用したGUIインターフェース
-- マクロの実行
+- コマンドライン(CLI)インターフェース  
+- マクロの実行・管理
 - リアルタイム画面プレビュー
 - スナップショット機能
-- ログ出力・モニタリング
+- 統合ログ管理システム (LogManager)
 - キャプチャデバイス・シリアルデバイスの設定
+- 外部通知システム (Discord, Bluesky)
+- 設定の永続化 (.nyxpy/)
 
 ### 必要なハードウェア
 - **キャプチャデバイス**: Nintendo Switchの画面を取得するためのキャプチャカード/ボード
@@ -66,7 +69,12 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 ### GUIアプリケーションの起動
 
 ```
-nyxpy gui
+uv run nyx-gui
+```
+
+または開発環境でない場合:
+```
+nyx-gui
 ```
 
 ### 初回起動時
@@ -77,7 +85,7 @@ nyxpy gui
 
 ### マクロの作成と実行
 
-1. `macros/` フォルダにマクロを作成 (詳細は[マクロ開発ガイド(To Be Written)](#マクロ開発)参照)
+1. `macros/` フォルダにマクロを作成 (詳細は[マクロ開発](#4-マクロ開発)参照)
 2. GUIからマクロを選択
 3. 実行ボタンをクリック
 4. 必要に応じてパラメータを設定
@@ -87,6 +95,31 @@ nyxpy gui
 
 - 右側のペインにゲーム画面のリアルタイムプレビューが表示
 - スナップショットボタンで現在のフレームを `snapshots/` フォルダに保存
+
+### CLIでの実行
+
+コマンドラインからマクロを直接実行することも可能です:
+
+```bash
+uv run nyx-cli sample_macro --serial COM3 --capture 0
+```
+
+**主なオプション:**
+- `--serial`: シリアルデバイス名 (必須)
+- `--capture`: キャプチャデバイス名/番号 (必須) 
+- `--protocol`: 通信プロトコル (デフォルト: ch552)
+- `--verbose`: 詳細ログ出力
+- `--silence`: ログ出力を最小限に抑制
+- `--define`: マクロ変数の定義 (例: `--define key=value`)
+
+### 通知機能
+
+マクロ実行完了時に外部サービスへ通知を送信できます:
+
+- **Discord**: Webhook経由での通知
+- **Bluesky**: AT Protocolを使用した投稿
+
+通知設定は `.nyxpy/secrets.toml` で設定します。
 
 ### デバイス設定
 
@@ -101,6 +134,7 @@ nyxpy gui
 
 ```python
 from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.constants.controller import Button
 
 class SampleMacro(MacroBase):
     description = "マクロの説明"
@@ -112,7 +146,7 @@ class SampleMacro(MacroBase):
         
     def run(self, cmd):
         # メイン処理
-        cmd.press(KeyType.A, dur=0.1)
+        cmd.press(Button.A, dur=0.1)
         cmd.wait(1.0)
         # 例: 画面キャプチャ
         img = cmd.capture()
@@ -126,18 +160,43 @@ class SampleMacro(MacroBase):
 
 ### 主なコマンド
 
-- `cmd.press(key, dur=0.1, wait=0.0)`: キーを押して離す
-- `cmd.hold(key)`: キーを押しっぱなしにする
-- `cmd.release(key)`: 押しっぱなしのキーを離す
+- `cmd.press(button, dur=0.1, wait=0.0)`: ボタンを押して離す
+- `cmd.hold(button)`: ボタンを押しっぱなしにする
+- `cmd.release(button)`: 押しっぱなしのボタンを離す
 - `cmd.wait(sec)`: 指定秒数待機
 - `cmd.capture()`: スクリーンショット取得
+- `cmd.save_img(filename, image)`: 画像をファイルに保存
+- `cmd.load_img(filename)`: ファイルから画像を読み込み
+- `cmd.keyboard(text)`: キーボード文字列入力
+- `cmd.type(key)`: キーボード単一キー入力
+- `cmd.notify(text, img)`: 外部通知送信
 - `cmd.log(message)`: ログ出力
+
+**ボタン定数例:**
+- `Button.A`, `Button.B`, `Button.X`, `Button.Y`
+- `Button.L`, `Button.R`, `Button.ZL`, `Button.ZR`
+- `Hat.UP`, `Hat.DOWN`, `Hat.LEFT`, `Hat.RIGHT`
+
+**スティック操作例:**
+- `LStick.UP`, `LStick.DOWN`, `LStick.LEFT`, `LStick.RIGHT`
+- `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
+- カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
 
 詳細は `docs/macro_design.md` を参照ください。
 
 ## 5. 設定ファイル
 
-`.nyxpy/settings.toml` に設定が保存されます。GUI上での変更は自動的に保存されます。
+`.nyxpy/global.toml` に基本設定が保存されます。GUI上での変更は自動的に保存されます。
+
+### 設定ファイルの構造
+- **global.toml**: デバイス設定、シリアル通信設定など
+- **secrets.toml**: 通知システムの認証情報など機密情報
+
+### 主な設定項目
+- `capture_device`: キャプチャデバイス名
+- `serial_device`: シリアルデバイス名  
+- `serial_baud`: シリアル通信のボーレート
+- `serial_protocol`: 通信プロトコル (デフォルト: "CH552")
 
 ## 6. トラブルシューティング
 
@@ -161,12 +220,20 @@ class SampleMacro(MacroBase):
 - Python および依存ライブラリのバージョンを確認
 - GitHub Issuesで報告（ログを添付）
 
+### ログに関する問題
+- ログは自動的に `logs/` ディレクトリに保存されます
+- ログレベル調整: CLI では `--verbose` / `--silence` オプション
+- ログローテーション: 1MB で自動ローテーション
+
 ## 7. 今後の予定
 
-- GUIの見直し
-    - ログ表示機能の拡充
-    - etc
+- マクロ機能の拡張
+    - マクロの中断・再開機能
+    - 複数マクロの同時実行
+- 通知システムの拡張
+    - 追加の通知プラットフォーム対応
 - パフォーマンス最適化
+- 手動入力層の追加検討
 
 ## 8. ライセンス
 
