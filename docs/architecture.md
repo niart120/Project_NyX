@@ -273,8 +273,14 @@ CH552デバイス向けの具体的なプロトコル実装です。
 - **詳細なエラーハンドリング**:
   例外の階層化と回復メカニズムの強化
 
-### 6.3 プロトコル拡張
+### 6.3 プロトコル拡張 ✅ **複数プロトコル実装済み**
 新たなデバイスへの対応は、`SerialProtocolInterface` の新規実装で容易に追加可能です。
+
+**実装済みプロトコル:**
+- **CH552SerialProtocol**: CH552デバイス向けバイナリプロトコル
+- **PokeConSerialProtocol**: PokeCon用Arduino向けテキストベースプロトコル
+
+プロトコルは `ProtocolFactory` により動的に選択され、同一インターフェースで異なるハードウェアデバイスに対応できます。
 
 ### 6.4 通知システム拡張 ✅ **実装済み**
 外部通知システムが実装され、以下の機能を提供:
@@ -299,8 +305,9 @@ CH552デバイス向けの具体的なプロトコル実装です。
 
 ## 追加: GUIアーキテクチャの要点
 
-### DeviceModel/EventBus/シングルトン設計
-- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理
-- DeviceModelがアクティブデバイスの切替・参照・イベント発行を担当
-- GUIコンポーネントやコマンドはDeviceModel/Managerからデバイスを受け取り、直接操作
-- 状態変更はEventBusで伝播し、疎結合な設計を実現
+### シングルトン/EventBus/モデル設計
+- Manager系（SerialManager, CaptureManager）とSettings系は`singletons.py`で一元管理
+- `VirtualControllerModel`がコントローラー状態管理とシリアル通信を担当
+- `EventBus`による疎結合なイベント通信（デバイス変更、プロトコル変更等）
+- GUIコンポーネントはManagerから直接デバイス取得し、EventBusで状態変更を通知
+- Qt Signalとカスタム EventBus の併用による柔軟な状態管理

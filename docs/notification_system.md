@@ -102,7 +102,67 @@ image = cv2.imread("screenshot.png")
 handler.publish("マクロが完了しました", image)
 ```
 
-### 5.2 CLI での利用
+### 5.2 マクロ内での利用
+
+マクロ内で通知システムを使用する場合、`cmd.notify()` メソッドを使用します。
+
+**基本的な通知**
+```python
+from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.constants.controller import Button
+
+class NotificationSampleMacro(MacroBase):
+    description = "通知システムの使用例"
+    tags = ["sample", "notification"]
+    
+    def run(self, cmd):
+        # 重要な処理の開始時に通知
+        cmd.notify("マクロ処理を開始しました")
+        
+        # 何かしらの処理
+        cmd.press(Button.A, dur=0.1)
+        cmd.wait(5.0)
+        
+        # スクリーンショット付き通知
+        screenshot = cmd.capture()
+        cmd.notify("中間処理が完了しました", screenshot)
+        
+        # さらなる処理...
+        for i in range(10):
+            cmd.press(Button.B, dur=0.1, wait=1.0)
+        
+        # 最終完了通知
+        final_image = cmd.capture()
+        cmd.notify("🎉 マクロが正常に完了しました！", final_image)
+```
+
+**エラーハンドリング付き通知**
+```python
+class ErrorHandlingSampleMacro(MacroBase):
+    description = "エラーハンドリング付き通知の例"
+    tags = ["sample", "notification", "error-handling"]
+    
+    def run(self, cmd):
+        try:
+            cmd.notify("処理開始 - リスクの高い操作を実行中...")
+            
+            # リスクの高い処理
+            self.risky_operation(cmd)
+            
+            cmd.notify("✅ 全ての処理が正常に完了しました")
+            
+        except Exception as e:
+            error_screenshot = cmd.capture()
+            cmd.notify(f"❌ エラーが発生しました: {str(e)}", error_screenshot)
+            raise  # エラーを再発生させてマクロを停止
+    
+    def risky_operation(self, cmd):
+        # 何かしらのリスクのある処理
+        cmd.press(Button.HOME, dur=0.1)
+        cmd.wait(2.0)
+```
+
+### 5.3 CLI での利用
 CLI でマクロを実行する際、設定が有効であれば自動的に通知が送信されます。
 
 ---
