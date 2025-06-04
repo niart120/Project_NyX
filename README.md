@@ -134,6 +134,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ```python
 from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.constants.controller import Button
 
 class SampleMacro(MacroBase):
     description = "マクロの説明"
@@ -145,7 +146,7 @@ class SampleMacro(MacroBase):
         
     def run(self, cmd):
         # メイン処理
-        cmd.press(KeyType.A, dur=0.1)
+        cmd.press(Button.A, dur=0.1)
         cmd.wait(1.0)
         # 例: 画面キャプチャ
         img = cmd.capture()
@@ -159,12 +160,27 @@ class SampleMacro(MacroBase):
 
 ### 主なコマンド
 
-- `cmd.press(key, dur=0.1, wait=0.0)`: キーを押して離す
-- `cmd.hold(key)`: キーを押しっぱなしにする
-- `cmd.release(key)`: 押しっぱなしのキーを離す
+- `cmd.press(button, dur=0.1, wait=0.0)`: ボタンを押して離す
+- `cmd.hold(button)`: ボタンを押しっぱなしにする
+- `cmd.release(button)`: 押しっぱなしのボタンを離す
 - `cmd.wait(sec)`: 指定秒数待機
 - `cmd.capture()`: スクリーンショット取得
+- `cmd.save_img(filename, image)`: 画像をファイルに保存
+- `cmd.load_img(filename)`: ファイルから画像を読み込み
+- `cmd.keyboard(text)`: キーボード文字列入力
+- `cmd.type(key)`: キーボード単一キー入力
+- `cmd.notify(text, img)`: 外部通知送信
 - `cmd.log(message)`: ログ出力
+
+**ボタン定数例:**
+- `Button.A`, `Button.B`, `Button.X`, `Button.Y`
+- `Button.L`, `Button.R`, `Button.ZL`, `Button.ZR`
+- `Hat.UP`, `Hat.DOWN`, `Hat.LEFT`, `Hat.RIGHT`
+
+**スティック操作例:**
+- `LStick.UP`, `LStick.DOWN`, `LStick.LEFT`, `LStick.RIGHT`
+- `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
+- カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
 
 詳細は `docs/macro_design.md` を参照ください。
 
