@@ -278,12 +278,14 @@ class MainWindow(QMainWindow):
             dlg.setText(f"マクロ実行中にエラーが発生しました:\n{status}")
             dlg.setStandardButtons(QMessageBox.Retry | QMessageBox.Close)
             ret = dlg.exec()
+            # リトライまたは閉じるの選択肢を処理
             if ret == QMessageBox.Retry:
+                # リトライ時は現在のマクロを再実行
                 self._start_macro({})
-            elif ret == QMessageBox.Close:
-                from PySide6.QtWidgets import QApplication
 
-                QApplication.instance().quit()
+            elif ret == QMessageBox.Close:
+                # 閉じる場合は何もしない
+                pass
 
 
 class WorkerThread(QThread):
