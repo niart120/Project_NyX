@@ -268,6 +268,35 @@ class MainWindow(QMainWindow):
             self.worker.cmd.stop()
             self.control_pane.set_running(False)  # 状態管理に統一
 
+    def closeEvent(self, event):
+        """ウィンドウ終了時にリソースを確実に解放する。"""
+        log_manager.log("INFO", "アプリケーションを終了します...", "MainWindow")
+
+        # 1. マクロ実行中なら停止を要求し、ワーカースレッドの終了を待つ
+        if hasattr(self, "worker") and self.worker.isRunning():
+            self.worker.cmd.stop()
+            if not self.worker.wait(5000):  # 最大5秒待機
+                log_manager.log("WARNING", "ワーカースレッドの終了がタイムアウトしました", "MainWindow")
+                self.worker.terminate()
+                self.worker.wait(2000)
+
+        # 2. プレビュータイマーを停止
+        self.preview_pane.timer.stop()
+
+        # 3. キャプチャデバイスを解放（バックグラウンドスレッド停止）
+        try:
+            capture_manager.release_active()
+        except Exception as e:
+            log_manager.log("WARNING", f"キャプチャデバイス解放エラー: {e}", "MainWindow")
+
+        # 4. シリアルデバイスを解放
+        try:
+            serial_manager.close_active()
+        except Exception as e:
+            log_manager.log("WARNING", f"シリアルデバイス解放エラー: {e}", "MainWindow")
+
+        super().closeEvent(event)
+
     def on_finished(self, status: str):
         self.status_label.setText(status)
         self.control_pane.set_running(False)

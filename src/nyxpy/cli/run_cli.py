@@ -198,6 +198,17 @@ def cli_main(args: argparse.Namespace) -> int:
         print(f"Unexpected error: {e}")
         return 2  # 重大なエラー時の終了コード
 
+    finally:
+        # デバイスリソースを確実に解放（ゾンビプロセス防止）
+        try:
+            capture_manager.release_active()
+        except Exception:
+            pass
+        try:
+            serial_manager.close_active()
+        except Exception:
+            pass
+
 
 def main():
     """

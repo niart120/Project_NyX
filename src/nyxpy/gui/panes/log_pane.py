@@ -54,7 +54,7 @@ class LogPane(QWidget):
 
     def closeEvent(self, event):
         # LogManagerからハンドラを削除（多重登録・多重出力防止）
-        log_manager.remove_handler(self.append)
+        log_manager.remove_handler(self._emit_append)
         super().closeEvent(event)
 
     def _on_debug_checkbox_changed(self, state):
