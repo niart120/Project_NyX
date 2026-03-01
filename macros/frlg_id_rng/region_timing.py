@@ -101,7 +101,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
         game_start_wait=5.0,
         report_a_presses=7,
         report_a_wait=1.0,
-        tid_roi=(860, 85, 210, 55),
+        tid_roi=(860, 80, 220, 65),
         # セーブデータなし時 (「はなしのはやさ」がデフォルト速度) 用シーケンス
         # wait 値はセーブデータありの約 4 倍を基準に設定
         intro_sequence_no_save=[
