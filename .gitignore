@@ -73,6 +73,9 @@ macros/
 snapshots/
 static/
 
+# 内部参照用
+references/
+
 # その他
 .envrc
 *.pem
