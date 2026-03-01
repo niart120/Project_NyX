@@ -1,92 +1,153 @@
-import time
+"""
+DefaultCommand.press() パフォーマンステスト
+
+テスト設計方針
+-----------
+press() の実行時間は「処理オーバーヘッド + sleep(dur) + sleep(wait)」で構成される。
+sleep の精度は OS / Python バージョンに依存し、Python 3.11+ の Windows では
+高精度タイマーにより ~1ms 精度で動作する。
+
+本テストでは、処理オーバーヘッド (actual - (dur + wait)) が閾値内であることを検証する。
+sleep 自体の精度テストではなく、press() に伴う非 sleep 処理コストを対象とする。
+
+処理オーバーヘッドの主な内訳:
+- check_interrupt デコレータ (press + wait ×2) → ~0.01ms
+- log() 呼び出し ×4 (inspect.stack() + loguru) → 環境により 1–10ms
+- protocol.build_{press,release}_command → ~0.01ms
+- serial_device.send → ~0.01ms (ダミー)
+
+NOTE: inspect.stack() のコストは pytest 環境下で増大する傾向がある。
+閾値はこの影響を考慮した上で設定している。
+"""
+
 import statistics
+import time
+
 import pytest
+
+from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.constants.controller import Hat
 from nyxpy.framework.core.constants.stick import LStick, RStick
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, PokeConSerialProtocol
+from nyxpy.framework.core.hardware.protocol import (
+    CH552SerialProtocol,
+    PokeConSerialProtocol,
+)
 from nyxpy.framework.core.hardware.serial_comm import DummySerialComm
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.constants import Button
-
-# 既存Mockをunitテストから流用
 from tests.unit.command.test_default_command import (
-    MockCaptureDevice,
-    MockResourceIO,
-    MockProtocol,
     MockCancellationToken,
+    MockCaptureDevice,
+    MockProtocol,
+    MockResourceIO,
 )
 
-@pytest.mark.parametrize("protocol_cls,proto_name", [
-    (MockProtocol, "MockProtocol"),
-    (CH552SerialProtocol, "CH552SerialProtocol"),
-    (PokeConSerialProtocol, "PokeConSerialProtocol")
-])
-def test_press_performance(protocol_cls, proto_name):
-    """
-    DefaultCommand.press() のパフォーマンステスト
-    - 各プロトコルごとに100回pressを実行し、実行時間の分布を計測
-    - wait/sleep等も含めたコマンド全体の遅延を測定
-    """
 
-    log_manager.set_level("INFO")  # INFOレベルに設定
-    serial_device = DummySerialComm("dummy")
-    capture_device = MockCaptureDevice()
-    resource_io = MockResourceIO()
-    protocol = protocol_cls()
-    ct = MockCancellationToken()
-    cmd = DefaultCommand(
-        serial_device=serial_device,
-        capture_device=capture_device,
-        resource_io=resource_io,
+# ============================================================
+# ヘルパー
+# ============================================================
+
+
+def _make_command(protocol) -> DefaultCommand:
+    """テスト用 DefaultCommand を組み立てる。"""
+    return DefaultCommand(
+        serial_device=DummySerialComm("dummy"),
+        capture_device=MockCaptureDevice(),
+        resource_io=MockResourceIO(),
         protocol=protocol,
-        ct=ct,
+        ct=MockCancellationToken(),
         notification_handler=None,
     )
-    N = 100
-    times = []
-    for _ in range(N):
+
+
+def _measure_overhead(
+    cmd: DefaultCommand,
+    keys,
+    dur: float,
+    wait: float,
+    n: int,
+) -> dict:
+    """press() を n 回実行し、オーバーヘッド統計を返す。
+
+    Returns:
+        dict with keys: overhead_avg, overhead_median, overhead_max,
+                        total_avg, total_max, total_min, total_stdev
+    """
+    expected_sleep = dur + wait
+    overheads: list[float] = []
+    totals: list[float] = []
+    for _ in range(n):
         t0 = time.perf_counter()
-        cmd.press(Button.A, dur=0.01, wait=0.01)  # 実行時間を短縮
-        t1 = time.perf_counter()
-        times.append(t1 - t0)
-    avg = sum(times) / N
-    stdev = statistics.stdev(times) if N > 1 else 0
-    print(f"[perf] {proto_name} press: avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms")
-    # 目安として1回40ms未満を期待（Windows の time.sleep 解像度 ~15.6ms を考慮）
-    assert avg < 0.04, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
-    # 1回あたりの最大値が50msを超えた場合は警告を出す
-    if max(times) > 0.05:
-        print(f"[perf] WARNING: {proto_name} press max time exceeded 50ms: {max(times)*1000:.3f}ms")
+        cmd.press(keys, dur=dur, wait=wait)
+        elapsed = time.perf_counter() - t0
+        totals.append(elapsed)
+        overheads.append(elapsed - expected_sleep)
+    return {
+        "overhead_avg": sum(overheads) / n,
+        "overhead_median": sorted(overheads)[n // 2],
+        "overhead_max": max(overheads),
+        "total_avg": sum(totals) / n,
+        "total_max": max(totals),
+        "total_min": min(totals),
+        "total_stdev": statistics.stdev(totals) if n > 1 else 0.0,
+    }
 
-@pytest.mark.parametrize("protocol_cls,proto_name", [
-    (CH552SerialProtocol, "CH552SerialProtocol"),
-    (PokeConSerialProtocol, "PokeConSerialProtocol")
-])
-def test_press_performance_mixed_input(protocol_cls, proto_name):
-    """
-    PythonCommand.press() のパフォーマンステスト（複雑な入力パターン）
-    - Button, Hat, Stick, Direction を混在させて100回pressを実行
-    - 実行時間の分布を計測
-    """
 
-    log_manager.set_level("INFO")  # INFOレベルに設定
-    serial_device = DummySerialComm("dummy")
-    capture_device = MockCaptureDevice()
-    resource_io = MockResourceIO()
-    protocol = protocol_cls()
-    ct = MockCancellationToken()
-    cmd = DefaultCommand(
-        serial_device=serial_device,
-        capture_device=capture_device,
-        resource_io=resource_io,
-        protocol=protocol,
-        ct=ct,
-        notification_handler=None,
+# ============================================================
+# 1. 処理オーバーヘッド計測
+# ============================================================
+
+# 閾値: press() 1回あたりの処理オーバーヘッド (sleep を除いた部分)
+# inspect.stack() ×4 + loguru + pytest 環境オーバーヘッドを含めて 15ms 以内を期待
+OVERHEAD_THRESHOLD_S = 0.015
+
+
+@pytest.mark.parametrize(
+    "protocol_cls,proto_name",
+    [
+        (MockProtocol, "MockProtocol"),
+        (CH552SerialProtocol, "CH552SerialProtocol"),
+        (PokeConSerialProtocol, "PokeConSerialProtocol"),
+    ],
+)
+def test_press_overhead(protocol_cls, proto_name):
+    """press() の処理オーバーヘッド (sleep を除いた部分) が閾値内であること。
+
+    dur/wait を小さく設定し、actual - expected_sleep でオーバーヘッドを分離する。
+    """
+    log_manager.set_level("INFO")
+    cmd = _make_command(protocol_cls())
+
+    # ウォームアップ (JIT 等の初回コストを排除)
+    for _ in range(5):
+        cmd.press(Button.A, dur=0.001, wait=0.001)
+
+    stats = _measure_overhead(cmd, Button.A, dur=0.01, wait=0.01, n=100)
+
+    print(
+        f"[overhead] {proto_name}: "
+        f"median={stats['overhead_median']*1000:.3f}ms, "
+        f"avg={stats['overhead_avg']*1000:.3f}ms, "
+        f"max={stats['overhead_max']*1000:.3f}ms"
+    )
+    assert stats["overhead_median"] < OVERHEAD_THRESHOLD_S, (
+        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S*1000:.0f}ms を超過: "
+        f"median={stats['overhead_median']*1000:.3f}ms"
     )
 
-    N = 100
-    # 複雑な入力パターンを用意
+
+@pytest.mark.parametrize(
+    "protocol_cls,proto_name",
+    [
+        (CH552SerialProtocol, "CH552SerialProtocol"),
+        (PokeConSerialProtocol, "PokeConSerialProtocol"),
+    ],
+)
+def test_press_overhead_mixed_input(protocol_cls, proto_name):
+    """複雑な入力パターンでのオーバーヘッドが閾値内であること。"""
+    log_manager.set_level("INFO")
+    cmd = _make_command(protocol_cls())
+
     input_patterns = [
         Button.A,
         Button.B,
@@ -96,7 +157,7 @@ def test_press_performance_mixed_input(protocol_cls, proto_name):
         [Button.L, Hat.DOWNRIGHT],
         LStick.UP,
         RStick.DOWNRIGHT,
-        [Button.R, LStick.UP,],
+        [Button.R, LStick.UP],
         [Hat.RIGHT, RStick.UP],
         [Button.ZL, Button.ZR, Hat.CENTER, RStick.DOWN],
         LStick.LEFT,
@@ -104,57 +165,30 @@ def test_press_performance_mixed_input(protocol_cls, proto_name):
         [Button.PLUS, LStick.LEFT],
         [Button.MINUS, RStick.RIGHT],
     ]
-    times = []
-    for i in range(N):
+
+    # ウォームアップ
+    for p in input_patterns[:3]:
+        cmd.press(p, dur=0.001, wait=0.001)
+
+    expected_sleep = 0.02  # dur + wait
+    overheads: list[float] = []
+    n = 100
+    for i in range(n):
         pattern = input_patterns[i % len(input_patterns)]
         t0 = time.perf_counter()
         cmd.press(pattern, dur=0.01, wait=0.01)
-        t1 = time.perf_counter()
-        times.append(t1 - t0)
-    avg = sum(times) / N
-    stdev = statistics.stdev(times) if N > 1 else 0
-    print(f"[perf-mixed] {proto_name}.press: avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms")
-    assert avg < 0.04, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
-    if max(times) > 0.06:
-        print(f"[perf-mixed] WARNING: {proto_name}.press max time exceeded 60ms: {max(times)*1000:.3f}ms")
+        elapsed = time.perf_counter() - t0
+        overheads.append(elapsed - expected_sleep)
 
-@pytest.mark.parametrize("protocol_cls,proto_name", [
-    (CH552SerialProtocol, "CH552SerialProtocol"),
-    (PokeConSerialProtocol, "PokeConSerialProtocol")
-])
-def test_press_performance_long_wait(protocol_cls, proto_name):
-    """
-    dur/waitを0.15秒に設定し、20回だけpressを実行して実行時間分布を計測するテスト
-    """
-    log_manager.set_level("INFO")  # INFOレベルに設定
-
-    serial_device = DummySerialComm("dummy")
-    capture_device = MockCaptureDevice()
-    resource_io = MockResourceIO()
-    protocol = protocol_cls()
-    ct = MockCancellationToken()
-    cmd = DefaultCommand(
-        serial_device=serial_device,
-        capture_device=capture_device,
-        resource_io=resource_io,
-        protocol=protocol,
-        ct=ct,
-        notification_handler=None,
+    median = sorted(overheads)[n // 2]
+    avg = sum(overheads) / n
+    print(
+        f"[overhead-mixed] {proto_name}: "
+        f"median={median*1000:.3f}ms, avg={avg*1000:.3f}ms, "
+        f"max={max(overheads)*1000:.3f}ms"
     )
-    N = 20
-    dur = 0.15
-    wait = 0.15
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        cmd.press(Button.A, dur=dur, wait=wait)
-        t1 = time.perf_counter()
-        times.append(t1 - t0)
-    avg = sum(times) / N
-    stdev = statistics.stdev(times) if N > 1 else 0
-    print(f"[perf-long] {proto_name} press (dur={dur}, wait={wait}): avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms")
-    # 目安として1回350ms未満を期待（環境依存なのでassertは緩め）
-    assert avg < 0.35
-    # 1回あたりの最大値が500msを超えた場合は警告を出す
-    if max(times) > 0.5:
-        print(f"[perf-long] WARNING: {proto_name} press max time exceeded 500ms: {max(times)*1000:.3f}ms")
+    assert median < OVERHEAD_THRESHOLD_S, (
+        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S*1000:.0f}ms を超過: "
+        f"median={median*1000:.3f}ms"
+    )
+
