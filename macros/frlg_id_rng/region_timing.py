@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,18 @@ class RegionTiming:
 
     tid_roi: tuple[int, int, int, int]
     """TID OCR 用 ROI (x, y, w, h) — 720p 基準"""
+
+    intro_sequence_no_save: list[tuple[float, float]] | None = field(default=None)
+    """セーブデータなし時のイントロ会話送りシーケンス。
+    None の場合は intro_sequence を使用する。"""
+
+    name_confirm_sequence_no_save: list[tuple[float, float]] | None = field(default=None)
+    """セーブデータなし時の名前決定後〜ライバル登場シーケンス。
+    None の場合は name_confirm_sequence を使用する。"""
+
+    rival_confirm_sequence_no_save: list[tuple[float, float]] | None = field(default=None)
+    """セーブデータなし時のライバル名確定後の会話シーケンス。
+    None の場合は rival_confirm_sequence を使用する。"""
 
 
 # ============================================================
@@ -90,6 +102,41 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
         report_a_presses=7,
         report_a_wait=1.0,
         tid_roi=(869, 91, 190, 46),
+        # セーブデータなし時 (「はなしのはやさ」がデフォルト速度) 用シーケンス
+        # wait 値はセーブデータありの約 4 倍を基準に設定
+        intro_sequence_no_save=[
+            # オーキド博士
+            (0.1, 2.4),
+            (0.1, 2.4),
+            (0.1, 1.6),
+            # ニドラン♀登場
+            (0.1, 4.4),
+            (0.1, 2.0),
+            (0.1, 2.4),
+            (0.1, 2.0),
+            (0.1, 2.0),
+            (0.1, 2.8),
+            # ニドラン♀退場
+            (0.1, 10.4),
+            (0.1, 9.2),
+        ],
+        name_confirm_sequence_no_save=[
+            # 名前決定
+            (0.1, 7.2),
+            (0.1, 10.0),
+            # ライバル登場
+            (0.1, 2.8),
+            (0.1, 2.8),
+            (0.1, 2.8),
+        ],
+        rival_confirm_sequence_no_save=[
+            # 名前確定
+            (0.1, 2.8),
+            (0.1, 9.6),
+            # 会話
+            (0.1, 2.8),
+            (0.1, 2.8),
+        ],
     ),
     # ----------------------------------------------------------
     # ENG

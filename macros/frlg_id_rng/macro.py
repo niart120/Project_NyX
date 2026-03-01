@@ -94,22 +94,23 @@ class FrlgIdRngMacro(MacroBase):
         self._default_rival_name: bool = bool(args.get("default_rival_name", False))
         self._gender: str = str(args.get("gender", "おとこのこ"))
         self._report_on_match: bool = bool(args.get("report_on_match", True))
+        self._has_save_data: bool = bool(args.get("has_save_data", False))
 
         # --- フレームタイミング ---
-        self._frame1: float = float(args.get("frame1", 1235.0))
-        self._frame2: float = float(args.get("frame2", 1267.0))
-        self._frame3_raw: float = float(args.get("frame3", 6609.0))
-        self._op_frame: float = float(args.get("op_frame", 468.0))
-        self._fps: float = float(args.get("fps", 59.7275))
+        self._frame1: float = float(args.get("frame1", 1260))
+        self._frame2: float = float(args.get("frame2", 1200))
+        self._frame3_raw: float = float(args.get("frame3", 1209))
+        self._op_frame: float = float(args.get("op_frame", 468))
+        self._fps: float = float(args.get("fps", 60))
 
         # --- インクリメントモード ---
         self._frame_increment_mode: bool = bool(
             args.get("frame_increment_mode", False)
         )
-        self._frame1_min: float = float(args.get("frame1_min", 1200.0))
-        self._frame1_max: float = float(args.get("frame1_max", 1500.0))
-        self._frame2_min: float = float(args.get("frame2_min", 1200.0))
-        self._frame2_max: float = float(args.get("frame2_max", 1600.0))
+        self._frame1_min: float = float(args.get("frame1_min", 1200))
+        self._frame1_max: float = float(args.get("frame1_max", 1500))
+        self._frame2_min: float = float(args.get("frame2_min", 1200))
+        self._frame2_max: float = float(args.get("frame2_max", 1600))
 
         self._op_increment_mode: bool = bool(args.get("op_increment_mode", False))
         self._op_frame_min: float = float(args.get("op_frame_min", 382.0))
@@ -125,6 +126,7 @@ class FrlgIdRngMacro(MacroBase):
 
         cmd.log(
             f"FrlgIdRngMacro 初期化完了: region={self._region}, tid={self._tid}, "
+            f"has_save_data={self._has_save_data}, "
             f"frame1={self._frame1}, frame2={self._frame2}, "
             f"frame3={self._frame3_raw}→{self._frame3} (offset={self._timing.frame3_offset}), "
             f"op_frame={self._op_frame}",
@@ -172,7 +174,11 @@ class FrlgIdRngMacro(MacroBase):
             _consume_timer(cmd, t2, current_f2, self._fps)
 
             # Step 9: 名前決定後の会話進行
-            self._press_a_sequence(cmd, self._timing.name_confirm_sequence)
+            self._press_a_sequence(
+                cmd,
+                self._timing.name_confirm_sequence,
+                self._timing.name_confirm_sequence_no_save,
+            )
 
             # Step 10: ライバル名前入力
             self._enter_rival_name(cmd)
@@ -181,7 +187,11 @@ class FrlgIdRngMacro(MacroBase):
             t3 = _start_timer()
 
             # Step 11: ライバル名確定後の会話
-            self._press_a_sequence(cmd, self._timing.rival_confirm_sequence)
+            self._press_a_sequence(
+                cmd,
+                self._timing.rival_confirm_sequence,
+                self._timing.rival_confirm_sequence_no_save,
+            )
 
             # --- Frame3 タイマー消化 ---
             _consume_timer(cmd, t3, self._frame3, self._fps)
@@ -266,21 +276,30 @@ class FrlgIdRngMacro(MacroBase):
         _consume_timer(cmd, t, op_frame, self._fps)
 
     def _select_new_game(self, cmd: Command) -> None:
-        """Step 3: OP送り → ニューゲーム選択"""
+        """Step 3: OP送り → ニューゲーム選択 → ヘルプ画面通過
+
+        セーブデータの有無でメニュー選択の操作が異なる:
+        - あり: ↓ → A (メニュー2番目の「さいしょからはじめる」を選択)
+        - なし: メニュー画面スキップで直接ヘルプ画面に飛ぶ
+        いずれの場合もその後ヘルプ画面 (操作説明・ゲームの目的) を通過する。
+        """
         # OPをAで飛ばす
         cmd.press(Button.A, dur=0.20, wait=0.167)
         cmd.press(Button.A, dur=0.20, wait=3.350)
 
-        # さいしょからはじめる
-        cmd.press(Hat.DOWN, dur=0.20, wait=0.335)
-        cmd.press(Button.A, dur=0.1, wait=1.674)
+        if self._has_save_data:
+            # セーブデータあり: メニュー2番目の「さいしょからはじめる」を選択
+            cmd.press(Hat.DOWN, dur=0.20, wait=0.335)
+            cmd.press(Button.A, dur=0.1, wait=1.674)
 
-        # そうさせつめい
+
+        # ヘルプ画面: 操作方法の説明 (3回A) → 暗転 → ゲームプレイの目的 (3回A)
+        # ヘルプ画面はセーブデータの有無にかかわらず常に表示される
         cmd.press(Button.A, dur=0.2, wait=1.0)
         cmd.press(Button.A, dur=0.2, wait=1.0)
         cmd.press(Button.A, dur=0.2, wait=2.5)
 
-        # あらすじ
+        cmd.press(Button.A, dur=0.2, wait=0.5)
         cmd.press(Button.A, dur=0.2, wait=0.5)
         cmd.press(Button.A, dur=0.2, wait=0.5)
 
@@ -288,7 +307,11 @@ class FrlgIdRngMacro(MacroBase):
         """Step 4: イントロ会話送り"""
         if self._timing.intro_pre_wait > 0:
             cmd.wait(self._timing.intro_pre_wait)
-        self._press_a_sequence(cmd, self._timing.intro_sequence)
+        self._press_a_sequence(
+            cmd,
+            self._timing.intro_sequence,
+            self._timing.intro_sequence_no_save,
+        )
 
     def _select_gender(self, cmd: Command) -> None:
         """Step 5: 性別選択"""
@@ -495,10 +518,23 @@ class FrlgIdRngMacro(MacroBase):
     # --------------------------------------------------------
 
     def _press_a_sequence(
-        self, cmd: Command, sequence: list[tuple[float, float]]
+        self,
+        cmd: Command,
+        sequence: list[tuple[float, float]],
+        no_save_sequence: list[tuple[float, float]] | None = None,
     ) -> None:
-        """A ボタンの (dur, wait) シーケンスを順に実行する。"""
-        for dur, wait in sequence:
+        """A ボタンの (dur, wait) シーケンスを順に実行する。
+
+        ``has_save_data=False`` かつ ``no_save_sequence`` が指定されている場合は
+        ``no_save_sequence`` を使用する。
+        ``no_save_sequence`` が ``None`` の場合は ``sequence`` を使用する。
+        """
+        seq = (
+            no_save_sequence
+            if not self._has_save_data and no_save_sequence is not None
+            else sequence
+        )
+        for dur, wait in seq:
             cmd.press(Button.A, dur=dur, wait=wait)
 
     def _is_within_tolerance(self, recognized_id: int) -> bool:
