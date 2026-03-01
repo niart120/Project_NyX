@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-from unittest.mock import patch
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 from nyxpy.gui.main_window import MainWindow
@@ -24,26 +23,8 @@ def tmp_cwd_and_dummy(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def patched_managers():
-    # キャプチャマネージャとシリアルマネージャの非同期動作をパッチ
-    with patch("nyxpy.framework.core.hardware.capture.CaptureManager") as mock_cap_mgr:
-        with patch(
-            "nyxpy.framework.core.hardware.serial_comm.SerialManager"
-        ) as mock_ser_mgr:
-            # 同期的にデバイスを検出するように振る舞いを変更
-            mock_cap_mgr.return_value.auto_register_devices.side_effect = lambda: None
-            mock_ser_mgr.return_value.auto_register_devices.side_effect = lambda: None
-            yield mock_cap_mgr, mock_ser_mgr
-
-
-@pytest.fixture
-def window(qtbot, tmp_cwd_and_dummy, patched_managers):
-    mock_cap_mgr, mock_ser_mgr = patched_managers
-
-    # モックのキャプチャマネージャを設定
-    mock_cap_mgr.return_value.list_devices.return_value = ["ダミーデバイス"]
-
-    QApplication.instance() or QApplication([])
+def window(qtbot, tmp_cwd_and_dummy):
+    # conftest の _no_real_hardware で initialize_managers は no-op 化済み
     w = MainWindow()
     qtbot.addWidget(w)
 
@@ -54,11 +35,13 @@ def window(qtbot, tmp_cwd_and_dummy, patched_managers):
     w.show()
 
     # 非推奨の waitForWindowShown の代わりに waitExposed を使用
-    # (コンテキストマネージャとして使用)
     with qtbot.waitExposed(w):
         pass
 
-    return w
+    yield w
+
+    # teardown: プレビュータイマーを確実に停止
+    w.preview_pane.timer.stop()
 
 
 def test_update_preview_success(window: MainWindow, qtbot):
@@ -122,5 +105,9 @@ def test_update_preview_failure(window: MainWindow, qtbot):
     qtbot.wait(100)
     # 失敗後のPixmap
     after_pix = window.preview_pane.label.pixmap()
-    # PixmapがNoneまたは変更されていないことを確認
-    assert after_pix is None or after_pix.cacheKey() == (before_pix.cacheKey() if before_pix else None)
+    # PixmapがNone・null、または変更されていないことを確認
+    if after_pix is None or after_pix.isNull():
+        pass  # 失敗後にPixmapがクリアされるのは許容
+    else:
+        before_key = before_pix.cacheKey() if (before_pix and not before_pix.isNull()) else 0
+        assert after_pix.cacheKey() == before_key

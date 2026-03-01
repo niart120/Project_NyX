@@ -7,7 +7,10 @@ from serial import Serial
 def setup_and_teardown():
     """テストのセットアップとクリーンアップ"""
     # テスト前のセットアップ
-    recv_device = Serial("COM255", 9600, timeout=1)  # 受信用の実際のデバイスに接続
+    try:
+        recv_device = Serial("COM255", 9600, timeout=1)  # 受信用の実際のデバイスに接続
+    except Exception as e:
+        pytest.skip(f"受信用デバイス未接続: {e}")
     assert recv_device.is_open, "Failed to open the serial port."
 
     yield

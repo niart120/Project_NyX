@@ -45,4 +45,7 @@ targets.wheel.packages = ["src/nyxpy"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
+markers = [
+    "realdevice: tests requiring real hardware devices (capture card, serial port)",
+]
 

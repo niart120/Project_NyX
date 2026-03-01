@@ -308,4 +308,3 @@ class WorkerThread(QThread):
             self.finished.emit("中断")
         except Exception as e:
             self.finished.emit(f"エラー: {e}")
-            raise e

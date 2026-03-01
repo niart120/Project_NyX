@@ -19,17 +19,19 @@ def test_continuous_frame_update():
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
 
-    time.sleep(1.5)  # 初期化後、少し待機してフレームが取得できるようにする
-    initial_frame = capture_device.get_frame()
-    time.sleep(0.5)  # 数秒待機してフレームが更新されるのを確認
-    updated_frame = capture_device.get_frame()
-    capture_device.release()
+    try:
+        time.sleep(1.5)  # 初期化後、少し待機してフレームが取得できるようにする
+        initial_frame = capture_device.get_frame()
+        time.sleep(0.5)  # 数秒待機してフレームが更新されるのを確認
+        updated_frame = capture_device.get_frame()
 
-    # フレーム更新が確認できる場合、変更されているかを比較（内容が同一でも問題なければログ出力などで確認）
-    assert updated_frame is not None, "更新されたフレームが None です。"
-    assert not np.allclose(updated_frame, initial_frame), (
-        "フレームが更新されていない可能性があります。"
-    )
+        # フレーム更新が確認できる場合、変更されているかを比較（内容が同一でも問題なければログ出力などで確認）
+        assert updated_frame is not None, "更新されたフレームが None です。"
+        assert not np.allclose(updated_frame, initial_frame), (
+            "フレームが更新されていない可能性があります。"
+        )
+    finally:
+        capture_device.release()
 
 
 @pytest.mark.realdevice
@@ -45,22 +47,24 @@ def test_multithreaded_get_latest_frame():
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
 
-    # 少し待ってから複数スレッドで取得
-    time.sleep(1.0)
-    frames = []
+    try:
+        # 少し待ってから複数スレッドで取得
+        time.sleep(1.0)
+        frames = []
 
-    def worker():
-        frames.append(capture_device.get_frame())
+        def worker():
+            frames.append(capture_device.get_frame())
 
-    threads = [threading.Thread(target=worker) for _ in range(5)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
-    capture_device.release()
-    for frame in frames:
-        assert frame is not None, "取得されたフレームが None です。"
+        for frame in frames:
+            assert frame is not None, "取得されたフレームが None です。"
+    finally:
+        capture_device.release()
 
 
 @pytest.mark.realdevice
@@ -75,12 +79,17 @@ def test_release_idempotence():
     except RuntimeError as e:
         pytest.skip(f"実デバイス未接続: {e}")
 
-    # 正常にリリース
-    capture_device.release()
-    assert capture_device.cap is None
-
-    # 2回目のリリース（エラーが発生しないことを確認）
     try:
+        # 正常にリリース
         capture_device.release()
-    except Exception as e:
-        pytest.fail(f"2回目のリリースでエラーが発生: {e}")
+        assert capture_device.cap is None
+
+        # 2回目のリリース（エラーが発生しないことを確認）
+        try:
+            capture_device.release()
+        except Exception as e:
+            pytest.fail(f"2回目のリリースでエラーが発生: {e}")
+    finally:
+        # 万が一のため確実に解放
+        if capture_device.cap is not None:
+            capture_device.release()

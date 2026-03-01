@@ -1,25 +1,14 @@
 import pytest
 import os
-import sys
 import numpy as np
 import cv2
 from unittest.mock import Mock, patch
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
 from nyxpy.gui.panes.preview_pane import PreviewPane, SNAPSHOT_DIR
 
-# Add the project root to sys.path if needed
-sys.path.append(str(Path(__file__).parents[4]))
-
 
 @pytest.fixture
-def app():
-    """Create QApplication instance for tests."""
-    return QApplication.instance() or QApplication([])
-
-
-@pytest.fixture
-def preview_pane(app):
+def preview_pane(qtbot):
     """Create a PreviewPane with mocked dependencies."""
     # Mock capture device
     device_mock = Mock()
@@ -33,7 +22,10 @@ def preview_pane(app):
             capture_device=device_mock,
             preview_fps=20       # プレビュー用のみ
         )
-    return pane
+    qtbot.addWidget(pane)
+    yield pane
+    # teardown: タイマーを確実に停止
+    pane.timer.stop()
 
 
 class TestPreviewPane:
