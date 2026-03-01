@@ -171,13 +171,13 @@ class TestRegionTiming:
         assert REGION_TIMINGS[region].frame3_offset == offset
 
     def test_jpn_game_start_wait(self):
-        """JPN のゲーム開始待機は 4.5s"""
-        assert REGION_TIMINGS["JPN"].game_start_wait == 4.5
+        """JPN のゲーム開始待機は 5.0s"""
+        assert REGION_TIMINGS["JPN"].game_start_wait == 5.0
 
     @pytest.mark.parametrize("region", ["ENG", "FRA", "ITA", "ESP", "NOE"])
     def test_non_jpn_game_start_wait(self, region: str):
-        """JPN 以外のゲーム開始待機は 6.0s"""
-        assert REGION_TIMINGS[region].game_start_wait == 6.0
+        """JPN 以外のゲーム開始待機は 6.5s"""
+        assert REGION_TIMINGS[region].game_start_wait == 6.5
 
     def test_timing_is_frozen(self):
         """RegionTiming は frozen dataclass"""

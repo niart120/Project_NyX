@@ -53,8 +53,8 @@ def test_press_performance(protocol_cls, proto_name):
     avg = sum(times) / N
     stdev = statistics.stdev(times) if N > 1 else 0
     print(f"[perf] {proto_name} press: avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms")
-    # 目安として1回25ms未満を期待（環境依存なのでassertは緩め）
-    assert avg < 0.025, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
+    # 目安として1回40ms未満を期待（Windows の time.sleep 解像度 ~15.6ms を考慮）
+    assert avg < 0.04, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
     # 1回あたりの最大値が50msを超えた場合は警告を出す
     if max(times) > 0.05:
         print(f"[perf] WARNING: {proto_name} press max time exceeded 50ms: {max(times)*1000:.3f}ms")
@@ -114,7 +114,7 @@ def test_press_performance_mixed_input(protocol_cls, proto_name):
     avg = sum(times) / N
     stdev = statistics.stdev(times) if N > 1 else 0
     print(f"[perf-mixed] {proto_name}.press: avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms")
-    assert avg < 0.03, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
+    assert avg < 0.04, f"avg={avg*1000:.3f}ms, max={max(times)*1000:.3f}ms, min={min(times)*1000:.3f}ms, stdev={stdev*1000:.3f}ms"
     if max(times) > 0.06:
         print(f"[perf-mixed] WARNING: {proto_name}.press max time exceeded 60ms: {max(times)*1000:.3f}ms")
 
