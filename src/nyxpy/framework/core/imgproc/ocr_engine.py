@@ -32,11 +32,11 @@ class OCRProcessor:
             lang_map = {'ja': 'japan', 'en': 'en'}
             paddle_lang = lang_map.get(self.language, 'japan')
             
-            # PaddleOCRの初期化（ログを無効化）
+            # PaddleOCRの初期化
+            # NOTE: use_angle_cls / show_log は新版で廃止されたため使用しない
             self._ocr_engine = PaddleOCR(
-                use_angle_cls=False, 
-                lang=paddle_lang, 
-                show_log=False
+                use_textline_orientation=False,
+                lang=paddle_lang,
             )
         except ImportError:
             raise OCREngineNotFoundError("PaddleOCRがインストールされていません")
@@ -54,14 +54,15 @@ class OCRProcessor:
             return []
             
         try:
-            results = self._ocr_engine.ocr(image, cls=False)
+            results = self._ocr_engine.predict(image)
             
             ocr_results = []
-            if results and len(results) > 0 and results[0]:
-                for line in results[0]:
-                    text = line[1][0]
-                    confidence = line[1][1]
-                    ocr_results.append(OCRResult(text=text, confidence=confidence))
+            if results:
+                for item in results:
+                    rec_texts = item.get('rec_texts', [])
+                    rec_scores = item.get('rec_scores', [])
+                    for text, score in zip(rec_texts, rec_scores):
+                        ocr_results.append(OCRResult(text=text, confidence=score))
             
             return ocr_results
             

@@ -18,8 +18,8 @@ dependencies = [
     "setuptools >=80.4.0",
     "opencv-python>=4.11.0.86",
     "pyside6>=6.9.0",
-    "paddlepaddle>=3.0.0",
-    "paddleocr>=2.10.0",
+    "paddlepaddle>=3.0.0,<3.3.0",
+    "paddleocr>=3.0.0",
 ]
 
 [dependency-groups]
