@@ -30,7 +30,7 @@ class RegionTiming:
     """ライバル名確定後の会話 (Step 11) の (dur, wait) シーケンス"""
 
     game_start_wait: float
-    """ゲーム開始 (Step 13) の待機秒数。JPN=4.5, 他=6.0"""
+    """ゲーム開始 (Step 13) の待機秒数。JPN=5.0, 他=6.5"""
 
     report_a_presses: int
     """レポート書き込み時の A 押下回数"""
@@ -98,7 +98,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             (0.1, 0.7),
             (0.1, 0.7),
         ],
-        game_start_wait=4.5,
+        game_start_wait=5.0,
         report_a_presses=7,
         report_a_wait=1.0,
         tid_roi=(869, 91, 190, 46),
@@ -106,33 +106,33 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
         # wait 値はセーブデータありの約 4 倍を基準に設定
         intro_sequence_no_save=[
             # オーキド博士
-            (0.1, 2.4),
+            (0.1, 2.0),
             (0.1, 2.4),
             (0.1, 1.6),
             # ニドラン♀登場
-            (0.1, 4.4),
+            (0.1, 3.6),
             (0.1, 2.0),
             (0.1, 2.4),
-            (0.1, 2.0),
-            (0.1, 2.0),
+            (0.1, 1.8),
+            (0.1, 1.0),
             (0.1, 2.8),
             # ニドラン♀退場
-            (0.1, 10.4),
-            (0.1, 9.2),
+            (0.1, 4.1),
+            (0.1, 3.8),
         ],
         name_confirm_sequence_no_save=[
             # 名前決定
-            (0.1, 7.2),
-            (0.1, 10.0),
+            (0.1, 2.5),
+            (0.1, 2.0),
             # ライバル登場
-            (0.1, 2.8),
-            (0.1, 2.8),
+            (0.1, 2.0),
+            (0.1, 2.0),
             (0.1, 2.8),
         ],
         rival_confirm_sequence_no_save=[
             # 名前確定
-            (0.1, 2.8),
-            (0.1, 9.6),
+            (0.1, 2.0),
+            (0.1, 3.0),
             # 会話
             (0.1, 2.8),
             (0.1, 2.8),
@@ -173,7 +173,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             # 会話
             (0.1, 0.9),
         ],
-        game_start_wait=6.0,
+        game_start_wait=6.5,
         report_a_presses=6,
         report_a_wait=1.5,
         tid_roi=(888, 86, 127, 47),
@@ -214,7 +214,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             (0.1, 1.0),
             (0.1, 1.5),
         ],
-        game_start_wait=6.0,
+        game_start_wait=6.5,
         report_a_presses=6,
         report_a_wait=1.5,
         tid_roi=(893, 86, 127, 47),
@@ -254,7 +254,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             (0.1, 1.0),
             (0.1, 1.5),
         ],
-        game_start_wait=6.0,
+        game_start_wait=6.5,
         report_a_presses=7,
         report_a_wait=1.5,
         tid_roi=(893, 86, 127, 47),
@@ -296,7 +296,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             (0.1, 0.9),
             (0.1, 0.9),
         ],
-        game_start_wait=6.0,
+        game_start_wait=6.5,
         report_a_presses=6,
         report_a_wait=1.5,
         tid_roi=(915, 86, 127, 47),
@@ -338,7 +338,7 @@ REGION_TIMINGS: dict[str, RegionTiming] = {
             (0.1, 1.1),
             (0.1, 1.8),
         ],
-        game_start_wait=6.0,
+        game_start_wait=6.5,
         report_a_presses=9,
         report_a_wait=1.5,
         tid_roi=(888, 86, 127, 47),

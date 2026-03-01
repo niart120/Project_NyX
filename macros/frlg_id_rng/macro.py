@@ -99,7 +99,7 @@ class FrlgIdRngMacro(MacroBase):
         # --- フレームタイミング ---
         self._frame1: float = float(args.get("frame1", 1260))
         self._frame2: float = float(args.get("frame2", 1200))
-        self._frame3_raw: float = float(args.get("frame3", 1209))
+        self._frame3_raw: float = float(args.get("frame3", 3009))
         self._op_frame: float = float(args.get("op_frame", 468))
         self._fps: float = float(args.get("fps", 60))
 
@@ -173,6 +173,9 @@ class FrlgIdRngMacro(MacroBase):
             # --- Frame2 タイマー消化 ---
             _consume_timer(cmd, t2, current_f2, self._fps)
 
+            # --- Frame3 タイマー開始 ---
+            t3 = _start_timer()
+
             # Step 9: 名前決定後の会話進行
             self._press_a_sequence(
                 cmd,
@@ -182,9 +185,6 @@ class FrlgIdRngMacro(MacroBase):
 
             # Step 10: ライバル名前入力
             self._enter_rival_name(cmd)
-
-            # --- Frame3 タイマー開始 ---
-            t3 = _start_timer()
 
             # Step 11: ライバル名確定後の会話
             self._press_a_sequence(
@@ -199,6 +199,7 @@ class FrlgIdRngMacro(MacroBase):
             # Step 13: ゲーム開始（主人公の家へ）
             cmd.press(Button.A, dur=0.1, wait=self._timing.game_start_wait)
 
+            cmd.log("ゲーム開始 TID チェック", level="INFO")
             # Step 14: TID 確認画面を開く
             self._open_trainer_card(cmd)
 
@@ -332,7 +333,7 @@ class FrlgIdRngMacro(MacroBase):
         else:
             cmd.press(Button.A, dur=0.1, wait=1.5)
             self._enter_name(cmd, self._rival_name, is_trainer=False)
-            cmd.press(Button.A, dur=0.1, wait=1.8)
+            cmd.press(Button.A, dur=0.1, wait=2.2)
 
     def _open_trainer_card(self, cmd: Command) -> None:
         """Step 14: メニュー → トレーナーカードを開く"""
