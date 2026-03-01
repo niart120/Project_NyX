@@ -190,17 +190,8 @@ class TestRegionTiming:
 # FrlgIdRngMacro テスト
 # ============================================================
 
-# macros/frlg_id_rng.py をインポート
-# ファイル名とパッケージ名が同一のため、importlib で明示的にロード
-import importlib as _importlib
-
-_frlg_macro_spec = _importlib.util.spec_from_file_location(
-    "frlg_id_rng_macro",
-    str(Path(__file__).resolve().parent.parent.parent.parent / "macros" / "frlg_id_rng.py"),
-)
-_frlg_macro_mod = _importlib.util.module_from_spec(_frlg_macro_spec)
-_frlg_macro_spec.loader.exec_module(_frlg_macro_mod)
-FrlgIdRngMacro = _frlg_macro_mod.FrlgIdRngMacro
+# macros/frlg_id_rng/ パッケージからインポート
+from frlg_id_rng import FrlgIdRngMacro
 
 
 def _make_cmd_mock() -> MagicMock:

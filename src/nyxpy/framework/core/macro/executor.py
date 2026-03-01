@@ -37,25 +37,34 @@ class MacroExecutor:
         self.macros.clear()
         if not macros_dir.is_dir():
             return
-        for file in macros_dir.iterdir():
-            if file.suffix == ".py" and file.name != "__init__.py":
-                module_name = f"macros.{file.stem}"
-                try:
-                    if module_name in sys.modules:
-                        module = importlib.reload(sys.modules[module_name])
-                    else:
-                        module = importlib.import_module(module_name)
-                    for name, obj in inspect.getmembers(module, inspect.isclass):
-                        if issubclass(obj, MacroBase) and obj is not MacroBase:
-                            instance = obj()
-                            self.macros[obj.__name__] = instance
-                except Exception as e:
-                    log_manager.log(
-                        "ERROR",
-                        f"Error loading macro:{file.name}, {e}",
-                        component="MacroExecutor",
-                    )
-                    pass
+
+        # マクロ候補のモジュール名を収集
+        # 1) 単一 .py ファイル (例: macros/sample.py → "macros.sample")
+        # 2) パッケージディレクトリ (例: macros/frlg_id_rng/ + __init__.py → "macros.frlg_id_rng")
+        module_entries: list[tuple[str, str]] = []  # (module_name, display_name)
+        for entry in macros_dir.iterdir():
+            if entry.is_file() and entry.suffix == ".py" and entry.name != "__init__.py":
+                module_entries.append((f"macros.{entry.stem}", entry.name))
+            elif entry.is_dir() and (entry / "__init__.py").exists():
+                module_entries.append((f"macros.{entry.name}", entry.name))
+
+        for module_name, display_name in module_entries:
+            try:
+                if module_name in sys.modules:
+                    module = importlib.reload(sys.modules[module_name])
+                else:
+                    module = importlib.import_module(module_name)
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if issubclass(obj, MacroBase) and obj is not MacroBase:
+                        instance = obj()
+                        self.macros[obj.__name__] = instance
+            except Exception as e:
+                log_manager.log(
+                    "ERROR",
+                    f"Error loading macro:{display_name}, {e}",
+                    component="MacroExecutor",
+                )
+                pass
 
     def set_active_macro(self, macro_name: str) -> None:
         """

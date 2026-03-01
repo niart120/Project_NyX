@@ -14,18 +14,18 @@ from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
-from frlg_id_rng.frame_sweep import (
+from .frame_sweep import (
     dual_frame_sweep,
     frame_sweep,
     single_value_iterator,
 )
-from frlg_id_rng.keyboard_layout import (
+from .keyboard_layout import (
     REGION_KEYBOARDS,
     RegionKeyboard,
     find_char_in_keyboard,
 )
-from frlg_id_rng.region_timing import REGION_TIMINGS, RegionTiming
-from frlg_id_rng.tid_recognizer import recognize_tid
+from .region_timing import REGION_TIMINGS, RegionTiming
+from .tid_recognizer import recognize_tid
 
 # ============================================================
 # 定数
