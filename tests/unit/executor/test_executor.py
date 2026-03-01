@@ -1,5 +1,7 @@
 import pytest
 import textwrap
+import importlib.util
+from pathlib import Path
 from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.macro.base import MacroBase
@@ -167,3 +169,82 @@ def test_macro_executor_exception_handling(executor_with_dummy, mock_command):
         "Finalizing macro...",
         "finalize",
     ]
+
+
+# ---- パッケージ型マクロのリロードテスト ----------------------------------------
+
+PACKAGE_INIT_V1 = textwrap.dedent("""\
+    from .impl import PackageMacro
+    __all__ = ["PackageMacro"]
+""")
+
+PACKAGE_IMPL_V1 = textwrap.dedent("""\
+    from nyxpy.framework.core.macro.base import MacroBase
+    from nyxpy.framework.core.macro.command import Command
+
+    LABEL = "v1"
+
+    class PackageMacro(MacroBase):
+        label = LABEL
+        def initialize(self, cmd: Command, args: dict) -> None: pass
+        def run(self, cmd: Command) -> None: pass
+        def finalize(self, cmd: Command) -> None: pass
+""")
+
+PACKAGE_IMPL_V2 = textwrap.dedent("""\
+    from nyxpy.framework.core.macro.base import MacroBase
+    from nyxpy.framework.core.macro.command import Command
+
+    LABEL = "v2"
+
+    class PackageMacro(MacroBase):
+        label = LABEL
+        def initialize(self, cmd: Command, args: dict) -> None: pass
+        def run(self, cmd: Command) -> None: pass
+        def finalize(self, cmd: Command) -> None: pass
+""")
+
+
+@pytest.fixture
+def temp_package_macros_dir(tmp_path, monkeypatch):
+    """パッケージ型マクロ（サブモジュールあり）用の一時ディレクトリ"""
+    macros_dir = tmp_path / "macros"
+    pkg_dir = macros_dir / "pkg_macro"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "__init__.py").write_text(PACKAGE_INIT_V1)
+    (pkg_dir / "impl.py").write_text(PACKAGE_IMPL_V1)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(tmp_path)
+    return pkg_dir
+
+
+def test_package_macro_initial_load(temp_package_macros_dir):
+    """パッケージ型マクロが正常にロードされることを確認"""
+    executor = MacroExecutor()
+    assert "PackageMacro" in executor.macros
+    assert executor.macros["PackageMacro"].label == "v1"
+
+
+def test_package_macro_submodule_reload(temp_package_macros_dir):
+    """
+    サブモジュールを変更してリロードしたとき、変更が反映されることを確認。
+    importlib.reload() のみでは __init__.py だけ再実行されサブモジュールは
+    キャッシュ(旧バージョン)が使われてしまう問題を回帰テストする。
+    """
+    executor = MacroExecutor()
+    assert executor.macros["PackageMacro"].label == "v1"
+
+    # サブモジュール impl.py を v2 に書き換える
+    (temp_package_macros_dir / "impl.py").write_text(PACKAGE_IMPL_V2)
+
+    # .pyc のタイムスタンプが同一秒になるケースを防ぎ、確実に再コンパイルさせる
+    pyc_path = Path(importlib.util.cache_from_source(str(temp_package_macros_dir / "impl.py")))
+    if pyc_path.exists():
+        pyc_path.unlink()
+
+    executor.reload_macros()
+
+    assert "PackageMacro" in executor.macros, "リロード後もマクロが存在すること"
+    assert executor.macros["PackageMacro"].label == "v2", (
+        "サブモジュールの変更がリロード後に反映されること"
+    )

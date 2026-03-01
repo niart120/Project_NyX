@@ -50,10 +50,17 @@ class MacroExecutor:
 
         for module_name, display_name in module_entries:
             try:
-                if module_name in sys.modules:
-                    module = importlib.reload(sys.modules[module_name])
-                else:
-                    module = importlib.import_module(module_name)
+                # パッケージ型マクロのサブモジュールも含む全関連エントリを sys.modules から
+                # 削除し、フレッシュインポートを強制する。
+                # importlib.reload() はトップレベルの __init__.py しか再実行しないため、
+                # サブモジュール (例: macros.frlg_id_rng.region_timing) の変更が反映されない。
+                stale_keys = [
+                    key for key in sys.modules
+                    if key == module_name or key.startswith(module_name + ".")
+                ]
+                for key in stale_keys:
+                    del sys.modules[key]
+                module = importlib.import_module(module_name)
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, MacroBase) and obj is not MacroBase:
                         instance = obj()
