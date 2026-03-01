@@ -1,7 +1,8 @@
 
 import cv2
-from typing import List
+from typing import ClassVar, Dict, List
 from dataclasses import dataclass
+from threading import Lock
 
 from .exceptions import OCREngineNotFoundError, OCRProcessingError
 
@@ -14,7 +15,40 @@ class OCRResult:
 
 
 class OCRProcessor:
-    """シンプルなOCR処理クラス"""
+    """シンプルなOCR処理クラス
+
+    通常のインスタンス生成 (``OCRProcessor(language)``) に加え、
+    ``get_instance(language)`` で言語ごとにキャッシュされた
+    シングルトンインスタンスを取得できる。
+    PaddleOCR のモデルロード・初回推論コストを複数箇所で共有したい場合は
+    ``get_instance`` の利用を推奨する。
+    """
+
+    _instances: ClassVar[Dict[str, "OCRProcessor"]] = {}
+    _lock: ClassVar[Lock] = Lock()
+
+    @classmethod
+    def get_instance(cls, language: str = "ja") -> "OCRProcessor":
+        """言語ごとにキャッシュされたインスタンスを返す。
+
+        同じ ``language`` に対しては常に同一インスタンスが返される。
+        スレッドセーフ。
+
+        :param language: 認識言語 ('ja', 'en')
+        :return: キャッシュ済みの OCRProcessor
+        """
+        if language not in cls._instances:
+            with cls._lock:
+                # ダブルチェックロッキング
+                if language not in cls._instances:
+                    cls._instances[language] = cls(language)
+        return cls._instances[language]
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """キャッシュを全クリアする (テスト用)。"""
+        with cls._lock:
+            cls._instances.clear()
     
     def __init__(self, language: str = 'ja'):
         """

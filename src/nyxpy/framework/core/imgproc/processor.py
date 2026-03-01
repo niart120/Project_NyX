@@ -21,7 +21,6 @@ class ImageProcessor:
         if image is None or image.size == 0:
             raise InvalidImageError("画像が無効です")
         self.image = image
-        self._ocr_processor = None  # 遅延初期化
         self.preprocessor = ImagePreprocessor()
     
     def contains_template(self, 
@@ -82,9 +81,8 @@ class ImageProcessor:
         :param preprocess: OCR用前処理を行うか
         :return: 認識されたテキスト（見つからない場合は空文字列）
         """
-        # OCRプロセッサーの遅延初期化
-        if self._ocr_processor is None or self._ocr_processor.language != language:
-            self._ocr_processor = OCRProcessor(language=language)
+        # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
+        ocr = OCRProcessor.get_instance(language)
         
         # 認識対象画像の決定
         target_image = self.image
@@ -97,7 +95,7 @@ class ImageProcessor:
             target_image = self.preprocessor.enhance_for_ocr(target_image)
         
         # OCR実行
-        return self._ocr_processor.get_best_text(target_image)
+        return ocr.get_best_text(target_image)
     
     def get_digits(self, 
                    language: str = 'en',
@@ -111,9 +109,8 @@ class ImageProcessor:
         :param preprocess: OCR用前処理を行うか
         :return: 認識された数字文字列
         """
-        # OCRプロセッサーの遅延初期化
-        if self._ocr_processor is None or self._ocr_processor.language != language:
-            self._ocr_processor = OCRProcessor(language=language)
+        # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
+        ocr = OCRProcessor.get_instance(language)
         
         # 認識対象画像の決定
         target_image = self.image
@@ -126,7 +123,7 @@ class ImageProcessor:
             target_image = self.preprocessor.enhance_for_ocr(target_image)
         
         # 数字抽出
-        return self._ocr_processor.extract_digits(target_image)
+        return ocr.extract_digits(target_image)
     
     def find_text_region_with_template(self,
                                       template: cv2.typing.MatLike,

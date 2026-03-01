@@ -9,8 +9,13 @@ Switch (720p) 専用。
 from __future__ import annotations
 
 import time
+from datetime import datetime
+
+import cv2
+import numpy as np
 
 from nyxpy.framework.core.constants import Button, Hat
+from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
@@ -25,7 +30,6 @@ from .keyboard_layout import (
     find_char_in_keyboard,
 )
 from .region_timing import REGION_TIMINGS, RegionTiming
-from .tid_recognizer import recognize_tid
 
 # ============================================================
 # 定数
@@ -133,6 +137,15 @@ class FrlgIdRngMacro(MacroBase):
             level="INFO",
         )
 
+        # OCR エンジンのウォームアップ（初回起動コストを TID チェック前に消化）
+        cmd.log("ウォームアップ開始", level="INFO")
+        ocr = OCRProcessor.get_instance("en")
+        try:
+            ocr.get_best_text(np.zeros((64, 200, 3), dtype=np.uint8))
+        except Exception:
+            pass
+        cmd.log("ウォームアップ完了", level="INFO")
+
     def run(self, cmd: Command) -> None:
         attempt = 0
         for current_f1, current_f2, current_op in self._build_iterator():
@@ -204,7 +217,15 @@ class FrlgIdRngMacro(MacroBase):
             self._open_trainer_card(cmd)
 
             # Step 15: TID 認識
-            tid = self._recognize_tid(cmd)
+            tid, cropped_img = self._recognize_tid(cmd)
+
+            # 判定結果に依らず常に画像を保存
+            if cropped_img is not None:
+                ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                tid_str = f"{tid:05d}" if tid is not None else "xxxxx"
+                filename = f"frlg_id_rng/img/{ts}_{tid_str}_{int(current_f1)}_{int(current_f2)}.png"
+                cmd.save_img(filename, cropped_img)
+
             if tid is None:
                 cmd.log("TID 認識失敗 — リトライ", level="WARNING")
                 continue
@@ -212,7 +233,7 @@ class FrlgIdRngMacro(MacroBase):
             cmd.log(f"認識 TID: {tid:05d} (目標: {self._tid:05d})", level="INFO")
 
             # Step 16: TID 判定
-            if self._check_tid(cmd, tid, attempt, current_f1, current_f2, current_op):
+            if self._check_tid(cmd, tid, cropped_img, attempt, current_f1, current_f2, current_op):
                 return
 
         cmd.log("全探索範囲を走査完了 — 目標 TID 未発見", level="WARNING")
@@ -341,17 +362,48 @@ class FrlgIdRngMacro(MacroBase):
         cmd.press(Hat.DOWN, dur=0.10, wait=0.20)
         cmd.press(Button.A, dur=0.10, wait=2.20)
 
-    def _recognize_tid(self, cmd: Command) -> int | None:
-        """Step 15: キャプチャして TID を OCR 認識"""
+    _SAVE_PADDING: int = 40
+    """ROI の各辺に加える白パディング (px)。OCR 精度向上と保存画像の視認性を兼ねる。"""
+
+    def _recognize_tid(
+        self, cmd: Command
+    ) -> tuple[int | None, "cv2.typing.MatLike | None"]:
+        """Step 15: キャプチャして TID を OCR 認識。
+
+        ROI をクロップし、白パディングを付与した画像で OCR を実行する。
+        パディング付き画像はそのまま保存用としても返す。
+
+        :return: (TID または None, 白パディング付きクロップ画像 または None)
+        """
         image = cmd.capture()
         if image is None:
-            return None
-        return recognize_tid(image, self._timing.tid_roi)
+            return None, None
+
+        # ROI クロップ → 白パディング付与
+        x, y, w, h = self._timing.tid_roi
+        cropped = image[y : y + h, x : x + w]
+        pad = self._SAVE_PADDING
+        padded = cv2.copyMakeBorder(
+            cropped, pad, pad, pad, pad,
+            borderType=cv2.BORDER_CONSTANT,
+            value=(255, 255, 255),
+        )
+
+        # パディング付き画像で OCR 実行
+        digits = ImageProcessor(padded).get_digits(language="en")
+        tid: int | None = None
+        if digits:
+            value = int(digits)
+            if 0 <= value <= _TID_MAX:
+                tid = value
+
+        return tid, padded
 
     def _check_tid(
         self,
         cmd: Command,
         recognized_id: int,
+        cropped_img: "cv2.typing.MatLike | None",
         attempt: int,
         f1: float,
         f2: float,
@@ -365,14 +417,7 @@ class FrlgIdRngMacro(MacroBase):
                 f"（Frame1：{f1}F、Frame2：{f2}F、OP待機：{op}F）"
             )
             cmd.log(msg, level="INFO")
-
-            # キャプチャ保存 & 通知
-            img = cmd.capture()
-            if img is not None:
-                cmd.save_img(f"frlg_tid_{recognized_id:05d}.png", img)
-                cmd.notify(msg, img)
-            else:
-                cmd.notify(msg)
+            cmd.notify(msg, cropped_img) if cropped_img is not None else cmd.notify(msg)
 
             # レポート書き込み
             if self._report_on_match:
@@ -388,14 +433,7 @@ class FrlgIdRngMacro(MacroBase):
                     f"（Frame1：{f1}F、Frame2：{f2}F、OP待機：{op}F）"
                 )
                 cmd.log(msg, level="INFO")
-                img = cmd.capture()
-                if img is not None:
-                    cmd.save_img(
-                        f"frlg_tid_{recognized_id:05d}_near.png", img
-                    )
-                    cmd.notify(msg, img)
-                else:
-                    cmd.notify(msg)
+                cmd.notify(msg, cropped_img) if cropped_img is not None else cmd.notify(msg)
 
         return False
 
