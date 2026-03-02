@@ -40,3 +40,28 @@ class LCG32:
         """Advance(1) してから上位 16bit を返す。"""
         self.advance()
         return (self._seed >> 16) & 0xFFFF
+
+    @staticmethod
+    def jump_constants(n: int) -> tuple[int, int]:
+        """n-step ジャンプ定数 (An, Cn) を O(log n) で求める。
+
+        seed_n = An * seed_0 + Cn (mod 2^32) を満たす定数ペアを返す。
+        これにより、任意の初期 seed から n step 先の状態を 1 回の乗算+加算で算出できる。
+        """
+        a = LCG32.A
+        c = LCG32.C
+        mask = LCG32.MASK
+
+        an = 1
+        cn = 0
+        cur_a = a
+        cur_c = c
+        m = n
+        while m > 0:
+            if m & 1:
+                an = (an * cur_a) & mask
+                cn = (cn * cur_a + cur_c) & mask
+            cur_c = (cur_c * (cur_a + 1)) & mask
+            cur_a = (cur_a * cur_a) & mask
+            m >>= 1
+        return an, cn
