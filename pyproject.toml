@@ -20,6 +20,7 @@ dependencies = [
     "pyside6>=6.9.0",
     "paddlepaddle>=3.0.0,<3.3.0",
     "paddleocr>=3.0.0",
+    "chardet>=5.0.0,<6.0.0",
 ]
 
 [dependency-groups]
