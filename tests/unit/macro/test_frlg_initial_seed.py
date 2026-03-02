@@ -341,6 +341,122 @@ class TestSeedSolver:
             assert seed == "0000"
             assert advance == 741
 
+    # --------------------------------------------------------
+    # 実機データによる回帰テスト
+    # --------------------------------------------------------
+
+    def test_real_data_jolly_unique(self):
+        """実機データ: ようき (Jolly) — 一意に Seed 特定できるケース
+
+        実機観測値:
+            Stats: HP=231, Atk=149, Def=204, SpA=119, SpD=240, Spe=182
+            IV: H=5, A=27, B=25, C=3, D=28, S=10
+            初期Seed=0x557B, advance=1708, LCG state=0x35D25317
+        """
+        seed, advance = solve_initial_seed(
+            nature="Jolly",
+            observed_stats=(231, 149, 204, 119, 240, 182),
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=1700,
+            max_advance=1710,
+        )
+        assert seed == "557B"
+        assert advance == 1708
+
+    def test_real_data_hasty_unique_narrow(self):
+        """実機データ: せっかち (Hasty) — 狭い範囲で一意に特定できるケース
+
+        実機観測値:
+            Stats: HP=231, Atk=133, Def=171, SpA=145, SpD=233, Spe=174
+            IV: H=5, A=4, B=7, C=20, D=18, S=1
+            初期Seed=0x87B5, advance=1708, LCG state=0xA4B0A931
+
+        ※ 同一ステータスの別候補 (seed=0xCA28, adv=12193) が存在するが、
+           狭い探索範囲では 0x87B5 のみがヒットする。
+        """
+        seed, advance = solve_initial_seed(
+            nature="Hasty",
+            observed_stats=(231, 133, 171, 145, 233, 174),
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=1700,
+            max_advance=1710,
+        )
+        assert seed == "87B5"
+        assert advance == 1708
+
+    def test_real_data_hasty_multiple_seeds(self):
+        """実機データ: せっかち (Hasty) — 広い範囲で複数候補となるケース
+
+        同一ステータスに対して 2 つの (seed, advance) が存在する:
+            1. seed=0x87B5, advance=1708
+            2. seed=0xCA28, advance=12193
+        両方が探索範囲に含まれる場合、"MultipleSeeds" を返す。
+        """
+        seed, advance = solve_initial_seed(
+            nature="Hasty",
+            observed_stats=(231, 133, 171, 145, 233, 174),
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=1700,
+            max_advance=12200,
+        )
+        assert seed == "MultipleSeeds"
+        assert advance is None
+
+    def test_real_data_jolly_forward_consistency(self):
+        """実機データ: 順方向生成と逆算結果の一貫性検証
+
+        seed=0x557B から advance=1708 で生成した個体のステータスが
+        実機観測値と一致することを確認する。
+        """
+        lcg = LCG32(0x557B)
+        lcg.advance(1708)
+        assert lcg.seed == 0x35D25317  # 生成直前の LCG state
+
+        pokemon = generate_pokemon(lcg)
+        assert pokemon.nature_id == NATURE_TO_ID["Jolly"]
+
+        # IV が実機観測の範囲内
+        assert pokemon.iv_hp == 5
+        assert pokemon.iv_atk == 27
+        assert pokemon.iv_def == 25
+        assert pokemon.iv_spa == 3
+        assert pokemon.iv_spd == 28
+        assert pokemon.iv_spe == 10
+
+        mult = get_nature_multipliers("Jolly")
+        stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, mult)
+        assert stats == (231, 149, 204, 119, 240, 182)
+
+    def test_real_data_hasty_forward_consistency(self):
+        """実機データ: 順方向生成と逆算結果の一貫性検証 (Hasty, 2 候補)
+
+        2 つの (seed, advance) ペアがそれぞれ同一ステータスを生成することを確認する。
+        """
+        expected_stats = (231, 133, 171, 145, 233, 174)
+        mult = get_nature_multipliers("Hasty")
+
+        # 候補 1: seed=0x87B5, advance=1708
+        lcg1 = LCG32(0x87B5)
+        lcg1.advance(1708)
+        assert lcg1.seed == 0xA4B0A931
+        p1 = generate_pokemon(lcg1)
+        assert p1.nature_id == NATURE_TO_ID["Hasty"]
+        assert p1.calc_stats(self.BASE_STATS, self.LEVEL, mult) == expected_stats
+
+        # 候補 2: seed=0xCA28, advance=12193
+        lcg2 = LCG32(0xCA28)
+        lcg2.advance(12193)
+        assert lcg2.seed == 0x8ACEDC9B
+        p2 = generate_pokemon(lcg2)
+        assert p2.nature_id == NATURE_TO_ID["Hasty"]
+        assert p2.calc_stats(self.BASE_STATS, self.LEVEL, mult) == expected_stats
+
+        # 異なる IV で同一ステータスになるケース
+        assert p1.pid != p2.pid
+
 
 # ============================================================
 # config テスト
