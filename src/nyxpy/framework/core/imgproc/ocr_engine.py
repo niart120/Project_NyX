@@ -68,7 +68,11 @@ class OCRProcessor:
             
             # PaddleOCRの初期化
             # NOTE: use_angle_cls / show_log は新版で廃止されたため使用しない
+            # OCR.yaml のデフォルトはいずれも True のため、ゲーム画面用に
+            # 向き分類・歪み補正をすべて無効化して固定する
             self._ocr_engine = PaddleOCR(
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
                 use_textline_orientation=False,
                 lang=paddle_lang,
             )
@@ -88,8 +92,16 @@ class OCRProcessor:
             return []
             
         try:
-            results = self._ocr_engine.predict(image)
-            
+            # 呼び出し時にも向き分類・歪み補正を明示的に無効化する
+            # (OCR.yaml デフォルトが True のため、コンストラクタ設定だけでは
+            # predict() のキーワード引数で上書きされる可能性があるため)
+            results = self._ocr_engine.predict(
+                image,
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+            )
+
             ocr_results = []
             if results:
                 for item in results:
