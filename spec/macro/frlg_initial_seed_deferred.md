@@ -118,7 +118,7 @@ while (i < ki_seeds):
     Step 4: _consume_timer(ki_frame1) で初期Seed決定フレームまで消化
     Step 5: frame2 タイマー開始 → OP送り → つづきからはじめる → 回想スキップ → _consume_timer(ki_frame2)
     Step 6: 個体生成 → 捕獲 → ステータス画面を開く
-    Step 7: 性格認識・実数値認識（失敗時は frame2 += 2 でリトライ）
+    Step 7: 性格認識・実数値認識（失敗時は同一 frame2 でリトライ、最大 3 回）
     Step 9: 初期Seed逆算
     Step 10: 結果をコンソール出力 + CSV 書き込み
     Step 11: WaitTime += Increment で次の試行へ
