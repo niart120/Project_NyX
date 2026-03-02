@@ -21,14 +21,14 @@ class FrlgInitialSeedConfig:
     button_mode: str = "ヘルプ"
 
     # === フレームタイミング ===
-    min_frame: int = 1800
-    max_frame: int = 1920
+    min_frame: int = 2000
+    max_frame: int = 2180
     trials: int = 5
-    frame2: int = 750
+    frame2: int = 560
     frame1_offset: int = 0
     frame2_offset: int = 0
-    min_advance: int = 1600
-    max_advance: int = 1800
+    min_advance: int = 1200
+    max_advance: int = 1300
     fps: float = 60.0
 
     # === 対象ポケモン ===

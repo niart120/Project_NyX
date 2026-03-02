@@ -474,10 +474,10 @@ class TestConfig:
         assert cfg.language == "JPN"
         assert cfg.rom == "FR"
         assert cfg.device == "Switch"
-        assert cfg.min_frame == 1800
-        assert cfg.max_frame == 1920
+        assert cfg.min_frame == 2000
+        assert cfg.max_frame == 2180
         assert cfg.trials == 5
-        assert cfg.frame2 == 750
+        assert cfg.frame2 == 560
         assert cfg.fps == 60.0
         assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
         assert cfg.level == 70
@@ -485,7 +485,7 @@ class TestConfig:
     def test_file_name_auto_generated(self):
         """file_name が設定値から自動生成される"""
         cfg = FrlgInitialSeedConfig()
-        expected = "JPN_FR_Switch_モノラル_ヘルプ_1800_1920"
+        expected = "JPN_FR_Switch_モノラル_ヘルプ_2000_2180"
         assert cfg.file_name == expected
 
     def test_file_name_reflects_settings(self):
@@ -521,7 +521,7 @@ class TestConfig:
         assert cfg.trials == 3
         assert cfg.sound == "ステレオ"
         # 指定しなかった値はデフォルト
-        assert cfg.frame2 == 750
+        assert cfg.frame2 == 560
         assert cfg.button_mode == "ヘルプ"
 
     def test_from_args_base_stats(self):
@@ -545,7 +545,7 @@ class TestCSVHelper:
         """CSV パスが設定値から自動生成される"""
         cfg = FrlgInitialSeedConfig()
         path = _build_csv_path(cfg)
-        expected = Path("static/frlg_initial_seed/JPN_FR_Switch_モノラル_ヘルプ_1800_1920.csv")
+        expected = Path("static/frlg_initial_seed/JPN_FR_Switch_モノラル_ヘルプ_2000_2180.csv")
         assert path == expected
 
     def test_save_and_load(self, tmp_path):

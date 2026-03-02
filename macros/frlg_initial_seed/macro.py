@@ -339,14 +339,14 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.press(Button.A, dur=0.20)  # ゲーム起動
 
     def _navigate_to_encounter(self, cmd: Command) -> None:
-        """OP送り → つづきからはじめる → 回想スキップ。
+        """スプラッシュ画面送り → つづきからはじめる → 回想スキップ。
 
         frame2 タイマーの計測区間内で実行される操作。
         所要時間はタイマーにより自然に吸収される。
         """
-        cmd.press(Button.A, dur=3.50, wait=1.00)   # OP を A で飛ばす
+        cmd.press(Button.A, dur=2.50, wait=1.00)   # スプラッシュ画面 を A で飛ばす
         cmd.press(Button.A, dur=0.20, wait=1.50)   # つづきからはじめる
-        cmd.press(Button.B, dur=0.50, wait=2.00)   # 回想を B で飛ばす
+        cmd.press(Button.B, dur=1.00, wait=0.50)   # 回想を B で飛ばす
 
     def _trigger_encounter(self, cmd: Command) -> None:
         """ルギアに話しかけてエンカウントを発生させる。"""
@@ -437,7 +437,7 @@ class FrlgInitialSeedMacro(MacroBase):
             level="DEBUG",
         )
 
-        stats = recognize_stats(stat_image)
+        stats = recognize_stats(stat_image, cfg.base_stats, cfg.level)
         if stats is None:
             cmd.log("ステータス認識失敗", level="WARNING")
         else:

@@ -32,27 +32,47 @@ ROI_NATURE: tuple[int, int, int, int] = (185, 520, 270, 60)
 
 # ステータス ROI: (x, y, w, h) — HP, Atk, Def, SpA, SpD, Spe の順
 ROI_STATS: tuple[tuple[int, int, int, int], ...] = (
-    (1015, 90, 135, 60),   # HP
-    (1005, 170, 145, 60),  # こうげき
-    (1005, 225, 145, 60),  # ぼうぎょ
-    (1005, 280, 145, 60),  # とくこう
-    (1005, 335, 145, 60),  # とくぼう
-    (1005, 390, 145, 60),  # すばやさ
+    (1005, 90, 160, 60),   # HP
+    (1005, 170, 160, 60),  # こうげき
+    (1005, 225, 160, 60),  # ぼうぎょ
+    (1005, 280, 160, 60),  # とくこう
+    (1005, 335, 160, 60),  # とくぼう
+    (1005, 390, 160, 60),  # すばやさ
 )
-
-# ステータス有効範囲 (ルギア Lv.70, EV=0 時の理論値域)
-STAT_VALID_RANGES: dict[str, tuple[int, int]] = {
-    "HP": (228, 250),
-    "Atk": (117, 167),
-    "Def": (168, 228),
-    "SpA": (117, 167),
-    "SpD": (198, 266),
-    "Spe": (143, 198),
-}
 
 _STAT_KEYS = ("HP", "Atk", "Def", "SpA", "SpD", "Spe")
 
 _PADDING = 40  # 白パディング (px)
+
+
+def calc_stat_valid_ranges(
+    base_stats: tuple[int, int, int, int, int, int],
+    level: int,
+) -> dict[str, tuple[int, int]]:
+    """種族値・レベルから各ステータスの有効範囲 (EV=0, IV=0〜31, 性格補正考慮) を返す。
+
+    HP 以外は性格補正 0.9〜1.1 を考慮した広い範囲を返す。
+    """
+    b_hp, b_atk, b_def, b_spa, b_spd, b_spe = base_stats
+
+    def _hp_range(base: int) -> tuple[int, int]:
+        lo = ((2 * base) * level) // 100 + level + 10
+        hi = ((2 * base + 31) * level) // 100 + level + 10
+        return lo, hi
+
+    def _stat_range(base: int) -> tuple[int, int]:
+        lo = int(((2 * base) * level // 100 + 5) * 0.9)
+        hi = int(((2 * base + 31) * level // 100 + 5) * 1.1)
+        return lo, hi
+
+    return {
+        "HP":  _hp_range(b_hp),
+        "Atk": _stat_range(b_atk),
+        "Def": _stat_range(b_def),
+        "SpA": _stat_range(b_spa),
+        "SpD": _stat_range(b_spd),
+        "Spe": _stat_range(b_spe),
+    }
 
 # ============================================================
 # 認識関数
@@ -121,15 +141,20 @@ def recognize_nature(image: "np.ndarray") -> str | None:
 
 def recognize_stats(
     image: "np.ndarray",
+    base_stats: tuple[int, int, int, int, int, int],
+    level: int,
 ) -> tuple[int, int, int, int, int, int] | None:
     """キャプチャ画像から6ステータスの実数値を OCR 認識する。
 
     Args:
         image: キャプチャ画像 (BGR)
+        base_stats: 対象ポケモンの種族値 (HP, Atk, Def, SpA, SpD, Spe)
+        level: 対象ポケモンのレベル
 
     Returns:
         (HP, Atk, Def, SpA, SpD, Spe) のタプル、または認識失敗時は None
     """
+    valid_ranges = calc_stat_valid_ranges(base_stats, level)
     values: list[int] = []
     raw_digits = get_stat_digits(image)
 
@@ -142,9 +167,9 @@ def recognize_stats(
         except ValueError:
             return None
 
-        # 有効範囲チェック
+        # 有効範囲チェック (種族値・レベルから導出)
         key = _STAT_KEYS[i]
-        lo, hi = STAT_VALID_RANGES[key]
+        lo, hi = valid_ranges[key]
         if not (lo <= value <= hi):
             return None
 
