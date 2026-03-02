@@ -1,0 +1,461 @@
+"""
+FRLG 初期Seed特定マクロ — ユニットテスト
+
+LCG32 / nature / pokemon_gen / seed_solver のテストを提供する。
+"""
+
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+# macros/ ディレクトリをインポートパスに追加
+_macros_dir = str(Path(__file__).resolve().parent.parent.parent.parent / "macros")
+if _macros_dir not in sys.path:
+    sys.path.insert(0, _macros_dir)
+
+
+# ============================================================
+# LCG32 テスト
+# ============================================================
+
+from frlg_initial_seed.lcg32 import LCG32
+
+
+class TestLCG32:
+    """LCG32 乱数生成器のテスト"""
+
+    def test_initial_seed(self):
+        """初期化時に seed が正しく設定される"""
+        lcg = LCG32(0x1234)
+        assert lcg.seed == 0x1234
+
+    def test_mask_on_init(self):
+        """初期化時に 32bit マスクが適用される"""
+        lcg = LCG32(0x1_0000_0000)
+        assert lcg.seed == 0
+
+    def test_advance_once(self):
+        """1 step 前進の計算が正しい"""
+        lcg = LCG32(0)
+        lcg.advance()
+        # seed = (0x41C64E6D * 0 + 0x6073) & 0xFFFFFFFF = 0x6073
+        assert lcg.seed == 0x00006073
+
+    def test_advance_sequence(self):
+        """複数回前進した結果が既知の値と一致する"""
+        lcg = LCG32(0)
+        seeds = []
+        for _ in range(5):
+            lcg.advance()
+            seeds.append(lcg.seed)
+        # 手動計算:
+        # s0 = 0
+        # s1 = 0x00006073
+        # s2 = (0x41C64E6D * 0x6073 + 0x6073) & mask
+        assert seeds[0] == 0x00006073
+        # 2回目以降は既知の LCG シーケンスで検証
+        expected_s2 = (0x41C64E6D * 0x00006073 + 0x00006073) & 0xFFFFFFFF
+        assert seeds[1] == expected_s2
+
+    def test_back_reverses_advance(self):
+        """back() が advance() の逆操作として機能する"""
+        lcg = LCG32(0xABCD)
+        original = lcg.seed
+        lcg.advance(5)
+        lcg.back(5)
+        assert lcg.seed == original
+
+    def test_get_rand(self):
+        """get_rand() が advance(1) + 上位 16bit を返す"""
+        lcg = LCG32(0)
+        rand = lcg.get_rand()
+        # advance 後の seed: 0x00006073 → 上位16bit: 0
+        assert rand == 0
+        # 2回目
+        rand2 = lcg.get_rand()
+        expected_seed = (0x41C64E6D * 0x00006073 + 0x00006073) & 0xFFFFFFFF
+        assert rand2 == (expected_seed >> 16) & 0xFFFF
+
+    def test_advance_n(self):
+        """advance(n) は advance() × n回と同等"""
+        lcg1 = LCG32(42)
+        lcg1.advance(10)
+
+        lcg2 = LCG32(42)
+        for _ in range(10):
+            lcg2.advance()
+
+        assert lcg1.seed == lcg2.seed
+
+    def test_back_n(self):
+        """back(n) は back() × n回と同等"""
+        lcg1 = LCG32(42)
+        lcg1.advance(10)
+        lcg1.back(10)
+
+        assert lcg1.seed == 42
+
+
+# ============================================================
+# nature テスト
+# ============================================================
+
+from frlg_initial_seed.nature import (
+    NATURE_JPN_TO_EN,
+    NATURE_NAMES,
+    NATURE_TO_ID,
+    get_nature_multipliers,
+)
+
+
+class TestNature:
+    """性格テーブルのテスト"""
+
+    def test_nature_count(self):
+        """25 種類の性格が定義されている"""
+        assert len(NATURE_NAMES) == 25
+        assert len(NATURE_TO_ID) == 25
+
+    def test_nature_id_round_trip(self):
+        """名前 → ID → 名前の往復変換"""
+        for name in NATURE_NAMES:
+            idx = NATURE_TO_ID[name]
+            assert NATURE_NAMES[idx] == name
+
+    def test_jpn_to_en_complete(self):
+        """日本語名 → 英語名テーブルが全25種をカバー"""
+        assert len(NATURE_JPN_TO_EN) == 25
+        en_names = set(NATURE_JPN_TO_EN.values())
+        assert en_names == set(NATURE_NAMES)
+
+    def test_adamant_multipliers(self):
+        """Adamant: Attack ×1.1, SpecialAttack ×0.9"""
+        mult = get_nature_multipliers("Adamant")
+        assert mult["Attack"] == pytest.approx(1.1)
+        assert mult["SpecialAttack"] == pytest.approx(0.9)
+        assert mult["Defense"] == pytest.approx(1.0)
+        assert mult["Speed"] == pytest.approx(1.0)
+        assert mult["SpecialDefense"] == pytest.approx(1.0)
+
+    def test_hardy_neutral(self):
+        """Hardy（無補正）: 全ステータス ×1.0"""
+        mult = get_nature_multipliers("Hardy")
+        for key in ("Attack", "Defense", "Speed", "SpecialAttack", "SpecialDefense"):
+            assert mult[key] == pytest.approx(1.0)
+
+    def test_timid_multipliers(self):
+        """Timid: Speed ×1.1, Attack ×0.9"""
+        mult = get_nature_multipliers("Timid")
+        assert mult["Speed"] == pytest.approx(1.1)
+        assert mult["Attack"] == pytest.approx(0.9)
+
+
+# ============================================================
+# pokemon_gen テスト
+# ============================================================
+
+from frlg_initial_seed.pokemon_gen import Pokemon, generate_pokemon
+
+
+class TestPokemonGen:
+    """個体生成ロジックのテスト"""
+
+    def test_generate_pokemon_consumes_4_steps(self):
+        """generate_pokemon は LCG を 4step 消費する"""
+        lcg = LCG32(0x1234)
+        lcg_copy = LCG32(0x1234)
+        lcg_copy.advance(4)
+
+        generate_pokemon(lcg)
+        assert lcg.seed == lcg_copy.seed
+
+    def test_pid_composition(self):
+        """PID = lid | (hid << 16)"""
+        lcg = LCG32(0x1234)
+        lcg_copy = LCG32(0x1234)
+
+        lid = lcg_copy.get_rand()
+        hid = lcg_copy.get_rand()
+        expected_pid = lid | (hid << 16)
+
+        pokemon = generate_pokemon(lcg)
+        assert pokemon.pid == expected_pid
+
+    def test_nature_id(self):
+        """nature_id = PID % 25"""
+        lcg = LCG32(0x5678)
+        pokemon = generate_pokemon(lcg)
+        assert pokemon.nature_id == pokemon.pid % 25
+
+    def test_ivs_in_range(self):
+        """IV は 0〜31 の範囲"""
+        for seed in (0, 0x1234, 0xABCD, 0xFFFF):
+            lcg = LCG32(seed)
+            p = generate_pokemon(lcg)
+            for iv in (p.iv_hp, p.iv_atk, p.iv_def, p.iv_spa, p.iv_spd, p.iv_spe):
+                assert 0 <= iv <= 31
+
+    def test_calc_stats_lugia_example(self):
+        """仕様書 §7 の計算例: ルギア Lv.70 Adamant
+
+        HP=238, Atk=149, Def=189, SpA=130, SpD=229, Spe=162
+        """
+        # IV: HP=15, Atk=8, Def=3, SpA=20, SpD=12, Spe=5
+        pokemon = Pokemon(
+            pid=0,  # PID は calc_stats には影響しない
+            nature_id=3,  # Adamant
+            iv_hp=15,
+            iv_atk=8,
+            iv_def=3,
+            iv_spa=20,
+            iv_spd=12,
+            iv_spe=5,
+        )
+
+        base_stats = (106, 90, 130, 90, 154, 110)
+        level = 70
+        nature_mult = get_nature_multipliers("Adamant")
+
+        stats = pokemon.calc_stats(base_stats, level, nature_mult)
+        assert stats == (238, 149, 189, 130, 229, 162)
+
+
+# ============================================================
+# seed_solver テスト
+# ============================================================
+
+from frlg_initial_seed.seed_solver import solve_initial_seed
+
+
+class TestSeedSolver:
+    """Seed 逆算ロジックのテスト"""
+
+    # ルギア Lv.70 の種族値
+    BASE_STATS = (106, 90, 130, 90, 154, 110)
+    LEVEL = 70
+
+    def test_known_seed_returns_hex(self):
+        """既知の条件から正しい Seed が返ること。
+
+        Seed=0x0000, advance=741 で生成される個体を事前計算し、
+        それを入力として solve_initial_seed に渡す。
+        """
+        # Seed 0x0000, advance 741 で個体を生成
+        lcg = LCG32(0x0000)
+        lcg.advance(741)
+        pokemon = generate_pokemon(lcg)
+
+        nature = NATURE_NAMES[pokemon.nature_id]
+        nature_mult = get_nature_multipliers(nature)
+        observed_stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
+
+        seed, advance = solve_initial_seed(
+            nature=nature,
+            observed_stats=observed_stats,
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=741,
+            max_advance=741,
+        )
+
+        # 結果は "0000" または一意な Seed
+        assert seed != "False"
+        assert seed != "MultipleSeeds"
+        # advance が返ること
+        assert advance == 741
+
+    def test_false_on_impossible_stats(self):
+        """不可能な実数値で ("False", None) が返る"""
+        seed, advance = solve_initial_seed(
+            nature="Hardy",
+            observed_stats=(999, 999, 999, 999, 999, 999),
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=741,
+            max_advance=749,
+        )
+        assert seed == "False"
+        assert advance is None
+
+    def test_narrow_range_specific_seed(self):
+        """特定 Seed + 狭い advance 範囲で一意に特定できること"""
+        # 複数の seed で試行し、一意に特定できるケースを見つける
+        for test_seed in range(0, 100):
+            lcg = LCG32(test_seed)
+            lcg.advance(745)
+            pokemon = generate_pokemon(lcg)
+
+            nature = NATURE_NAMES[pokemon.nature_id]
+            nature_mult = get_nature_multipliers(nature)
+            stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
+
+            seed, advance = solve_initial_seed(
+                nature=nature,
+                observed_stats=stats,
+                base_stats=self.BASE_STATS,
+                level=self.LEVEL,
+                min_advance=745,
+                max_advance=745,
+            )
+
+            # 結果は False でないべき（少なくとも test_seed が見つかるはず）
+            assert seed != "False", f"Seed {test_seed:04X} が見つからなかった"
+
+            if seed != "MultipleSeeds":
+                # 一意に特定されたなら、test_seed のはず
+                assert seed == f"{test_seed:04X}"
+                assert advance == 745
+                return  # テスト成功
+
+        pytest.fail("100件の seed で一意に特定できるケースが見つからなかった")
+
+    def test_nature_none_stats_only(self):
+        """性格 None でもステータスのみで Seed 逆算ができること"""
+        # Seed 0x0000, advance 741 で個体を生成
+        lcg = LCG32(0x0000)
+        lcg.advance(741)
+        pokemon = generate_pokemon(lcg)
+
+        nature = NATURE_NAMES[pokemon.nature_id]
+        nature_mult = get_nature_multipliers(nature)
+        observed_stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
+
+        seed, advance = solve_initial_seed(
+            nature=None,
+            observed_stats=observed_stats,
+            base_stats=self.BASE_STATS,
+            level=self.LEVEL,
+            min_advance=741,
+            max_advance=741,
+        )
+
+        # 性格フィルタなしでも候補が見つかる（False でない）
+        assert seed != "False"
+        # 一意特定 or MultipleSeeds のどちらかになりうる
+        if seed != "MultipleSeeds":
+            assert seed == "0000"
+            assert advance == 741
+
+
+# ============================================================
+# config テスト
+# ============================================================
+
+from frlg_initial_seed.config import FrlgInitialSeedConfig
+
+
+class TestConfig:
+    """設定パラメータのテスト"""
+
+    def test_defaults(self):
+        """デフォルト値が正しく設定される"""
+        cfg = FrlgInitialSeedConfig()
+        assert cfg.min_frame == 2090
+        assert cfg.max_frame == 4500
+        assert cfg.trials == 5
+        assert cfg.frame2 == 745
+        assert cfg.fps == 60.0
+        assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
+        assert cfg.level == 70
+
+    def test_from_args(self):
+        """args dict から設定が構築される"""
+        args = {
+            "min_frame": 3000,
+            "max_frame": 3500,
+            "trials": 3,
+            "sound": "ステレオ",
+        }
+        cfg = FrlgInitialSeedConfig.from_args(args)
+        assert cfg.min_frame == 3000
+        assert cfg.max_frame == 3500
+        assert cfg.trials == 3
+        assert cfg.sound == "ステレオ"
+        # 指定しなかった値はデフォルト
+        assert cfg.frame2 == 745
+        assert cfg.button_mode == "ヘルプ"
+
+    def test_from_args_base_stats(self):
+        """args dict から base_stats が構築される"""
+        args = {"base_stats": [100, 80, 120, 80, 140, 100]}
+        cfg = FrlgInitialSeedConfig.from_args(args)
+        assert cfg.base_stats == (100, 80, 120, 80, 140, 100)
+
+
+# ============================================================
+# CSV ヘルパーテスト
+# ============================================================
+
+from frlg_initial_seed.macro import _build_csv_path, _load_csv, _new_frame_row, _save_csv
+
+
+class TestCSVHelper:
+    """CSV 読み書きのテスト"""
+
+    def test_build_csv_path(self):
+        """CSV パスが正しく構築される"""
+        cfg = FrlgInitialSeedConfig()
+        path = _build_csv_path(cfg)
+        assert path == Path("static/frlg_initial_seed/Switch.csv")
+
+    def test_save_and_load(self, tmp_path):
+        """CSV の保存と読み込みが往復する"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.output_dir = str(tmp_path)
+        cfg.trials = 3
+
+        csv_path = _build_csv_path(cfg)
+
+        data = {
+            2090: {
+                "seeds": ["A3F1", "A3F1", "A3F1"],
+                "advances": ["741", "741", "741"],
+            },
+            2091: {
+                "seeds": ["7C02", "", ""],
+                "advances": ["742", "", ""],
+            },
+        }
+        _save_csv(csv_path, data, cfg)
+
+        loaded, resume = _load_csv(csv_path, cfg.trials)
+        assert 2090 in loaded
+        assert loaded[2090]["seeds"] == ["A3F1", "A3F1", "A3F1"]
+        assert loaded[2090]["advances"] == ["741", "741", "741"]
+        assert loaded[2091]["seeds"] == ["7C02", "", ""]
+        assert loaded[2091]["advances"] == ["742", "", ""]
+        # 2091 は未完了なので resume_frame
+        assert resume == 2091
+
+    def test_load_nonexistent(self, tmp_path):
+        """存在しない CSV を読み込むと空の dict が返る"""
+        csv_path = tmp_path / "nonexistent.csv"
+        data, resume = _load_csv(csv_path, 5)
+        assert data == {}
+        assert resume is None
+
+    def test_resume_all_complete(self, tmp_path):
+        """全フレーム完了済みの CSV なら resume_frame は None"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.output_dir = str(tmp_path)
+        cfg.trials = 2
+
+        csv_path = _build_csv_path(cfg)
+        data = {
+            2090: {"seeds": ["ABCD", "ABCD"], "advances": ["741", "741"]},
+            2091: {"seeds": ["1234", "5678"], "advances": ["742", "743"]},
+        }
+        _save_csv(csv_path, data, cfg)
+
+        loaded, resume = _load_csv(csv_path, cfg.trials)
+        assert resume is None
+
+    def test_new_frame_row(self):
+        """_new_frame_row が正しい構造を返す"""
+        row = _new_frame_row(3)
+        assert row == {"seeds": ["", "", ""], "advances": ["", "", ""]}

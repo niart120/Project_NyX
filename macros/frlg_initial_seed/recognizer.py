@@ -1,0 +1,153 @@
+"""画像認識ラッパー
+
+性格・ステータスの OCR 認識を担当する。
+NyX フレームワークの ImageProcessor / OCRProcessor を使用する。
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import cv2
+
+from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor
+
+from .nature import NATURE_JPN_TO_EN
+
+# 部分一致用: 長い性格名から先にマッチさせる（誤マッチ防止）
+_NATURE_JPN_SORTED: list[tuple[str, str]] = sorted(
+    NATURE_JPN_TO_EN.items(), key=lambda kv: len(kv[0]), reverse=True
+)
+
+if TYPE_CHECKING:
+    import numpy as np
+    from nyxpy.framework.core.macro.command import Command
+
+# ============================================================
+# ROI 定義 (Switch / JPN / 720p)
+# ============================================================
+
+# 性格 ROI: (x, y, w, h)
+ROI_NATURE: tuple[int, int, int, int] = (185, 520, 270, 60)
+
+# ステータス ROI: (x, y, w, h) — HP, Atk, Def, SpA, SpD, Spe の順
+ROI_STATS: tuple[tuple[int, int, int, int], ...] = (
+    (1015, 90, 135, 60),   # HP
+    (1005, 170, 145, 60),  # こうげき
+    (1005, 225, 145, 60),  # ぼうぎょ
+    (1005, 280, 145, 60),  # とくこう
+    (1005, 335, 145, 60),  # とくぼう
+    (1005, 390, 145, 60),  # すばやさ
+)
+
+# ステータス有効範囲 (ルギア Lv.70, EV=0 時の理論値域)
+STAT_VALID_RANGES: dict[str, tuple[int, int]] = {
+    "HP": (228, 250),
+    "Atk": (117, 167),
+    "Def": (168, 228),
+    "SpA": (117, 167),
+    "SpD": (198, 266),
+    "Spe": (143, 198),
+}
+
+_STAT_KEYS = ("HP", "Atk", "Def", "SpA", "SpD", "Spe")
+
+_PADDING = 40  # 白パディング (px)
+
+# ============================================================
+# 認識関数
+# ============================================================
+
+
+def _crop_and_pad(
+    image: "np.ndarray", roi: tuple[int, int, int, int]
+) -> "np.ndarray":
+    """ROI クロップ → 白パディング付与。"""
+    x, y, w, h = roi
+    cropped = image[y : y + h, x : x + w]
+    return cv2.copyMakeBorder(
+        cropped,
+        _PADDING,
+        _PADDING,
+        _PADDING,
+        _PADDING,
+        borderType=cv2.BORDER_CONSTANT,
+        value=(255, 255, 255),
+    )
+
+
+def get_nature_text(image: "np.ndarray") -> str | None:
+    """性格 ROI から OCR 生文字列を取得する。"""
+    padded = _crop_and_pad(image, ROI_NATURE)
+    text = ImageProcessor(padded).get_text(language="ja")
+    if not text:
+        return None
+    return text.strip().replace(" ", "").replace("\n", "")
+
+
+def get_stat_digits(
+    image: "np.ndarray",
+) -> tuple[str | None, str | None, str | None, str | None, str | None, str | None]:
+    """ステータス 6 項目の OCR 生文字列を取得する。"""
+    raw: list[str | None] = []
+    for roi in ROI_STATS:
+        padded = _crop_and_pad(image, roi)
+        digits = ImageProcessor(padded).get_digits(language="en")
+        raw.append(digits if digits else None)
+
+    return (raw[0], raw[1], raw[2], raw[3], raw[4], raw[5])
+
+
+def recognize_nature(image: "np.ndarray") -> str | None:
+    """キャプチャ画像から性格を OCR 認識する。
+
+    Args:
+        image: キャプチャ画像 (BGR)
+
+    Returns:
+        性格の英語名、または認識失敗時は None
+    """
+    text = get_nature_text(image)
+    if not text:
+        return None
+
+    # 部分一致: ROI 拡大により「すなおな せいかく」等が含まれうるため
+    for jpn, eng in _NATURE_JPN_SORTED:
+        if jpn in text:
+            return eng
+
+    return None
+
+
+def recognize_stats(
+    image: "np.ndarray",
+) -> tuple[int, int, int, int, int, int] | None:
+    """キャプチャ画像から6ステータスの実数値を OCR 認識する。
+
+    Args:
+        image: キャプチャ画像 (BGR)
+
+    Returns:
+        (HP, Atk, Def, SpA, SpD, Spe) のタプル、または認識失敗時は None
+    """
+    values: list[int] = []
+    raw_digits = get_stat_digits(image)
+
+    for i, digits in enumerate(raw_digits):
+        if not digits:
+            return None
+
+        try:
+            value = int(digits)
+        except ValueError:
+            return None
+
+        # 有効範囲チェック
+        key = _STAT_KEYS[i]
+        lo, hi = STAT_VALID_RANGES[key]
+        if not (lo <= value <= hi):
+            return None
+
+        values.append(value)
+
+    return (values[0], values[1], values[2], values[3], values[4], values[5])
