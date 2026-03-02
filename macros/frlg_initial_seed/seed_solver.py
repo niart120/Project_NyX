@@ -1,7 +1,8 @@
 """初期Seed逆算ロジック (Seed Solver)
 
-画像認識で取得した性格・実数値から、16bit 初期Seed を逆算する。
+画像認識で取得した実数値から、16bit 初期Seed を逆算する。
 
+PID から導出される性格の補正を考慮した実数値照合で候補を絞り込む。
 内部実装は numpy ベクトル化により、65,536 通りの初期Seed を一括並列計算する。
 """
 
@@ -10,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from .lcg32 import LCG32
-from .nature import NATURE_NAMES, NATURE_TO_ID, get_nature_multipliers
+from .nature import NATURE_NAMES, get_nature_multipliers
 
 # ---- numpy 用 LCG 定数 (uint64 で演算し下位 32bit をマスク) ----
 _A64 = np.uint64(LCG32.A)
@@ -18,33 +19,23 @@ _C64 = np.uint64(LCG32.C)
 _MASK64 = np.uint64(LCG32.MASK)
 
 
-def _calc_stat_vec(
-    base: int, ivs: np.ndarray, level: int, mult: float
-) -> np.ndarray:
-    """HP 以外のステータス実数値をベクトル計算する。
+def _build_nature_mult_arrays() -> dict[str, np.ndarray]:
+    """全25性格の補正値を stat キー別の numpy 配列として構築する。
 
-    int(((2 * base + iv) * level // 100 + 5) * mult) を numpy 配列で一括算出。
+    Returns:
+        {"Attack": float64[25], "Defense": ..., ...}
+        nature_id でインデクシングして各 seed の補正値を一括取得できる。
     """
-    raw = (2 * base + ivs.astype(np.int32)) * level // 100 + 5
-    return (raw * mult).astype(np.int32)
-
-
-def _build_nature_mults(
-    nature: str | None,
-) -> tuple[int | None, dict[int, dict[str, float]]]:
-    """性格補正テーブルを構築する。"""
-    if nature is not None:
-        nid = NATURE_TO_ID[nature]
-        return nid, {nid: get_nature_multipliers(nature)}
-
-    mults: dict[int, dict[str, float]] = {}
+    keys = ("Attack", "Defense", "SpecialAttack", "SpecialDefense", "Speed")
+    arrays: dict[str, np.ndarray] = {k: np.empty(25, dtype=np.float64) for k in keys}
     for i, name in enumerate(NATURE_NAMES):
-        mults[i] = get_nature_multipliers(name)
-    return None, mults
+        mult = get_nature_multipliers(name)
+        for k in keys:
+            arrays[k][i] = mult[k]
+    return arrays
 
 
 def solve_initial_seed(
-    nature: str | None,
     observed_stats: tuple[int, int, int, int, int, int],
     base_stats: tuple[int, int, int, int, int, int],
     level: int,
@@ -53,9 +44,9 @@ def solve_initial_seed(
 ) -> tuple[str, int | None]:
     """初期Seed を逆算する。
 
+    PID から導出される性格補正を考慮し、実数値のみで照合する。
+
     Args:
-        nature: 画像認識で取得した性格名 (英語名)。
-                None の場合はステータスのみで照合する。
         observed_stats: 画像認識で取得した実数値 (HP, Atk, Def, SpA, SpD, Spe)
         base_stats: 対象ポケモンの種族値 (HP, Atk, Def, SpA, SpD, Spe)
         level: 対象ポケモンのレベル
@@ -68,7 +59,7 @@ def solve_initial_seed(
         - 候補が見つからない:   ("False", None)
         - 候補が2つ以上:       ("MultipleSeeds", None)
     """
-    nature_id, nature_mults = _build_nature_mults(nature)
+    nature_mult_arrays = _build_nature_mult_arrays()
 
     b_hp, b_atk, b_def, b_spa, b_spd, b_spe = base_stats
     o_hp, o_atk, o_def, o_spa, o_spd, o_spe = observed_stats
@@ -98,90 +89,85 @@ def solve_initial_seed(
         s4 = (_A64 * s3 + _C64) & _MASK64
         scd = ((s4 >> np.uint64(16)) & np.uint64(0xFFFF)).astype(np.uint32)
 
-        # ---- PID → 性格フィルタ (96% を棄却) ----
+        # ---- PID → 性格導出 ----
         pid = lid | (hid << np.uint32(16))
-        nature_ids = pid % np.uint32(25)
+        nature_ids = (pid % np.uint32(25)).astype(np.intp)
 
-        if nature_id is not None:
-            # 性格が既知: 1 性格分のみ照合
-            mask = nature_ids == np.uint32(nature_id)
-            if not mask.any():
-                states = s1
-                continue
-            natures_to_check = [(nature_id, mask)]
-        else:
-            # 性格不明: 全 25 性格を順にチェック
-            natures_to_check = []
-            for nid in range(25):
-                m = nature_ids == np.uint32(nid)
-                if m.any():
-                    natures_to_check.append((nid, m))
+        # ---- IV 抽出 ----
+        iv_hp  = hab & np.uint32(0x1F)
+        iv_atk = (hab >> np.uint32(5)) & np.uint32(0x1F)
+        iv_def = (hab >> np.uint32(10)) & np.uint32(0x1F)
+        iv_spe = scd & np.uint32(0x1F)
+        iv_spa = (scd >> np.uint32(5)) & np.uint32(0x1F)
+        iv_spd = (scd >> np.uint32(10)) & np.uint32(0x1F)
 
-        for nid, mask in natures_to_check:
-            mult = nature_mults[nid]
+        # ---- 段階的ステータス照合 (早期棄却) ----
+        # HP (性格補正なし)
+        hp = (2 * b_hp + iv_hp.astype(np.int32)) * level // 100 + level + 10
+        ok = hp == o_hp
+        if not ok.any():
+            states = s1
+            continue
 
-            # ---- IV 抽出 ----
-            m_hab = hab[mask]
-            m_scd = scd[mask]
-            iv_hp = m_hab & np.uint32(0x1F)
-            iv_atk = (m_hab >> np.uint32(5)) & np.uint32(0x1F)
-            iv_def = (m_hab >> np.uint32(10)) & np.uint32(0x1F)
-            iv_spe = m_scd & np.uint32(0x1F)
-            iv_spa = (m_scd >> np.uint32(5)) & np.uint32(0x1F)
-            iv_spd = (m_scd >> np.uint32(10)) & np.uint32(0x1F)
+        # 以降は ok でフィルタした部分配列で計算
+        nids = nature_ids[ok]
 
-            # ---- 段階的ステータス照合 (早期棄却) ----
-            # HP
-            hp = (
-                (2 * b_hp + iv_hp.astype(np.int32)) * level
-            ) // 100 + level + 10
-            ok = hp == o_hp
-            if not ok.any():
-                continue
+        # Atk
+        m_atk = nature_mult_arrays["Attack"][nids]
+        raw_atk = (2 * b_atk + iv_atk[ok].astype(np.int32)) * level // 100 + 5
+        atk = (raw_atk * m_atk).astype(np.int32)
+        ok2 = atk == o_atk
+        if not ok2.any():
+            states = s1
+            continue
 
-            # Atk
-            atk = _calc_stat_vec(b_atk, iv_atk[ok], level, mult["Attack"])
-            ok2 = atk == o_atk
-            if not ok2.any():
-                continue
+        # Def
+        nids2 = nids[ok2]
+        m_def = nature_mult_arrays["Defense"][nids2]
+        raw_def = (2 * b_def + iv_def[ok][ok2].astype(np.int32)) * level // 100 + 5
+        def_ = (raw_def * m_def).astype(np.int32)
+        ok3 = def_ == o_def
+        if not ok3.any():
+            states = s1
+            continue
 
-            # Def
-            def_ = _calc_stat_vec(b_def, iv_def[ok][ok2], level, mult["Defense"])
-            ok3 = def_ == o_def
-            if not ok3.any():
-                continue
+        # SpA
+        nids3 = nids2[ok3]
+        m_spa = nature_mult_arrays["SpecialAttack"][nids3]
+        raw_spa = (2 * b_spa + iv_spa[ok][ok2][ok3].astype(np.int32)) * level // 100 + 5
+        spa = (raw_spa * m_spa).astype(np.int32)
+        ok4 = spa == o_spa
+        if not ok4.any():
+            states = s1
+            continue
 
-            # SpA
-            spa = _calc_stat_vec(
-                b_spa, iv_spa[ok][ok2][ok3], level, mult["SpecialAttack"]
-            )
-            ok4 = spa == o_spa
-            if not ok4.any():
-                continue
+        # SpD
+        nids4 = nids3[ok4]
+        m_spd = nature_mult_arrays["SpecialDefense"][nids4]
+        raw_spd = (2 * b_spd + iv_spd[ok][ok2][ok3][ok4].astype(np.int32)) * level // 100 + 5
+        spd = (raw_spd * m_spd).astype(np.int32)
+        ok5 = spd == o_spd
+        if not ok5.any():
+            states = s1
+            continue
 
-            # SpD
-            spd = _calc_stat_vec(
-                b_spd, iv_spd[ok][ok2][ok3][ok4], level, mult["SpecialDefense"]
-            )
-            ok5 = spd == o_spd
-            if not ok5.any():
-                continue
+        # Spe
+        nids5 = nids4[ok5]
+        m_spe = nature_mult_arrays["Speed"][nids5]
+        raw_spe = (2 * b_spe + iv_spe[ok][ok2][ok3][ok4][ok5].astype(np.int32)) * level // 100 + 5
+        spe = (raw_spe * m_spe).astype(np.int32)
+        ok6 = spe == o_spe
+        if not ok6.any():
+            states = s1
+            continue
 
-            # Spe
-            spe = _calc_stat_vec(
-                b_spe, iv_spe[ok][ok2][ok3][ok4][ok5], level, mult["Speed"]
-            )
-            ok6 = spe == o_spe
-            if not ok6.any():
-                continue
-
-            # ---- ヒットした初期Seed を復元 ----
-            original_idx = np.where(mask)[0]
-            hit_idx = original_idx[ok][ok2][ok3][ok4][ok5][ok6]
-            for idx in hit_idx:
-                result_count += 1
-                result_seed = f"{int(idx):04X}"
-                result_advance = adv
+        # ---- ヒットした初期Seed を復元 ----
+        all_idx = np.arange(len(ok))[ok]
+        hit_idx = all_idx[ok2][ok3][ok4][ok5][ok6]
+        for idx in hit_idx:
+            result_count += 1
+            result_seed = f"{int(idx):04X}"
+            result_advance = adv
 
         # net +1 step: states を 1step 進める
         states = s1

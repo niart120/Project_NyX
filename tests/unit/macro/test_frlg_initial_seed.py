@@ -255,7 +255,6 @@ class TestSeedSolver:
         observed_stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
 
         seed, advance = solve_initial_seed(
-            nature=nature,
             observed_stats=observed_stats,
             base_stats=self.BASE_STATS,
             level=self.LEVEL,
@@ -272,7 +271,6 @@ class TestSeedSolver:
     def test_false_on_impossible_stats(self):
         """不可能な実数値で ("False", None) が返る"""
         seed, advance = solve_initial_seed(
-            nature="Hardy",
             observed_stats=(999, 999, 999, 999, 999, 999),
             base_stats=self.BASE_STATS,
             level=self.LEVEL,
@@ -295,7 +293,6 @@ class TestSeedSolver:
             stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
 
             seed, advance = solve_initial_seed(
-                nature=nature,
                 observed_stats=stats,
                 base_stats=self.BASE_STATS,
                 level=self.LEVEL,
@@ -314,8 +311,8 @@ class TestSeedSolver:
 
         pytest.fail("100件の seed で一意に特定できるケースが見つからなかった")
 
-    def test_nature_none_stats_only(self):
-        """性格 None でもステータスのみで Seed 逆算ができること"""
+    def test_stats_only_seed_resolution(self):
+        """実数値のみで Seed 逆算ができること"""
         # Seed 0x0000, advance 741 で個体を生成
         lcg = LCG32(0x0000)
         lcg.advance(741)
@@ -326,7 +323,6 @@ class TestSeedSolver:
         observed_stats = pokemon.calc_stats(self.BASE_STATS, self.LEVEL, nature_mult)
 
         seed, advance = solve_initial_seed(
-            nature=None,
             observed_stats=observed_stats,
             base_stats=self.BASE_STATS,
             level=self.LEVEL,
@@ -334,7 +330,7 @@ class TestSeedSolver:
             max_advance=741,
         )
 
-        # 性格フィルタなしでも候補が見つかる（False でない）
+        # 候補が見つかる（False でない）
         assert seed != "False"
         # 一意特定 or MultipleSeeds のどちらかになりうる
         if seed != "MultipleSeeds":
@@ -354,7 +350,6 @@ class TestSeedSolver:
             初期Seed=0x557B, advance=1708, LCG state=0x35D25317
         """
         seed, advance = solve_initial_seed(
-            nature="Jolly",
             observed_stats=(231, 149, 204, 119, 240, 182),
             base_stats=self.BASE_STATS,
             level=self.LEVEL,
@@ -376,7 +371,6 @@ class TestSeedSolver:
            狭い探索範囲では 0x87B5 のみがヒットする。
         """
         seed, advance = solve_initial_seed(
-            nature="Hasty",
             observed_stats=(231, 133, 171, 145, 233, 174),
             base_stats=self.BASE_STATS,
             level=self.LEVEL,
@@ -395,7 +389,6 @@ class TestSeedSolver:
         両方が探索範囲に含まれる場合、"MultipleSeeds" を返す。
         """
         seed, advance = solve_initial_seed(
-            nature="Hasty",
             observed_stats=(231, 133, 171, 145, 233, 174),
             base_stats=self.BASE_STATS,
             level=self.LEVEL,

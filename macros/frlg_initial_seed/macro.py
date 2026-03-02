@@ -1,7 +1,7 @@
 """
 FRLG 初期Seed特定マクロ
 
-ゲームのソフトリセット → 捕獲 → OCR で性格・実数値を取得し
+ゲームのソフトリセット → 捕獲 → OCR で実数値を取得し
 16bit 初期Seed を逆算して CSV に記録するマクロ。
 Switch (720p) 専用。
 """
@@ -22,11 +22,8 @@ from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
 from .recognizer import (
-    ROI_NATURE,
     ROI_STATS,
-    get_nature_text,
     get_stat_digits,
-    recognize_nature,
     recognize_stats,
 )
 from .seed_solver import solve_initial_seed
@@ -311,18 +308,18 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.log("Phase1: エンカウント発生", level="DEBUG")
         self._trigger_encounter(cmd)
 
-        # === Phase 2: 捕獲 → B 連打 → ステータス画面表示 ===
+        # === Phase 2: 捕獲 → B 連打 → 実数値画面表示 ===
         cmd.log("Phase2: 捕獲操作", level="DEBUG")
         self._capture_pokemon(cmd)
 
         cmd.log("Phase2: 捕獲後ダイアログ B 連打", level="DEBUG")
         self._dismiss_post_capture(cmd)
 
-        cmd.log("Phase2: ステータス画面を開く", level="DEBUG")
-        self._open_status_screen(cmd)
+        cmd.log("Phase2: 実数値画面を開く", level="DEBUG")
+        self._open_stats_screen(cmd)
 
         # === Phase 3: OCR 認識 → Seed 逆算 ===
-        cmd.log("Phase3: OCR 認識 → Seed 逆算", level="DEBUG")
+        cmd.log("Phase3: 実数値 OCR → Seed 逆算", level="DEBUG")
         return self._recognize_and_solve(cmd)
 
     # --------------------------------------------------------
@@ -364,8 +361,8 @@ class FrlgInitialSeedMacro(MacroBase):
         """
         cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)   # 「バッグ」を選択
         cmd.press(Button.A, dur=0.10, wait=1.20)     # バッグを開く
-        cmd.press(LStick.RIGHT, dur=0.10, wait=0.50)  # ポケット移動
-        cmd.press(LStick.RIGHT, dur=0.10, wait=0.50)  # ポケット移動
+        cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)  # ポケット移動
+        cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)  # ポケット移動
         cmd.press(Button.A, dur=0.10, wait=0.30)    # マスターボールを選択
         cmd.press(Button.A, dur=0.10, wait=8.00)    # 「つかう」→ 捕獲アニメーション
 
@@ -378,8 +375,12 @@ class FrlgInitialSeedMacro(MacroBase):
         for _ in range(50):  # 10 秒間 B を連打
             cmd.press(Button.B, dur=0.10, wait=0.10)
 
-    def _open_status_screen(self, cmd: Command) -> None:
-        """メニューからステータス画面を開く。"""
+    def _open_stats_screen(self, cmd: Command) -> None:
+        """メニューから実数値画面を直接開く。
+
+        性格画面を経由せず、ステータス画面で右入力して
+        実数値ページを直接表示する。
+        """
         cmd.press(Button.PLUS, dur=0.10, wait=0.30) # メニューを開く
         cmd.press(LStick.DOWN, dur=0.10, wait=0.10)    # カーソルを移動
         cmd.press(Button.A, dur=0.10, wait=1.20)    # ポケモンを選択
@@ -387,40 +388,22 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.press(LStick.UP, dur=0.10, wait=0.10)    # カーソルを移動
         cmd.press(Button.A, dur=0.10, wait=0.30)    # ルギアを選択
         cmd.press(Button.A, dur=0.10, wait=0.30)    # 「つよさをみる」
-        cmd.press(Button.A, dur=0.10, wait=2.40)    # ステータス画面表示
+        cmd.press(Button.A, dur=0.10, wait=1.00)    # ステータス画面表示
+        cmd.press(LStick.RIGHT, dur=0.10, wait=1.00)  # 実数値ページへ遷移
 
     # --------------------------------------------------------
     # Phase 3: OCR 認識 → Seed 逆算
     # --------------------------------------------------------
 
     def _recognize_and_solve(self, cmd: Command) -> TrialResult | None:
-        """性格・ステータスを OCR 認識し、Seed 逆算を実行する。
+        """実数値を OCR 認識し、Seed 逆算を実行する。
 
-        性格による足切りは行うが、性格・ステータスの取得自体は常に
-        両方実行する。認識失敗時は None を返す。
+        性格画面の OCR は行わず、実数値のみで Seed を特定する。
+        認識失敗時は None を返す。
         """
         cfg = self._cfg
 
-        # --- 性格画面キャプチャ → ROI 保存 → 認識 ---
-        image = cmd.capture()
-        if image is None:
-            cmd.log("キャプチャ失敗", level="WARNING")
-            return None
-
-        self._save_roi_image(image, ROI_NATURE, "nature.png")
-
-        nature_raw = get_nature_text(image)
-        cmd.log(f"OCR生文字列(性格): {nature_raw!r}", level="DEBUG")
-
-        nature = recognize_nature(image)
-        if nature is None:
-            cmd.log("性格認識失敗", level="WARNING")
-        else:
-            cmd.log(f"性格認識: {nature}", level="INFO")
-
-        # --- 実数値画面に切替 → ROI 保存 → 認識（性格認識の成否に依らず常に実行）---
-        cmd.press(LStick.RIGHT, dur=0.10, wait=1.00)
-
+        # --- 実数値画面キャプチャ → ROI 保存 → 認識 ---
         stat_image = cmd.capture()
         if stat_image is None:
             cmd.log("キャプチャ失敗（実数値）", level="WARNING")
@@ -440,24 +423,17 @@ class FrlgInitialSeedMacro(MacroBase):
         stats = recognize_stats(stat_image, cfg.base_stats, cfg.level)
         if stats is None:
             cmd.log("ステータス認識失敗", level="WARNING")
-        else:
-            cmd.log(
-                f"ステータス認識: HP={stats[0]}, Atk={stats[1]}, Def={stats[2]}, "
-                f"SpA={stats[3]}, SpD={stats[4]}, Spe={stats[5]}",
-                level="INFO",
-            )
-
-        # ステータス認識失敗時は逆算不可（性格は None でも続行）
-        if stats is None:
             return None
 
-        # Seed 逆算（性格が None の場合はステータスのみで照合）
-        if nature is None:
-            cmd.log("性格不明のためステータスのみで Seed 逆算開始", level="INFO")
-        else:
-            cmd.log("Seed 逆算開始", level="DEBUG")
+        cmd.log(
+            f"ステータス認識: HP={stats[0]}, Atk={stats[1]}, Def={stats[2]}, "
+            f"SpA={stats[3]}, SpD={stats[4]}, Spe={stats[5]}",
+            level="INFO",
+        )
+
+        # Seed 逆算（実数値のみで照合）
+        cmd.log("Seed 逆算開始", level="DEBUG")
         seed, advance = solve_initial_seed(
-            nature=nature,
             observed_stats=stats,
             base_stats=cfg.base_stats,
             level=cfg.level,

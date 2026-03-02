@@ -27,8 +27,8 @@ class FrlgInitialSeedConfig:
     frame2: int = 560
     frame1_offset: int = 0
     frame2_offset: int = 0
-    min_advance: int = 1200
-    max_advance: int = 1300
+    min_advance: int = 1300
+    max_advance: int = 1400
     fps: float = 60.0
 
     # === 対象ポケモン ===
