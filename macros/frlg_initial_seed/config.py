@@ -13,31 +13,47 @@ class FrlgInitialSeedConfig:
     """FRLG 初期Seed特定マクロの設定"""
 
     # === 基本設定 ===
-    file_name: str = "Switch"
+    language: str = "JPN"
+    rom: str = "FR"
+    device: str = "Switch"
     output_dir: str = "static/frlg_initial_seed"
     sound: str = "モノラル"
     button_mode: str = "ヘルプ"
 
     # === フレームタイミング ===
-    min_frame: int = 2090
-    max_frame: int = 4500
+    min_frame: int = 1800
+    max_frame: int = 1920
     trials: int = 5
-    frame2: int = 745
+    frame2: int = 750
     frame1_offset: int = 0
     frame2_offset: int = 0
-    min_advance: int = 600
-    max_advance: int = 1500
+    min_advance: int = 1600
+    max_advance: int = 1800
     fps: float = 60.0
 
     # === 対象ポケモン ===
     base_stats: tuple[int, int, int, int, int, int] = (106, 90, 130, 90, 154, 110)
     level: int = 70
 
+    @property
+    def file_name(self) -> str:
+        """設定値からファイル名を自動生成する。
+
+        フォーマット: {language}_{rom}_{device}_{sound}_{button_mode}_{min_frame}_{max_frame}
+        """
+        return (
+            f"{self.language}_{self.rom}_{self.device}"
+            f"_{self.sound}_{self.button_mode}"
+            f"_{self.min_frame}_{self.max_frame}"
+        )
+
     @classmethod
     def from_args(cls, args: dict) -> "FrlgInitialSeedConfig":
         """args dict から設定を構築する。"""
         cfg = cls()
-        cfg.file_name = str(args.get("file_name", cfg.file_name))
+        cfg.language = str(args.get("language", cfg.language))
+        cfg.rom = str(args.get("rom", cfg.rom))
+        cfg.device = str(args.get("device", cfg.device))
         cfg.output_dir = str(args.get("output_dir", cfg.output_dir))
         cfg.sound = str(args.get("sound", cfg.sound))
         cfg.button_mode = str(args.get("button_mode", cfg.button_mode))

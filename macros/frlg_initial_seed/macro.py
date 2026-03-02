@@ -77,7 +77,7 @@ def _consume_timer(
 # CSV ヘルパー
 # ============================================================
 
-_CSV_HEADER_PREFIX = ["frame", "sound", "button_mode"]
+_CSV_HEADER_PREFIX = ["frame"]
 
 
 def _build_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
@@ -145,8 +145,6 @@ def _save_csv(
 
             row: dict[str, str] = {
                 "frame": str(frame),
-                "sound": cfg.sound,
-                "button_mode": cfg.button_mode,
             }
             for i, col in enumerate(seed_columns):
                 row[col] = seeds[i] if i < len(seeds) else ""

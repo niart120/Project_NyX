@@ -471,29 +471,57 @@ class TestConfig:
     def test_defaults(self):
         """デフォルト値が正しく設定される"""
         cfg = FrlgInitialSeedConfig()
-        assert cfg.min_frame == 2090
-        assert cfg.max_frame == 4500
+        assert cfg.language == "JPN"
+        assert cfg.rom == "FR"
+        assert cfg.device == "Switch"
+        assert cfg.min_frame == 1800
+        assert cfg.max_frame == 1920
         assert cfg.trials == 5
-        assert cfg.frame2 == 745
+        assert cfg.frame2 == 750
         assert cfg.fps == 60.0
         assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
         assert cfg.level == 70
 
+    def test_file_name_auto_generated(self):
+        """file_name が設定値から自動生成される"""
+        cfg = FrlgInitialSeedConfig()
+        expected = "JPN_FR_Switch_モノラル_ヘルプ_1800_1920"
+        assert cfg.file_name == expected
+
+    def test_file_name_reflects_settings(self):
+        """設定変更がファイル名に反映される"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.language = "ENG"
+        cfg.rom = "LG"
+        cfg.device = "GC"
+        cfg.sound = "ステレオ"
+        cfg.button_mode = "LR"
+        cfg.min_frame = 1800
+        cfg.max_frame = 2100
+        expected = "ENG_LG_GC_ステレオ_LR_1800_2100"
+        assert cfg.file_name == expected
+
     def test_from_args(self):
         """args dict から設定が構築される"""
         args = {
+            "language": "ENG",
+            "rom": "LG",
+            "device": "GC",
             "min_frame": 3000,
             "max_frame": 3500,
             "trials": 3,
             "sound": "ステレオ",
         }
         cfg = FrlgInitialSeedConfig.from_args(args)
+        assert cfg.language == "ENG"
+        assert cfg.rom == "LG"
+        assert cfg.device == "GC"
         assert cfg.min_frame == 3000
         assert cfg.max_frame == 3500
         assert cfg.trials == 3
         assert cfg.sound == "ステレオ"
         # 指定しなかった値はデフォルト
-        assert cfg.frame2 == 745
+        assert cfg.frame2 == 750
         assert cfg.button_mode == "ヘルプ"
 
     def test_from_args_base_stats(self):
@@ -514,10 +542,11 @@ class TestCSVHelper:
     """CSV 読み書きのテスト"""
 
     def test_build_csv_path(self):
-        """CSV パスが正しく構築される"""
+        """CSV パスが設定値から自動生成される"""
         cfg = FrlgInitialSeedConfig()
         path = _build_csv_path(cfg)
-        assert path == Path("static/frlg_initial_seed/Switch.csv")
+        expected = Path("static/frlg_initial_seed/JPN_FR_Switch_モノラル_ヘルプ_1800_1920.csv")
+        assert path == expected
 
     def test_save_and_load(self, tmp_path):
         """CSV の保存と読み込みが往復する"""
@@ -547,6 +576,25 @@ class TestCSVHelper:
         assert loaded[2091]["advances"] == ["742", "", ""]
         # 2091 は未完了なので resume_frame
         assert resume == 2091
+
+    def test_csv_no_sound_button_mode_columns(self, tmp_path):
+        """CSV に sound / button_mode カラムが含まれないこと"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.output_dir = str(tmp_path)
+        cfg.trials = 1
+
+        csv_path = _build_csv_path(cfg)
+        data = {
+            2090: {"seeds": ["ABCD"], "advances": ["741"]},
+        }
+        _save_csv(csv_path, data, cfg)
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+        assert "sound" not in fieldnames
+        assert "button_mode" not in fieldnames
+        assert "frame" in fieldnames
 
     def test_load_nonexistent(self, tmp_path):
         """存在しない CSV を読み込むと空の dict が返る"""
