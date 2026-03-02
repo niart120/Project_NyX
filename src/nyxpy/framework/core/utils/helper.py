@@ -20,13 +20,23 @@ def get_caller_class_name():
 def load_macro_settings(macro_cls) -> dict:
     """
     指定されたマクロクラスに対応する設定ファイルを読み込み、辞書型のオブジェクトとして返却します。
-    設定ファイルは、<current_working_directory>/static/<macro_filename_without_extension>/settings.toml に存在することを想定します。
+    設定ファイルは、<current_working_directory>/static/<macro_name>/settings.toml に存在することを想定します。
+
+    マクロの特定方法:
+    - パッケージマクロ (macros/<pkg>/macro.py): パッケージディレクトリ名を使用
+    - 単一ファイルマクロ (macros/sample.py): ファイル名（拡張子なし）を使用
 
     :param macro_cls: マクロクラス（例: DummyTestMacro）
     :return: マージされた設定辞書
     """
     macro_file = Path(inspect.getfile(macro_cls))
-    macro_name = macro_file.stem  # マクロクラスのファイル名（拡張子なし）
+
+    # パッケージマクロ判定: 親ディレクトリに __init__.py があればパッケージ
+    if (macro_file.parent / "__init__.py").exists():
+        macro_name = macro_file.parent.name
+    else:
+        macro_name = macro_file.stem
+
     settings_file = Path.cwd() / "static" / macro_name / "settings.toml"
     file_params = {}
     if settings_file.exists():
