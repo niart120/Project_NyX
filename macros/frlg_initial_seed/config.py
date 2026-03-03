@@ -23,7 +23,7 @@ class FrlgInitialSeedConfig:
     # === フレームタイミング ===
     min_frame: int = 2000
     max_frame: int = 2180
-    trials: int = 4
+    trials: int = 3
     frame2: int = 560
     frame1_offset: int = 0
     frame2_offset: int = 0

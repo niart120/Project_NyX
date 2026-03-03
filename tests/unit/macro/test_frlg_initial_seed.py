@@ -469,7 +469,7 @@ class TestConfig:
         assert cfg.device == "Switch"
         assert cfg.min_frame == 2000
         assert cfg.max_frame == 2180
-        assert cfg.trials == 5
+        assert cfg.trials == 3
         assert cfg.frame2 == 560
         assert cfg.fps == 60.0
         assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
