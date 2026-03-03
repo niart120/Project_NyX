@@ -72,7 +72,7 @@ class ImageProcessor:
     def get_text(self, 
                  language: str = 'ja',
                  region: Optional[Tuple[int, int, int, int]] = None,
-                 preprocess: bool = True) -> str:
+                 preprocess: bool = False) -> str:
         """
         画像からテキストを認識し、最も信頼度の高い文字列を返す
         
@@ -100,7 +100,7 @@ class ImageProcessor:
     def get_digits(self, 
                    language: str = 'en',
                    region: Optional[Tuple[int, int, int, int]] = None,
-                   preprocess: bool = True) -> str:
+                   preprocess: bool = False) -> str:
         """
         画像から数字のみを認識して返す
         
@@ -130,7 +130,7 @@ class ImageProcessor:
                                       roi_offset: Tuple[int, int, int, int] = (0, 0, 0, 0),
                                       language: str = 'ja',
                                       template_threshold: float = 0.8,
-                                      preprocess: bool = True) -> str:
+                                      preprocess: bool = False) -> str:
         """
         テンプレートマッチングでテキスト領域を特定し、OCR実行
         
