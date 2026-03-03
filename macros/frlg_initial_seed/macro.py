@@ -23,6 +23,7 @@ from nyxpy.framework.core.macro.command import Command
 from .config import FrlgInitialSeedConfig
 from .recognizer import (
     ROI_STATS,
+    crop_and_pad,
     get_stat_digits,
     recognize_stats,
 )
@@ -30,7 +31,6 @@ from .seed_solver import solve_initial_seed
 
 # ステータス ROI に対応するファイル名サフィックス
 _STAT_FILE_NAMES: tuple[str, ...] = ("hp", "atk", "def", "spa", "spd", "spe")
-_ROI_PADDING: int = 40
 
 
 # ============================================================
@@ -204,9 +204,9 @@ class FrlgInitialSeedMacro(MacroBase):
             self._start_frame = cfg.min_frame
             cmd.log(f"新規開始 — Frame {cfg.min_frame}", level="INFO")
 
-        # OCR ウォームアップ
+        # OCR ウォームアップ (ステータス認識は en を使用)
         cmd.log("OCR ウォームアップ開始", level="INFO")
-        ocr = OCRProcessor.get_instance("ja")
+        ocr = OCRProcessor.get_instance("en")
         try:
             ocr.get_best_text(np.zeros((64, 200, 3), dtype=np.uint8))
         except Exception:
@@ -462,17 +462,7 @@ class FrlgInitialSeedMacro(MacroBase):
 
         frlg_id_rng の TID ROI 保存と同様のパターン。
         """
-        x, y, w, h = roi
-        cropped = image[y : y + h, x : x + w]
-        padded = cv2.copyMakeBorder(
-            cropped,
-            _ROI_PADDING,
-            _ROI_PADDING,
-            _ROI_PADDING,
-            _ROI_PADDING,
-            borderType=cv2.BORDER_CONSTANT,
-            value=(255, 255, 255),
-        )
+        padded = crop_and_pad(image, roi)
         path = self._img_dir / filename
         cv2.imwrite(str(path), padded)
 
