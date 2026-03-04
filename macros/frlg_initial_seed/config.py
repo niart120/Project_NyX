@@ -29,7 +29,7 @@ class FrlgInitialSeedConfig:
     # === 基本設定 ===
     language: str = "JPN"
     rom: str = "FR"
-    device: str = "Switch"
+    edition: str = "Switch"
     output_dir: str = "static/frlg_initial_seed"
     sound_mode: str = "モノラル"
     button_mode: str = "ヘルプ"
@@ -42,8 +42,8 @@ class FrlgInitialSeedConfig:
     frame2: int = 560
     frame1_offset: int = 0
     frame2_offset: int = 0
-    min_advance: int = 1330
-    max_advance: int = 1350
+    min_advance: int = 1335
+    max_advance: int = 1345
     fps: float = 60.0
 
     # === 対象ポケモン ===
@@ -56,7 +56,7 @@ class FrlgInitialSeedConfig:
         cfg = cls()
         cfg.language = str(args.get("language", cfg.language))
         cfg.rom = str(args.get("rom", cfg.rom))
-        cfg.device = str(args.get("device", cfg.device))
+        cfg.edition = str(args.get("edition", cfg.edition))
         cfg.output_dir = str(args.get("output_dir", cfg.output_dir))
         cfg.sound_mode = str(args.get("sound_mode", cfg.sound_mode))
         cfg.button_mode = str(args.get("button_mode", cfg.button_mode))

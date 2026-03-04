@@ -466,7 +466,7 @@ class TestConfig:
         cfg = FrlgInitialSeedConfig()
         assert cfg.language == "JPN"
         assert cfg.rom == "FR"
-        assert cfg.device == "Switch"
+        assert cfg.edition == "Switch"
         assert cfg.min_frame == 2000
         assert cfg.max_frame == 2180
         assert cfg.trials == 3
@@ -486,7 +486,7 @@ class TestConfig:
         args = {
             "language": "ENG",
             "rom": "LG",
-            "device": "GC",
+            "edition": "GC",
             "min_frame": 3000,
             "max_frame": 3500,
             "trials": 3,
@@ -496,7 +496,7 @@ class TestConfig:
         cfg = FrlgInitialSeedConfig.from_args(args)
         assert cfg.language == "ENG"
         assert cfg.rom == "LG"
-        assert cfg.device == "GC"
+        assert cfg.edition == "GC"
         assert cfg.min_frame == 3000
         assert cfg.max_frame == 3500
         assert cfg.trials == 3

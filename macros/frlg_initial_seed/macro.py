@@ -142,7 +142,7 @@ class FrlgInitialSeedMacro(MacroBase):
                     "advance": str(advance) if advance is not None else "",
                     "region": cfg.language,
                     "version": cfg.rom,
-                    "edition": cfg.device,
+                    "edition": cfg.edition,
                     "sound_mode": cfg.sound_mode,
                     "button_mode": cfg.button_mode,
                     "keyinput": cfg.keyinput,
