@@ -216,11 +216,11 @@ LStick.RIGHT (dur=0.10, wait=1.00)  # 実数値ページへ遷移
 - 結果:
   - Seed特定成功 → Step 9 へ
   - `"False"`（見つからない） → そのまま記録し Step 9 へ
-  - `"MultipleSeeds"`（複数候補） → そのまま記録し Step 9 へ
+  - `"MULT"`（複数候補） → そのまま記録し Step 9 へ
 
 > **リトライポリシー**: 認識失敗（ステータスの OCR が null を返す場合）のみ再試行対象。
 > リトライ時も frame2 は設定値のまま変更しない。リトライ上限（`_MAX_RETRIES = 3`）を超えた場合は
-> `"False"` として記録する。Seed 逆算結果が `"False"` / `"MultipleSeeds"` の場合はリトライせず、
+> `"False"` として記録する。Seed 逆算結果が `"False"` / `"MULT"` の場合はリトライせず、
 > そのまま CSV に書き込んで次の trial へ進む。
 
 ### Step 9: 結果出力
@@ -228,7 +228,7 @@ LStick.RIGHT (dur=0.10, wait=1.00)  # 実数値ページへ遷移
 - CSV に 1 行追加（append 方式）。各行にはメタデータ (region/version/edition/sound_mode/button_mode/keyinput) が含まれる
   - Seed特定成功: 4桁 HEX（例: `A3F1`）
   - `"False"`: 候補が見つからない
-  - `"MultipleSeeds"`: 候補が2つ以上
+  - `"MULT"`: 候補が2つ以上
 - `frame` カラムには `frame1 + frame1_offset` の値を記録する
 - コンソールに `"{frame1+frame1_offset}F ({trial}/{trials})：{Seed} (adv={advance})"` を出力
 - 現在のフレームの測定が `trials` 回完了したら次のフレームへ移行
@@ -265,7 +265,7 @@ LStick.RIGHT (dur=0.10, wait=1.00)  # 実数値ページへ遷移
 ステータスの画像認識に失敗した場合、**同じ frame2 のまま** Step 1 に戻って再試行する。
 リトライ上限は `_MAX_RETRIES = 3` 回で、上限到達時は `"False"` として記録する。
 
-Seed 逆算結果が `"False"` / `"MultipleSeeds"` の場合はリトライ対象外であり、そのまま記録して次の trial へ進む。
+Seed 逆算結果が `"False"` / `"MULT"` の場合はリトライ対象外であり、そのまま記録して次の trial へ進む。
 
 > 元スクリプトでは失敗時に `frame2 += 2` で補正する方式が採用されていたが、
 > frame2 の変更はエンカウントタイミング自体を変えてしまい「同じ条件での再試行」という意味を持たないため、
@@ -439,7 +439,7 @@ Switch / JPN / 720p のみ（NyX スコープ）:
 
 - **入力**: 画像認識で取得した 6ステータス実数値 + 種族値・レベル + フレーム探索パラメータ (`min_advance`, `max_advance`)
 - **処理**: 16bit 初期Seed (0x0000〜0xFFFF) × フレーム範囲 `[min_advance, max_advance]` を全探索し、LCG32 で PID/IV を生成 → PID から性格を導出し、性格補正を考慮したステータスを順方向に計算し観測値と `==` で突合
-- **出力**: 一致候補が 1 つなら (4桁 HEX の Seed, advance) / 0 なら `("False", None)` / 2 つ以上なら `("MultipleSeeds", None)`
+- **出力**: 一致候補が 1 つなら (4桁 HEX の Seed, advance) / 0 なら `("False", None)` / 2 つ以上なら `("MULT", None)`
 
 > **性格は入力不要**: 元仕様では性格 OCR 結果を入力としていたが、現行実装では PID から性格を内部導出し、
 > その性格補正を考慮した実数値照合を行う。これにより性格 OCR ステップが不要となり、
@@ -469,7 +469,7 @@ frame,seed,advance,region,version,edition,sound_mode,button_mode,keyinput
 | カラム | 型 | 説明 |
 |--------|------|------|
 | `frame` | `int` | `frame1 + frame1_offset` の値 |
-| `seed` | `str` | Seed 結果。`XXXX`（4桁 HEX）/ `False` / `MultipleSeeds` |
+| `seed` | `str` | Seed 結果。`XXXX`（4桁 HEX）/ `False` / `MULT` |
 | `advance` | `str` | advance 値。Seed 特定成功時のみ記録、それ以外は空欄 |
 | `region` | `str` | 言語リージョン (`"JPN"` / `"ENG"` 等)。`config.language` に対応 |
 | `version` | `str` | ROM 種別 (`"FR"` / `"LG"`)。`config.rom` に対応 |

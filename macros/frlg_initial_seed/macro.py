@@ -20,7 +20,7 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
-from .csv_helper import append_csv_row, build_csv_path, load_frame_counts
+from .csv_helper import append_csv_row, build_csv_path
 from .recognizer import (
     ROI_STATS,
     get_stat_digits,
@@ -103,35 +103,12 @@ class FrlgInitialSeedMacro(MacroBase):
         self._img_dir.mkdir(parents=True, exist_ok=True)
         cmd.log(f"デバッグ画像保存先: {self._img_dir}", level="DEBUG")
 
-        # CSV 読み込み・再開ポイント算出
+        # CSV 追記パス
         self._csv_path = build_csv_path(cfg)
-        self._frame_counts = load_frame_counts(self._csv_path, cfg)
-
-        # 再開フレームを算出
-        self._start_frame = cfg.max_frame + 1  # デフォルト: 全完了
-        for f1 in range(cfg.min_frame, cfg.max_frame + 1):
-            fl = f1 + cfg.frame1_offset
-            if self._frame_counts.get(fl, 0) < cfg.trials:
-                self._start_frame = f1
-                break
-
-        if self._start_frame <= cfg.max_frame:
-            fl = self._start_frame + cfg.frame1_offset
-            done = self._frame_counts.get(fl, 0)
-            if done > 0:
-                cmd.log(
-                    f"既存 CSV を検出 — Frame {fl} (trial {done + 1}/{cfg.trials}) から再開",
-                    level="INFO",
-                )
-            elif self._frame_counts:
-                cmd.log(f"既存 CSV を検出 — Frame {fl} から再開", level="INFO")
-            else:
-                cmd.log(f"新規開始 — Frame {fl}", level="INFO")
-        else:
-            cmd.log(
-                f"既存 CSV は全フレーム完了済み — Frame {cfg.max_frame + cfg.frame1_offset} まで測定済み",
-                level="INFO",
-            )
+        cmd.log(
+            f"CSV 出力先: {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
+            level="INFO",
+        )
 
         # OCR ウォームアップ (ステータス認識は en を使用)
         cmd.log("OCR ウォームアップ開始", level="INFO")
@@ -146,14 +123,12 @@ class FrlgInitialSeedMacro(MacroBase):
         cfg = self._cfg
 
         # 開始通知
-        if self._start_frame <= cfg.max_frame:
-            self._notify_start(cmd)
+        self._notify_start(cmd)
 
-        for frame1 in range(self._start_frame, cfg.max_frame + 1):
+        for frame1 in range(cfg.min_frame, cfg.max_frame + 1):
             frame_label = frame1 + cfg.frame1_offset
-            start_trial = self._frame_counts.get(frame_label, 0)
 
-            for trial in range(start_trial, cfg.trials):
+            for trial in range(cfg.trials):
                 cmd.log(
                     f"--- Frame {frame_label} ({trial + 1}/{cfg.trials}) ---",
                     level="INFO",
@@ -172,10 +147,6 @@ class FrlgInitialSeedMacro(MacroBase):
                     "button_mode": cfg.button_mode,
                     "keyinput": cfg.keyinput,
                 })
-                self._frame_counts[frame_label] = (
-                    self._frame_counts.get(frame_label, 0) + 1
-                )
-
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
                     f"{frame_label}F ({trial + 1}/{cfg.trials})"
@@ -389,7 +360,7 @@ class FrlgInitialSeedMacro(MacroBase):
     def _notify_start(self, cmd: Command) -> None:
         """開始通知を送信する。"""
         cfg = self._cfg
-        fl = self._start_frame + cfg.frame1_offset
+        fl = cfg.min_frame + cfg.frame1_offset
         msg = (
             f"[FRLG初期Seed集め自動化] "
             f"Frame {fl}〜{cfg.max_frame + cfg.frame1_offset} "

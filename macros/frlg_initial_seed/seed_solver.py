@@ -57,7 +57,7 @@ def solve_initial_seed(
         (seed, advance) のタプル。
         - 一意に特定できた場合: ("XXXX", advance)
         - 候補が見つからない:   ("False", None)
-        - 候補が2つ以上:       ("MultipleSeeds", None)
+        - 候補が2つ以上:       ("MULT", None)
     """
     nature_mult_arrays = _build_nature_mult_arrays()
 
@@ -177,4 +177,4 @@ def solve_initial_seed(
     elif result_count == 1:
         return (result_seed, result_advance)
     else:
-        return ("MultipleSeeds", None)
+        return ("MULT", None)

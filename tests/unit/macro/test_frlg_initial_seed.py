@@ -264,7 +264,7 @@ class TestSeedSolver:
 
         # 結果は "0000" または一意な Seed
         assert seed != "False"
-        assert seed != "MultipleSeeds"
+        assert seed != "MULT"
         # advance が返ること
         assert advance == 741
 
@@ -303,7 +303,7 @@ class TestSeedSolver:
             # 結果は False でないべき（少なくとも test_seed が見つかるはず）
             assert seed != "False", f"Seed {test_seed:04X} が見つからなかった"
 
-            if seed != "MultipleSeeds":
+            if seed != "MULT":
                 # 一意に特定されたなら、test_seed のはず
                 assert seed == f"{test_seed:04X}"
                 assert advance == 745
@@ -332,8 +332,8 @@ class TestSeedSolver:
 
         # 候補が見つかる（False でない）
         assert seed != "False"
-        # 一意特定 or MultipleSeeds のどちらかになりうる
-        if seed != "MultipleSeeds":
+        # 一意特定 or MULT のどちらかになりうる
+        if seed != "MULT":
             assert seed == "0000"
             assert advance == 741
 
@@ -386,7 +386,7 @@ class TestSeedSolver:
         同一ステータスに対して 2 つの (seed, advance) が存在する:
             1. seed=0x87B5, advance=1708
             2. seed=0xCA28, advance=12193
-        両方が探索範囲に含まれる場合、"MultipleSeeds" を返す。
+        両方が探索範囲に含まれる場合、"MULT" を返す。
         """
         seed, advance = solve_initial_seed(
             observed_stats=(231, 133, 171, 145, 233, 174),
@@ -395,7 +395,7 @@ class TestSeedSolver:
             min_advance=1700,
             max_advance=12200,
         )
-        assert seed == "MultipleSeeds"
+        assert seed == "MULT"
         assert advance is None
 
     def test_real_data_jolly_forward_consistency(self):
@@ -522,7 +522,6 @@ from frlg_initial_seed.csv_helper import (
     build_csv_path,
     CSV_FIELDNAMES,
     CSV_FILENAME,
-    load_frame_counts,
 )
 
 
@@ -567,53 +566,6 @@ class TestCSVHelper:
             lines = f.readlines()
         # ヘッダー 1 行 + データ 2 行
         assert len(lines) == 3
-
-    def test_load_frame_counts_matching(self, tmp_path):
-        """config に一致する行だけカウントされる"""
-        cfg = FrlgInitialSeedConfig()
-        cfg.output_dir = str(tmp_path)
-        csv_path = build_csv_path(cfg)
-
-        # frame 2120 に 2 行、frame 2121 に 1 行
-        for frame, seed in [("2120", "72C2"), ("2120", "A3F1"), ("2121", "1234")]:
-            append_csv_row(csv_path, {
-                "frame": frame, "seed": seed, "advance": "1340",
-                "region": "JPN", "version": "FR", "edition": "Switch",
-                "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-            })
-
-        counts = load_frame_counts(csv_path, cfg)
-        assert counts[2120] == 2
-        assert counts[2121] == 1
-
-    def test_load_frame_counts_filters_config(self, tmp_path):
-        """設定が異なる行はカウントされない"""
-        cfg = FrlgInitialSeedConfig()
-        cfg.output_dir = str(tmp_path)
-        csv_path = build_csv_path(cfg)
-
-        # JPN/FR の行
-        append_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2", "advance": "1340",
-            "region": "JPN", "version": "FR", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-        })
-        # ENG/LG の行（フィルタされるべき）
-        append_csv_row(csv_path, {
-            "frame": "2120", "seed": "FFFF", "advance": "1340",
-            "region": "ENG", "version": "LG", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-        })
-
-        counts = load_frame_counts(csv_path, cfg)
-        assert counts.get(2120, 0) == 1  # JPN/FR のみ
-
-    def test_load_nonexistent(self, tmp_path):
-        """存在しない CSV を読み込むと空の dict が返る"""
-        csv_path = tmp_path / "nonexistent.csv"
-        cfg = FrlgInitialSeedConfig()
-        counts = load_frame_counts(csv_path, cfg)
-        assert counts == {}
 
     def test_csv_contains_metadata_columns(self, tmp_path):
         """CSV に region/version/edition/sound_mode/button_mode/keyinput が含まれる"""
