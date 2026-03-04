@@ -51,17 +51,15 @@
 | `rom` | `str` | `"FR"` | ROM 種別 (`"FR"` / `"LG"`) |
 | `device` | `str` | `"Switch"` | デバイス (`"Switch"` / `"GC"`) |
 | `output_dir` | `str` | `"static/frlg_initial_seed"` | 出力ディレクトリ（マクロルートからの相対パス） |
-| `sound` | `str` | `"モノラル"` | ゲーム内「せってい」のサウンド設定。`"モノラル"` / `"ステレオ"` |
+| `sound_mode` | `str` | `"モノラル"` | ゲーム内「せってい」のサウンド設定。`"モノラル"` / `"ステレオ"` |
 | `button_mode` | `str` | `"ヘルプ"` | ゲーム内「せってい」のボタンモード設定。`"ヘルプ"` / `"LR"` / `"かたて"` |
+| `keyinput` | `KeyInput` (StrEnum) | `KeyInput.NONE` | キー入力パターン。`"none"` / `"dpad_on_boot"` / `"a_on_boot"` / `"dpad_after_fade"` / `"a_after_fade"`。通常モードでは `"none"`。Phase 2 のキー入力調査モードで他の値を使用 |
 
-> **`file_name` (computed property)**: 出力ファイル名は設定値から自動生成される。
-> フォーマット: `{language}_{rom}_{device}_{sound}_{button_mode}_{min_frame}_{max_frame}`
-> 例: `"JPN_FR_Switch_モノラル_ヘルプ_2000_2180"`
-
-> **`sound` / `button_mode` の意味**: FRLG の「せってい」はセーブデータに保存されており、
-> 「つづきからはじめる」でロードした際の RNG 消費量に影響する。
-> 同じカートリッジでも設定の組み合わせごとに Seed テーブルが異なるため、この 2 パラメータで区別する。
-> ファイル名にも `sound` と `button_mode` が含まれるため、設定の組み合わせごとに別ファイルとして出力される。
+> **出力ファイル名**: 固定ファイル名 `initial_seeds.csv` を使用する。
+> 設定の組み合わせ (region/version/edition/sound_mode/button_mode/keyinput) は
+> CSV の各行にメタデータとして含まれるため、1ファイルに統合される。
+> 出力先: `{output_dir}/initial_seeds.csv`
+> 例: `static/frlg_initial_seed/initial_seeds.csv`
 
 ### 2.2 フレームタイミング
 
@@ -90,8 +88,9 @@
 
 ### 2.4 自動再開
 
-既存の CSV ファイルが存在する場合、測定が `trials` 回に満たない最初のフレームから自動的に再開する。
-全フレームが `trials` 回完了済みの場合は、最終フレーム +1 から続行する。
+既存の CSV ファイルが存在する場合、現在の設定 (region/version/edition/sound_mode/button_mode/keyinput) に一致する行のみをカウントし、
+測定が `trials` 回に満たない最初のフレーム（`[min_frame, max_frame]` 範囲内）から自動的に再開する。
+全フレームが `trials` 回完了済みの場合は測定完了とする。
 ファイルが存在しない場合は `min_frame` から新規開始する。
 
 ---
@@ -226,11 +225,11 @@ LStick.RIGHT (dur=0.10, wait=1.00)  # 実数値ページへ遷移
 
 ### Step 9: 結果出力
 
-- CSV の当該フレーム行の次の空き `seed_N` カラムに結果を書き込み
+- CSV に 1 行追加（append 方式）。各行にはメタデータ (region/version/edition/sound_mode/button_mode/keyinput) が含まれる
   - Seed特定成功: 4桁 HEX（例: `A3F1`）
   - `"False"`: 候補が見つからない
   - `"MultipleSeeds"`: 候補が2つ以上
-- CSV の `frame` カラムには `frame1 + frame1_offset` の値を記録する
+- `frame` カラムには `frame1 + frame1_offset` の値を記録する
 - コンソールに `"{frame1+frame1_offset}F ({trial}/{trials})：{Seed} (adv={advance})"` を出力
 - 現在のフレームの測定が `trials` 回完了したら次のフレームへ移行
 
@@ -455,31 +454,35 @@ Switch / JPN / 720p のみ（NyX スコープ）:
 
 ### 8.1 CSV フォーマット
 
-1フレーム = 1行。各フレームについて `trials` 回分の Seed 測定結果と、対応する advance を記録する（文字コード: UTF-8）。
+1測定 = 1行のフラットな構造。各行にメタデータ (region/version/edition/sound_mode/button_mode/keyinput) を含む（文字コード: UTF-8）。
 
-出力先: `{output_dir}/{file_name}.csv`
-
-> `file_name` は `{language}_{rom}_{device}_{sound}_{button_mode}_{min_frame}_{max_frame}` から自動生成される。
-> 例: `JPN_FR_Switch_モノラル_ヘルプ_2000_2180.csv`
+出力先: `{output_dir}/initial_seeds.csv`（固定ファイル名）
 
 ```csv
-frame,seed_1,seed_2,seed_3,seed_4,seed_5,adv_1,adv_2,adv_3,adv_4,adv_5
-2000,7454,7454,9D17,9D17,7454,1340,1340,1340,1340,1340
-2001,E692,E692,E692,E692,9D17,1343,1341,1343,1341,1342
-2002,1234,,,,,743,,,,
+frame,seed,advance,region,version,edition,sound_mode,button_mode,keyinput
+2120,72C2,1340,JPN,FR,Switch,モノラル,ヘルプ,none
+2120,72C2,1340,JPN,FR,Switch,モノラル,ヘルプ,none
+2120,A3F1,1342,JPN,FR,Switch,モノラル,ヘルプ,none
+2121,1234,743,JPN,FR,Switch,モノラル,ヘルプ,none
 ```
 
 | カラム | 型 | 説明 |
 |--------|------|------|
 | `frame` | `int` | `frame1 + frame1_offset` の値 |
-| `seed_1` … `seed_N` | `str` | 各測定回の Seed 結果。`XXXX`（4桁 HEX）/ `False` / `MultipleSeeds` / 空欄（未測定） |
-| `adv_1` … `adv_N` | `str` | 各測定回の advance 値。Seed 特定成功時のみ記録、それ以外は空欄 |
+| `seed` | `str` | Seed 結果。`XXXX`（4桁 HEX）/ `False` / `MultipleSeeds` |
+| `advance` | `str` | advance 値。Seed 特定成功時のみ記録、それ以外は空欄 |
+| `region` | `str` | 言語リージョン (`"JPN"` / `"ENG"` 等)。`config.language` に対応 |
+| `version` | `str` | ROM 種別 (`"FR"` / `"LG"`)。`config.rom` に対応 |
+| `edition` | `str` | デバイス (`"Switch"` / `"GC"`)。`config.device` に対応 |
+| `sound_mode` | `str` | サウンド設定 (`"モノラル"` / `"ステレオ"`)。`config.sound_mode` に対応 |
+| `button_mode` | `str` | ボタンモード設定 (`"ヘルプ"` 等)。`config.button_mode` に対応 |
+| `keyinput` | `str` | キー入力パターン。`KeyInput` StrEnum の値 (`"none"` / `"dpad_on_boot"` 等)。`config.keyinput` に対応 |
 
-- ヘッダー行あり
-- 測定ごとに `seed_N` カラムが埋まる。未測定のカラムは空欄
+- ヘッダー行あり（ファイル新規作成時のみ書き込み）
+- 測定ごとに 1 行を末尾に追加（append 方式）
 - 同一フレームでも測定ごとに異なる Seed が出る可能性があるため、全結果をそのまま記録する
-- マクロ再開時は、既存 CSV を読み込み、`seed_N` が埋まっていないフレームから続行する
-- `sound` / `button_mode` は CSV カラムには含まない（ファイル名で区別される）
+- 異なる設定（region/version 等）のデータが同一ファイルに共存可能
+- マクロ再開時は、現在の設定に一致する行のみをカウントし、`trials` 回に満たない最初のフレームから続行する
 
 ### 8.2 デバッグ画像
 
@@ -727,7 +730,7 @@ macros/
 | **フレームタイマー** | `_start_timer()` / `_consume_timer()` | ID調整マクロと同一パターン。offset の事前差し引きは行わず、操作の所要時間をタイマーで自然吸収 |
 | **性格認識** | メインフローでは不使用 | `recognize_nature()` は `recognizer.py` に実装済みだが、Seed 逆算側で PID から性格を内部導出するため、マクロ本体では性格 OCR を行わない |
 | **ステータス認識** | OCR (`ImageProcessor.get_digits`) | PaddleOCR で数値認識、有効範囲でバリデーション |
-| **出力形式** | UTF-8 の CSV（ヘッダー付き、`trials` 回分カラム） | TXT ・ Shift_JIS は廃止 |
+| **出力形式** | UTF-8 CSV（固定ファイル名 `initial_seeds.csv`、1測定=1行、メタデータ付き、append 方式） | TXT ・ Shift_JIS は廃止。異なる設定のデータが同一ファイルに共存可能 |
 | **Seed逆算入力** | 実数値のみ（性格は不要） | PID から性格を導出し、性格補正を考慮した実数値照合で候補を絞り込む。numpy ベクトル化による一括並列計算 |
 | **Seed逆算探索範囲** | `[min_advance, max_advance]` 閉区間 | LCG advance 数。frame2 を目安にユーザーが設定 |
 | **RNG** | Python 実装の LCG32 | `PokemonPRNG.dll` の代替 |

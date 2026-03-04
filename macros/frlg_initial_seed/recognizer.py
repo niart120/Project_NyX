@@ -6,6 +6,7 @@ NyX フレームワークの ImageProcessor / OCRProcessor を使用する。
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
@@ -136,3 +137,18 @@ def recognize_stats(
         values.append(value)
 
     return (values[0], values[1], values[2], values[3], values[4], values[5])
+
+
+# ============================================================
+# 画像保存ヘルパー
+# ============================================================
+
+
+def save_roi_image(
+    image: "np.ndarray",
+    roi: tuple[int, int, int, int],
+    path: Path,
+) -> None:
+    """ROI をクロップし白パディングを付与して保存する（毎回上書き）。"""
+    padded = crop_and_pad(image, roi)
+    cv2.imwrite(str(path), padded)

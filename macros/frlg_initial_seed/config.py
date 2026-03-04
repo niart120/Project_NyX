@@ -6,6 +6,20 @@ FRLG 初期Seed特定マクロの設定値を管理する dataclass。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class KeyInput(StrEnum):
+    """ゲーム起動時のキー入力パターン。
+
+    通常モードでは NONE を使用。Phase 2 のキー入力調査モードで他の値を使用する。
+    """
+
+    NONE = "none"
+    DPAD_ON_BOOT = "dpad_on_boot"
+    A_ON_BOOT = "a_on_boot"
+    DPAD_AFTER_FADE = "dpad_after_fade"
+    A_AFTER_FADE = "a_after_fade"
 
 
 @dataclass
@@ -17,8 +31,9 @@ class FrlgInitialSeedConfig:
     rom: str = "FR"
     device: str = "Switch"
     output_dir: str = "static/frlg_initial_seed"
-    sound: str = "モノラル"
+    sound_mode: str = "モノラル"
     button_mode: str = "ヘルプ"
+    keyinput: KeyInput = KeyInput.NONE
 
     # === フレームタイミング ===
     min_frame: int = 2000
@@ -27,25 +42,13 @@ class FrlgInitialSeedConfig:
     frame2: int = 560
     frame1_offset: int = 0
     frame2_offset: int = 0
-    min_advance: int = 1300
-    max_advance: int = 1400
+    min_advance: int = 1330
+    max_advance: int = 1350
     fps: float = 60.0
 
     # === 対象ポケモン ===
     base_stats: tuple[int, int, int, int, int, int] = (106, 90, 130, 90, 154, 110)
     level: int = 70
-
-    @property
-    def file_name(self) -> str:
-        """設定値からファイル名を自動生成する。
-
-        フォーマット: {language}_{rom}_{device}_{sound}_{button_mode}_{min_frame}_{max_frame}
-        """
-        return (
-            f"{self.language}_{self.rom}_{self.device}"
-            f"_{self.sound}_{self.button_mode}"
-            f"_{self.min_frame}_{self.max_frame}"
-        )
 
     @classmethod
     def from_args(cls, args: dict) -> "FrlgInitialSeedConfig":
@@ -55,8 +58,9 @@ class FrlgInitialSeedConfig:
         cfg.rom = str(args.get("rom", cfg.rom))
         cfg.device = str(args.get("device", cfg.device))
         cfg.output_dir = str(args.get("output_dir", cfg.output_dir))
-        cfg.sound = str(args.get("sound", cfg.sound))
+        cfg.sound_mode = str(args.get("sound_mode", cfg.sound_mode))
         cfg.button_mode = str(args.get("button_mode", cfg.button_mode))
+        cfg.keyinput = KeyInput(args.get("keyinput", cfg.keyinput))
 
         cfg.min_frame = int(args.get("min_frame", cfg.min_frame))
         cfg.max_frame = int(args.get("max_frame", cfg.max_frame))

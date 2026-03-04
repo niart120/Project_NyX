@@ -455,7 +455,7 @@ class TestSeedSolver:
 # config テスト
 # ============================================================
 
-from frlg_initial_seed.config import FrlgInitialSeedConfig
+from frlg_initial_seed.config import FrlgInitialSeedConfig, KeyInput
 
 
 class TestConfig:
@@ -474,25 +474,12 @@ class TestConfig:
         assert cfg.fps == 60.0
         assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
         assert cfg.level == 70
+        assert cfg.keyinput is KeyInput.NONE
 
-    def test_file_name_auto_generated(self):
-        """file_name が設定値から自動生成される"""
+    def test_file_name_removed(self):
+        """ファイル名は固定 (initial_seeds.csv) になったため file_name プロパティが存在しない"""
         cfg = FrlgInitialSeedConfig()
-        expected = "JPN_FR_Switch_モノラル_ヘルプ_2000_2180"
-        assert cfg.file_name == expected
-
-    def test_file_name_reflects_settings(self):
-        """設定変更がファイル名に反映される"""
-        cfg = FrlgInitialSeedConfig()
-        cfg.language = "ENG"
-        cfg.rom = "LG"
-        cfg.device = "GC"
-        cfg.sound = "ステレオ"
-        cfg.button_mode = "LR"
-        cfg.min_frame = 1800
-        cfg.max_frame = 2100
-        expected = "ENG_LG_GC_ステレオ_LR_1800_2100"
-        assert cfg.file_name == expected
+        assert not hasattr(cfg, "file_name")
 
     def test_from_args(self):
         """args dict から設定が構築される"""
@@ -503,7 +490,8 @@ class TestConfig:
             "min_frame": 3000,
             "max_frame": 3500,
             "trials": 3,
-            "sound": "ステレオ",
+            "sound_mode": "ステレオ",
+            "keyinput": "dpad_on_boot",
         }
         cfg = FrlgInitialSeedConfig.from_args(args)
         assert cfg.language == "ENG"
@@ -512,7 +500,8 @@ class TestConfig:
         assert cfg.min_frame == 3000
         assert cfg.max_frame == 3500
         assert cfg.trials == 3
-        assert cfg.sound == "ステレオ"
+        assert cfg.sound_mode == "ステレオ"
+        assert cfg.keyinput is KeyInput.DPAD_ON_BOOT
         # 指定しなかった値はデフォルト
         assert cfg.frame2 == 560
         assert cfg.button_mode == "ヘルプ"
@@ -528,91 +517,120 @@ class TestConfig:
 # CSV ヘルパーテスト
 # ============================================================
 
-from frlg_initial_seed.macro import _build_csv_path, _load_csv, _new_frame_row, _save_csv
+from frlg_initial_seed.csv_helper import (
+    append_csv_row,
+    build_csv_path,
+    CSV_FIELDNAMES,
+    CSV_FILENAME,
+    load_frame_counts,
+)
 
 
 class TestCSVHelper:
     """CSV 読み書きのテスト"""
 
-    def test_build_csv_path(self):
-        """CSV パスが設定値から自動生成される"""
+    def test_build_csv_path_fixed(self):
+        """固定ファイル名 initial_seeds.csv が返る"""
         cfg = FrlgInitialSeedConfig()
-        path = _build_csv_path(cfg)
-        expected = Path("static/frlg_initial_seed/JPN_FR_Switch_モノラル_ヘルプ_2000_2180.csv")
+        path = build_csv_path(cfg)
+        expected = Path("static/frlg_initial_seed") / CSV_FILENAME
         assert path == expected
 
-    def test_save_and_load(self, tmp_path):
-        """CSV の保存と読み込みが往復する"""
-        cfg = FrlgInitialSeedConfig()
-        cfg.output_dir = str(tmp_path)
-        cfg.trials = 3
-
-        csv_path = _build_csv_path(cfg)
-
-        data = {
-            2090: {
-                "seeds": ["A3F1", "A3F1", "A3F1"],
-                "advances": ["741", "741", "741"],
-            },
-            2091: {
-                "seeds": ["7C02", "", ""],
-                "advances": ["742", "", ""],
-            },
-        }
-        _save_csv(csv_path, data, cfg)
-
-        loaded, resume = _load_csv(csv_path, cfg.trials)
-        assert 2090 in loaded
-        assert loaded[2090]["seeds"] == ["A3F1", "A3F1", "A3F1"]
-        assert loaded[2090]["advances"] == ["741", "741", "741"]
-        assert loaded[2091]["seeds"] == ["7C02", "", ""]
-        assert loaded[2091]["advances"] == ["742", "", ""]
-        # 2091 は未完了なので resume_frame
-        assert resume == 2091
-
-    def test_csv_no_sound_button_mode_columns(self, tmp_path):
-        """CSV に sound / button_mode カラムが含まれないこと"""
-        cfg = FrlgInitialSeedConfig()
-        cfg.output_dir = str(tmp_path)
-        cfg.trials = 1
-
-        csv_path = _build_csv_path(cfg)
-        data = {
-            2090: {"seeds": ["ABCD"], "advances": ["741"]},
-        }
-        _save_csv(csv_path, data, cfg)
+    def test_append_creates_with_header(self, tmp_path):
+        """ファイルが存在しない場合、ヘッダー付きで作成される"""
+        csv_path = tmp_path / CSV_FILENAME
+        append_csv_row(csv_path, {
+            "frame": "2120", "seed": "72C2", "advance": "1340",
+            "region": "JPN", "version": "FR", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+        })
 
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            fieldnames = reader.fieldnames
-        assert "sound" not in fieldnames
-        assert "button_mode" not in fieldnames
-        assert "frame" in fieldnames
+            assert reader.fieldnames == CSV_FIELDNAMES
+            rows = list(reader)
+        assert len(rows) == 1
+        assert rows[0]["frame"] == "2120"
+        assert rows[0]["seed"] == "72C2"
+
+    def test_append_does_not_duplicate_header(self, tmp_path):
+        """複数回 append してもヘッダーは 1 回のみ"""
+        csv_path = tmp_path / CSV_FILENAME
+        for seed in ("AAAA", "BBBB"):
+            append_csv_row(csv_path, {
+                "frame": "2120", "seed": seed, "advance": "1340",
+                "region": "JPN", "version": "FR", "edition": "Switch",
+                "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            })
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        # ヘッダー 1 行 + データ 2 行
+        assert len(lines) == 3
+
+    def test_load_frame_counts_matching(self, tmp_path):
+        """config に一致する行だけカウントされる"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.output_dir = str(tmp_path)
+        csv_path = build_csv_path(cfg)
+
+        # frame 2120 に 2 行、frame 2121 に 1 行
+        for frame, seed in [("2120", "72C2"), ("2120", "A3F1"), ("2121", "1234")]:
+            append_csv_row(csv_path, {
+                "frame": frame, "seed": seed, "advance": "1340",
+                "region": "JPN", "version": "FR", "edition": "Switch",
+                "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            })
+
+        counts = load_frame_counts(csv_path, cfg)
+        assert counts[2120] == 2
+        assert counts[2121] == 1
+
+    def test_load_frame_counts_filters_config(self, tmp_path):
+        """設定が異なる行はカウントされない"""
+        cfg = FrlgInitialSeedConfig()
+        cfg.output_dir = str(tmp_path)
+        csv_path = build_csv_path(cfg)
+
+        # JPN/FR の行
+        append_csv_row(csv_path, {
+            "frame": "2120", "seed": "72C2", "advance": "1340",
+            "region": "JPN", "version": "FR", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+        })
+        # ENG/LG の行（フィルタされるべき）
+        append_csv_row(csv_path, {
+            "frame": "2120", "seed": "FFFF", "advance": "1340",
+            "region": "ENG", "version": "LG", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+        })
+
+        counts = load_frame_counts(csv_path, cfg)
+        assert counts.get(2120, 0) == 1  # JPN/FR のみ
 
     def test_load_nonexistent(self, tmp_path):
         """存在しない CSV を読み込むと空の dict が返る"""
         csv_path = tmp_path / "nonexistent.csv"
-        data, resume = _load_csv(csv_path, 5)
-        assert data == {}
-        assert resume is None
-
-    def test_resume_all_complete(self, tmp_path):
-        """全フレーム完了済みの CSV なら resume_frame は None"""
         cfg = FrlgInitialSeedConfig()
-        cfg.output_dir = str(tmp_path)
-        cfg.trials = 2
+        counts = load_frame_counts(csv_path, cfg)
+        assert counts == {}
 
-        csv_path = _build_csv_path(cfg)
-        data = {
-            2090: {"seeds": ["ABCD", "ABCD"], "advances": ["741", "741"]},
-            2091: {"seeds": ["1234", "5678"], "advances": ["742", "743"]},
-        }
-        _save_csv(csv_path, data, cfg)
+    def test_csv_contains_metadata_columns(self, tmp_path):
+        """CSV に region/version/edition/sound_mode/button_mode/keyinput が含まれる"""
+        csv_path = tmp_path / CSV_FILENAME
+        append_csv_row(csv_path, {
+            "frame": "2120", "seed": "72C2", "advance": "1340",
+            "region": "JPN", "version": "FR", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+        })
 
-        loaded, resume = _load_csv(csv_path, cfg.trials)
-        assert resume is None
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+        assert "region" in fieldnames
+        assert "version" in fieldnames
+        assert "edition" in fieldnames
+        assert "sound_mode" in fieldnames
+        assert "button_mode" in fieldnames
+        assert "keyinput" in fieldnames
 
-    def test_new_frame_row(self):
-        """_new_frame_row が正しい構造を返す"""
-        row = _new_frame_row(3)
-        assert row == {"seeds": ["", "", ""], "advances": ["", "", ""]}

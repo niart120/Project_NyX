@@ -8,7 +8,6 @@ Switch (720p) 専用。
 
 from __future__ import annotations
 
-import csv
 import time
 from pathlib import Path
 
@@ -21,11 +20,12 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
+from .csv_helper import append_csv_row, build_csv_path, load_frame_counts
 from .recognizer import (
     ROI_STATS,
-    crop_and_pad,
     get_stat_digits,
     recognize_stats,
+    save_roi_image,
 )
 from .seed_solver import solve_initial_seed
 
@@ -39,9 +39,6 @@ _STAT_FILE_NAMES: tuple[str, ...] = ("hp", "atk", "def", "spa", "spd", "spe")
 
 # 1 trial の結果: (seed 文字列, advance or None)
 TrialResult = tuple[str, int | None]
-
-# 1 フレーム分の CSV 行データ
-FrameRow = dict[str, list[str]]  # {"seeds": [...], "advances": [...]}
 
 
 # ============================================================
@@ -68,86 +65,6 @@ def _consume_timer(
             f"タイマー超過: {-remaining:.3f}秒 (操作が指定フレーム数を超過)",
             level="WARNING",
         )
-
-
-# ============================================================
-# CSV ヘルパー
-# ============================================================
-
-_CSV_HEADER_PREFIX = ["frame"]
-
-
-def _build_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
-    """CSV ファイルパスを構築する。"""
-    return Path(cfg.output_dir) / f"{cfg.file_name}.csv"
-
-
-def _new_frame_row(trials: int) -> FrameRow:
-    """空の FrameRow を生成する。"""
-    return {"seeds": [""] * trials, "advances": [""] * trials}
-
-
-def _load_csv(
-    csv_path: Path, trials: int
-) -> tuple[dict[int, FrameRow], int | None]:
-    """既存 CSV を読み込み、フレーム → FrameRow の dict を返す。
-
-    Returns:
-        (data, resume_frame)
-        data: {frame: {"seeds": [...], "advances": [...]}}
-        resume_frame: 測定が trials 回に満たない最初のフレーム、なければ None
-    """
-    data: dict[int, FrameRow] = {}
-    resume_frame: int | None = None
-
-    if not csv_path.exists():
-        return data, resume_frame
-
-    with open(csv_path, "r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            frame = int(row["frame"])
-            seeds = [row.get(f"seed_{i}", "") for i in range(1, trials + 1)]
-            advances = [row.get(f"adv_{i}", "") for i in range(1, trials + 1)]
-            data[frame] = {"seeds": seeds, "advances": advances}
-
-            # 最初の未完了フレームを記録
-            if resume_frame is None:
-                filled = sum(1 for s in seeds if s)
-                if filled < trials:
-                    resume_frame = frame
-
-    return data, resume_frame
-
-
-def _save_csv(
-    csv_path: Path,
-    data: dict[int, FrameRow],
-    cfg: FrlgInitialSeedConfig,
-) -> None:
-    """CSV を書き出す。"""
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-
-    seed_columns = [f"seed_{i}" for i in range(1, cfg.trials + 1)]
-    adv_columns = [f"adv_{i}" for i in range(1, cfg.trials + 1)]
-    fieldnames = _CSV_HEADER_PREFIX + seed_columns + adv_columns
-
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for frame in sorted(data.keys()):
-            frame_row = data[frame]
-            seeds = frame_row["seeds"]
-            advances = frame_row["advances"]
-
-            row: dict[str, str] = {
-                "frame": str(frame),
-            }
-            for i, col in enumerate(seed_columns):
-                row[col] = seeds[i] if i < len(seeds) else ""
-            for i, col in enumerate(adv_columns):
-                row[col] = advances[i] if i < len(advances) else ""
-            writer.writerow(row)
 
 
 # ============================================================
@@ -187,22 +104,34 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.log(f"デバッグ画像保存先: {self._img_dir}", level="DEBUG")
 
         # CSV 読み込み・再開ポイント算出
-        self._csv_path = _build_csv_path(cfg)
-        self._csv_data, resume = _load_csv(self._csv_path, cfg.trials)
+        self._csv_path = build_csv_path(cfg)
+        self._frame_counts = load_frame_counts(self._csv_path, cfg)
 
-        if resume is not None:
-            self._start_frame = resume
-            cmd.log(f"既存 CSV を検出 — Frame {resume} から再開", level="INFO")
-        elif self._csv_data:
-            last = max(self._csv_data.keys())
-            self._start_frame = last + 1
+        # 再開フレームを算出
+        self._start_frame = cfg.max_frame + 1  # デフォルト: 全完了
+        for f1 in range(cfg.min_frame, cfg.max_frame + 1):
+            fl = f1 + cfg.frame1_offset
+            if self._frame_counts.get(fl, 0) < cfg.trials:
+                self._start_frame = f1
+                break
+
+        if self._start_frame <= cfg.max_frame:
+            fl = self._start_frame + cfg.frame1_offset
+            done = self._frame_counts.get(fl, 0)
+            if done > 0:
+                cmd.log(
+                    f"既存 CSV を検出 — Frame {fl} (trial {done + 1}/{cfg.trials}) から再開",
+                    level="INFO",
+                )
+            elif self._frame_counts:
+                cmd.log(f"既存 CSV を検出 — Frame {fl} から再開", level="INFO")
+            else:
+                cmd.log(f"新規開始 — Frame {fl}", level="INFO")
+        else:
             cmd.log(
-                f"既存 CSV は全フレーム完了済み — Frame {self._start_frame} から続行",
+                f"既存 CSV は全フレーム完了済み — Frame {cfg.max_frame + cfg.frame1_offset} まで測定済み",
                 level="INFO",
             )
-        else:
-            self._start_frame = cfg.min_frame
-            cmd.log(f"新規開始 — Frame {cfg.min_frame}", level="INFO")
 
         # OCR ウォームアップ (ステータス認識は en を使用)
         cmd.log("OCR ウォームアップ開始", level="INFO")
@@ -216,12 +145,13 @@ class FrlgInitialSeedMacro(MacroBase):
     def run(self, cmd: Command) -> None:
         cfg = self._cfg
 
+        # 開始通知
+        if self._start_frame <= cfg.max_frame:
+            self._notify_start(cmd)
+
         for frame1 in range(self._start_frame, cfg.max_frame + 1):
             frame_label = frame1 + cfg.frame1_offset
-            self._ensure_frame_row(frame_label)
-            frame_row = self._csv_data[frame_label]
-
-            start_trial = sum(1 for s in frame_row["seeds"] if s)
+            start_trial = self._frame_counts.get(frame_label, 0)
 
             for trial in range(start_trial, cfg.trials):
                 cmd.log(
@@ -231,11 +161,20 @@ class FrlgInitialSeedMacro(MacroBase):
 
                 seed_result, advance = self._run_trial_with_retry(cmd, frame1)
 
-                frame_row["seeds"][trial] = seed_result
-                frame_row["advances"][trial] = (
-                    str(advance) if advance is not None else ""
+                append_csv_row(self._csv_path, {
+                    "frame": str(frame_label),
+                    "seed": seed_result,
+                    "advance": str(advance) if advance is not None else "",
+                    "region": cfg.language,
+                    "version": cfg.rom,
+                    "edition": cfg.device,
+                    "sound_mode": cfg.sound_mode,
+                    "button_mode": cfg.button_mode,
+                    "keyinput": cfg.keyinput,
+                })
+                self._frame_counts[frame_label] = (
+                    self._frame_counts.get(frame_label, 0) + 1
                 )
-                _save_csv(self._csv_path, self._csv_data, cfg)
 
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
@@ -410,7 +349,7 @@ class FrlgInitialSeedMacro(MacroBase):
             return None
 
         for roi, name in zip(ROI_STATS, _STAT_FILE_NAMES):
-            self._save_roi_image(stat_image, roi, f"stat_{name}.png")
+            save_roi_image(stat_image, roi, self._img_dir / f"stat_{name}.png")
 
         stat_raw = get_stat_digits(stat_image)
         cmd.log(
@@ -444,27 +383,20 @@ class FrlgInitialSeedMacro(MacroBase):
         return (seed, advance)
 
     # --------------------------------------------------------
-    # ユーティリティ
+    # 通知
     # --------------------------------------------------------
 
-    def _ensure_frame_row(self, frame_label: int) -> None:
-        """CSV データに当該フレームの行を確保する。"""
-        if frame_label not in self._csv_data:
-            self._csv_data[frame_label] = _new_frame_row(self._cfg.trials)
-
-    def _save_roi_image(
-        self,
-        image: np.ndarray,
-        roi: tuple[int, int, int, int],
-        filename: str,
-    ) -> None:
-        """ROI をクロップし白パディングを付与して保存する（毎回上書き）。
-
-        frlg_id_rng の TID ROI 保存と同様のパターン。
-        """
-        padded = crop_and_pad(image, roi)
-        path = self._img_dir / filename
-        cv2.imwrite(str(path), padded)
+    def _notify_start(self, cmd: Command) -> None:
+        """開始通知を送信する。"""
+        cfg = self._cfg
+        fl = self._start_frame + cfg.frame1_offset
+        msg = (
+            f"[FRLG初期Seed集め自動化] "
+            f"Frame {fl}〜{cfg.max_frame + cfg.frame1_offset} "
+            f"(trials={cfg.trials}) の測定を開始します。"
+        )
+        cmd.log(msg, level="INFO")
+        cmd.notify(msg)
 
     def _notify_completion(self, cmd: Command) -> None:
         """完了通知を送信する。"""
