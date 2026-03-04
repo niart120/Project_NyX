@@ -20,7 +20,12 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
-from .csv_helper import append_csv_row, build_csv_path
+from .csv_helper import (
+    append_csv_row,
+    append_detail_csv_row,
+    build_csv_path,
+    build_detail_csv_path,
+)
 from .recognizer import (
     ROI_STATS,
     get_stat_digits,
@@ -37,8 +42,8 @@ _STAT_FILE_NAMES: tuple[str, ...] = ("hp", "atk", "def", "spa", "spd", "spe")
 # 型エイリアス
 # ============================================================
 
-# 1 trial の結果: (seed 文字列, advance or None)
-TrialResult = tuple[str, int | None]
+# 1 trial の結果: (seed 文字列, advance or None, 認識実数値 or None)
+TrialResult = tuple[str, int | None, tuple[int, ...] | None]
 
 
 # ============================================================
@@ -105,10 +110,12 @@ class FrlgInitialSeedMacro(MacroBase):
 
         # CSV 追記パス
         self._csv_path = build_csv_path(cfg)
+        self._detail_csv_path = build_detail_csv_path(cfg)
         cmd.log(
             f"CSV 出力先: {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
             level="INFO",
         )
+        cmd.log(f"詳細CSV 出力先: {self._detail_csv_path}", level="INFO")
 
         # OCR ウォームアップ (ステータス認識は en を使用)
         cmd.log("OCR ウォームアップ開始", level="INFO")
@@ -134,19 +141,45 @@ class FrlgInitialSeedMacro(MacroBase):
                     level="INFO",
                 )
 
-                seed_result, advance = self._run_trial_with_retry(cmd, frame1)
+                seed_result, advance, observed_stats = self._run_trial_with_retry(
+                    cmd, frame1,
+                )
 
-                append_csv_row(self._csv_path, {
+                # 共通メタデータ
+                meta = {
                     "frame": str(frame_label),
                     "seed": seed_result,
-                    "advance": str(advance) if advance is not None else "",
                     "region": cfg.language,
                     "version": cfg.rom,
                     "edition": cfg.edition,
                     "sound_mode": cfg.sound_mode,
                     "button_mode": cfg.button_mode,
                     "keyinput": cfg.keyinput,
-                })
+                    "hardware": cfg.hardware,
+                    "fps": str(cfg.fps),
+                }
+
+                # 詳細ログ (全行)
+                detail_row = {
+                    **meta,
+                    "advance": str(advance) if advance is not None else "",
+                    "pokemon": cfg.pokemon,
+                    "level": str(cfg.level),
+                    "note": "",
+                }
+                if observed_stats is not None:
+                    stat_keys = ("hp", "atk", "def", "spa", "spd", "spe")
+                    for k, v in zip(stat_keys, observed_stats):
+                        detail_row[k] = str(v)
+                else:
+                    for k in ("hp", "atk", "def", "spa", "spd", "spe"):
+                        detail_row[k] = ""
+                append_detail_csv_row(self._detail_csv_path, detail_row)
+
+                # 共有用 (Seed 特定成功行のみ)
+                if seed_result not in ("MULT", "False"):
+                    append_csv_row(self._csv_path, {**meta, "note": ""})
+
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
                     f"{frame_label}F ({trial + 1}/{cfg.trials})"
@@ -185,7 +218,7 @@ class FrlgInitialSeedMacro(MacroBase):
             )
 
         cmd.log("リトライ上限到達 — False として記録", level="WARNING")
-        return ("False", None)
+        return ("False", None, None)
 
     # --------------------------------------------------------
     # 1回分の試行 (ゲーム再起動 〜 Seed 逆算)
@@ -351,7 +384,7 @@ class FrlgInitialSeedMacro(MacroBase):
             max_advance=cfg.max_advance,
         )
         cmd.log(f"Seed 逆算完了: seed={seed}, advance={advance}", level="DEBUG")
-        return (seed, advance)
+        return (seed, advance, stats)
 
     # --------------------------------------------------------
     # 通知

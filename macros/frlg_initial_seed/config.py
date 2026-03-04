@@ -22,15 +22,27 @@ class KeyInput(StrEnum):
     A_AFTER_FADE = "a_after_fade"
 
 
+class Hardware(StrEnum):
+    """ゲームを実行する本体ハードウェア。"""
+
+    SWITCH2 = "Switch2"
+    SWITCH = "Switch"
+    GC = "GC"
+
+
 @dataclass
 class FrlgInitialSeedConfig:
     """FRLG 初期Seed特定マクロの設定"""
 
-    # === 基本設定 ===
+    # === 環境設定 ===
     language: str = "JPN"
     rom: str = "FR"
     edition: str = "Switch"
+    hardware: Hardware = Hardware.SWITCH
+    fps: float = 60.0
     output_dir: str = "static/frlg_initial_seed"
+
+    # === ゲーム内設定 ===
     sound_mode: str = "モノラル"
     button_mode: str = "ヘルプ"
     keyinput: KeyInput = KeyInput.NONE
@@ -44,24 +56,31 @@ class FrlgInitialSeedConfig:
     frame2_offset: int = 0
     min_advance: int = 1335
     max_advance: int = 1345
-    fps: float = 60.0
 
     # === 対象ポケモン ===
     base_stats: tuple[int, int, int, int, int, int] = (106, 90, 130, 90, 154, 110)
     level: int = 70
+    pokemon: str = "ルギア"
 
     @classmethod
     def from_args(cls, args: dict) -> "FrlgInitialSeedConfig":
         """args dict から設定を構築する。"""
         cfg = cls()
+
+        # 環境設定
         cfg.language = str(args.get("language", cfg.language))
         cfg.rom = str(args.get("rom", cfg.rom))
         cfg.edition = str(args.get("edition", cfg.edition))
+        cfg.hardware = Hardware(args.get("hardware", cfg.hardware))
+        cfg.fps = float(args.get("fps", cfg.fps))
         cfg.output_dir = str(args.get("output_dir", cfg.output_dir))
+
+        # ゲーム内設定
         cfg.sound_mode = str(args.get("sound_mode", cfg.sound_mode))
         cfg.button_mode = str(args.get("button_mode", cfg.button_mode))
         cfg.keyinput = KeyInput(args.get("keyinput", cfg.keyinput))
 
+        # フレームタイミング
         cfg.min_frame = int(args.get("min_frame", cfg.min_frame))
         cfg.max_frame = int(args.get("max_frame", cfg.max_frame))
         cfg.trials = int(args.get("trials", cfg.trials))
@@ -70,9 +89,10 @@ class FrlgInitialSeedConfig:
         cfg.frame2_offset = int(args.get("frame2_offset", cfg.frame2_offset))
         cfg.min_advance = int(args.get("min_advance", cfg.min_advance))
         cfg.max_advance = int(args.get("max_advance", cfg.max_advance))
-        cfg.fps = float(args.get("fps", cfg.fps))
 
+        # 対象ポケモン
         cfg.level = int(args.get("level", cfg.level))
+        cfg.pokemon = str(args.get("pokemon", cfg.pokemon))
 
         base = args.get("base_stats")
         if base is not None:

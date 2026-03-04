@@ -455,7 +455,7 @@ class TestSeedSolver:
 # config テスト
 # ============================================================
 
-from frlg_initial_seed.config import FrlgInitialSeedConfig, KeyInput
+from frlg_initial_seed.config import FrlgInitialSeedConfig, Hardware, KeyInput
 
 
 class TestConfig:
@@ -467,13 +467,15 @@ class TestConfig:
         assert cfg.language == "JPN"
         assert cfg.rom == "FR"
         assert cfg.edition == "Switch"
+        assert cfg.hardware is Hardware.SWITCH
+        assert cfg.fps == 60.0
         assert cfg.min_frame == 2000
         assert cfg.max_frame == 2180
         assert cfg.trials == 3
         assert cfg.frame2 == 560
-        assert cfg.fps == 60.0
         assert cfg.base_stats == (106, 90, 130, 90, 154, 110)
         assert cfg.level == 70
+        assert cfg.pokemon == "ルギア"
         assert cfg.keyinput is KeyInput.NONE
 
     def test_file_name_removed(self):
@@ -487,24 +489,29 @@ class TestConfig:
             "language": "ENG",
             "rom": "LG",
             "edition": "GC",
+            "hardware": "Switch2",
             "min_frame": 3000,
             "max_frame": 3500,
             "trials": 3,
             "sound_mode": "ステレオ",
             "keyinput": "dpad_on_boot",
+            "pokemon": "ミュウツー",
         }
         cfg = FrlgInitialSeedConfig.from_args(args)
         assert cfg.language == "ENG"
         assert cfg.rom == "LG"
         assert cfg.edition == "GC"
+        assert cfg.hardware is Hardware.SWITCH2
         assert cfg.min_frame == 3000
         assert cfg.max_frame == 3500
         assert cfg.trials == 3
         assert cfg.sound_mode == "ステレオ"
         assert cfg.keyinput is KeyInput.DPAD_ON_BOOT
+        assert cfg.pokemon == "ミュウツー"
         # 指定しなかった値はデフォルト
         assert cfg.frame2 == 560
         assert cfg.button_mode == "ヘルプ"
+        assert cfg.fps == 60.0
 
     def test_from_args_base_stats(self):
         """args dict から base_stats が構築される"""
@@ -519,9 +526,13 @@ class TestConfig:
 
 from frlg_initial_seed.csv_helper import (
     append_csv_row,
+    append_detail_csv_row,
     build_csv_path,
+    build_detail_csv_path,
     CSV_FIELDNAMES,
+    CSV_DETAIL_FIELDNAMES,
     CSV_FILENAME,
+    CSV_DETAIL_FILENAME,
 )
 
 
@@ -535,13 +546,21 @@ class TestCSVHelper:
         expected = Path("static/frlg_initial_seed") / CSV_FILENAME
         assert path == expected
 
+    def test_build_detail_csv_path_fixed(self):
+        """固定ファイル名 initial_seeds_details.csv が返る"""
+        cfg = FrlgInitialSeedConfig()
+        path = build_detail_csv_path(cfg)
+        expected = Path("static/frlg_initial_seed") / CSV_DETAIL_FILENAME
+        assert path == expected
+
     def test_append_creates_with_header(self, tmp_path):
         """ファイルが存在しない場合、ヘッダー付きで作成される"""
         csv_path = tmp_path / CSV_FILENAME
         append_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2", "advance": "1340",
+            "frame": "2120", "seed": "72C2",
             "region": "JPN", "version": "FR", "edition": "Switch",
             "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            "hardware": "Switch", "fps": "60.0", "note": "",
         })
 
         with open(csv_path, "r", encoding="utf-8") as f:
@@ -551,15 +570,41 @@ class TestCSVHelper:
         assert len(rows) == 1
         assert rows[0]["frame"] == "2120"
         assert rows[0]["seed"] == "72C2"
+        assert rows[0]["hardware"] == "Switch"
+        assert rows[0]["fps"] == "60.0"
+
+    def test_append_detail_creates_with_header(self, tmp_path):
+        """詳細CSV: ファイルが存在しない場合、ヘッダー付きで作成される"""
+        csv_path = tmp_path / CSV_DETAIL_FILENAME
+        append_detail_csv_row(csv_path, {
+            "frame": "2120", "seed": "72C2",
+            "region": "JPN", "version": "FR", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            "hardware": "Switch", "fps": "60.0",
+            "advance": "1340", "pokemon": "ルギア", "level": "70",
+            "hp": "253", "atk": "168", "def": "220",
+            "spa": "172", "spd": "258", "spe": "194",
+            "note": "",
+        })
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            assert reader.fieldnames == CSV_DETAIL_FIELDNAMES
+            rows = list(reader)
+        assert len(rows) == 1
+        assert rows[0]["advance"] == "1340"
+        assert rows[0]["pokemon"] == "ルギア"
+        assert rows[0]["hp"] == "253"
 
     def test_append_does_not_duplicate_header(self, tmp_path):
         """複数回 append してもヘッダーは 1 回のみ"""
         csv_path = tmp_path / CSV_FILENAME
         for seed in ("AAAA", "BBBB"):
             append_csv_row(csv_path, {
-                "frame": "2120", "seed": seed, "advance": "1340",
+                "frame": "2120", "seed": seed,
                 "region": "JPN", "version": "FR", "edition": "Switch",
                 "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+                "hardware": "Switch", "fps": "60.0", "note": "",
             })
 
         with open(csv_path, "r", encoding="utf-8") as f:
@@ -568,12 +613,13 @@ class TestCSVHelper:
         assert len(lines) == 3
 
     def test_csv_contains_metadata_columns(self, tmp_path):
-        """CSV に region/version/edition/sound_mode/button_mode/keyinput が含まれる"""
+        """CSV に hardware/fps/note を含む全カラムが存在する"""
         csv_path = tmp_path / CSV_FILENAME
         append_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2", "advance": "1340",
+            "frame": "2120", "seed": "72C2",
             "region": "JPN", "version": "FR", "edition": "Switch",
             "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            "hardware": "Switch", "fps": "60.0", "note": "",
         })
 
         with open(csv_path, "r", encoding="utf-8") as f:
@@ -585,4 +631,33 @@ class TestCSVHelper:
         assert "sound_mode" in fieldnames
         assert "button_mode" in fieldnames
         assert "keyinput" in fieldnames
+        assert "hardware" in fieldnames
+        assert "fps" in fieldnames
+        assert "note" in fieldnames
+
+    def test_detail_csv_contains_stats_columns(self, tmp_path):
+        """詳細CSV に advance/pokemon/level/hp〜spe が含まれる"""
+        csv_path = tmp_path / CSV_DETAIL_FILENAME
+        append_detail_csv_row(csv_path, {
+            "frame": "2120", "seed": "MULT",
+            "region": "JPN", "version": "FR", "edition": "Switch",
+            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
+            "hardware": "Switch", "fps": "60.0",
+            "advance": "", "pokemon": "ルギア", "level": "70",
+            "hp": "250", "atk": "162", "def": "218",
+            "spa": "166", "spd": "264", "spe": "188",
+            "note": "候補2つ",
+        })
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            rows = list(reader)
+        assert "advance" in fieldnames
+        assert "pokemon" in fieldnames
+        assert "hp" in fieldnames
+        assert "spe" in fieldnames
+        assert rows[0]["seed"] == "MULT"
+        assert rows[0]["advance"] == ""
+        assert rows[0]["note"] == "候補2つ"
 
