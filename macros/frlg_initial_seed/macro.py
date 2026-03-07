@@ -9,6 +9,7 @@ Switch (720p) 専用。
 from __future__ import annotations
 
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
@@ -44,6 +45,25 @@ _STAT_FILE_NAMES: tuple[str, ...] = ("hp", "atk", "def", "spa", "spd", "spe")
 
 # 1 trial の結果: (seed 文字列, advance or None, 認識実数値 or None)
 TrialResult = tuple[str, int | None, tuple[int, ...] | None]
+
+
+# ============================================================
+# 所要時間見積もり
+# ============================================================
+
+# 1 trial あたりのタイマー外固定操作時間 (秒)
+# restart(2.55) + encounter(14.20) + capture(11.00)
+# + dismiss(10.00) + stats(5.30) + OCR(~1.0)
+_T_OPS: float = 44.05
+
+
+def _estimate_total_seconds(cfg: FrlgInitialSeedConfig) -> float:
+    """設定値から想定所要時間 (秒) を算出する。"""
+    total = 0.0
+    for f1 in range(cfg.min_frame, cfg.max_frame + 1):
+        timer_sec = (f1 + cfg.frame1_offset + cfg.frame2 + cfg.frame2_offset) / cfg.fps
+        total += cfg.trials * (timer_sec + _T_OPS)
+    return total
 
 
 # ============================================================
@@ -125,6 +145,20 @@ class FrlgInitialSeedMacro(MacroBase):
         except Exception:
             pass
         cmd.log("OCR ウォームアップ完了", level="INFO")
+
+        # 想定所要時間・ETA
+        est_sec = _estimate_total_seconds(cfg)
+        n_frames = cfg.max_frame - cfg.min_frame + 1
+        total_trials = n_frames * cfg.trials
+        h, rem = divmod(int(est_sec), 3600)
+        m, s = divmod(rem, 60)
+        eta = datetime.now() + timedelta(seconds=est_sec)
+        cmd.log(
+            f"想定所要時間: {h}時間{m}分{s}秒 "
+            f"({n_frames}F × {cfg.trials}試行 = {total_trials}回), "
+            f"ETA: {eta.strftime('%Y-%m-%d %H:%M')}",
+            level="INFO",
+        )
 
     def run(self, cmd: Command) -> None:
         cfg = self._cfg
