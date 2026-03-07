@@ -157,6 +157,7 @@ class FrlgInitialSeedMacro(MacroBase):
             f"想定所要時間: {h}時間{m}分{s}秒 "
             f"({n_frames}F × {cfg.trials}試行 = {total_trials}回), "
             f"ETA: {eta.strftime('%Y-%m-%d %H:%M')}",
+            sep="\n",
             level="INFO",
         )
 
