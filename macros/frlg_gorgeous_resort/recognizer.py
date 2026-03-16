@@ -28,7 +28,7 @@ ROI_POKEMON_NAME_BASE: tuple[int, int, int] = (200, 590, 70)  # (x, y, h)
 ROI_POKEMON_NAME_WIDTHS: tuple[int, ...] = (120, 190, 260, 330)
 
 # アイテム取得テキスト表示領域 — 実機計測で確定する
-ROI_ITEM_NAME: tuple[int, int, int, int] = (200, 520, 500, 70)
+ROI_ITEM_NAME: tuple[int, int, int, int] = (200, 520, 640, 70)
 
 # メッセージウィンドウ検出用 ROI
 ROI_MESSAGE: tuple[int, int, int, int] = (1056, 474, 89, 223)
