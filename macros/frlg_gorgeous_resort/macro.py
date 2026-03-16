@@ -94,8 +94,9 @@ class FrlgGorgeousResortMacro(MacroBase):
                 level="INFO",
             )
 
-        # frame2 に frame2_offset を加算
-        self._effective_frame2 = cfg.frame2 + cfg.frame2_offset
+        # advance → 実待機秒数: (target_advance + advance_offset) / (fps × rng_multiplier)
+        self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
+        self._effective_advance = cfg.target_advance + cfg.advance_offset
 
         # カウンタ初期化
         self._item_counters: dict[str, int] = defaultdict(int)
@@ -140,8 +141,8 @@ class FrlgGorgeousResortMacro(MacroBase):
 
         # ETA 見積りと開始通知
         t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
-        t_frame2 = self._effective_frame2 / cfg.fps
-        t_loop = _OVERHEAD_RESTART + t_frame1 + t_frame2 + _OVERHEAD_POST
+        t_advance = self._effective_advance / self._advance_wait_fps
+        t_loop = _OVERHEAD_RESTART + t_frame1 + t_advance + _OVERHEAD_POST
         total_seconds = _OCR_WARMUP_SECONDS + (t_loop * cfg.target_count)
         eta = datetime.now() + timedelta(seconds=total_seconds)
         eta_str = eta.strftime("%Y-%m-%d %H:%M")
@@ -162,8 +163,9 @@ class FrlgGorgeousResortMacro(MacroBase):
 
         cmd.log(
             f"FrlgGorgeousResortMacro 初期化完了: "
-            f"frame1={cfg.frame1}, frame2={cfg.frame2}, "
-            f"frame2_offset={cfg.frame2_offset}, "
+            f"frame1={cfg.frame1}, target_advance={cfg.target_advance}, "
+            f"advance_offset={cfg.advance_offset}, "
+            f"rng_multiplier={cfg.rng_multiplier}, "
             f"target_item={cfg.target_item}, "
             f"target_count={cfg.target_count}",
             level="INFO",
@@ -193,8 +195,8 @@ class FrlgGorgeousResortMacro(MacroBase):
             t2 = _start_timer()
             self._navigate_to_akiho(cmd)
 
-            # Step 4: frame2 タイマー消化
-            _consume_timer(cmd, t2, self._effective_frame2, cfg.fps)
+            # Step 4: advance タイマー消化
+            _consume_timer(cmd, t2, self._effective_advance, self._advance_wait_fps)
 
             # Step 5: 1回目の会話を終了し、改めてアキホに話しかける
             self._end_first_conversation(cmd)

@@ -30,10 +30,12 @@
 | 用語 | 定義 |
 |------|------|
 | **フレーム (F)** | 1/60 秒を 1F とする時間単位。`seconds = frames / fps`, `frames = seconds × fps` |
-| **frame1** | ゲーム起動から初期Seed決定までの待機フレーム数。初期Seedリストから取得した値 |
-| **frame2** | 初期Seed決定以降、ポケモン決定処理が走るフレームまでの待機フレーム数 |
-| **frame1_offset** | frame1 に加算するユーザー調整オフセット (default: 0) |
-| **frame2_offset** | frame2 に加算する補正値。プラットフォームごとの内部遅延を吸収する。（→ §2.2） |
+| **advance** | LCG32 の seed を 1 step 前進させる操作。1 advance = 1 回の乱数消費 |
+| **frame1** | ゲーム起動から初期Seed決定までの待機フレーム数（時間フレーム）。初期Seedリストから取得した値 |
+| **target_advance** | 初期Seed決定以降、ポケモン決定処理が走るまでの目標 RNG advance 数 |
+| **frame1_offset** | frame1 に加算するユーザー調整オフセット (default: 0)。時間フレーム単位 |
+| **advance_offset** | target_advance に加算する補正値。プラットフォームごとの内部遅延を吸収する。advance 単位（→ §2.2） |
+| **rng_multiplier** | 1 フレームあたりの RNG 消費倍率。Switch = 2（RNG が毎フレーム 2 回消費される）、GC = 1 |
 | **fps** | フレームレート。Switch = 60.0 |
 | **初期Seed** | ゲーム起動時に決定される 16bit の乱数初期値 |
 
@@ -48,24 +50,33 @@ NyX 移植時は TOML 設定ファイルで管理し、`initialize()` の `args`
 | パラメータ | 型 | デフォルト値 | 説明 |
 |-----------|-----|-------------|------|
 | `language` | `str` | `"JPN"` | 言語リージョン |
-| `frame1` | `int` | `2347` | 初期Seed決定フレーム |
-| `frame2` | `int` | `610` | ポケモン決定フレーム |
+| `frame1` | `int` | `2347` | 初期Seed決定フレーム（時間フレーム） |
+| `target_advance` | `int` | `610` | ポケモン決定までの目標 RNG advance 数 |
 | `target_item` | `str` | `"ゴージャスボール"` | 目標アイテム。指定なしで無制限ループ |
 | `target_count` | `int` | `9999` | 目標アイテムの収集数。到達時に停止 |
 | `target_pokemon` | `list[str]` | `[]` | アキホに見せるポケモン名のリスト（日本語カタカナ）。OCR 突合に使用。いずれかに一致すれば OK |
 | `pokedex` | `list[int]` | `[]` | 全国図鑑の登録済み番号リスト（例: `[1, 4, 7, 25, ...]`）。空の場合は図鑑チェックを省略 |
 | `fps` | `float` | `60.0` | フレームレート |
 
-### 2.2 フレーム補正
+### 2.2 フレーム・RNG 補正
 
 | パラメータ | 型 | デフォルト値 | 説明 |
 |-----------|-----|-------------|------|
-| `frame1_offset` | `int` | `0` | frame1 に加算する微調整オフセット |
-| `frame2_offset` | `int` | `322` | frame2 に加算するプラットフォーム補正値 |
+| `frame1_offset` | `int` | `0` | frame1 に加算する微調整オフセット（時間フレーム単位） |
+| `advance_offset` | `int` | `322` | target_advance に加算するプラットフォーム補正値（advance 単位） |
+| `rng_multiplier` | `int` | `2` | 1フレームあたりの RNG 消費倍率。Switch=2, GC=1 |
 
-> **frame2_offset の由来**: 元スクリプトでは Switch の場合 `Frame2 += 322` を適用している。
+> **advance_offset の由来**: 元スクリプトでは Switch の場合 `Frame2 += 322` を適用している。
 > これはゲーム内部でポケモン決定処理が走るタイミングと、
-> 直接指定するフレーム値との間に生じるプラットフォーム固有の遅延を補正するためである。
+> 直接指定する advance 値との間に生じるプラットフォーム固有の遅延を補正するためである。
+>
+> **rng_multiplier の由来**: Switch 版では RNG が毎フレーム 2 回消費される。
+> 元スクリプトでは `fps2 = 120.0` として fps 値を 2 倍にすることで吸収していたが、
+> NyX では 「消費倍率」として明示的にパラメータ化する。
+>
+> **待機時間の導出式**:
+> - frame1: `wait = (frame1 + frame1_offset) / fps`
+> - advance: `wait = (target_advance + advance_offset) / (fps × rng_multiplier)`
 
 ### 2.3 通知設定
 
@@ -106,7 +117,7 @@ pokedex = [1, 4, 7, 25, 26, 133, 134, 135, 136, 150, 151]
 ### Step 0: 初期化
 
 - 設定読み込み
-- frame2 に `frame2_offset` を加算
+- `target_advance` に `advance_offset` を加算し、`rng_multiplier` から実効 fps を算出
 - ループカウンタ・アイテムカウンタを初期化
 - OCR エンジンのウォームアップ（`OCRProcessor.get_instance("ja")`）
     - 初回 OCR 呼び出し時のモデルロード遅延を、メインループ開始前に吸収する
@@ -153,8 +164,8 @@ _OVERHEAD_RESTART = 4.35    # Step 1: HOME操作からタイマー開始まで
 _OVERHEAD_POST    = 30.0    # Step 5〜9: 会話終了・受渡し・OCR・レポート・退出・再入場
 
 t_frame1 = (self._cfg.frame1 + self._cfg.frame1_offset) / self._cfg.fps
-t_frame2 = (self._cfg.frame2 + self._cfg.frame2_offset) / self._cfg.fps
-t_loop = _OVERHEAD_RESTART + t_frame1 + t_frame2 + _OVERHEAD_POST
+t_advance = (self._cfg.target_advance + self._cfg.advance_offset) / (self._cfg.fps * self._cfg.rng_multiplier)
+t_loop = _OVERHEAD_RESTART + t_frame1 + t_advance + _OVERHEAD_POST
 
 total_seconds = _OCR_WARMUP_SECONDS + (t_loop * self._cfg.target_count)
 eta = datetime.now() + timedelta(seconds=total_seconds)
@@ -178,15 +189,15 @@ cmd.notify(
 
 ##### 見積り時間の内訳
 
-| 要素 | 算出式 | 典型値 (frame1=2347, frame2=610, offset=322) |
+| 要素 | 算出式 | 典型値 (frame1=2347, target_advance=610, advance_offset=322, rng_multiplier=2) |
 |------|--------|-----|
 | OCR ウォームアップ | `_OCR_WARMUP_SECONDS` 固定 | 3.0s |
 | Step 1 再起動 | `_OVERHEAD_RESTART` 固定 | 4.35s |
 | frame1 タイマー | `(frame1 + frame1_offset) / fps` | 39.1s |
-| frame2 タイマー | `(frame2 + frame2_offset) / fps` | 15.5s |
+| advance タイマー | `(target_advance + advance_offset) / (fps × rng_multiplier)` | 7.8s |
 | Step 5〜9 固定操作 | `_OVERHEAD_POST` 固定 | 30.0s |
-| **1ループ合計** | | **≈ 89s** |
-| **開始からの初回総所要時間** | `OCRウォームアップ + 1ループ合計` | **≈ 92s** |
+| **1ループ合計** | | **≈ 81s** |
+| **開始からの初回総所要時間** | `OCRウォームアップ + 1ループ合計` | **≈ 84s** |
 
 > **見積りの前提**: 毎ループが成功（Step 6 の OCR 突合がパス）すると仮定している。
 > ポケモン不一致によるリトライが発生すると実際の所要時間は増加する。
@@ -215,11 +226,11 @@ A    (dur=0.20)              # ゲーム起動
 
 ### Step 3: OP送り → つづきからはじめる → 回想スキップ → アキホに話しかける
 
-frame1 タイマー消化完了直後に frame2 タイマーを開始し、
-以降のゲーム内操作はすべて frame2 タイマー内で実行される。
+frame1 タイマー消化完了直後に advance タイマーを開始し、
+以降のゲーム内操作はすべて advance タイマー内で実行される。
 
 ```python
-t2 = _start_timer()                           # ★ frame2 タイマー開始
+t2 = _start_timer()                           # ★ advance タイマー開始
 
 cmd.press(Button.A, dur=3.50, wait=1.00)       # OPをAで飛ばす
 cmd.press(Button.A, dur=0.20, wait=0.30)       # つづきからはじめる
@@ -231,13 +242,14 @@ cmd.press(Button.B, dur=0.10, wait=0.70)       # テキスト送り
 cmd.press(Button.B, dur=0.10, wait=0.50)       # テキスト送り
 ```
 
-### Step 4: frame2 タイマー消化（ポケモン・アイテム決定）
+### Step 4: advance タイマー消化（ポケモン・アイテム決定）
 
 ```python
-_consume_timer(cmd, t2, frame2 + frame2_offset, fps)  # ★ frame2 タイマー消化
+_consume_timer(cmd, t2, target_advance + advance_offset, fps * rng_multiplier)  # ★ advance タイマー消化
 ```
 
 > 消化完了時点でアキホの要求ポケモンと報酬アイテムが乱数から決定される。
+> 待機時間の導出式: `wait = (target_advance + advance_offset) / (fps × rng_multiplier)`
 
 ### Step 5: 1回目の会話を終了し、改めてアキホに話しかける
 
@@ -532,13 +544,13 @@ def _consume_timer(cmd: Command, start_time: float, total_frames: float, fps: fl
 
 ### タイマーポイント
 
-| タイマー | 起点 | 終点 | 意味 |
-|---------|------|------|------|
-| **t1** (frame1) | ゲーム起動 A 直前 | Step 2 消化完了 | 初期Seed決定タイミング |
-| **t2** (frame2) | frame1 消化完了直後 | Step 4 消化完了 | ポケモン・アイテム決定タイミング |
+| タイマー | 起点 | 終点 | 意味 | 待機時間の導出式 |
+|---------|------|------|------|------|
+| **t1** (frame1) | ゲーム起動 A 直前 | Step 2 消化完了 | 初期Seed決定タイミング | `(frame1 + frame1_offset) / fps` |
+| **t2** (advance) | frame1 消化完了直後 | Step 4 消化完了 | ポケモン・アイテム決定タイミング | `(target_advance + advance_offset) / (fps × rng_multiplier)` |
 
 > frame1 タイマー内の操作（A ボタン押下等）はタイマーに自然吸収される。
-> frame2 タイマー内の操作（OP 送り、つづきから、回想スキップ、アキホへの話しかけ）も
+> advance タイマー内の操作（OP 送り、つづきから、回想スキップ、アキホへの話しかけ）も
 > タイマーに自然吸収される。
 
 ---

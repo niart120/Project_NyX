@@ -324,30 +324,33 @@ class TestConfig:
         cfg = FrlgGorgeousResortConfig()
         assert cfg.language == "JPN"
         assert cfg.frame1 == 2347
-        assert cfg.frame2 == 610
+        assert cfg.target_advance == 610
         assert cfg.target_item == "ゴージャスボール"
         assert cfg.target_count == 9999
         assert cfg.target_pokemon == []
         assert cfg.pokedex == []
         assert cfg.fps == 60.0
         assert cfg.frame1_offset == 0
-        assert cfg.frame2_offset == 322
+        assert cfg.advance_offset == 322
+        assert cfg.rng_multiplier == 2
 
     def test_from_args(self):
         args = {
             "frame1": 3000,
-            "frame2": 700,
+            "target_advance": 700,
             "target_item": "ふしぎなアメ",
             "target_count": 50,
             "target_pokemon": ["ピカチュウ", "リザードン"],
             "pokedex": [1, 4, 7, 25],
-            "frame2_offset": 300,
+            "advance_offset": 300,
+            "rng_multiplier": 1,
         }
         cfg = FrlgGorgeousResortConfig.from_args(args)
         assert cfg.frame1 == 3000
-        assert cfg.frame2 == 700
+        assert cfg.target_advance == 700
         assert cfg.target_item == "ふしぎなアメ"
         assert cfg.target_count == 50
         assert cfg.target_pokemon == ["ピカチュウ", "リザードン"]
         assert cfg.pokedex == [1, 4, 7, 25]
-        assert cfg.frame2_offset == 300
+        assert cfg.advance_offset == 300
+        assert cfg.rng_multiplier == 1

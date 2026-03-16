@@ -16,16 +16,17 @@ class FrlgGorgeousResortConfig:
     # === 基本設定 ===
     language: str = "JPN"
     frame1: int = 2347
-    frame2: int = 610
+    target_advance: int = 610
     target_item: str = "ゴージャスボール"
     target_count: int = 9999
     target_pokemon: list[str] = field(default_factory=list)
     pokedex: list[int] = field(default_factory=list)
     fps: float = 60.0
 
-    # === フレーム補正 ===
+    # === フレーム・RNG 補正 ===
     frame1_offset: int = 0
-    frame2_offset: int = 322
+    advance_offset: int = 322
+    rng_multiplier: int = 2
 
     # === デバッグ ===
     screenshot_mode: bool = False
@@ -38,7 +39,7 @@ class FrlgGorgeousResortConfig:
         # 基本設定
         cfg.language = str(args.get("language", cfg.language))
         cfg.frame1 = int(args.get("frame1", cfg.frame1))
-        cfg.frame2 = int(args.get("frame2", cfg.frame2))
+        cfg.target_advance = int(args.get("target_advance", cfg.target_advance))
         cfg.target_item = str(args.get("target_item", cfg.target_item))
         cfg.target_count = int(args.get("target_count", cfg.target_count))
         cfg.fps = float(args.get("fps", cfg.fps))
@@ -53,9 +54,10 @@ class FrlgGorgeousResortConfig:
         if pd is not None:
             cfg.pokedex = [int(v) for v in pd]
 
-        # フレーム補正
+        # フレーム・RNG 補正
         cfg.frame1_offset = int(args.get("frame1_offset", cfg.frame1_offset))
-        cfg.frame2_offset = int(args.get("frame2_offset", cfg.frame2_offset))
+        cfg.advance_offset = int(args.get("advance_offset", cfg.advance_offset))
+        cfg.rng_multiplier = int(args.get("rng_multiplier", cfg.rng_multiplier))
 
         # デバッグ
         cfg.screenshot_mode = bool(args.get("screenshot_mode", cfg.screenshot_mode))
