@@ -13,7 +13,6 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import numpy as np
 
@@ -84,15 +83,6 @@ class FrlgGorgeousResortMacro(MacroBase):
     def initialize(self, cmd: Command, args: dict) -> None:
         self._cfg = FrlgGorgeousResortConfig.from_args(args)
         cfg = self._cfg
-
-        # スクリーンショットモード用ディレクトリ
-        self._ss_dir = Path("snapshots/frlg_gorgeous_resort")
-        if cfg.screenshot_mode:
-            self._ss_dir.mkdir(parents=True, exist_ok=True)
-            cmd.log(
-                f"スクリーンショットモード: ON — 保存先: {self._ss_dir}",
-                level="INFO",
-            )
 
         # advance → 実待機秒数: (target_advance + advance_offset) / (fps × rng_multiplier)
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
@@ -202,11 +192,8 @@ class FrlgGorgeousResortMacro(MacroBase):
             self._end_first_conversation(cmd)
 
             # Step 6: ポケモン確認（OCR）
-            if cfg.screenshot_mode:
-                self._save_screenshot(cmd, "step6_pokemon_name")
-
             recognized = recognize_requested_pokemon(cmd)
-            if cfg.target_pokemon and not cfg.screenshot_mode:
+            if cfg.target_pokemon:
                 if recognized is None or not matches_any_target(
                     recognized, cfg.target_pokemon
                 ):
@@ -222,9 +209,6 @@ class FrlgGorgeousResortMacro(MacroBase):
             self._deliver_pokemon_and_receive_item(cmd)
 
             # Step 8: アイテム認識 → カウント更新
-            if cfg.screenshot_mode:
-                self._save_screenshot(cmd, "step8_item_name")
-
             item = recognize_item(cmd)
             if item == "BAG_FULL":
                 cmd.log("バッグが上限に達したため停止", level="INFO")
@@ -244,14 +228,6 @@ class FrlgGorgeousResortMacro(MacroBase):
                 cmd.log(f"{i}回目：アイテム認識失敗", level="WARNING")
 
             # Step 9: レポート書き → 退出 → 再入場
-            if cfg.screenshot_mode:
-                self._save_screenshot(cmd, "step8_after_item")
-                cmd.log(
-                    "スクリーンショットモード: 1ループ完了 — 停止",
-                    level="INFO",
-                )
-                break
-
             self._save_and_reenter(cmd)
 
             # Step 10: 目標達成チェック
@@ -279,18 +255,6 @@ class FrlgGorgeousResortMacro(MacroBase):
             f"アイテム: {dict(self._item_counters)})",
             level="INFO",
         )
-
-    # --------------------------------------------------------
-    # スクリーンショット保存
-    # --------------------------------------------------------
-
-    def _save_screenshot(self, cmd: Command, label: str) -> None:
-        """現在の画面を撮影して保存する (ROI 特定用)。"""
-        image = cmd.capture()
-        ts = datetime.now().strftime("%H%M%S")
-        path = self._ss_dir / f"{ts}_{label}.png"
-        cmd.save_img(str(path), image)
-        cmd.log(f"スクリーンショット保存: {path}", level="INFO")
 
     # --------------------------------------------------------
     # Step 1: ゲーム再起動
