@@ -27,6 +27,9 @@ class FrlgGorgeousResortConfig:
     frame1_offset: int = 0
     frame2_offset: int = 322
 
+    # === デバッグ ===
+    screenshot_mode: bool = False
+
     @classmethod
     def from_args(cls, args: dict) -> FrlgGorgeousResortConfig:
         """args dict から設定を構築する。"""
@@ -53,5 +56,8 @@ class FrlgGorgeousResortConfig:
         # フレーム補正
         cfg.frame1_offset = int(args.get("frame1_offset", cfg.frame1_offset))
         cfg.frame2_offset = int(args.get("frame2_offset", cfg.frame2_offset))
+
+        # デバッグ
+        cfg.screenshot_mode = bool(args.get("screenshot_mode", cfg.screenshot_mode))
 
         return cfg
