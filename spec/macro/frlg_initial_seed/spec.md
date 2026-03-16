@@ -433,7 +433,7 @@ Switch / JPN / 720p のみ（NyX スコープ）:
 
 個体生成ロジック（LCG32 / PID / IV）および突合処理の詳細は、独立した仕様書に分離した。
 
-> **→ [frlg_seed_solver.md](frlg_seed_solver.md)** を参照
+> **→ [seed_solver.md](seed_solver.md)** を参照
 
 以下は要約:
 
@@ -619,7 +619,7 @@ $$
 ### 11.1 スコープ
 
 NyX移植では **Switch (720p)** のみを対象とする。以下はスコープ外
-（→ [frlg_initial_seed_deferred.md](frlg_initial_seed_deferred.md) に詳細を記録）:
+（→ [deferred.md](deferred.md) に詳細を記録）:
 - GC 固有のリセット手順・ROI 座標（§2）
 - 1080p 固有の ROI 座標（§3）
 - キー入力調査モード（§4）
@@ -704,7 +704,7 @@ macros/
 ```
 
 > 元実装にあった `stat_calculator.py` (IV 逆変換関数) は不要。
-> 順方向変換は `Pokemon.calc_stats()` メソッドに集約 (→ [frlg_seed_solver.md](frlg_seed_solver.md) §3.4)。
+> 順方向変換は `Pokemon.calc_stats()` メソッドに集約 (→ [seed_solver.md](seed_solver.md) §3.4)。
 
 ### 11.5 API マッピング
 
@@ -734,5 +734,5 @@ macros/
 | **Seed逆算入力** | 実数値のみ（性格は不要） | PID から性格を導出し、性格補正を考慮した実数値照合で候補を絞り込む。numpy ベクトル化による一括並列計算 |
 | **Seed逆算探索範囲** | `[min_advance, max_advance]` 閉区間 | LCG advance 数。frame2 を目安にユーザーが設定 |
 | **RNG** | Python 実装の LCG32 | `PokemonPRNG.dll` の代替 |
-| **キー入力調査モード** | 別仕様書として Phase 2 で整備 | → [frlg_initial_seed_deferred.md](frlg_initial_seed_deferred.md) §4 |
+| **キー入力調査モード** | 別仕様書として Phase 2 で整備 | → [deferred.md](deferred.md) §4 |
 | **中断対応** | メインループ各ステップで `cmd.stop()` チェック | ID調整マクロと同様 |
