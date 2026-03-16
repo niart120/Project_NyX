@@ -113,8 +113,7 @@ def recognize_requested_pokemon(
     cmd: "Command", *, img_dir: Path | None = None
 ) -> str | None:
     """アキホのダイアログからポケモン名を OCR で読み取る。"""
-    img_path = img_dir / "pokemon_name.png" if img_dir is not None else None
-    return ocr_roi(cmd, ROI_POKEMON_NAME, img_path=img_path)
+    return ocr_roi(cmd, ROI_POKEMON_NAME, img_path=img_dir and img_dir / "pokemon_name.png")
 
 
 def _edit_distance(s1: str, s2: str) -> int:
@@ -154,8 +153,7 @@ def recognize_item(cmd: "Command", *, img_dir: Path | None = None) -> str | None
     Returns:
         アイテム名、"BAG_FULL"、または認識失敗時は None
     """
-    img_path = img_dir / "item_name.png" if img_dir is not None else None
-    text = ocr_roi(cmd, ROI_ITEM_NAME, img_path=img_path)
+    text = ocr_roi(cmd, ROI_ITEM_NAME, img_path=img_dir and img_dir / "item_name.png")
     if text is None:
         return None
     return match_item(text)
