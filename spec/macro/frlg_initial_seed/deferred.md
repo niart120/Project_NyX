@@ -1,6 +1,6 @@
 # FRLG 初期Seed特定マクロ — スコープ外機能 仕様書
 
-> **関連マクロ**: [frlg_initial_seed.md](frlg_initial_seed.md)（Phase 1 仕様）  
+> **関連マクロ**: [spec.md](spec.md)（Phase 1 仕様）  
 > **対象タイトル**: ポケットモンスター ファイアレッド・リーフグリーン (FRLG)  
 > **目的**: Phase 1 で除外した機能の仕様を保全し、将来の Phase 2 以降で実装する際の参照とする  
 > **元ファイル**: `初期Seed特定.csx`（C# Script / NX Macro Controller 向け）
