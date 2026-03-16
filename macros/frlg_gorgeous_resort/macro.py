@@ -194,11 +194,11 @@ class FrlgGorgeousResortMacro(MacroBase):
             # Step 4: advance タイマー消化
             _consume_timer(cmd, t2, self._effective_advance, self._advance_wait_fps)
 
-            # Step 5: 1回目の会話を終了し、改めてアキホに話しかける
-            self._end_first_conversation(cmd)
-
-            # Step 6: ポケモン確認（OCR）
-            recognized = recognize_requested_pokemon(cmd, img_dir=self._img_dir)
+            # Step 5: テキスト送り → ポケモン名 OCR（1回目の会話内）
+            cmd.press(Button.B, dur=0.10, wait=0.70)   # ポケモン名表示待ち
+            recognized = recognize_requested_pokemon(
+                cmd, cfg.target_pokemon, img_dir=self._img_dir,
+            )
             if cfg.target_pokemon:
                 if recognized is None or not matches_any_target(
                     recognized, cfg.target_pokemon
@@ -210,6 +210,9 @@ class FrlgGorgeousResortMacro(MacroBase):
                     )
                     continue
             cmd.log(f"{i}回目：要求={recognized} — OK", level="DEBUG")
+
+            # Step 6: 1回目の会話を終了し、改めてアキホに話しかける
+            self._end_first_conversation(cmd)
 
             # Step 7: ポケモン受け渡し → アイテム受領
             self._deliver_pokemon_and_receive_item(cmd)
@@ -290,12 +293,11 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(Button.B, dur=0.10, wait=0.50)   # テキスト送り
 
     # --------------------------------------------------------
-    # Step 5: 1回目の会話を終了 → 改めて話しかける
+    # Step 6: 1回目の会話を終了 → 改めて話しかける
     # --------------------------------------------------------
 
     def _end_first_conversation(self, cmd: Command) -> None:
-        """ポケモン決定後、現在の会話を終了して改めて話しかける。"""
-        cmd.press(Button.B, dur=0.10, wait=0.60)
+        """ポケモン名 OCR 後、残りの会話を終了して改めて話しかける。"""
         cmd.press(Button.B, dur=0.10, wait=0.60)
         cmd.press(Button.B, dur=0.10, wait=0.30)
         # 改めてアキホに話しかける
@@ -308,7 +310,7 @@ class FrlgGorgeousResortMacro(MacroBase):
     def _deliver_pokemon_and_receive_item(self, cmd: Command) -> None:
         """アキホとの会話を進め、ポケモンを見せてアイテムを受け取る。"""
         # アキホとの会話を進める
-        for _ in range(7):
+        for _ in range(8):
             cmd.press(Button.B, dur=0.10, wait=0.70)
 
         # セバスチャン登場・アイテム受取
@@ -329,10 +331,10 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(Button.B, dur=0.10, wait=0.30)
 
         # 外に出る
-        cmd.press(LStick.UP, dur=1.50, wait=2.20)
+        cmd.press(LStick.DOWN, dur=1.50, wait=2.20)
 
         # アキホの家に再入場
-        cmd.press(LStick.DOWN, dur=3.30, wait=0.10)
+        cmd.press(LStick.UP, dur=3.30, wait=0.10)
 
         # レポートを書く
         cmd.press(Button.PLUS, dur=0.10, wait=0.30)
@@ -341,8 +343,8 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(LStick.UP, dur=0.10, wait=0.10)
         cmd.press(Button.A, dur=0.10, wait=1.00)   # 「レポートをかく」
         cmd.press(Button.A, dur=0.10, wait=1.00)   # 確認
-        cmd.press(LStick.UP, dur=0.10, wait=0.10)  # 「はい」を選択
-        cmd.press(Button.A, dur=0.10, wait=0.50)   # レポート書き込み実行
+        cmd.press(Button.A, dur=0.10, wait=0.10)  # 「はい」を選択
+        cmd.press(Button.A, dur=0.10, wait=1.00)   # レポート書き込み実行
 
         # レポート完了待ち
         while is_message_window_visible(cmd):

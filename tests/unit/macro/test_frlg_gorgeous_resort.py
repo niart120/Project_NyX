@@ -1,4 +1,4 @@
-"""FRLG ゴージャスリゾート アキホおねだりマクロ — ユニットテスト
+﻿"""FRLG ゴージャスリゾート アキホおねだりマクロ — ユニットテスト
 
 species_data / selphy_logic / frame_search / recognizer / config のテストを提供する。
 """
@@ -22,7 +22,6 @@ from frlg_gorgeous_resort.frame_search import (
     search_akiho_frames,
 )
 from frlg_gorgeous_resort.recognizer import (
-    _edit_distance,
     match_item,
     matches_any_target,
 )
@@ -262,31 +261,15 @@ class TestFrameSearch:
 # ============================================================
 
 
-class TestEditDistance:
-    """_edit_distance() のテスト"""
-
-    def test_identical(self):
-        assert _edit_distance("ピカチュウ", "ピカチュウ") == 0
-
-    def test_one_char_diff(self):
-        assert _edit_distance("ピカチュウ", "ピカチュオ") == 1
-
-    def test_empty_strings(self):
-        assert _edit_distance("", "") == 0
-
-    def test_one_empty(self):
-        assert _edit_distance("abc", "") == 3
-
-
 class TestMatchesAnyTarget:
     """matches_any_target() のテスト"""
 
     def test_exact_match(self):
         assert matches_any_target("ピカチュウ", ["ピカチュウ", "リザードン"])
 
-    def test_fuzzy_match(self):
-        # 1文字違い → 編集距離1 で一致扱い
-        assert matches_any_target("ピカチュオ", ["ピカチュウ"])
+    def test_substring_match(self):
+        # OCR 結果にポケモン名が含まれていればマッチ
+        assert matches_any_target("ディグダをみせて", ["ディグダ"])
 
     def test_no_match(self):
         assert not matches_any_target("フシギダネ", ["ピカチュウ", "リザードン"])

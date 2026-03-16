@@ -23,10 +23,12 @@ if TYPE_CHECKING:
 # ============================================================
 
 # ポケモン名表示領域 (Switch / JPN / 720p)
-ROI_POKEMON_NAME: tuple[int, int, int, int] = (200, 590, 335, 70)
+# 文字数により表示幅が変わるため、複数の横幅で OCR を試行する
+ROI_POKEMON_NAME_BASE: tuple[int, int, int] = (200, 590, 70)  # (x, y, h)
+ROI_POKEMON_NAME_WIDTHS: tuple[int, ...] = (120, 190, 260, 330)
 
-# アイテム取得テキスト表示領域 — 実機計測で確定すること (TBD)
-ROI_ITEM_NAME: tuple[int, int, int, int] = (200, 480, 500, 50)
+# アイテム取得テキスト表示領域 — 実機計測で確定する
+ROI_ITEM_NAME: tuple[int, int, int, int] = (200, 520, 500, 70)
 
 # メッセージウィンドウ検出用 ROI
 ROI_MESSAGE: tuple[int, int, int, int] = (1056, 474, 89, 223)
@@ -38,8 +40,6 @@ ROI_MESSAGE: tuple[int, int, int, int] = (1056, 474, 89, 223)
 _PADDING: int = 40  # 白パディング (px)
 
 _MESSAGE_BRIGHTNESS_THRESHOLD: float = 240.0
-
-_FUZZY_THRESHOLD: int = 1  # 編集距離の許容閾値
 
 ITEM_NAMES: list[str] = [
     "ゴージャスボール",
@@ -110,34 +110,45 @@ def ocr_roi(
 
 
 def recognize_requested_pokemon(
-    cmd: "Command", *, img_dir: Path | None = None
+    cmd: "Command",
+    target_pokemon: list[str],
+    *,
+    img_dir: Path | None = None,
 ) -> str | None:
-    """アキホのダイアログからポケモン名を OCR で読み取る。"""
-    return ocr_roi(cmd, ROI_POKEMON_NAME, img_path=img_dir and img_dir / "pokemon_name.png")
+    """アキホのダイアログからポケモン名を OCR で読み取る。
 
+    ROI の横幅を 4 段階で切り替えながら OCR を試行し、
+    target_pokemon との部分文字列マッチに成功した時点で結果を返す。
+    いずれの幅でもマッチしない場合は最後の試行結果を返す。
+    """
+    x, y, h = ROI_POKEMON_NAME_BASE
+    image = cmd.capture()
+    last_text: str | None = None
 
-def _edit_distance(s1: str, s2: str) -> int:
-    """2 つの文字列間のレーベンシュタイン距離を返す。"""
-    if len(s1) < len(s2):
-        return _edit_distance(s2, s1)
+    for w in ROI_POKEMON_NAME_WIDTHS:
+        roi = (x, y, w, h)
+        padded = _crop_and_pad(image, roi)
+        if img_dir is not None:
+            cv2.imwrite(str(img_dir / f"pokemon_name_w{w}.png"), padded)
+        text = ImageProcessor(padded).get_text(language="ja")
+        text = text.strip() if text else None
+        matched = text is not None and matches_any_target(text, target_pokemon)
+        cmd.log(f"OCR w={w}: '{text}' matched={matched}", level="DEBUG")
+        if text is not None:
+            last_text = text
+            if matched:
+                return text
 
-    prev = list(range(len(s2) + 1))
-    for i, c1 in enumerate(s1):
-        curr = [i + 1]
-        for j, c2 in enumerate(s2):
-            cost = 0 if c1 == c2 else 1
-            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + cost))
-        prev = curr
-
-    return prev[len(s2)]
+    return last_text
 
 
 def matches_any_target(recognized: str, target_pokemon: list[str]) -> bool:
-    """OCR 認識結果が target_pokemon リスト内のいずれかと一致するか判定する。"""
+    """OCR 認識結果が target_pokemon リスト内のいずれかを含むか判定する。
+
+    recognized の部分文字列として target が出現するかを検証する。
+    """
     for target in target_pokemon:
-        if recognized == target:
-            return True
-        if _edit_distance(recognized, target) <= _FUZZY_THRESHOLD:
+        if target in recognized:
             return True
     return False
 
