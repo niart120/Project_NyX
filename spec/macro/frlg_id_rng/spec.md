@@ -488,26 +488,22 @@ def _wait_frames(self, cmd: Command, total_frames: float, fps: float) -> None:
 
 ### 8.1 Frame インクリメントモード
 
-Frame1 と Frame2 を範囲内で +2 ずつ増加させながら探索する。
+Frame1 と Frame2 を範囲内で +1 ずつ増加させながら探索する。
 
 ```
-偶数パス: Frame1 = Frame1Min, Frame1Min+2, ..., Frame1Max
-          Frame2 = Frame2Min, Frame2Min+2, ..., Frame2Max
-
-奇数パス: Frame1 = Frame1Min+1, Frame1Min+3, ..., Frame1Max
-          Frame2 = Frame2Min+1, Frame2Min+3, ..., Frame2Max
+Frame1 = Frame1Min, Frame1Min+1, ..., Frame1Max
+Frame2 = Frame2Min, Frame2Min+1, ..., Frame2Max
 ```
 
 **繰り上がり規則:**
-1. `Frame1 += 2` → `Frame1 > Frame1Max` なら Frame2 を +2 して Frame1 をリセット
-2. `Frame2 > Frame2Max` なら偶数パス→奇数パスへ切り替え（または逆）
-3. 範囲幅が 0F（Min == Max）の場合、その軸の奇数パスはスキップ
+1. `Frame1 += 1` → `Frame1 > Frame1Max` なら Frame2 を +1 して Frame1 をリセット
+2. `Frame2 > Frame2Max` になったら探索完了
+3. 範囲幅が 0F（Min == Max）の場合、その軸は固定値として一度だけ使用
 
 ### 8.2 OP インクリメントモード
 
 ```
-偶数パス: OPFrame = OPFrameMin, OPFrameMin+2, ..., OPFrameMax
-奇数パス: OPFrame = OPFrameMin+1, OPFrameMin+3, ..., OPFrameMax
+OPFrame = OPFrameMin, OPFrameMin+1, ..., OPFrameMax
 ```
 
 ### 8.3 許容範囲判定
@@ -709,27 +705,20 @@ def _enter_name(self, cmd: Command, name: str, keyboard: RegionKeyboard) -> None
 ```python
 from typing import Iterator
 
-def frame_sweep(min_val: float, max_val: float, step: float = 2.0) -> Iterator[float]:
-    """偶数パス → 奇数パスの順にフレーム値を列挙する。"""
-    # 偶数パス
+def frame_sweep(min_val: float, max_val: float, step: float = 1.0) -> Iterator[float]:
+    """フレーム値を min_val から max_val まで step ずつ列挙する。"""
     v = min_val
     while v <= max_val:
         yield v
         v += step
-    # 奇数パス（範囲幅が 0 ならスキップ）
-    if min_val < max_val:
-        v = min_val + 1
-        while v <= max_val:
-            yield v
-            v += step
 
 def dual_frame_sweep(
     f1_min: float, f1_max: float,
     f2_min: float, f2_max: float,
 ) -> Iterator[tuple[float, float]]:
-    """Frame1 × Frame2 の2軸スイープ。"""
-    for f2 in frame_sweep(f2_min, f2_max):
-        for f1 in frame_sweep(f1_min, f1_max):
+    """Frame1 外側 × Frame2 内側の2軸スイープ。"""
+    for f1 in frame_sweep(f1_min, f1_max):
+        for f2 in frame_sweep(f2_min, f2_max):
             yield f1, f2
 ```
 

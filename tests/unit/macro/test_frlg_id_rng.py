@@ -29,9 +29,9 @@ class TestFrameSweep:
     """frame_sweep ジェネレータのテスト"""
 
     def test_basic_sweep(self):
-        """偶数パス → 奇数パスの順に列挙される"""
-        result = list(frame_sweep(10, 16))
-        assert result == [10, 12, 14, 16, 11, 13, 15]
+        """min から max まで 1 ずつ列挙される"""
+        result = list(frame_sweep(10, 13))
+        assert result == [10, 11, 12, 13]
 
     def test_single_value(self):
         """min == max の場合、値が1つだけ返る"""
@@ -41,17 +41,18 @@ class TestFrameSweep:
     def test_step_3(self):
         """step=3 で動作する"""
         result = list(frame_sweep(0, 6, step=3))
-        # 偶数パス: 0, 3, 6 / 奇数パス: 1, 4
-        assert result == [0, 3, 6, 1, 4]
+        assert result == [0, 3, 6]
 
     def test_dual_sweep(self):
-        """2軸スイープが Frame2 外側 × Frame1 内側で列挙される"""
+        """2軸スイープが Frame1 外側 × Frame2 内側で列挙される"""
         result = list(dual_frame_sweep(10, 12, 20, 22))
-        # Frame2=20: (10,20),(12,20),(11,20)
-        # Frame2=22: (10,22),(12,22),(11,22)
-        # Frame2=21: (10,21),(12,21),(11,21)
+        # Frame1=10: (10,20),(10,21),(10,22)
+        # Frame1=11: (11,20),(11,21),(11,22)
+        # Frame1=12: (12,20),(12,21),(12,22)
         assert (10, 20) == result[0]
-        assert (12, 20) == result[1]
+        assert (10, 21) == result[1]
+        assert (10, 22) == result[2]
+        assert (11, 20) == result[3]
         assert len(result) == 9
 
     def test_single_value_iterator(self):

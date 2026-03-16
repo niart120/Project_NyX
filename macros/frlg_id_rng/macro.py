@@ -64,6 +64,13 @@ def _consume_timer(
     remaining = target_seconds - elapsed
     if remaining > 0:
         cmd.wait(remaining)
+    else:
+        overrun_ms = -remaining * 1000
+        cmd.log(
+            f"タイマー超過: {total_frames:.0f}F/{fps}fps={target_seconds:.3f}s に対し "
+            f"経過 {elapsed:.3f}s（超過 {overrun_ms:.1f}ms）",
+            level="WARNING",
+        )
 
 
 # ============================================================
@@ -103,7 +110,7 @@ class FrlgIdRngMacro(MacroBase):
         # --- フレームタイミング ---
         self._frame1: float = float(args.get("frame1", 1260))
         self._frame2: float = float(args.get("frame2", 1200))
-        self._frame3_raw: float = float(args.get("frame3", 3009))
+        self._frame3_raw: float = float(args.get("frame3", 3000))
         self._op_frame: float = float(args.get("op_frame", 468))
         self._fps: float = float(args.get("fps", 60))
 
@@ -199,18 +206,22 @@ class FrlgIdRngMacro(MacroBase):
             # Step 10: ライバル名前入力
             self._enter_rival_name(cmd)
 
-            # Step 11: ライバル名確定後の会話
-            self._press_a_sequence(
-                cmd,
-                self._timing.rival_confirm_sequence,
-                self._timing.rival_confirm_sequence_no_save,
-            )
+            if self._frame_increment_mode or self._op_increment_mode:
+                # インクリメントモード: ライバル名確定後〜ゲーム開始を A 連打で高速通過
+                self._rush_to_game(cmd)
+            else:
+                # Step 11: ライバル名確定後の会話
+                self._press_a_sequence(
+                    cmd,
+                    self._timing.rival_confirm_sequence,
+                    self._timing.rival_confirm_sequence_no_save,
+                )
 
-            # --- Frame3 タイマー消化 ---
-            _consume_timer(cmd, t3, self._frame3, self._fps)
+                # --- Frame3 タイマー消化 ---
+                _consume_timer(cmd, t3, self._frame3, self._fps)
 
-            # Step 13: ゲーム開始（主人公の家へ）
-            cmd.press(Button.A, dur=0.1, wait=self._timing.game_start_wait)
+                # Step 13: ゲーム開始（主人公の家へ）
+                cmd.press(Button.A, dur=0.1, wait=self._timing.game_start_wait)
 
             cmd.log("ゲーム開始 TID チェック", level="INFO")
             # Step 14: TID 確認画面を開く
@@ -355,6 +366,26 @@ class FrlgIdRngMacro(MacroBase):
             cmd.press(Button.A, dur=0.1, wait=1.5)
             self._enter_name(cmd, self._rival_name, is_trainer=False)
             cmd.press(Button.A, dur=0.1, wait=2.2)
+
+    _RUSH_DURATION: float = 11.0
+    """インクリメントモード時の B 連打継続秒数。"""
+
+    _RUSH_INTERVAL: float = 0.2
+    """B 連打の間隔 (秒)。"""
+
+    def _rush_to_game(self, cmd: Command) -> None:
+        """Frame3 区間を B 連打で高速通過する (インクリメントモード用)。
+
+        名前決定後の会話 → ライバル名確定 → ゲーム開始までを
+        一定時間の B 連打でまとめて突破する。
+        """
+
+         # 名前確定後の会話を2行進める
+        cmd.press(Button.A, dur=0.1, wait=0.5)
+        cmd.press(Button.A, dur=0.1, wait=0.5)
+        end_time = time.perf_counter() + self._RUSH_DURATION
+        while time.perf_counter() < end_time:
+            cmd.press(Button.B, dur=self._RUSH_INTERVAL, wait=self._RUSH_INTERVAL)
 
     def _open_trainer_card(self, cmd: Command) -> None:
         """Step 14: メニュー → トレーナーカードを開く"""
