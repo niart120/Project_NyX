@@ -7,6 +7,7 @@ OCR によるポケモン名・アイテム名認識と、
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
@@ -21,8 +22,8 @@ if TYPE_CHECKING:
 # ROI 定義 (Switch / JPN / 720p)
 # ============================================================
 
-# ポケモン名表示領域 — 実機計測で確定すること (TBD)
-ROI_POKEMON_NAME: tuple[int, int, int, int] = (200, 480, 400, 50)
+# ポケモン名表示領域 (Switch / JPN / 720p)
+ROI_POKEMON_NAME: tuple[int, int, int, int] = (200, 590, 335, 70)
 
 # アイテム取得テキスト表示領域 — 実機計測で確定すること (TBD)
 ROI_ITEM_NAME: tuple[int, int, int, int] = (200, 480, 500, 50)
@@ -77,14 +78,28 @@ def _crop_and_pad(
     )
 
 
+def save_roi_image(
+    image: np.ndarray,
+    roi: tuple[int, int, int, int],
+    path: Path,
+) -> None:
+    """ROI をクロップし白パディングを付与して保存する（毎回上書き）。"""
+    padded = _crop_and_pad(image, roi)
+    cv2.imwrite(str(path), padded)
+
+
 def ocr_roi(
     cmd: "Command",
     roi: tuple[int, int, int, int],
     pad: int = _PADDING,
+    *,
+    img_path: Path | None = None,
 ) -> str | None:
     """指定 ROI をクロップし、OCR でテキストを返す。"""
     image = cmd.capture()
     padded = _crop_and_pad(image, roi, pad)
+    if img_path is not None:
+        cv2.imwrite(str(img_path), padded)
     text = ImageProcessor(padded).get_text(language="ja")
     return text.strip() if text else None
 
@@ -94,9 +109,12 @@ def ocr_roi(
 # ============================================================
 
 
-def recognize_requested_pokemon(cmd: "Command") -> str | None:
+def recognize_requested_pokemon(
+    cmd: "Command", *, img_dir: Path | None = None
+) -> str | None:
     """アキホのダイアログからポケモン名を OCR で読み取る。"""
-    return ocr_roi(cmd, ROI_POKEMON_NAME)
+    img_path = img_dir / "pokemon_name.png" if img_dir is not None else None
+    return ocr_roi(cmd, ROI_POKEMON_NAME, img_path=img_path)
 
 
 def _edit_distance(s1: str, s2: str) -> int:
@@ -130,13 +148,14 @@ def matches_any_target(recognized: str, target_pokemon: list[str]) -> bool:
 # ============================================================
 
 
-def recognize_item(cmd: "Command") -> str | None:
+def recognize_item(cmd: "Command", *, img_dir: Path | None = None) -> str | None:
     """アイテム取得テキストを OCR で読み取り、アイテム名を返す。
 
     Returns:
         アイテム名、"BAG_FULL"、または認識失敗時は None
     """
-    text = ocr_roi(cmd, ROI_ITEM_NAME)
+    img_path = img_dir / "item_name.png" if img_dir is not None else None
+    text = ocr_roi(cmd, ROI_ITEM_NAME, img_path=img_path)
     if text is None:
         return None
     return match_item(text)

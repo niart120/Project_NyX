@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 
@@ -87,6 +88,11 @@ class FrlgGorgeousResortMacro(MacroBase):
         # advance → 実待機秒数: (target_advance + advance_offset) / (fps × rng_multiplier)
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
         self._effective_advance = cfg.target_advance + cfg.advance_offset
+
+        # デバッグ画像保存先を確保
+        self._img_dir = Path("static/frlg_gorgeous_resort") / "img"
+        self._img_dir.mkdir(parents=True, exist_ok=True)
+        cmd.log(f"デバッグ画像保存先: {self._img_dir}", level="DEBUG")
 
         # カウンタ初期化
         self._item_counters: dict[str, int] = defaultdict(int)
@@ -192,7 +198,7 @@ class FrlgGorgeousResortMacro(MacroBase):
             self._end_first_conversation(cmd)
 
             # Step 6: ポケモン確認（OCR）
-            recognized = recognize_requested_pokemon(cmd)
+            recognized = recognize_requested_pokemon(cmd, img_dir=self._img_dir)
             if cfg.target_pokemon:
                 if recognized is None or not matches_any_target(
                     recognized, cfg.target_pokemon
@@ -209,7 +215,7 @@ class FrlgGorgeousResortMacro(MacroBase):
             self._deliver_pokemon_and_receive_item(cmd)
 
             # Step 8: アイテム認識 → カウント更新
-            item = recognize_item(cmd)
+            item = recognize_item(cmd, img_dir=self._img_dir)
             if item == "BAG_FULL":
                 cmd.log("バッグが上限に達したため停止", level="INFO")
                 cmd.notify(
