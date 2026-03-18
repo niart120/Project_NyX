@@ -1,16 +1,17 @@
-from PySide6.QtCore import Qt, Signal, QPointF
+import math
+
+from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import (
-    QPainter,
-    QPen,
-    QColor,
-    QPainterPath,
     QBrush,
-    QPaintEvent,
+    QColor,
     QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QPen,
 )
 from PySide6.QtWidgets import QWidget
-from typing import Optional
-import math
+
 from nyxpy.framework.core.constants import Hat
 
 
@@ -19,7 +20,7 @@ class DPad(QWidget):
 
     directionChanged = Signal(Hat)
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedSize(70, 70)
         self.current_direction: Hat = Hat.CENTER

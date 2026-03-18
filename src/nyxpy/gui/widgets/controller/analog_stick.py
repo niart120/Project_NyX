@@ -1,8 +1,8 @@
-from PySide6.QtCore import Qt, Signal, QPointF, QRectF
-from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QPaintEvent, QMouseEvent
-from PySide6.QtWidgets import QWidget
-from typing import Optional
 import math
+
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPaintEvent, QPen
+from PySide6.QtWidgets import QWidget
 
 
 class AnalogStick(QWidget):
@@ -10,7 +10,7 @@ class AnalogStick(QWidget):
 
     valueChanged = Signal(float, float)  # 角度と強さのシグナル
 
-    def __init__(self, parent: Optional[QWidget] = None, is_left: bool = True) -> None:
+    def __init__(self, parent: QWidget | None = None, is_left: bool = True) -> None:
         super().__init__(parent)
         self.is_left = is_left
         self.setFixedSize(60, 60)

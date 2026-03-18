@@ -1,8 +1,9 @@
 
-import cv2
-from typing import ClassVar, Dict, List
 from dataclasses import dataclass
 from threading import Lock
+from typing import ClassVar
+
+import cv2
 
 from .exceptions import OCREngineNotFoundError, OCRProcessingError
 
@@ -24,7 +25,7 @@ class OCRProcessor:
     ``get_instance`` の利用を推奨する。
     """
 
-    _instances: ClassVar[Dict[str, "OCRProcessor"]] = {}
+    _instances: ClassVar[dict[str, "OCRProcessor"]] = {}
     _lock: ClassVar[Lock] = Lock()
 
     @classmethod
@@ -81,7 +82,7 @@ class OCRProcessor:
         except Exception as e:
             raise OCREngineNotFoundError(f"PaddleOCRの初期化に失敗しました: {e}")
     
-    def recognize_text(self, image: cv2.typing.MatLike) -> List[OCRResult]:
+    def recognize_text(self, image: cv2.typing.MatLike) -> list[OCRResult]:
         """
         テキスト認識実行
         

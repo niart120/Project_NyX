@@ -1,8 +1,11 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton
 from PySide6.QtCore import Signal
-from .settings.tab_widget import SettingsTabWidget
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QVBoxLayout
+
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+
+from .settings.tab_widget import SettingsTabWidget
+
 
 class AppSettingsDialog(QDialog):
     settings_applied = Signal()

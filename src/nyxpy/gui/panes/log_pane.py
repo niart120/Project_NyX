@@ -1,5 +1,14 @@
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QPlainTextEdit, QSizePolicy, QHBoxLayout, QPushButton, QCheckBox
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QPlainTextEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
 from nyxpy.framework.core.logger.log_manager import log_manager
 
 

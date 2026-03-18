@@ -1,17 +1,17 @@
 
-import cv2
-from typing import Tuple
 from dataclasses import dataclass
 
-from .exceptions import TemplateMatchingError, InvalidImageError, ThresholdNotMetError
+import cv2
+
+from .exceptions import InvalidImageError, TemplateMatchingError, ThresholdNotMetError
 
 
 @dataclass
 class MatchResult:
     """テンプレートマッチングの結果"""
-    position: Tuple[int, int]  # (x, y)
+    position: tuple[int, int]  # (x, y)
     confidence: float
-    bounding_box: Tuple[int, int, int, int]  # (x, y, width, height)
+    bounding_box: tuple[int, int, int, int]  # (x, y, width, height)
 
 
 def find_template(source_image: cv2.typing.MatLike, 

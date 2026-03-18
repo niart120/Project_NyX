@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 
 from nyxpy.cli.run_cli import cli_main
-from nyxpy.gui.run_gui import main as gui_main
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
+from nyxpy.gui.run_gui import main as gui_main
 
 
 def init_app() -> int:

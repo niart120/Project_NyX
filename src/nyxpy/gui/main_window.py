@@ -1,35 +1,42 @@
-from PySide6.QtCore import QThread, Signal, QTimer
+from copy import deepcopy
+from pathlib import Path
+
+from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QMessageBox,
-    QLabel,
     QDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QVBoxLayout,
+    QWidget,
 )
 
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.macro.command import Command, DefaultCommand
-from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
-from nyxpy.framework.core.macro.exceptions import MacroStopException
-from nyxpy.framework.core.utils.helper import parse_define_args
-from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
-from nyxpy.gui.panes.macro_browser import MacroBrowserPane
-from nyxpy.gui.panes.control_pane import ControlPane
-from pathlib import Path
-from copy import deepcopy
-from nyxpy.gui.panes.preview_pane import PreviewPane
-from nyxpy.framework.core.macro.executor import MacroExecutor
-from nyxpy.gui.panes.log_pane import LogPane
-from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-from nyxpy.framework.core.singletons import global_settings, serial_manager, capture_manager, secrets_settings, initialize_managers
-from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.resource import StaticResourceIO
+from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.macro.command import Command, DefaultCommand
+from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.singletons import (
+    capture_manager,
+    global_settings,
+    initialize_managers,
+    secrets_settings,
+    serial_manager,
+)
+from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.framework.core.utils.helper import parse_define_args
+from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
+from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.gui.events import EventBus, EventType
+from nyxpy.gui.panes.control_pane import ControlPane
+from nyxpy.gui.panes.log_pane import LogPane
+from nyxpy.gui.panes.macro_browser import MacroBrowserPane
+from nyxpy.gui.panes.preview_pane import PreviewPane
+from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
 
 class MainWindow(QMainWindow):

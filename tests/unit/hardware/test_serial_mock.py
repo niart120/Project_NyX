@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from nyxpy.framework.core.hardware.serial_comm import (
+    DummySerialComm,
     SerialComm,
     SerialManager,
-    DummySerialComm,
 )
 
 

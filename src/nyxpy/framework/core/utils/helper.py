@@ -1,6 +1,7 @@
 import inspect
-import tomlkit
 from pathlib import Path
+
+import tomlkit
 
 
 def get_caller_class_name():

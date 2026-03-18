@@ -1,4 +1,5 @@
 import pytest
+
 from nyxpy.gui.main_window import WorkerThread
 
 

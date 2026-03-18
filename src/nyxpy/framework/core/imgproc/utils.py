@@ -1,6 +1,6 @@
 
+
 import cv2
-from typing import Tuple, Optional
 
 
 class ImagePreprocessor:
@@ -9,7 +9,7 @@ class ImagePreprocessor:
     @staticmethod
     def enhance_contrast(image: cv2.typing.MatLike,
                         clip_limit: float = 2.0,
-                        tile_grid_size: Tuple[int, int] = (8, 8)) -> cv2.typing.MatLike:
+                        tile_grid_size: tuple[int, int] = (8, 8)) -> cv2.typing.MatLike:
         """
         コントラスト強化（CLAHE）
         
@@ -68,7 +68,7 @@ class ImagePreprocessor:
     
     @staticmethod
     def binarize(image: cv2.typing.MatLike,
-                threshold: Optional[int] = None,
+                threshold: int | None = None,
                 adaptive: bool = True,
                 inverse: bool = False) -> cv2.typing.MatLike:
         """

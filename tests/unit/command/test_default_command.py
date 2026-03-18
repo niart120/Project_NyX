@@ -1,7 +1,9 @@
 import time
+
 import pytest
+
+from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode, SpecialKeyCode
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.constants import Button, KeyCode, KeyboardOp, SpecialKeyCode
 
 
 # Mock for SerialCommInterface

@@ -14,7 +14,6 @@ _macros_dir = str(Path(__file__).resolve().parent.parent.parent.parent / "macros
 if _macros_dir not in sys.path:
     sys.path.insert(0, _macros_dir)
 
-from frlg_initial_seed.lcg32 import LCG32
 from frlg_gorgeous_resort.config import FrlgGorgeousResortConfig
 from frlg_gorgeous_resort.frame_search import (
     AkihoResult,
@@ -28,7 +27,6 @@ from frlg_gorgeous_resort.recognizer import (
 from frlg_gorgeous_resort.selphy_logic import (
     ITEM_TABLE,
     LUXURY_BALL,
-    MAX_RETRY,
     determine_item,
     determine_pokemon,
 )
@@ -43,7 +41,7 @@ from frlg_gorgeous_resort.species_data import (
     NUM_SPECIES_CODES,
     is_dummy,
 )
-
+from frlg_initial_seed.lcg32 import LCG32
 
 # ============================================================
 # species_data テスト

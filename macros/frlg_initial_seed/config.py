@@ -5,7 +5,7 @@ FRLG 初期Seed特定マクロの設定値を管理する dataclass。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -63,7 +63,7 @@ class FrlgInitialSeedConfig:
     pokemon: str = "ルギア"
 
     @classmethod
-    def from_args(cls, args: dict) -> "FrlgInitialSeedConfig":
+    def from_args(cls, args: dict) -> FrlgInitialSeedConfig:
         """args dict から設定を構築する。"""
         cfg = cls()
 

@@ -1,7 +1,9 @@
-import cv2
 import pathlib
-import pytest
+
+import cv2
 import numpy as np
+import pytest
+
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 
 

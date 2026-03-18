@@ -16,10 +16,10 @@ _DEFAULT_PADDING: int = 40
 
 
 def crop_and_pad(
-    image: "np.ndarray",
+    image: np.ndarray,
     roi: tuple[int, int, int, int],
     pad: int = _DEFAULT_PADDING,
-) -> "np.ndarray":
+) -> np.ndarray:
     """ROI をクロップし白パディングを付与して返す。
 
     :param image: 入力画像 (H×W×C)

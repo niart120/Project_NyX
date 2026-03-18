@@ -1,7 +1,7 @@
-import pytest
 import numpy as np
+import pytest
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication
+
 from nyxpy.gui.main_window import MainWindow
 
 

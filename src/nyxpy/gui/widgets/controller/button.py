@@ -1,6 +1,7 @@
+
 from PySide6.QtWidgets import QPushButton
+
 from nyxpy.framework.core.constants import Button
-from typing import Optional, Tuple
 
 
 class ControllerButton(QPushButton):
@@ -9,9 +10,9 @@ class ControllerButton(QPushButton):
     def __init__(
         self,
         text: str = "",
-        parent: Optional[QPushButton] = None,
-        button_type: Optional[Button] = None,
-        size: Tuple[int, int] = (30, 30),
+        parent: QPushButton | None = None,
+        button_type: Button | None = None,
+        size: tuple[int, int] = (30, 30),
         radius: int = 15,
         is_rectangular: bool = False,
     ) -> None:

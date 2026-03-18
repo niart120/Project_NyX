@@ -1,11 +1,11 @@
 
-import cv2
-from typing import Optional, Tuple
 
-from .template_matcher import find_template, contains_template, MatchResult
-from .ocr_engine import OCRProcessor
-from .utils import ImagePreprocessor
+import cv2
+
 from .exceptions import InvalidImageError
+from .ocr_engine import OCRProcessor
+from .template_matcher import MatchResult, contains_template, find_template
+from .utils import ImagePreprocessor
 
 
 class ImageProcessor:
@@ -71,7 +71,7 @@ class ImageProcessor:
     
     def get_text(self, 
                  language: str = 'ja',
-                 region: Optional[Tuple[int, int, int, int]] = None,
+                 region: tuple[int, int, int, int] | None = None,
                  preprocess: bool = False) -> str:
         """
         画像からテキストを認識し、最も信頼度の高い文字列を返す
@@ -99,7 +99,7 @@ class ImageProcessor:
     
     def get_digits(self, 
                    language: str = 'en',
-                   region: Optional[Tuple[int, int, int, int]] = None,
+                   region: tuple[int, int, int, int] | None = None,
                    preprocess: bool = False) -> str:
         """
         画像から数字のみを認識して返す
@@ -127,7 +127,7 @@ class ImageProcessor:
     
     def find_text_region_with_template(self,
                                       template: cv2.typing.MatLike,
-                                      roi_offset: Tuple[int, int, int, int] = (0, 0, 0, 0),
+                                      roi_offset: tuple[int, int, int, int] = (0, 0, 0, 0),
                                       language: str = 'ja',
                                       template_threshold: float = 0.8,
                                       preprocess: bool = False) -> str:

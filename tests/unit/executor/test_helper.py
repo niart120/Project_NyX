@@ -10,7 +10,6 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -21,7 +20,6 @@ from nyxpy.framework.core.utils.helper import (
     parse_define_args,
     validate_keyboard_text,
 )
-
 
 # ============================================================
 # load_macro_settings テスト

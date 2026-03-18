@@ -1,5 +1,5 @@
-from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.hardware.capture import CaptureManager
+from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 

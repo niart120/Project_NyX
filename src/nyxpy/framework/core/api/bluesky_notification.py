@@ -1,10 +1,12 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+
 import cv2
 import requests
-from .notification_interface import NotificationInterface
 
 from nyxpy.framework.core.logger.log_manager import log_manager
+
+from .notification_interface import NotificationInterface
+
 
 class BlueskyNotification(NotificationInterface):
     def __init__(self, identifier: str, password: str):
@@ -72,7 +74,7 @@ class BlueskyNotification(NotificationInterface):
             log_manager.log("ERROR", f"画像アップロード失敗: {e}", component="BlueskyNotification")
             return None
 
-    def notify(self, text: str, img: Optional[cv2.Mat] = None) -> None:
+    def notify(self, text: str, img: cv2.Mat | None = None) -> None:
         if not self.access_token:
             self._authenticate()
         try:
@@ -82,7 +84,7 @@ class BlueskyNotification(NotificationInterface):
                 "collection": "app.bsky.feed.post",
                 "record": {
                     "text": text,
-                    "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    "createdAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
                 }
             }
             if img is not None:

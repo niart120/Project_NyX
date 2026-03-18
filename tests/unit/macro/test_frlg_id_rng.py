@@ -7,17 +7,13 @@ frame_sweep / keyboard_layout / tid_recognizer / メインマクロクラスの
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-
 # ============================================================
 # frame_sweep テスト
 # ============================================================
-
 from frlg_id_rng.frame_sweep import (
     dual_frame_sweep,
     frame_sweep,
@@ -67,10 +63,8 @@ class TestFrameSweep:
 # ============================================================
 
 from frlg_id_rng.keyboard_layout import (
-    JPN_KEYBOARD,
     ENG_KEYBOARD,
-    FRA_KEYBOARD,
-    NOE_KEYBOARD,
+    JPN_KEYBOARD,
     REGION_KEYBOARDS,
     find_char_in_keyboard,
 )
@@ -145,7 +139,7 @@ class TestKeyboardLayout:
 # region_timing テスト
 # ============================================================
 
-from frlg_id_rng.region_timing import REGION_TIMINGS, RegionTiming
+from frlg_id_rng.region_timing import REGION_TIMINGS
 
 
 class TestRegionTiming:

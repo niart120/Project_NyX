@@ -3,8 +3,8 @@
 すべての GUI テストで実ハードウェアへのアクセスを防止する。
 """
 
+
 import pytest
-from unittest.mock import MagicMock
 
 
 @pytest.fixture(autouse=True)

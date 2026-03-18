@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+
 from nyxpy.gui.widgets.split_button import CustomSplitDropDownButton
 
 

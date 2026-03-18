@@ -4,6 +4,9 @@
 
 ユーザとの対話は日本語で行うこと。
 
+## 概要
+NyX は、Nintendo Switch 向け自動化ツールの開発フレームワークです。PCに接続したキャプチャデバイスからゲーム画面を取得し、シリアル通信デバイスを介してコントローラー操作を自動化できます。
+
 ### 主な機能
 - PySide6を使用したGUIインターフェース
 - コマンドライン(CLI)インターフェース  
@@ -19,6 +22,34 @@
 - **キャプチャデバイス**: Nintendo Switchの画面を取得するためのキャプチャカード/ボード
 - **シリアル通信デバイス**: CH552プロトコルをサポートするコントロール送信デバイス
 
+## プロジェクト構造
+
+```
+src/nyxpy/
+  framework/     — フレームワーク本体 (MacroBase, Command, imgproc, ロガー等)
+  gui/           — PySide6 GUI
+  cli/           — CLI エントリポイント
+macros/
+  shared/        — マクロ間共通部品 (timer, image_utils, ocr_utils)
+  {macro_name}/  — マクロパッケージ (macro.py, config.py, recognizer.py 等)
+static/
+  {macro_name}/  — 設定ファイル (settings.toml) ・画像リソース
+tests/
+  unit/          — 単体テスト
+  gui/           — GUI テスト (pytest-qt)
+  hardware/      — 実機必要テスト (@pytest.mark.realdevice)
+  integration/   — 結合テスト
+  perf/          — パフォーマンステスト
+spec/macro/      — マクロ仕様書
+```
+
+**依存方向の制約:**
+```
+macros/xxx/  →  nyxpy.framework.*   OK
+macros/xxx/  →  macros/shared/*     OK
+macros/xxx/  →  macros/yyy/*        NG (マクロ間の直接依存禁止)
+```
+
 ## コーディング規約
 
 - 技術文書は事実ベース・簡潔に記述
@@ -28,8 +59,40 @@
   - Commits → Why
   - Comments → Why not
 
+## Python コーディング規約
+
+### 環境
+- Python `>=3.12` / パッケージ管理は `uv`
+- 依存追加: `uv add <pkg>` / dev 依存: `uv add --dev <pkg>`
+
+### リント・フォーマット
+- **ruff** を使用する（`pyproject.toml` の `[tool.ruff]` を参照）
+- リント: `uv run ruff check .`
+- フォーマット: `uv run ruff format .`
+
+### 型ヒント
+- Python 3.12+ のため、前方参照以外で `from __future__ import annotations` は不要
+- モダン構文を使用する:
+  - `X | None` — not `Optional[X]`
+  - `list[X]` / `dict[K, V]` — not `List[X]` / `Dict[K, V]`
+  - `tuple[int, str]` — not `Tuple[int, str]`
+- ランタイムに不要な型インポートは `if TYPE_CHECKING:` ブロック内に置く
+
+### テスト
+- **pytest** を使用する
+- 副作用のないロジック関数は `Command` なしで単体テスト可能にする
+- 実機要件のテストには `@pytest.mark.realdevice` を指定する
+
 ## よく使うコマンド
 
+```powershell
+uv run nyx-gui                  # GUI 起動
+uv run nyx-cli                  # CLI 起動
+uv run pytest                   # 全テスト
+uv run pytest tests/unit/       # 単体テストのみ
+uv run ruff check .             # リント
+uv run ruff format .            # フォーマット
+```
 
 ## コミットルール
 

@@ -1,17 +1,18 @@
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,  # 追加
-    QLineEdit,
-    QPushButton,   # 追加
-    QTableWidget,
-    QTableWidgetItem,
-    QSizePolicy,
-    QHeaderView,
-)
+import os  # 追加
+
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QIcon  # 追加
-import os  # 追加
+from PySide6.QtWidgets import (
+    QHBoxLayout,  # 追加
+    QHeaderView,
+    QLineEdit,
+    QPushButton,  # 追加
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class MacroBrowserPane(QWidget):

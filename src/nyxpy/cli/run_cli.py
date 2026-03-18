@@ -1,23 +1,23 @@
-import pathlib
 import argparse
-from typing import Optional, Any
+import pathlib
+from typing import Any
 
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.framework.core.macro.executor import MacroExecutor
-from nyxpy.framework.core.macro.command import DefaultCommand, Command
-from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.api.notification_handler import (
+    create_notification_handler_from_settings,
+)
 from nyxpy.framework.core.hardware.protocol import (
     CH552SerialProtocol,
     SerialProtocolInterface,
 )
-from nyxpy.framework.core.utils.helper import parse_define_args
-from nyxpy.framework.core.utils.cancellation import CancellationToken
-from nyxpy.framework.core.singletons import serial_manager, capture_manager
+from nyxpy.framework.core.hardware.resource import StaticResourceIO
+from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.macro.command import Command, DefaultCommand
+from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.macro.executor import MacroExecutor
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
-from nyxpy.framework.core.api.notification_handler import (
-    create_notification_handler_from_settings,
-)
+from nyxpy.framework.core.singletons import capture_manager, serial_manager
+from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.framework.core.utils.helper import parse_define_args
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> None:
@@ -63,7 +63,7 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
 
 def create_command(
     protocol: SerialProtocolInterface,
-    resources_dir: Optional[pathlib.Path] = None,
+    resources_dir: pathlib.Path | None = None,
 ) -> Command:
     """
     指定されたコンポーネントでCommandインスタンスを作成します。

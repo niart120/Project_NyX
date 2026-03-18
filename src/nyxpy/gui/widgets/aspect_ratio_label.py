@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QLabel
 from typing import Any
+
+from PySide6.QtWidgets import QLabel
 
 
 class AspectRatioLabel(QLabel):

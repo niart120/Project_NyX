@@ -13,9 +13,8 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-from nyxpy.framework.core.imgproc import ImageProcessor
-
 from macros.shared.image_utils import crop_and_pad
+from nyxpy.framework.core.imgproc import ImageProcessor
 
 if TYPE_CHECKING:
     from nyxpy.framework.core.macro.command import Command
@@ -72,7 +71,7 @@ def save_roi_image(
 
 
 def ocr_roi(
-    cmd: "Command",
+    cmd: Command,
     roi: tuple[int, int, int, int],
     pad: int = _PADDING,
     *,
@@ -93,7 +92,7 @@ def ocr_roi(
 
 
 def recognize_requested_pokemon(
-    cmd: "Command",
+    cmd: Command,
     target_pokemon: list[str],
     *,
     img_dir: Path | None = None,
@@ -141,7 +140,7 @@ def matches_any_target(recognized: str, target_pokemon: list[str]) -> bool:
 # ============================================================
 
 
-def recognize_item(cmd: "Command", *, img_dir: Path | None = None) -> str | None:
+def recognize_item(cmd: Command, *, img_dir: Path | None = None) -> str | None:
     """アイテム取得テキストを OCR で読み取り、アイテム名を返す。
 
     Returns:
@@ -171,7 +170,7 @@ def match_item(ocr_text: str) -> str | None:
 # ============================================================
 
 
-def is_message_window_visible(cmd: "Command") -> bool:
+def is_message_window_visible(cmd: Command) -> bool:
     """メッセージウィンドウの有無を ROI 内平均輝度で検出する。"""
     image = cmd.capture()
     x, y, w, h = ROI_MESSAGE

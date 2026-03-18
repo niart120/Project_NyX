@@ -1,11 +1,12 @@
-from typing import Optional
-from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtCore import Qt, Signal, QTimer
-import cv2
-import numpy as np
 from datetime import datetime
 from pathlib import Path
+
+import cv2
+import numpy as np
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QVBoxLayout, QWidget
+
 from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.utils.helper import calc_aspect_size
 from nyxpy.gui.events import EventBus, EventType
@@ -20,7 +21,7 @@ class PreviewPane(QWidget):
     Pane for showing camera preview and handling snapshots.
     """
 
-    def __init__(self, capture_device: Optional[CaptureDeviceInterface] = None, parent=None, preview_fps=30):
+    def __init__(self, capture_device: CaptureDeviceInterface | None = None, parent=None, preview_fps=30):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         self.label = AspectRatioLabel(16, 9)

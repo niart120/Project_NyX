@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+
 
 class GeneralSettingsTab(QWidget):
     def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):

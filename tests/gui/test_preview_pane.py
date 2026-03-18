@@ -1,10 +1,12 @@
-import pytest
 import os
-import numpy as np
-import cv2
-from unittest.mock import Mock, patch
 from pathlib import Path
-from nyxpy.gui.panes.preview_pane import PreviewPane, SNAPSHOT_DIR
+from unittest.mock import Mock, patch
+
+import cv2
+import numpy as np
+import pytest
+
+from nyxpy.gui.panes.preview_pane import SNAPSHOT_DIR, PreviewPane
 
 
 @pytest.fixture

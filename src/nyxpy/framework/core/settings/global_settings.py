@@ -1,5 +1,6 @@
-import tomlkit
 from pathlib import Path
+
+import tomlkit
 
 
 class GlobalSettings:

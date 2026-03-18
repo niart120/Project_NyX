@@ -1,8 +1,11 @@
 import io
+
 import cv2
 import numpy as np
 import requests
+
 from nyxpy.framework.core.api.discord_notification import DiscordNotification
+
 
 def test_discord_notification_notify_text_only(monkeypatch):
     called = {}
@@ -11,7 +14,8 @@ def test_discord_notification_notify_text_only(monkeypatch):
         called['data'] = data
         called['files'] = files
         called['timeout'] = timeout
-        class Resp: pass
+        class Resp:
+            pass
         return Resp()
     monkeypatch.setattr(requests, "post", fake_post)
 
@@ -29,7 +33,8 @@ def test_discord_notification_notify_with_image(monkeypatch):
         called['data'] = data
         called['files'] = files
         called['timeout'] = timeout
-        class Resp: pass
+        class Resp:
+            pass
         return Resp()
     monkeypatch.setattr(requests, "post", fake_post)
     def fake_imencode(ext, img):

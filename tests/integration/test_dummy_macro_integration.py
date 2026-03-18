@@ -1,19 +1,22 @@
 import threading
 import time
-import pytest
+
 import numpy as np
+import pytest
+
+from nyxpy.framework.core.constants import Button, Hat
+from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice, CaptureManager
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 
 # インポートはプロジェクトのパッケージ構成に合わせる
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
+from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface, SerialManager
+from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import DefaultCommand
-from nyxpy.framework.core.hardware.serial_comm import SerialManager, SerialCommInterface
-from nyxpy.framework.core.hardware.capture import CaptureManager, AsyncCaptureDevice
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
-from nyxpy.framework.core.constants import Button, Hat
-from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.utils.cancellation import CancellationToken
+
 
 class MockNotificationHandler:
     def __init__(self):

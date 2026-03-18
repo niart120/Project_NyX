@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
+
 from nyxpy.framework.core.constants import (
     Button,
     Hat,
-    KeyCode,
     KeyboardOp,
+    KeyCode,
+    KeyType,
     LStick,
     RStick,
-    KeyType,
     SpecialKeyCode,
 )
 

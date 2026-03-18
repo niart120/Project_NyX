@@ -13,13 +13,12 @@ from datetime import datetime
 
 import cv2
 
+from macros.shared.ocr_utils import warmup_ocr
+from macros.shared.timer import consume_timer, start_timer
 from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.imgproc import ImageProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
-
-from macros.shared.ocr_utils import warmup_ocr
-from macros.shared.timer import consume_timer, start_timer
 
 from .frame_sweep import (
     dual_frame_sweep,
@@ -360,7 +359,7 @@ class FrlgIdRngMacro(MacroBase):
 
     def _recognize_tid(
         self, cmd: Command
-    ) -> tuple[int | None, "cv2.typing.MatLike | None"]:
+    ) -> tuple[int | None, cv2.typing.MatLike | None]:
         """Step 15: キャプチャして TID を OCR 認識。
 
         ROI をクロップし、白パディングを付与した画像で OCR を実行する。
@@ -396,7 +395,7 @@ class FrlgIdRngMacro(MacroBase):
         self,
         cmd: Command,
         recognized_id: int,
-        cropped_img: "cv2.typing.MatLike | None",
+        cropped_img: cv2.typing.MatLike | None,
         attempt: int,
         f1: float,
         f2: float,

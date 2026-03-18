@@ -1,7 +1,8 @@
-import serial
-import serial.tools.list_ports
 import threading
 from abc import ABC, abstractmethod
+
+import serial
+import serial.tools.list_ports
 
 
 class SerialCommInterface(ABC):

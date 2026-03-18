@@ -1,14 +1,15 @@
 import pytest
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
+
 from nyxpy.framework.core.constants import (
     Button,
     Hat,
+    KeyboardOp,
     KeyCode,
     LStick,
     RStick,
-    KeyboardOp,
     SpecialKeyCode,
 )
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 
 # テスト用にスティック操作のためのサブクラスが必要であれば、実装済みのものを利用
 # ここでは実際の LStick, RStick をそのまま利用します

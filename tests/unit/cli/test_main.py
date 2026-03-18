@@ -1,14 +1,15 @@
-import pytest
 import pathlib
 import unittest.mock
 from unittest.mock import MagicMock
 
+import pytest
+
 from nyxpy.cli.run_cli import (
-    configure_logging,
-    create_protocol,
-    create_command,
-    execute_macro,
     cli_main,
+    configure_logging,
+    create_command,
+    create_protocol,
+    execute_macro,
 )
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
 from nyxpy.framework.core.macro.exceptions import MacroStopException

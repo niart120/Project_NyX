@@ -1,7 +1,9 @@
-import time
 import threading
-import pytest
+import time
+
 import numpy as np
+import pytest
+
 from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice
 
 

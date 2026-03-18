@@ -1,8 +1,9 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
-from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
+
 from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 
 
 @pytest.fixture(autouse=True)

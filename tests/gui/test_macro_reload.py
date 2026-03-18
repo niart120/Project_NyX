@@ -1,8 +1,11 @@
 import os
+
 import pytest
 from PySide6.QtCore import Qt
-from nyxpy.gui.panes.macro_browser import MacroBrowserPane
+
 from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.gui.panes.macro_browser import MacroBrowserPane
+
 
 @pytest.fixture
 def macro_executor():

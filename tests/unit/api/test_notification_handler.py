@@ -1,5 +1,6 @@
 from nyxpy.framework.core.api.notification_handler import NotificationHandler
 
+
 class MockNotifier:
     def __init__(self):
         self.calls = []
@@ -18,7 +19,8 @@ def test_notification_handler_publish_all():
     assert n2.calls == [("msg", "imgdata")]
 
 def test_notification_handler_continue_on_exception():
-    n1 = MockNotifier(); n1.raise_exc = True
+    n1 = MockNotifier()
+    n1.raise_exc = True
     n2 = MockNotifier()
     handler = NotificationHandler([n1, n2])
     handler.publish("msg")

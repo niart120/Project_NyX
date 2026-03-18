@@ -1,5 +1,6 @@
 import pytest
 from loguru import logger
+
 from nyxpy.framework.core.logger.log_manager import LogManager
 
 

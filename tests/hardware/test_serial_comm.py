@@ -1,6 +1,7 @@
 import pytest
-from nyxpy.framework.core.hardware.serial_comm import SerialComm
 from serial import Serial
+
+from nyxpy.framework.core.hardware.serial_comm import SerialComm
 
 
 @pytest.fixture(autouse=True)

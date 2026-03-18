@@ -1,15 +1,18 @@
-import requests
-from typing import Optional
-import cv2
 import io
-from .notification_interface import NotificationInterface
+
+import cv2
+import requests
+
 from nyxpy.framework.core.logger.log_manager import log_manager
+
+from .notification_interface import NotificationInterface
+
 
 class DiscordNotification(NotificationInterface):
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
 
-    def notify(self, text: str, img: Optional[cv2.Mat] = None) -> None:
+    def notify(self, text: str, img: cv2.Mat | None = None) -> None:
         try:
             if img is not None:
                 # 画像をメモリ上でエンコードし、そのまま送信

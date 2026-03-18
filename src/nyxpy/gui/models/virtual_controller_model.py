@@ -1,11 +1,12 @@
-from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
+
+from PySide6.QtCore import QObject, Signal
+
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.gui.events import EventBus, EventType
-from PySide6.QtCore import QObject, Signal
-from typing import Optional, Set, Union
 
 
 class VirtualControllerModel(QObject):
@@ -16,8 +17,8 @@ class VirtualControllerModel(QObject):
 
     def __init__(
         self,
-        serial_device: Optional[SerialCommInterface] = None,
-        protocol: Optional[SerialProtocolInterface] = None,
+        serial_device: SerialCommInterface | None = None,
+        protocol: SerialProtocolInterface | None = None,
     ) -> None:
         super().__init__()
         self.serial_device = serial_device
@@ -27,7 +28,7 @@ class VirtualControllerModel(QObject):
         self.event_bus.subscribe(EventType.PROTOCOL_CHANGED, self.on_protocol_changed)
 
         # コントローラー状態
-        self.pressed_buttons: Set[Button] = set()
+        self.pressed_buttons: set[Button] = set()
         self.current_hat: Hat = Hat.CENTER
         self.current_l_stick: LStick = LStick.CENTER
         self.current_r_stick: RStick = RStick.CENTER
@@ -96,7 +97,7 @@ class VirtualControllerModel(QObject):
             self.current_r_stick = RStick.CENTER
 
     def send_release_command(
-        self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]
+        self, keys: tuple[Button | Hat | LStick | RStick, ...]
     ) -> None:
         if not self.serial_device:
             return
@@ -112,7 +113,7 @@ class VirtualControllerModel(QObject):
             raise e
 
     def send_press_command(
-        self, keys: tuple[Union[Button, Hat, LStick, RStick], ...]
+        self, keys: tuple[Button | Hat | LStick | RStick, ...]
     ) -> None:
         if not self.serial_device:
             return

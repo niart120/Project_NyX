@@ -1,10 +1,12 @@
-import pytest
-import textwrap
 import importlib.util
+import textwrap
 from pathlib import Path
-from nyxpy.framework.core.macro.executor import MacroExecutor
-from nyxpy.framework.core.macro.command import Command
+
+import pytest
+
 from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.command import Command
+from nyxpy.framework.core.macro.executor import MacroExecutor
 
 # ダミーマクロの実装を書いた Python ファイル用文字列
 DUMMY_MACRO_SOURCE = textwrap.dedent("""

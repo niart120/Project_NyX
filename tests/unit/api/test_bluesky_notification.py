@@ -1,7 +1,10 @@
+from datetime import UTC, datetime
+from unittest.mock import Mock, call, patch
+
 import requests
-from datetime import datetime, timezone
+
 from nyxpy.framework.core.api.bluesky_notification import BlueskyNotification
-from unittest.mock import patch, Mock, call
+
 
 # 固定の時刻をモックするためのクラス
 class MockDateTime:
@@ -9,8 +12,8 @@ class MockDateTime:
     def now(cls, tz=None):
         # 固定の時刻を返す
         mock_dt = datetime(2025, 5, 6, 0, 0, 0)
-        if tz is timezone.utc:
-            return mock_dt.replace(tzinfo=timezone.utc)
+        if tz is UTC:
+            return mock_dt.replace(tzinfo=UTC)
         return mock_dt
 
 def test_bluesky_notification_authentication():

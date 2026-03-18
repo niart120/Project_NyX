@@ -1,6 +1,8 @@
-import sys
 import os
+import sys
+
 from PySide6.QtWidgets import QApplication
+
 from nyxpy.gui.main_window import MainWindow
 
 

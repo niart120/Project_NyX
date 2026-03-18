@@ -9,7 +9,6 @@ from __future__ import annotations
 import csv
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -525,14 +524,14 @@ class TestConfig:
 # ============================================================
 
 from frlg_initial_seed.csv_helper import (
+    CSV_DETAIL_FIELDNAMES,
+    CSV_DETAIL_FILENAME,
+    CSV_FIELDNAMES,
+    CSV_FILENAME,
     append_csv_row,
     append_detail_csv_row,
     build_csv_path,
     build_detail_csv_path,
-    CSV_FIELDNAMES,
-    CSV_DETAIL_FIELDNAMES,
-    CSV_FILENAME,
-    CSV_DETAIL_FILENAME,
 )
 
 
@@ -563,7 +562,7 @@ class TestCSVHelper:
             "hardware": "Switch", "fps": "60.0", "note": "",
         })
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             assert reader.fieldnames == CSV_FIELDNAMES
             rows = list(reader)
@@ -587,7 +586,7 @@ class TestCSVHelper:
             "note": "",
         })
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             assert reader.fieldnames == CSV_DETAIL_FIELDNAMES
             rows = list(reader)
@@ -607,7 +606,7 @@ class TestCSVHelper:
                 "hardware": "Switch", "fps": "60.0", "note": "",
             })
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             lines = f.readlines()
         # ヘッダー 1 行 + データ 2 行
         assert len(lines) == 3
@@ -622,7 +621,7 @@ class TestCSVHelper:
             "hardware": "Switch", "fps": "60.0", "note": "",
         })
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames
         assert "region" in fieldnames
@@ -649,7 +648,7 @@ class TestCSVHelper:
             "note": "候補2つ",
         })
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames
             rows = list(reader)

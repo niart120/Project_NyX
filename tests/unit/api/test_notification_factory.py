@@ -1,6 +1,7 @@
-from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
-from nyxpy.framework.core.api.discord_notification import DiscordNotification
 from nyxpy.framework.core.api.bluesky_notification import BlueskyNotification
+from nyxpy.framework.core.api.discord_notification import DiscordNotification
+from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
+
 
 class DummySettings:
     def __init__(self, d): self.d = d

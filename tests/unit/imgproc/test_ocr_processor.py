@@ -28,7 +28,6 @@ PIL = pytest.importorskip("PIL", reason="Pillow が未インストール")
 from PIL import Image, ImageDraw, ImageFont
 
 from nyxpy.framework.core.imgproc.ocr_engine import OCRProcessor, OCRResult
-from nyxpy.framework.core.imgproc.exceptions import OCREngineNotFoundError, OCRProcessingError
 
 # テストに使用するシステムフォント (Windows 環境想定)
 _FONT_CANDIDATES = [

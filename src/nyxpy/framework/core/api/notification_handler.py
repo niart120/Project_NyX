@@ -1,22 +1,25 @@
-from typing import List, Optional
+
 import cv2
-from .notification_interface import NotificationInterface
+
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
-from .discord_notification import DiscordNotification
+
 from .bluesky_notification import BlueskyNotification
+from .discord_notification import DiscordNotification
+from .notification_interface import NotificationInterface
+
 
 class NotificationHandler:
-    def __init__(self, notifiers: Optional[List[NotificationInterface]] = None):
+    def __init__(self, notifiers: list[NotificationInterface] | None = None):
         self.notifiers = notifiers or []
 
     def add_notifier(self, notifier: NotificationInterface):
         self.notifiers.append(notifier)
 
-    def publish(self, text: str, img: Optional[cv2.typing.MatLike] = None) -> None:
+    def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         for notifier in self.notifiers:
             try:
                 notifier.notify(text, img)
-            except Exception as e:
+            except Exception:
                 # 各notifier側でログ出力するため、ここではpass
                 pass
 

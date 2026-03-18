@@ -1,12 +1,12 @@
-import time
-from typing import override
-import cv2
-from cv2_enumerate_cameras import enumerate_cameras
-from abc import ABC, abstractmethod
-import threading
 import platform
+import threading
+import time
+from abc import ABC, abstractmethod
+from typing import override
 
+import cv2
 import numpy as np
+from cv2_enumerate_cameras import enumerate_cameras
 
 from nyxpy.framework.core.logger.log_manager import log_manager
 

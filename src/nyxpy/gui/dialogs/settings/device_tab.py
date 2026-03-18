@@ -1,8 +1,19 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QPushButton, QGroupBox, QLabel, QHBoxLayout
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
-from nyxpy.framework.core.singletons import serial_manager, capture_manager
-from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.singletons import capture_manager, serial_manager
+
 
 class DeviceSettingsTab(QWidget):
     def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):

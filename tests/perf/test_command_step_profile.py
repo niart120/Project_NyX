@@ -1,14 +1,15 @@
 import time
-import pytest
-from nyxpy.framework.core.macro.command import DefaultCommand
+
 from nyxpy.framework.core.constants import Button
+from nyxpy.framework.core.macro.command import DefaultCommand
 from tests.unit.command.test_default_command import (
-    MockSerialDevice,
-    MockCaptureDevice,
-    MockResourceIO,
-    MockProtocol,
     MockCancellationToken,
+    MockCaptureDevice,
+    MockProtocol,
+    MockResourceIO,
+    MockSerialDevice,
 )
+
 
 def test_press_step_profile():
     """
@@ -20,7 +21,7 @@ def test_press_step_profile():
     resource_io = MockResourceIO()
     protocol = MockProtocol()
     ct = MockCancellationToken()
-    cmd = DefaultCommand(
+    DefaultCommand(
         serial_device=serial_device,
         capture_device=capture_device,
         resource_io=resource_io,

@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QToolButton, QMenu, QSizePolicy, QProxyStyle, QStyle, QStyleOptionButton
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QHBoxLayout, QMenu, QPushButton, QSizePolicy, QToolButton, QWidget
+
 
 class CustomSplitDropDownButton(QWidget):
     """

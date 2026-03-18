@@ -1,9 +1,9 @@
+
 from nyxpy.framework.core.hardware.protocol import (
-    SerialProtocolInterface,
     CH552SerialProtocol,
     PokeConSerialProtocol,
+    SerialProtocolInterface,
 )
-from typing import Dict, Type
 
 
 class ProtocolFactory:
@@ -13,7 +13,7 @@ class ProtocolFactory:
     """
 
     # 利用可能なプロトコル実装のマッピング
-    _protocols: Dict[str, Type[SerialProtocolInterface]] = {
+    _protocols: dict[str, type[SerialProtocolInterface]] = {
         "CH552": CH552SerialProtocol,
         "PokeCon": PokeConSerialProtocol,
     }

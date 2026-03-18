@@ -1,6 +1,8 @@
-from loguru import logger
 import sys
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
+
+from loguru import logger
 
 
 class LogManager:

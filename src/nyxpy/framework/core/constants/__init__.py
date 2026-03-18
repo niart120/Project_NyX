@@ -5,8 +5,8 @@
 """
 
 from .controller import Button, Hat
-from .stick import LStick, RStick
 from .keyboard import KeyboardOp, KeyCode, SpecialKeyCode
+from .stick import LStick, RStick
 from .types import KeyType
 
 __all__ = [

@@ -1,6 +1,8 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QCheckBox, QLineEdit, QGroupBox
+from PySide6.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QLineEdit, QVBoxLayout, QWidget
+
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+
 
 class NotificationSettingsTab(QWidget):
     def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):

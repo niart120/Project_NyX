@@ -8,16 +8,14 @@ Switch (720p) 専用。
 
 from __future__ import annotations
 
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from macros.shared.ocr_utils import warmup_ocr
+from macros.shared.timer import consume_timer, start_timer
 from nyxpy.framework.core.constants import Button, LStick
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
-
-from macros.shared.ocr_utils import warmup_ocr
-from macros.shared.timer import consume_timer, start_timer
 
 from .config import FrlgInitialSeedConfig
 from .csv_helper import (

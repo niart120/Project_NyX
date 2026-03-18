@@ -3,10 +3,10 @@ import inspect
 import sys
 from pathlib import Path
 
-from nyxpy.framework.core.macro.exceptions import MacroStopException
+from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.utils.helper import load_macro_settings
 
 

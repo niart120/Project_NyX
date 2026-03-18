@@ -11,13 +11,12 @@ from typing import TYPE_CHECKING
 
 import cv2
 
-from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor
-
 from macros.shared.image_utils import crop_and_pad as _shared_crop_and_pad
+from nyxpy.framework.core.imgproc import ImageProcessor
 
 if TYPE_CHECKING:
     import numpy as np
-    from nyxpy.framework.core.macro.command import Command
+
 
 # ============================================================
 # ROI 定義 (Switch / JPN / 720p)
@@ -73,14 +72,14 @@ def calc_stat_valid_ranges(
 
 
 def crop_and_pad(
-    image: "np.ndarray", roi: tuple[int, int, int, int]
-) -> "np.ndarray":
+    image: np.ndarray, roi: tuple[int, int, int, int]
+) -> np.ndarray:
     """ROI クロップ → 白パディング付与。"""
     return _shared_crop_and_pad(image, roi, pad=_PADDING)
 
 
 def get_stat_digits(
-    image: "np.ndarray",
+    image: np.ndarray,
 ) -> tuple[str | None, str | None, str | None, str | None, str | None, str | None]:
     """ステータス 6 項目の OCR 生文字列を取得する。"""
     raw: list[str | None] = []
@@ -93,7 +92,7 @@ def get_stat_digits(
 
 
 def recognize_stats(
-    image: "np.ndarray",
+    image: np.ndarray,
     base_stats: tuple[int, int, int, int, int, int],
     level: int,
 ) -> tuple[int, int, int, int, int, int] | None:
@@ -137,7 +136,7 @@ def recognize_stats(
 
 
 def save_roi_image(
-    image: "np.ndarray",
+    image: np.ndarray,
     roi: tuple[int, int, int, int],
     path: Path,
 ) -> None:
