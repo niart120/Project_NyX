@@ -12,12 +12,14 @@ import time
 from datetime import datetime
 
 import cv2
-import numpy as np
 
 from nyxpy.framework.core.constants import Button, Hat
-from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor
+from nyxpy.framework.core.imgproc import ImageProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
+
+from macros.shared.ocr_utils import warmup_ocr
+from macros.shared.timer import consume_timer, start_timer
 
 from .frame_sweep import (
     dual_frame_sweep,
@@ -37,40 +39,6 @@ from .region_timing import REGION_TIMINGS, RegionTiming
 
 _VALID_REGIONS = frozenset(REGION_TIMINGS.keys())
 _TID_MAX = 65535
-
-
-# ============================================================
-# タイマーヘルパー (モジュールレベル — インスタンス状態を持たない)
-# ============================================================
-
-
-def _start_timer() -> float:
-    """高精度タイマーの開始時刻を返す。"""
-    return time.perf_counter()
-
-
-def _consume_timer(
-    cmd: Command, start_time: float, total_frames: float, fps: float
-) -> None:
-    """開始時刻からの経過時間を差し引き、残りフレーム分だけ待機する。
-
-    :param cmd: コマンドインターフェース
-    :param start_time: _start_timer() で取得した開始時刻
-    :param total_frames: 待機すべき合計フレーム数
-    :param fps: フレームレート
-    """
-    target_seconds = total_frames / fps
-    elapsed = time.perf_counter() - start_time
-    remaining = target_seconds - elapsed
-    if remaining > 0:
-        cmd.wait(remaining)
-    else:
-        overrun_ms = -remaining * 1000
-        cmd.log(
-            f"タイマー超過: {total_frames:.0f}F/{fps}fps={target_seconds:.3f}s に対し "
-            f"経過 {elapsed:.3f}s（超過 {overrun_ms:.1f}ms）",
-            level="WARNING",
-        )
 
 
 # ============================================================
@@ -145,13 +113,7 @@ class FrlgIdRngMacro(MacroBase):
         )
 
         # OCR エンジンのウォームアップ（初回起動コストを TID チェック前に消化）
-        cmd.log("ウォームアップ開始", level="INFO")
-        ocr = OCRProcessor.get_instance("en")
-        try:
-            ocr.get_best_text(np.zeros((64, 200, 3), dtype=np.uint8))
-        except Exception:
-            pass
-        cmd.log("ウォームアップ完了", level="INFO")
+        warmup_ocr(cmd, language="en")
 
     def run(self, cmd: Command) -> None:
         attempt = 0
@@ -172,7 +134,7 @@ class FrlgIdRngMacro(MacroBase):
             self._select_new_game(cmd)
 
             # --- Frame1 タイマー開始 ---
-            t1 = _start_timer()
+            t1 = start_timer()
             cmd.press(Button.A, dur=0.1, wait=5.2)
 
             # Step 4: イントロ会話送り
@@ -182,19 +144,19 @@ class FrlgIdRngMacro(MacroBase):
             self._select_gender(cmd)
 
             # --- Frame1 タイマー消化 ---
-            _consume_timer(cmd, t1, current_f1, self._fps)
+            consume_timer(cmd, t1, current_f1, self._fps)
 
             # --- Frame2 タイマー開始 ---
-            t2 = _start_timer()
+            t2 = start_timer()
 
             # Step 7: 名前入力（主人公）
             self._enter_trainer_name(cmd)
 
             # --- Frame2 タイマー消化 ---
-            _consume_timer(cmd, t2, current_f2, self._fps)
+            consume_timer(cmd, t2, current_f2, self._fps)
 
             # --- Frame3 タイマー開始 ---
-            t3 = _start_timer()
+            t3 = start_timer()
 
             # Step 9: 名前決定後の会話進行
             self._press_a_sequence(
@@ -218,7 +180,7 @@ class FrlgIdRngMacro(MacroBase):
                 )
 
                 # --- Frame3 タイマー消化 ---
-                _consume_timer(cmd, t3, self._frame3, self._fps)
+                consume_timer(cmd, t3, self._frame3, self._fps)
 
                 # Step 13: ゲーム開始（主人公の家へ）
                 cmd.press(Button.A, dur=0.1, wait=self._timing.game_start_wait)
@@ -303,10 +265,10 @@ class FrlgIdRngMacro(MacroBase):
 
     def _wait_op(self, cmd: Command, op_frame: float) -> None:
         """Step 2: OP待機 (タイマー開始→A操作→タイマー消化)"""
-        t = _start_timer()
+        t = start_timer()
         cmd.press(Button.A, dur=0.20, wait=6.00)
         cmd.press(Button.A, dur=0.20, wait=0.0)
-        _consume_timer(cmd, t, op_frame, self._fps)
+        consume_timer(cmd, t, op_frame, self._fps)
 
     def _select_new_game(self, cmd: Command) -> None:
         """Step 3: OP送り → ニューゲーム選択 → ヘルプ画面通過

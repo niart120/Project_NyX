@@ -15,6 +15,8 @@ import numpy as np
 
 from nyxpy.framework.core.imgproc import ImageProcessor
 
+from macros.shared.image_utils import crop_and_pad
+
 if TYPE_CHECKING:
     from nyxpy.framework.core.macro.command import Command
 
@@ -55,27 +57,8 @@ BAG_FULL_KEYWORD: str = "おかばん"
 
 
 # ============================================================
-# 共通 OCR ヘルパー
+# OCR ヘルパー
 # ============================================================
-
-
-def _crop_and_pad(
-    image: np.ndarray,
-    roi: tuple[int, int, int, int],
-    pad: int = _PADDING,
-) -> np.ndarray:
-    """ROI クロップ → 白パディング付与。"""
-    x, y, w, h = roi
-    cropped = image[y : y + h, x : x + w]
-    return cv2.copyMakeBorder(
-        cropped,
-        pad,
-        pad,
-        pad,
-        pad,
-        borderType=cv2.BORDER_CONSTANT,
-        value=(255, 255, 255),
-    )
 
 
 def save_roi_image(
@@ -84,7 +67,7 @@ def save_roi_image(
     path: Path,
 ) -> None:
     """ROI をクロップし白パディングを付与して保存する（毎回上書き）。"""
-    padded = _crop_and_pad(image, roi)
+    padded = crop_and_pad(image, roi, pad=_PADDING)
     cv2.imwrite(str(path), padded)
 
 
@@ -97,7 +80,7 @@ def ocr_roi(
 ) -> str | None:
     """指定 ROI をクロップし、OCR でテキストを返す。"""
     image = cmd.capture()
-    padded = _crop_and_pad(image, roi, pad)
+    padded = crop_and_pad(image, roi, pad)
     if img_path is not None:
         cv2.imwrite(str(img_path), padded)
     text = ImageProcessor(padded).get_text(language="ja")
@@ -127,7 +110,7 @@ def recognize_requested_pokemon(
 
     for w in ROI_POKEMON_NAME_WIDTHS:
         roi = (x, y, w, h)
-        padded = _crop_and_pad(image, roi)
+        padded = crop_and_pad(image, roi, pad=_PADDING)
         if img_dir is not None:
             cv2.imwrite(str(img_dir / f"pokemon_name_w{w}.png"), padded)
         text = ImageProcessor(padded).get_text(language="ja")

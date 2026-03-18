@@ -12,13 +12,12 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import cv2
-import numpy as np
-
 from nyxpy.framework.core.constants import Button, LStick
-from nyxpy.framework.core.imgproc import OCRProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
+
+from macros.shared.ocr_utils import warmup_ocr
+from macros.shared.timer import consume_timer, start_timer
 
 from .config import FrlgInitialSeedConfig
 from .csv_helper import (
@@ -67,32 +66,6 @@ def _estimate_total_seconds(cfg: FrlgInitialSeedConfig) -> float:
 
 
 # ============================================================
-# タイマーヘルパー
-# ============================================================
-
-
-def _start_timer() -> float:
-    """高精度タイマーの開始時刻を返す。"""
-    return time.perf_counter()
-
-
-def _consume_timer(
-    cmd: Command, start_time: float, total_frames: float, fps: float
-) -> None:
-    """開始時刻からの経過時間を差し引き、残りフレーム分だけ待機する。"""
-    target_seconds = total_frames / fps
-    elapsed = time.perf_counter() - start_time
-    remaining = target_seconds - elapsed
-    if remaining > 0:
-        cmd.wait(remaining)
-    elif remaining < -0.5:
-        cmd.log(
-            f"タイマー超過: {-remaining:.3f}秒 (操作が指定フレーム数を超過)",
-            level="WARNING",
-        )
-
-
-# ============================================================
 # メインマクロクラス
 # ============================================================
 
@@ -138,13 +111,7 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.log(f"詳細CSV 出力先: {self._detail_csv_path}", level="INFO")
 
         # OCR ウォームアップ (ステータス認識は en を使用)
-        cmd.log("OCR ウォームアップ開始", level="INFO")
-        ocr = OCRProcessor.get_instance("en")
-        try:
-            ocr.get_best_text(np.zeros((64, 200, 3), dtype=np.uint8))
-        except Exception:
-            pass
-        cmd.log("OCR ウォームアップ完了", level="INFO")
+        warmup_ocr(cmd, language="en")
 
         # 想定所要時間・ETA
         est_sec = _estimate_total_seconds(cfg)
@@ -274,14 +241,14 @@ class FrlgInitialSeedMacro(MacroBase):
         self._restart_game(cmd)
 
         cmd.log("Phase1: frame1 タイマー消化", level="DEBUG")
-        _consume_timer(cmd, self._t1, frame1 + cfg.frame1_offset, cfg.fps)
+        consume_timer(cmd, self._t1, frame1 + cfg.frame1_offset, cfg.fps)
 
-        t2 = _start_timer()
+        t2 = start_timer()
         cmd.log("Phase1: OP送り → つづきから → 回想スキップ", level="DEBUG")
         self._navigate_to_encounter(cmd)
 
         cmd.log("Phase1: frame2 タイマー消化", level="DEBUG")
-        _consume_timer(cmd, t2, frame2 + cfg.frame2_offset, cfg.fps)
+        consume_timer(cmd, t2, frame2 + cfg.frame2_offset, cfg.fps)
 
         cmd.log("Phase1: エンカウント発生", level="DEBUG")
         self._trigger_encounter(cmd)
@@ -310,7 +277,7 @@ class FrlgInitialSeedMacro(MacroBase):
         cmd.press(Button.X, dur=0.20, wait=0.30)
         cmd.press(Button.A, dur=0.20, wait=0.50)
         cmd.press(Button.A, dur=0.20, wait=0.50)
-        self._t1 = _start_timer()
+        self._t1 = start_timer()
         cmd.press(Button.A, dur=0.20)  # ゲーム起動
 
     def _navigate_to_encounter(self, cmd: Command) -> None:

@@ -13,6 +13,8 @@ import cv2
 
 from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor
 
+from macros.shared.image_utils import crop_and_pad as _shared_crop_and_pad
+
 if TYPE_CHECKING:
     import numpy as np
     from nyxpy.framework.core.macro.command import Command
@@ -74,17 +76,7 @@ def crop_and_pad(
     image: "np.ndarray", roi: tuple[int, int, int, int]
 ) -> "np.ndarray":
     """ROI クロップ → 白パディング付与。"""
-    x, y, w, h = roi
-    cropped = image[y : y + h, x : x + w]
-    return cv2.copyMakeBorder(
-        cropped,
-        _PADDING,
-        _PADDING,
-        _PADDING,
-        _PADDING,
-        borderType=cv2.BORDER_CONSTANT,
-        value=(255, 255, 255),
-    )
+    return _shared_crop_and_pad(image, roi, pad=_PADDING)
 
 
 def get_stat_digits(

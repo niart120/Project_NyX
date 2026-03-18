@@ -11,24 +11,15 @@ Switch (720p) 専用。
 from __future__ import annotations
 
 import time
-from collections import defaultdict
 from datetime import datetime, timedelta
-from pathlib import Path
-
-import numpy as np
 
 from nyxpy.framework.core.constants import Button, LStick
-from nyxpy.framework.core.imgproc import OCRProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
+from macros.shared.timer import consume_timer, start_timer
+
 from .config import FrlgGorgeousResortConfig
-from .recognizer import (
-    is_message_window_visible,
-    matches_any_target,
-    recognize_item,
-    recognize_requested_pokemon,
-)
 from .species_data import (
     NAME_TO_NATIONAL,
     NATIONAL_TO_INTERNAL,
@@ -38,32 +29,8 @@ from .species_data import (
 # 所要時間見積もり定数 (seconds)
 # ============================================================
 
-_OCR_WARMUP_SECONDS: float = 3.0
 _OVERHEAD_RESTART: float = 4.35
 _OVERHEAD_POST: float = 30.0
-
-# ============================================================
-# タイマーヘルパー
-# ============================================================
-
-
-def _start_timer() -> float:
-    return time.perf_counter()
-
-
-def _consume_timer(
-    cmd: Command, start_time: float, total_frames: float, fps: float
-) -> None:
-    target_seconds = total_frames / fps
-    elapsed = time.perf_counter() - start_time
-    remaining = target_seconds - elapsed
-    if remaining > 0:
-        cmd.wait(remaining)
-    elif remaining < -0.5:
-        cmd.log(
-            f"タイマー超過: {-remaining:.3f}秒",
-            level="WARNING",
-        )
 
 
 # ============================================================
@@ -89,13 +56,7 @@ class FrlgGorgeousResortMacro(MacroBase):
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
         self._effective_advance = cfg.target_advance + cfg.advance_offset
 
-        # デバッグ画像保存先を確保
-        self._img_dir = Path("static/frlg_gorgeous_resort") / "img"
-        self._img_dir.mkdir(parents=True, exist_ok=True)
-        cmd.log(f"デバッグ画像保存先: {self._img_dir}", level="DEBUG")
-
         # カウンタ初期化
-        self._item_counters: dict[str, int] = defaultdict(int)
         self._loop_count = 0
 
         # pokedex 初期化
@@ -124,27 +85,15 @@ class FrlgGorgeousResortMacro(MacroBase):
                 level="INFO",
             )
 
-        # OCR ウォームアップ
-        cmd.log("OCR ウォームアップ開始", level="INFO")
-        ocr = OCRProcessor.get_instance("ja")
-        try:
-            ocr.get_best_text(
-                np.full((64, 256, 3), 255, dtype=np.uint8)
-            )
-        except Exception:
-            pass
-        cmd.log("OCR ウォームアップ完了", level="INFO")
-
         # ETA 見積りと開始通知
         t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
         t_advance = self._effective_advance / self._advance_wait_fps
         t_loop = _OVERHEAD_RESTART + t_frame1 + t_advance + _OVERHEAD_POST
-        total_seconds = _OCR_WARMUP_SECONDS + (t_loop * cfg.target_count)
+        total_seconds = t_loop * cfg.target_count
         eta = datetime.now() + timedelta(seconds=total_seconds)
         eta_str = eta.strftime("%Y-%m-%d %H:%M")
 
         cmd.log(
-            f"OCRウォームアップ見積: {_OCR_WARMUP_SECONDS:.1f}s, "
             f"1ループ見積: {t_loop:.1f}s"
             f" × {cfg.target_count}回"
             f" = {total_seconds / 60:.0f}分"
@@ -180,7 +129,7 @@ class FrlgGorgeousResortMacro(MacroBase):
             self._restart_game(cmd)
 
             # Step 2: frame1 タイマー消化
-            _consume_timer(
+            consume_timer(
                 cmd,
                 self._t1,
                 cfg.frame1 + cfg.frame1_offset,
@@ -188,28 +137,14 @@ class FrlgGorgeousResortMacro(MacroBase):
             )
 
             # Step 3: OP送り → つづきから → 回想スキップ → アキホに話しかける
-            t2 = _start_timer()
+            t2 = start_timer()
             self._navigate_to_akiho(cmd)
 
             # Step 4: advance タイマー消化
-            _consume_timer(cmd, t2, self._effective_advance, self._advance_wait_fps)
+            consume_timer(cmd, t2, self._effective_advance, self._advance_wait_fps)
 
-            # Step 5: テキスト送り → ポケモン名 OCR（1回目の会話内）
-            cmd.press(Button.B, dur=0.10, wait=0.70)   # ポケモン名表示待ち
-            recognized = recognize_requested_pokemon(
-                cmd, cfg.target_pokemon, img_dir=self._img_dir,
-            )
-            if cfg.target_pokemon:
-                if recognized is None or not matches_any_target(
-                    recognized, cfg.target_pokemon
-                ):
-                    cmd.log(
-                        f"{i}回目：要求={recognized or '認識失敗'}"
-                        f"（期待={cfg.target_pokemon}）リセット",
-                        level="INFO",
-                    )
-                    continue
-            cmd.log(f"{i}回目：要求={recognized} — OK", level="DEBUG")
+            # Step 5: テキスト送り（ポケモン名表示）
+            cmd.press(Button.B, dur=0.10, wait=0.70)
 
             # Step 6: 1回目の会話を終了し、改めてアキホに話しかける
             self._end_first_conversation(cmd)
@@ -217,42 +152,17 @@ class FrlgGorgeousResortMacro(MacroBase):
             # Step 7: ポケモン受け渡し → アイテム受領
             self._deliver_pokemon_and_receive_item(cmd)
 
-            # Step 8: アイテム認識 → カウント更新
-            item = recognize_item(cmd, img_dir=self._img_dir)
-            if item == "BAG_FULL":
-                cmd.log("バッグが上限に達したため停止", level="INFO")
-                cmd.notify(
-                    "手持ちのアイテムが上限に達したため停止",
-                    img=cmd.capture(),
-                )
-                break
-
-            if item is not None:
-                self._item_counters[item] += 1
-                cmd.log(
-                    f"{i}回目：{item} {self._item_counters[item]}個",
-                    level="INFO",
-                )
-            else:
-                cmd.log(f"{i}回目：アイテム認識失敗", level="WARNING")
-
             # Step 9: レポート書き → 退出 → 再入場
             self._save_and_reenter(cmd)
 
             # Step 10: 目標達成チェック
-            if (
-                cfg.target_item
-                and self._item_counters.get(cfg.target_item, 0)
-                >= cfg.target_count
-            ):
+            if i >= cfg.target_count:
                 cmd.log(
-                    f"目標数に到達: {cfg.target_item}"
-                    f" {cfg.target_count}個",
+                    f"目標ループ数に到達: {cfg.target_count}回",
                     level="INFO",
                 )
                 cmd.notify(
-                    f"目標数に到達: {cfg.target_item}"
-                    f" {cfg.target_count}個",
+                    f"目標ループ数に到達: {cfg.target_count}回",
                     img=cmd.capture(),
                 )
                 break
@@ -260,8 +170,7 @@ class FrlgGorgeousResortMacro(MacroBase):
     def finalize(self, cmd: Command) -> None:
         cmd.release()
         cmd.log(
-            f"マクロ終了 (ループ {self._loop_count}回, "
-            f"アイテム: {dict(self._item_counters)})",
+            f"マクロ終了 (ループ {self._loop_count}回)",
             level="INFO",
         )
 
@@ -275,7 +184,7 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(Button.X, dur=0.20, wait=0.60)
         cmd.press(Button.A, dur=0.20, wait=1.20)
         cmd.press(Button.A, dur=0.20, wait=0.80)
-        self._t1 = _start_timer()
+        self._t1 = start_timer()
         cmd.press(Button.A, dur=0.20)
 
     # --------------------------------------------------------
@@ -328,7 +237,7 @@ class FrlgGorgeousResortMacro(MacroBase):
     def _save_and_reenter(self, cmd: Command) -> None:
         """レポート書いて、外に出て、再入場する。"""
         # 会話を終える
-        cmd.press(Button.B, dur=0.10, wait=0.30)
+        cmd.press(Button.A, dur=0.10, wait=0.30)
 
         # 外に出る
         cmd.press(LStick.DOWN, dur=1.50, wait=2.20)
@@ -346,6 +255,4 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(Button.A, dur=0.10, wait=0.10)  # 「はい」を選択
         cmd.press(Button.A, dur=0.10, wait=1.00)   # レポート書き込み実行
 
-        # レポート完了待ち
-        while is_message_window_visible(cmd):
-            cmd.press(Button.B, dur=0.10, wait=0.30)
+        cmd.press(Button.A, dur=0.10, wait=1.00)   # レポート完了確認
