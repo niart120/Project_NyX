@@ -72,7 +72,7 @@ class OCRProcessor:
             # 向き分類をすべて無効化して固定する
             self._ocr_engine = PaddleOCR(
                 use_doc_orientation_classify=False,
-                use_doc_unwarping=True,
+                use_doc_unwarping=False,
                 use_textline_orientation=False,
                 lang=paddle_lang,
             )
@@ -98,7 +98,7 @@ class OCRProcessor:
             results = self._ocr_engine.predict(
                 image,
                 use_doc_orientation_classify=False,
-                use_doc_unwarping=True,
+                use_doc_unwarping=False,
                 use_textline_orientation=False,
             )
 
