@@ -11,8 +11,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from macros.shared.frlg_opening import skip_opening_and_continue
+from macros.shared.game_restart import restart_game
 from macros.shared.ocr_utils import warmup_ocr
-from macros.shared.timer import consume_timer, start_timer
+from macros.shared.timer import consume_timer
 from nyxpy.framework.core.constants import Button, LStick
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
@@ -236,17 +238,16 @@ class FrlgInitialSeedMacro(MacroBase):
 
         # === Phase 1: ゲーム再起動 → タイマー制御 → エンカウント ===
         cmd.log("Phase1: ゲーム再起動", level="DEBUG")
-        self._restart_game(cmd)
+        t0 = restart_game(cmd)
 
         cmd.log("Phase1: frame1 タイマー消化", level="DEBUG")
-        consume_timer(cmd, self._t1, frame1 + cfg.frame1_offset, cfg.fps)
+        consume_timer(cmd, t0, frame1 + cfg.frame1_offset, cfg.fps)
 
-        t2 = start_timer()
         cmd.log("Phase1: OP送り → つづきから → 回想スキップ", level="DEBUG")
-        self._navigate_to_encounter(cmd)
+        t1 = skip_opening_and_continue(cmd)
 
         cmd.log("Phase1: frame2 タイマー消化", level="DEBUG")
-        consume_timer(cmd, t2, frame2 + cfg.frame2_offset, cfg.fps)
+        consume_timer(cmd, t1, frame2 + cfg.frame2_offset, cfg.fps)
 
         cmd.log("Phase1: エンカウント発生", level="DEBUG")
         self._trigger_encounter(cmd)
@@ -268,25 +269,6 @@ class FrlgInitialSeedMacro(MacroBase):
     # --------------------------------------------------------
     # Phase 1: ゲーム操作
     # --------------------------------------------------------
-
-    def _restart_game(self, cmd: Command) -> None:
-        """ゲームを終了→再起動し、frame1 タイマーを開始する。"""
-        cmd.press(Button.HOME, dur=0.15, wait=0.50)
-        cmd.press(Button.X, dur=0.20, wait=0.30)
-        cmd.press(Button.A, dur=0.20, wait=0.50)
-        cmd.press(Button.A, dur=0.20, wait=0.50)
-        self._t1 = start_timer()
-        cmd.press(Button.A, dur=0.20)  # ゲーム起動
-
-    def _navigate_to_encounter(self, cmd: Command) -> None:
-        """スプラッシュ画面送り → つづきからはじめる → 回想スキップ。
-
-        frame2 タイマーの計測区間内で実行される操作。
-        所要時間はタイマーにより自然に吸収される。
-        """
-        cmd.press(Button.A, dur=2.50, wait=1.00)   # スプラッシュ画面 を A で飛ばす
-        cmd.press(Button.A, dur=0.20, wait=1.50)   # つづきからはじめる
-        cmd.press(Button.B, dur=1.00, wait=0.50)   # 回想を B で飛ばす
 
     def _trigger_encounter(self, cmd: Command) -> None:
         """ルギアに話しかけてエンカウントを発生させる。"""
