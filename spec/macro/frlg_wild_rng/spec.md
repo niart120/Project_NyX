@@ -35,7 +35,7 @@
 | **rng_multiplier** | 1 フレームあたりの RNG 消費倍率。Switch = 2 |
 | **fps** | フレームレート。Switch = 60.0 |
 | **初期 Seed** | ゲーム起動時に決定される 16bit の乱数初期値 |
-| **おしえテレビ** | FRLG の「ポケモンおしえテレビ」。フィールドで Y ボタンにより起動し、B ボタンで閉じる。起動中の乱数消費は固定で **313F (GC) / 314F (Switch)** である。この固定消費により advance を嵩増しする手段として使用する |
+| **おしえテレビ** | FRLG の「ポケモンおしえテレビ」。フィールドで Y ボタンにより起動し、B ボタンで閉じる。表示中は毎フレーム **313 adv/F (GC) / 314 adv/F (Switch)** の速度で乱数を消費する高速消費モードである。起動・終了時の暗転中は消費速度が異なる |
 | **あまいかおり** | ポケモンの技。フィールドで使用すると野生ポケモンとのエンカウントが発生する |
 | **timer0** | ゲーム起動から初期 Seed 決定までを管理するタイマー（= frame1 タイマー） |
 | **timer1** | 初期 Seed 決定後からあまいかおり実行までを管理するタイマー（= advance タイマー） |
@@ -65,10 +65,12 @@
 - **timer0 (frame1)**: ゲーム起動 → 初期 Seed 決定
   - `wait = (frame1 + frame1_offset) / fps`
 - **timer1 (advance)**: 初期 Seed 決定 → あまいかおり実行
-  - `wait = (target_advance + advance_offset) / (fps × rng_multiplier)`
+  - `wait = effective_advance / (fps × rng_multiplier)`
+  - `effective_advance = target_advance + advance_offset - teachy_advance`
+  - おしえテレビによる高速消費分を差し引いた残りをフィールド待機で消化する
 - **timer_teachy** (オプション): フィールド操作可能 → おしえテレビ終了
   - `wait = teachy_tv_frames / fps`
-  - おしえテレビの乱数消費量自体は固定（Switch: 314F）であり、timer_teachy はその消費量を制御するものではない。おしえテレビを起動してから適切なタイミングで B ボタンを押すための操作タイミング管理に使用する
+  - Y ボタンから B ボタンまでの操作タイミング制御に使用する。`teachy_tv_frames` を変えるとおしえテレビの表示時間が変わり、その分高速消費量も変わる
 
 timer0 の起動・終了タイミングおよび timer1 の起動タイミングはゴージャスリゾートマクロと同一である。
 
@@ -191,16 +193,16 @@ def skip_opening_and_continue(cmd: Command) -> float:
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `frame1` | `int` | `2347` | 初期 Seed 決定フレーム（時間フレーム） |
-| `target_advance` | `int` | `610` | あまいかおり実行時までの目標 RNG advance 数 |
+| `frame1` | `int` | `2036` | 初期 Seed 決定フレーム（時間フレーム） |
+| `target_advance` | `int` | `2049` | あまいかおり実行時までの目標 RNG advance 数 |
 | `fps` | `float` | `60.0` | フレームレート |
 
 #### 4.2 フレーム・RNG 補正
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `frame1_offset` | `int` | `0` | frame1 に加算する微調整オフセット（frame 単位） |
-| `advance_offset` | `int` | `322` | target_advance に加算するプラットフォーム補正値（advance 単位） |
+| `frame1_offset` | `float` | `7.0` | frame1 に加算する微調整オフセット（frame 単位） |
+| `advance_offset` | `int` | `-148` | target_advance に加算するプラットフォーム補正値（advance 単位） |
 | `rng_multiplier` | `int` | `2` | 1 フレームあたりの RNG 消費倍率。Switch = 2 |
 
 > **advance_offset / rng_multiplier の由来**: ゴージャスリゾートマクロと同一。
@@ -211,21 +213,46 @@ def skip_opening_and_continue(cmd: Command) -> float:
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
 | `use_teachy_tv` | `bool` | `false` | おしえテレビを使用する場合 `true` |
-| `teachy_tv_frames` | `int` | `0` | おしえテレビの起動〜終了間の待機フレーム数（frame 単位）。`use_teachy_tv=true` 時のみ有効 |
+| `teachy_tv_frames` | `int` | `0` | Y→B 間の待機フレーム数（操作タイミング制御）。`use_teachy_tv=true` 時のみ有効 |
+| `teachy_tv_adv_per_frame` | `int` | `314` | テレビ表示中の RNG 消費速度 (adv/frame)。Switch = 314, GC = 313 |
+| `teachy_tv_transition_offset` | `int` | `30` | 暗転（開閉）にかかるフレーム数のオフセット（実測）。`teachy_tv_frames` から差し引いてテレビ表示中フレーム数を算出する |
+| `teachy_tv_transition_advance` | `int` | `200` | 暗転中の RNG 消費量（実測） |
 
-> **teachy_tv_frames の意味**: おしえテレビの乱数消費量は固定で **313F (GC) / 314F (Switch)** であり、
-> `teachy_tv_frames` はこの消費量を変えるものではない。
-> Y ボタン押下後、`teachy_tv_frames / fps` 秒が経過した時点で B ボタンを押しておしえテレビを閉じるための
-> **操作タイミング制御用パラメータ**である。
-> おしえテレビの開閉操作自体にかかる時間を timer_teachy で管理し、timer1（advance タイマー）の中に吸収させる。
+> **おしえテレビの乱数消費モデル**:
+>
+> おしえテレビ 1 サイクルの総 RNG 消費量は以下の式で算出する:
+>
+> ```
+> tv_display_frames = teachy_tv_frames - teachy_tv_transition_offset
+> teachy_advance = teachy_tv_adv_per_frame × tv_display_frames + teachy_tv_transition_advance
+> ```
+>
+> - `tv_display_frames`: テレビが実際に表示されているフレーム数（`teachy_tv_frames` から暗転フレームを除いたもの）
+> - `teachy_tv_adv_per_frame × tv_display_frames`: テレビ表示中の高速消費 (314 adv/frame × 表示フレーム数)
+> - `teachy_tv_transition_advance`: 暗転の開閉中に発生する RNG 消費（実測値）
+>
+> この `teachy_advance` を `effective_advance` から差し引くことで、
+> timer1 のフィールド待機時間を正しく算出する。
+> `target_advance` には外部ツールの値をそのまま入力すればよく、
+> おしえテレビの ON/OFF 切替時に変更する必要はない。
 
 #### 待機時間の導出式
 
 | タイマー | 導出式 |
 |---------|--------|
 | timer0 (frame1) | `(frame1 + frame1_offset) / fps` |
-| timer1 (advance) | `(target_advance + advance_offset) / (fps × rng_multiplier)` |
+| timer1 (advance) | `effective_advance / (fps × rng_multiplier)` |
 | timer_teachy | `teachy_tv_frames / fps` |
+
+`effective_advance` の算出:
+
+```
+effective_advance = target_advance + advance_offset
+if use_teachy_tv:
+    tv_display_frames = teachy_tv_frames - teachy_tv_transition_offset
+    teachy_advance = teachy_tv_adv_per_frame × tv_display_frames + teachy_tv_transition_advance
+    effective_advance -= teachy_advance
+```
 
 ### メインフロー
 
@@ -244,6 +271,15 @@ def initialize(self, cmd: Command, args: dict) -> None:
 
     self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
     self._effective_advance = cfg.target_advance + cfg.advance_offset
+
+    # おしえテレビによる高速消費分を差し引く
+    if cfg.use_teachy_tv:
+        tv_display_frames = cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
+        teachy_advance = (
+            cfg.teachy_tv_adv_per_frame * tv_display_frames
+            + cfg.teachy_tv_transition_advance
+        )
+        self._effective_advance -= teachy_advance
 
     # 見積り
     t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
@@ -332,14 +368,15 @@ if cfg.use_teachy_tv:
 | timer_teachy 消化 | `teachy_tv_frames / fps` 秒の経過を待つ（Y 押下〜起動の時間は吸収される） |
 | B ボタン | おしえテレビを閉じる |
 
-> **おしえテレビの乱数消費**: おしえテレビを 1 回起動→終了すると、RNG は固定で
-> **313 advance (GC) / 314 advance (Switch)** 消費される。この消費量はおしえテレビの
-> 表示時間に依存しない固定値である。
+> **おしえテレビの乱数消費**: おしえテレビの表示中は毎フレーム **314 adv/F (Switch) / 313 adv/F (GC)** の
+> 速度で RNG が消費される（フィールドの 2 adv/F の 157 倍）。
+> `teachy_tv_frames` を変えるとテレビの表示時間が変わり、その分高速消費量も変動する。
+> 起動・終了時の暗転中は消費速度が異なるため、`teachy_tv_transition_offset`（暗転フレーム数）と
+> `teachy_tv_transition_advance`（暗転中の RNG 消費）を別パラメータで管理する。
 >
-> したがって、おしえテレビを使用するかどうかで target_advance の設定値を調整する
-> （おしえテレビあり = 314 advance 分だけ target_advance を小さくする）のが正しい運用である。
-> timer_teachy はあくまでおしえテレビの開閉操作にかかる時間を timer1 内に正しく吸収させるための
-> 操作タイミング管理であり、乱数消費量を制御するものではない。
+> マクロが初期化時におしえテレビの総消費量を自動算出し、`target_advance` から差し引くため、
+> ユーザーは外部ツールの値をそのまま `target_advance` に入力すればよい。
+> おしえテレビの ON/OFF 切替時に `target_advance` を変更する必要はない。
 
 #### Step 5: メニュー操作 → あまいかおり選択
 
@@ -349,14 +386,15 @@ if cfg.use_teachy_tv:
 ```python
 cmd.press(Button.X, dur=0.10, wait=0.50)       # 1. メニューを開く
 cmd.press(LStick.DOWN, dur=0.10, wait=0.30)    # 2. "ポケモン" にカーソル
-cmd.press(Button.A, dur=0.10, wait=0.50)       # 3. ポケモンメニューを開く
-cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 4. 最下段（あまいかおり持ち）にカーソル
-cmd.press(Button.A, dur=0.10, wait=0.30)       # 5. コンテキストメニューを開く
-cmd.press(LStick.DOWN, dur=0.10, wait=0.20)    # 6. "あまいかおり" にカーソル
+cmd.press(Button.A, dur=0.10, wait=1.00)       # 3. ポケモンメニューを開く
+cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 4. カーソルを上に移動（ラップアラウンド開始）
+cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 5. 最下段（あまいかおり持ち）にカーソル
+cmd.press(Button.A, dur=0.10, wait=0.30)       # 6. コンテキストメニューを開く
+cmd.press(LStick.DOWN, dur=0.10, wait=0.20)    # 7. "あまいかおり" にカーソル
 ```
 
 > **前提**: あまいかおりを覚えたポケモンは常に手持ちの最下段に配置する。
-> ポケモンメニューを開くとカーソルは先頭にあるため、`LStick.UP × 1` でリストが
+> ポケモンメニューを開くとカーソルは先頭にあるため、`LStick.UP × 2` でリストが
 > ラップアラウンドして最下段に移動する。
 
 #### Step 6: timer1 消化 → あまいかおり実行
@@ -372,8 +410,10 @@ consume_timer(cmd, t1, self._effective_advance, self._advance_wait_fps)
 cmd.press(Button.A, dur=0.10)
 ```
 
-> timer1 の総待機時間は `(target_advance + advance_offset) / (fps × rng_multiplier)` である。
-> Step 3 〜 Step 5 で費やした時間は timer1 に自然吸収されるため、
+> timer1 の総待機時間は `effective_advance / (fps × rng_multiplier)` である。
+> おしえテレビ使用時は `effective_advance` から高速消費分が差し引かれているため、
+> timer1 のフィールド待機は短くなる。
+> Step 3 〜 Step 5 で費やした時間（おしえテレビの実時間含む）は timer1 に自然吸収されるため、
 > ここでは残り時間のみを消化する。
 
 #### Step 7: マクロ終了
@@ -411,14 +451,17 @@ class FrlgWildRngMacro(MacroBase):
 class FrlgWildRngConfig:
     """FRLG 野生乱数操作マクロの設定"""
 
-    frame1: int = 2347
-    target_advance: int = 610
+    frame1: int = 2036
+    target_advance: int = 2049
     fps: float = 60.0
-    frame1_offset: int = 0
-    advance_offset: int = 322
+    frame1_offset: float = 7.0
+    advance_offset: int = -148
     rng_multiplier: int = 2
     use_teachy_tv: bool = False
     teachy_tv_frames: int = 0
+    teachy_tv_adv_per_frame: int = 314
+    teachy_tv_transition_offset: int = 30
+    teachy_tv_transition_advance: int = 200
 
     @classmethod
     def from_args(cls, args: dict) -> FrlgWildRngConfig: ...
@@ -432,7 +475,9 @@ class FrlgWildRngConfig:
 |------------|----------|----------|
 | ユニット | `test_config_from_args_defaults` | `FrlgWildRngConfig.from_args({})` がデフォルト値を返すこと |
 | ユニット | `test_config_from_args_override` | 各パラメータのオーバーライドが正しく反映されること |
-| ユニット | `test_config_teachy_tv_disabled` | `use_teachy_tv=false` 時に `teachy_tv_frames` が無視されること |
+| ユニット | `test_config_teachy_tv_disabled` | `use_teachy_tv=false` 時におしえテレビパラメータが無視されること |
+| ユニット | `test_teachy_tv_advance_calculation` | おしえテレビの総消費量算出が正しいこと |
+| ユニット | `test_effective_advance_with_teachy_tv` | おしえテレビありの effective_advance が正しく差し引かれること |
 | ユニット | `test_timer_wait_calculation` | `(frame1 + frame1_offset) / fps` の算出が正しいこと |
 | ユニット | `test_advance_wait_calculation` | `(target_advance + advance_offset) / (fps × rng_multiplier)` の算出が正しいこと |
 | ユニット | `test_restart_game_returns_timer` | `restart_game()` が `float` を返し `start_timer()` 相当の時刻であること |

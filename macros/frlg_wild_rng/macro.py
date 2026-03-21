@@ -49,6 +49,23 @@ class FrlgWildRngMacro(MacroBase):
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
         self._effective_advance = cfg.target_advance + cfg.advance_offset
 
+        # おしえテレビによる高速消費分を差し引く
+        if cfg.use_teachy_tv:
+            tv_display_frames = (
+                cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
+            )
+            teachy_advance = (
+                cfg.teachy_tv_adv_per_frame * tv_display_frames
+                + cfg.teachy_tv_transition_advance
+            )
+            self._effective_advance -= teachy_advance
+            cmd.log(
+                f"おしえテレビ消費: {teachy_advance} adv "
+                f"({cfg.teachy_tv_adv_per_frame} adv/F × {tv_display_frames}F "
+                f"+ 暗転{cfg.teachy_tv_transition_advance} adv)",
+                level="INFO",
+            )
+
         # 見積り
         t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
         t_advance = self._effective_advance / self._advance_wait_fps
@@ -77,7 +94,8 @@ class FrlgWildRngMacro(MacroBase):
         # Step 5: メニュー操作 → あまいかおり選択
         cmd.press(Button.X, dur=0.10, wait=0.50)       # メニューを開く
         cmd.press(LStick.DOWN, dur=0.10, wait=0.30)    # "ポケモン" にカーソル
-        cmd.press(Button.A, dur=0.10, wait=0.50)       # ポケモンメニューを開く
+        cmd.press(Button.A, dur=0.10, wait=1.00)       # ポケモンメニューを開く
+        cmd.press(LStick.UP, dur=0.10, wait=0.20)      # カーソル上移動
         cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 最下段にカーソル
         cmd.press(Button.A, dur=0.10, wait=0.30)       # コンテキストメニューを開く
         cmd.press(LStick.DOWN, dur=0.10, wait=0.20)    # "あまいかおり" にカーソル
