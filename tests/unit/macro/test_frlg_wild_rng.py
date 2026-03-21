@@ -37,8 +37,7 @@ class TestConfigFromArgsDefaults:
         assert cfg.use_teachy_tv is False
         assert cfg.teachy_tv_frames == 0
         assert cfg.teachy_tv_adv_per_frame == 314
-        assert cfg.teachy_tv_transition_offset == 30
-        assert cfg.teachy_tv_transition_advance == 200
+        assert cfg.teachy_tv_transition_correction == -12353
 
 
 class TestConfigFromArgsOverride:
@@ -69,14 +68,12 @@ class TestConfigFromArgsOverride:
             "use_teachy_tv": True,
             "teachy_tv_frames": 500,
             "teachy_tv_adv_per_frame": 313,
-            "teachy_tv_transition_offset": 25,
-            "teachy_tv_transition_advance": 150,
+            "teachy_tv_transition_correction": -10000,
         })
         assert cfg.use_teachy_tv is True
         assert cfg.teachy_tv_frames == 500
         assert cfg.teachy_tv_adv_per_frame == 313
-        assert cfg.teachy_tv_transition_offset == 25
-        assert cfg.teachy_tv_transition_advance == 150
+        assert cfg.teachy_tv_transition_correction == -10000
 
 
 class TestConfigTeachyTvDisabled:
@@ -94,28 +91,46 @@ class TestConfigTeachyTvDisabled:
 class TestTeachyTvAdvanceCalculation:
     """おしえテレビの消費量算出が正しいこと"""
 
-    def test_default_teachy_advance(self):
-        """adv_per_frame * (frames - transition_offset) + transition_advance"""
+    def test_teachy_excess_default_correction(self):
+        """(adv_per_frame - rng_multiplier) * frames + transition_correction"""
         cfg = FrlgWildRngConfig.from_args({
             "teachy_tv_frames": 300,
         })
-        tv_display = cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
-        expected = cfg.teachy_tv_adv_per_frame * tv_display + cfg.teachy_tv_transition_advance
-        # 314 * (300 - 30) + 200 = 314 * 270 + 200 = 84780 + 200 = 84980
-        assert expected == 84980
+        excess = (
+            (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier) * cfg.teachy_tv_frames
+            + cfg.teachy_tv_transition_correction
+        )
+        # (314 - 2) * 300 + (-12353) = 93600 - 12353 = 81247
+        assert excess == 81247
+
+    def test_teachy_excess_zero_correction(self):
+        """correction=0 のとき excess = (a-r)*F"""
+        cfg = FrlgWildRngConfig.from_args({
+            "teachy_tv_frames": 120,
+            "teachy_tv_transition_correction": 0,
+        })
+        excess = (
+            (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier) * cfg.teachy_tv_frames
+            + cfg.teachy_tv_transition_correction
+        )
+        # (314 - 2) * 120 + 0 = 37440
+        assert excess == 37440
 
     def test_effective_advance_with_teachy_tv(self):
-        """おしえテレビありの effective_advance が正しく差し引かれること"""
+        """おしえテレビありの effective_advance が超過分だけ差し引かれること"""
         cfg = FrlgWildRngConfig.from_args({
             "target_advance": 100000,
             "advance_offset": 0,
             "use_teachy_tv": True,
             "teachy_tv_frames": 300,
         })
-        tv_display = cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
-        teachy_adv = cfg.teachy_tv_adv_per_frame * tv_display + cfg.teachy_tv_transition_advance
-        effective = cfg.target_advance + cfg.advance_offset - teachy_adv
-        assert effective == 100000 - 84980
+        excess = (
+            (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier) * cfg.teachy_tv_frames
+            + cfg.teachy_tv_transition_correction
+        )
+        effective = cfg.target_advance + cfg.advance_offset - excess
+        # 100000 + 0 - 81247 = 18753
+        assert effective == 100000 - 81247
 
 
 # ============================================================

@@ -215,24 +215,25 @@ def skip_opening_and_continue(cmd: Command) -> float:
 | `use_teachy_tv` | `bool` | `false` | おしえテレビを使用する場合 `true` |
 | `teachy_tv_frames` | `int` | `0` | Y→B 間の待機フレーム数（操作タイミング制御）。`use_teachy_tv=true` 時のみ有効 |
 | `teachy_tv_adv_per_frame` | `int` | `314` | テレビ表示中の RNG 消費速度 (adv/frame)。Switch = 314, GC = 313 |
-| `teachy_tv_transition_offset` | `int` | `30` | 暗転（開閉）にかかるフレーム数のオフセット（実測）。`teachy_tv_frames` から差し引いてテレビ表示中フレーム数を算出する |
-| `teachy_tv_transition_advance` | `int` | `200` | 暗転中の RNG 消費量（実測） |
+| `teachy_tv_transition_correction` | `int` | `-12353` | 暗転補正定数 $C$（実測値）。詳細は [calibration_log.md](./calibration_log.md) 参照 |
 
 > **おしえテレビの乱数消費モデル**:
 >
-> おしえテレビ 1 サイクルの総 RNG 消費量は以下の式で算出する:
+> `consume_timer(t1, ...)` は timer1 開始からの壁時計時間で管理しており、
+> おしえテレビの `teachy_tv_frames / fps` 秒間もフィールド消費速度で進んだとみなされる。
+> そのため、差し引くのはフィールド基準との**超過分**である:
 >
 > ```
-> tv_display_frames = teachy_tv_frames - teachy_tv_transition_offset
-> teachy_advance = teachy_tv_adv_per_frame × tv_display_frames + teachy_tv_transition_advance
+> teachy_excess = (teachy_tv_adv_per_frame - rng_multiplier) × teachy_tv_frames
+>               + teachy_tv_transition_correction
+> effective_advance -= teachy_excess
 > ```
 >
-> - `tv_display_frames`: テレビが実際に表示されているフレーム数（`teachy_tv_frames` から暗転フレームを除いたもの）
-> - `teachy_tv_adv_per_frame × tv_display_frames`: テレビ表示中の高速消費 (314 adv/frame × 表示フレーム数)
-> - `teachy_tv_transition_advance`: 暗転の開閉中に発生する RNG 消費（実測値）
+> `teachy_tv_transition_correction` ($C$) は、おしえテレビの開閉時の暗転中に
+> 高速消費が行われないことによる補正定数である。
+> $F$ を変えた複数回の実測から $a = 314$ adv/F を確認済み、
+> $C = -12{,}353$ を導出した（詳細は [calibration_log.md](./calibration_log.md)）。
 >
-> この `teachy_advance` を `effective_advance` から差し引くことで、
-> timer1 のフィールド待機時間を正しく算出する。
 > `target_advance` には外部ツールの値をそのまま入力すればよく、
 > おしえテレビの ON/OFF 切替時に変更する必要はない。
 
@@ -249,9 +250,9 @@ def skip_opening_and_continue(cmd: Command) -> float:
 ```
 effective_advance = target_advance + advance_offset
 if use_teachy_tv:
-    tv_display_frames = teachy_tv_frames - teachy_tv_transition_offset
-    teachy_advance = teachy_tv_adv_per_frame × tv_display_frames + teachy_tv_transition_advance
-    effective_advance -= teachy_advance
+    teachy_excess = (teachy_tv_adv_per_frame - rng_multiplier) × teachy_tv_frames
+                  + teachy_tv_transition_correction
+    effective_advance -= teachy_excess
 ```
 
 ### メインフロー
@@ -272,14 +273,14 @@ def initialize(self, cmd: Command, args: dict) -> None:
     self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
     self._effective_advance = cfg.target_advance + cfg.advance_offset
 
-    # おしえテレビによる高速消費分を差し引く
+    # おしえテレビによるフィールド基準との超過消費分を差し引く
     if cfg.use_teachy_tv:
-        tv_display_frames = cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
-        teachy_advance = (
-            cfg.teachy_tv_adv_per_frame * tv_display_frames
-            + cfg.teachy_tv_transition_advance
+        teachy_excess = (
+            (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier)
+            * cfg.teachy_tv_frames
+            + cfg.teachy_tv_transition_correction
         )
-        self._effective_advance -= teachy_advance
+        self._effective_advance -= teachy_excess
 
     # 見積り
     t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
@@ -371,10 +372,9 @@ if cfg.use_teachy_tv:
 > **おしえテレビの乱数消費**: おしえテレビの表示中は毎フレーム **314 adv/F (Switch) / 313 adv/F (GC)** の
 > 速度で RNG が消費される（フィールドの 2 adv/F の 157 倍）。
 > `teachy_tv_frames` を変えるとテレビの表示時間が変わり、その分高速消費量も変動する。
-> 起動・終了時の暗転中は消費速度が異なるため、`teachy_tv_transition_offset`（暗転フレーム数）と
-> `teachy_tv_transition_advance`（暗転中の RNG 消費）を別パラメータで管理する。
+> 起動・終了時の暗転中は消費速度が異なるため、`teachy_tv_transition_correction` で補正する。
 >
-> マクロが初期化時におしえテレビの総消費量を自動算出し、`target_advance` から差し引くため、
+> マクロが初期化時におしえテレビの超過消費量を自動算出し、`target_advance` から差し引くため、
 > ユーザーは外部ツールの値をそのまま `target_advance` に入力すればよい。
 > おしえテレビの ON/OFF 切替時に `target_advance` を変更する必要はない。
 
@@ -460,8 +460,7 @@ class FrlgWildRngConfig:
     use_teachy_tv: bool = False
     teachy_tv_frames: int = 0
     teachy_tv_adv_per_frame: int = 314
-    teachy_tv_transition_offset: int = 30
-    teachy_tv_transition_advance: int = 200
+    teachy_tv_transition_correction: int = -12353
 
     @classmethod
     def from_args(cls, args: dict) -> FrlgWildRngConfig: ...

@@ -49,20 +49,19 @@ class FrlgWildRngMacro(MacroBase):
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
         self._effective_advance = cfg.target_advance + cfg.advance_offset
 
-        # おしえテレビによる高速消費分を差し引く
+        # おしえテレビによるフィールド基準との超過消費分を差し引く
         if cfg.use_teachy_tv:
-            tv_display_frames = (
-                cfg.teachy_tv_frames - cfg.teachy_tv_transition_offset
+            teachy_excess = (
+                (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier)
+                * cfg.teachy_tv_frames
+                + cfg.teachy_tv_transition_correction
             )
-            teachy_advance = (
-                cfg.teachy_tv_adv_per_frame * tv_display_frames
-                + cfg.teachy_tv_transition_advance
-            )
-            self._effective_advance -= teachy_advance
+            self._effective_advance -= teachy_excess
             cmd.log(
-                f"おしえテレビ消費: {teachy_advance} adv "
-                f"({cfg.teachy_tv_adv_per_frame} adv/F × {tv_display_frames}F "
-                f"+ 暗転{cfg.teachy_tv_transition_advance} adv)",
+                f"おしえテレビ: 超過 {teachy_excess} adv "
+                f"({cfg.teachy_tv_adv_per_frame}-{cfg.rng_multiplier})"
+                f"×{cfg.teachy_tv_frames}F + "
+                f"correction({cfg.teachy_tv_transition_correction})",
                 level="INFO",
             )
 
@@ -87,7 +86,7 @@ class FrlgWildRngMacro(MacroBase):
         # Step 4: おしえテレビ（オプション）
         if cfg.use_teachy_tv:
             timer_teachy = start_timer()
-            cmd.press(Button.Y, dur=0.10, wait=0.50)  # おしえテレビ起動
+            cmd.press(Button.Y, dur=0.10, wait=1.00)  # おしえテレビ起動
             consume_timer(cmd, timer_teachy, cfg.teachy_tv_frames, cfg.fps)
             cmd.press(Button.B, dur=0.10, wait=1.00)  # おしえテレビ終了
 

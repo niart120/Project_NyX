@@ -27,8 +27,7 @@ class FrlgWildRngConfig:
     use_teachy_tv: bool = False
     teachy_tv_frames: int = 0
     teachy_tv_adv_per_frame: int = 314
-    teachy_tv_transition_offset: int = 30
-    teachy_tv_transition_advance: int = 200
+    teachy_tv_transition_correction: int = -12353
 
     @classmethod
     def from_args(cls, args: dict) -> FrlgWildRngConfig:
@@ -51,11 +50,11 @@ class FrlgWildRngConfig:
         cfg.teachy_tv_adv_per_frame = int(
             args.get("teachy_tv_adv_per_frame", cfg.teachy_tv_adv_per_frame)
         )
-        cfg.teachy_tv_transition_offset = int(
-            args.get("teachy_tv_transition_offset", cfg.teachy_tv_transition_offset)
-        )
-        cfg.teachy_tv_transition_advance = int(
-            args.get("teachy_tv_transition_advance", cfg.teachy_tv_transition_advance)
+        cfg.teachy_tv_transition_correction = int(
+            args.get(
+                "teachy_tv_transition_correction",
+                cfg.teachy_tv_transition_correction,
+            )
         )
 
         return cfg
