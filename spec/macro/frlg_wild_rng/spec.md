@@ -220,21 +220,25 @@ def skip_opening_and_continue(cmd: Command) -> float:
 
 > **おしえテレビの乱数消費モデル**:
 >
-> ユーザーは `teachy_tv_consumption` でおしえテレビが消費する目標アドバンス数を指定する。
+> ユーザーは `teachy_tv_consumption` でおしえテレビが消費する**合計**アドバンス数を指定する。
 > マクロは必要なフレーム数を逆算する:
 >
 > ```
 > teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction)
->               / (teachy_tv_adv_per_frame - rng_multiplier)
+>               / teachy_tv_adv_per_frame
 > ```
 >
 > `consume_timer(t1, ...)` は timer1 開始からの壁時計時間で管理しており、
-> おしえテレビの表示時間中もフィールド消費速度で進んだとみなされる。
-> そのため、`effective_advance` からは `teachy_tv_consumption` をそのまま差し引く:
+> おしえテレビの表示時間中もタイマーは進行し続ける。
+> そのため、`effective_advance` から差し引くのは
+> フィールド基準との**超過分**である:
 >
 > ```
-> effective_advance -= teachy_tv_consumption
+> teachy_excess = teachy_tv_consumption - rng_multiplier × teachy_frames
+> effective_advance -= teachy_excess
 > ```
+>
+> この設計により、timer1 の予算はおしえテレビの壁時計時間を内包する十分な大きさになる。
 >
 > `teachy_tv_transition_correction` ($C$) は、おしえテレビの開閉時の暗転中に
 > 高速消費が行われないことによる補正定数である。
@@ -257,14 +261,17 @@ def skip_opening_and_continue(cmd: Command) -> float:
 ```
 effective_advance = target_advance + advance_offset
 if use_teachy_tv:
-    effective_advance -= teachy_tv_consumption
+    teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction)
+                  / teachy_tv_adv_per_frame
+    teachy_excess = teachy_tv_consumption - rng_multiplier × teachy_frames
+    effective_advance -= teachy_excess
 ```
 
 `teachy_frames`（おしえテレビの待機フレーム数）の逆算:
 
 ```
 teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction)
-              / (teachy_tv_adv_per_frame - rng_multiplier)
+              / teachy_tv_adv_per_frame
 ```
 
 ### メインフロー
@@ -290,8 +297,12 @@ def initialize(self, cmd: Command, args: dict) -> None:
         self._teachy_tv_frames = (
             cfg.teachy_tv_consumption
             - cfg.teachy_tv_transition_correction
-        ) / (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier)
-        self._effective_advance -= cfg.teachy_tv_consumption
+        ) / cfg.teachy_tv_adv_per_frame
+        teachy_excess = (
+            cfg.teachy_tv_consumption
+            - cfg.rng_multiplier * self._teachy_tv_frames
+        )
+        self._effective_advance -= teachy_excess
 
     # 見積り
     t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps

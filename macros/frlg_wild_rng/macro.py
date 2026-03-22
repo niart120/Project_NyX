@@ -51,15 +51,18 @@ class FrlgWildRngMacro(MacroBase):
 
         # おしえテレビによる消費分を差し引く
         if cfg.use_teachy_tv:
-            teachy_excess = cfg.teachy_tv_consumption
             self._teachy_tv_frames = (
                 cfg.teachy_tv_consumption
                 - cfg.teachy_tv_transition_correction
-            ) / (cfg.teachy_tv_adv_per_frame - cfg.rng_multiplier)
+            ) / cfg.teachy_tv_adv_per_frame
+            teachy_excess = (
+                cfg.teachy_tv_consumption
+                - cfg.rng_multiplier * self._teachy_tv_frames
+            )
             self._effective_advance -= teachy_excess
             cmd.log(
                 f"おしえテレビ: "
-                f"消費 {teachy_excess} adv, "
+                f"消費 {cfg.teachy_tv_consumption} adv, "
                 f"換算フレーム {self._teachy_tv_frames:.1f}F "
                 f"(correction {cfg.teachy_tv_transition_correction})",
                 level="INFO",
