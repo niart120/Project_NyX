@@ -32,7 +32,8 @@ class TestConfigFromArgsDefaults:
         assert cfg.target_advance == 2049
         assert cfg.fps == 60.0
         assert cfg.frame1_offset == pytest.approx(7.0)
-        assert cfg.advance_offset == -148
+        assert cfg.platform_offset == -148
+        assert cfg.user_offset == 0
         assert cfg.rng_multiplier == 2
         assert cfg.use_teachy_tv is False
         assert cfg.teachy_tv_consumption == 0
@@ -56,11 +57,13 @@ class TestConfigFromArgsOverride:
     def test_override_corrections(self):
         cfg = FrlgWildRngConfig.from_args({
             "frame1_offset": 5,
-            "advance_offset": 400,
+            "platform_offset": 400,
+            "user_offset": -10,
             "rng_multiplier": 1,
         })
         assert cfg.frame1_offset == 5
-        assert cfg.advance_offset == 400
+        assert cfg.platform_offset == 400
+        assert cfg.user_offset == -10
         assert cfg.rng_multiplier == 1
 
     def test_override_teachy_tv(self):
@@ -132,7 +135,8 @@ class TestTeachyTvAdvanceCalculation:
         """おしえテレビありの effective_advance が excess 分だけ差し引かれること"""
         cfg = FrlgWildRngConfig.from_args({
             "target_advance": 100000,
-            "advance_offset": 0,
+            "platform_offset": 0,
+            "user_offset": 0,
             "use_teachy_tv": True,
             "teachy_tv_consumption": 94200,
         })
@@ -140,7 +144,7 @@ class TestTeachyTvAdvanceCalculation:
             cfg.teachy_tv_consumption - cfg.teachy_tv_transition_correction
         ) / cfg.teachy_tv_adv_per_frame
         excess = cfg.teachy_tv_consumption - cfg.rng_multiplier * frames
-        effective = cfg.target_advance + cfg.advance_offset - excess
+        effective = cfg.target_advance + cfg.platform_offset + cfg.user_offset - excess
         # effective_advance > teachy_frames (timer1 budget > teachy TV time)
         assert effective > frames
         assert effective == pytest.approx(100000 - excess)
@@ -170,22 +174,23 @@ class TestAdvanceWaitCalculation:
 
     def test_default_advance_wait(self):
         cfg = FrlgWildRngConfig.from_args({})
-        effective_advance = cfg.target_advance + cfg.advance_offset
+        effective_advance = cfg.target_advance + cfg.platform_offset + cfg.user_offset
         advance_wait_fps = cfg.fps * cfg.rng_multiplier
         wait = effective_advance / advance_wait_fps
-        assert wait == pytest.approx((2049 + (-148)) / (60.0 * 2))
+        assert wait == pytest.approx((2049 + (-148) + 0) / (60.0 * 2))
 
     def test_custom_advance_wait(self):
         cfg = FrlgWildRngConfig.from_args({
             "target_advance": 1000,
-            "advance_offset": 400,
+            "platform_offset": 400,
+            "user_offset": 50,
             "rng_multiplier": 1,
             "fps": 59.7275,
         })
-        effective_advance = cfg.target_advance + cfg.advance_offset
+        effective_advance = cfg.target_advance + cfg.platform_offset + cfg.user_offset
         advance_wait_fps = cfg.fps * cfg.rng_multiplier
         wait = effective_advance / advance_wait_fps
-        assert wait == pytest.approx(1400 / 59.7275)
+        assert wait == pytest.approx(1450 / 59.7275)
 
 
 # ============================================================

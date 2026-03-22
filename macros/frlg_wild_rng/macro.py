@@ -47,7 +47,7 @@ class FrlgWildRngMacro(MacroBase):
         cfg = self._cfg
 
         self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
-        self._effective_advance = cfg.target_advance + cfg.advance_offset
+        self._effective_advance = cfg.target_advance + cfg.platform_offset + cfg.user_offset
 
         # おしえテレビによる消費分を差し引く
         if cfg.use_teachy_tv:

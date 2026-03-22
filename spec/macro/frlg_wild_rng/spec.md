@@ -31,7 +31,8 @@
 | **frame1** | ゲーム起動から初期 Seed 決定までの待機フレーム数（時間フレーム） |
 | **target_advance** | 初期 Seed 決定以降、あまいかおり実行時までの目標 RNG advance 数 |
 | **frame1_offset** | frame1 に加算するユーザー調整オフセット（frame 単位） |
-| **advance_offset** | target_advance に加算するプラットフォーム補正値（advance 単位） |
+| **platform_offset** | target_advance に加算するプラットフォーム固有の補正値（advance 単位）。Switch = -148 |
+| **user_offset** | target_advance に加算するユーザー調整用オフセット（advance 単位） |
 | **rng_multiplier** | 1 フレームあたりの RNG 消費倍率。Switch = 2 |
 | **fps** | フレームレート。Switch = 60.0 |
 | **初期 Seed** | ゲーム起動時に決定される 16bit の乱数初期値 |
@@ -66,7 +67,7 @@
   - `wait = (frame1 + frame1_offset) / fps`
 - **timer1 (advance)**: 初期 Seed 決定 → あまいかおり実行
   - `wait = effective_advance / (fps × rng_multiplier)`
-  - `effective_advance = target_advance + advance_offset - teachy_advance`
+  - `effective_advance = target_advance + platform_offset + user_offset - teachy_advance`
   - おしえテレビによる高速消費分を差し引いた残りをフィールド待機で消化する
 - **timer_teachy** (オプション): フィールド操作可能 → おしえテレビ終了
   - `teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction) / (teachy_tv_adv_per_frame - rng_multiplier)`
@@ -203,10 +204,11 @@ def skip_opening_and_continue(cmd: Command) -> float:
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
 | `frame1_offset` | `float` | `7.0` | frame1 に加算する微調整オフセット（frame 単位） |
-| `advance_offset` | `int` | `-148` | target_advance に加算するプラットフォーム補正値（advance 単位） |
+| `platform_offset` | `int` | `-148` | プラットフォーム固有の補正値（advance 単位）。Switch = -148 |
+| `user_offset` | `int` | `0` | ユーザー調整用オフセット（advance 単位） |
 | `rng_multiplier` | `int` | `2` | 1 フレームあたりの RNG 消費倍率。Switch = 2 |
 
-> **advance_offset / rng_multiplier の由来**: ゴージャスリゾートマクロと同一。
+> **platform_offset / rng_multiplier の由来**: ゴージャスリゾートマクロと同一。
 > 詳細は [ゴージャスリゾート仕様 §2.2](../frlg_gorgeous_resort/spec.md) を参照。
 
 #### 4.3 おしえテレビ設定
@@ -259,7 +261,7 @@ def skip_opening_and_continue(cmd: Command) -> float:
 `effective_advance` の算出:
 
 ```
-effective_advance = target_advance + advance_offset
+effective_advance = target_advance + platform_offset + user_offset
 if use_teachy_tv:
     teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction)
                   / teachy_tv_adv_per_frame
@@ -281,7 +283,7 @@ teachy_frames = (teachy_tv_consumption - teachy_tv_transition_correction)
 #### Step 0: 初期化
 
 - 設定読み込み (`config.py` の `FrlgWildRngConfig.from_args(args)`)
-- `target_advance` に `advance_offset` を加算し、`rng_multiplier` から実効 fps を算出
+- `target_advance` に `platform_offset` + `user_offset` を加算し、`rng_multiplier` から実効 fps を算出
 - 所要時間の見積もりをログ出力
 
 ```python
@@ -290,7 +292,7 @@ def initialize(self, cmd: Command, args: dict) -> None:
     cfg = self._cfg
 
     self._advance_wait_fps = cfg.fps * cfg.rng_multiplier
-    self._effective_advance = cfg.target_advance + cfg.advance_offset
+    self._effective_advance = cfg.target_advance + cfg.platform_offset + cfg.user_offset
 
     # おしえテレビによる消費分を差し引き、フレーム数を逆算
     if cfg.use_teachy_tv:
@@ -317,7 +319,7 @@ def initialize(self, cmd: Command, args: dict) -> None:
 |------|--------|-----|
 | ゲーム再起動 | `_OVERHEAD_RESTART` 固定 | ≈ 4.35s |
 | frame1 タイマー | `(frame1 + frame1_offset) / fps` | ≈ 39.1s |
-| advance タイマー | `(target_advance + advance_offset) / (fps × rng_multiplier)` | ≈ 7.8s |
+| advance タイマー | `(target_advance + platform_offset + user_offset) / (fps × rng_multiplier)` | ≈ 7.8s |
 | OP〜エンカウント操作 | `_OVERHEAD_POST` 固定 | ≈ 15s |
 | **合計** | | **≈ 66s** |
 
@@ -478,7 +480,8 @@ class FrlgWildRngConfig:
     target_advance: int = 2049
     fps: float = 60.0
     frame1_offset: float = 7.0
-    advance_offset: int = -148
+    platform_offset: int = -148
+    user_offset: int = 0
     rng_multiplier: int = 2
     use_teachy_tv: bool = False
     teachy_tv_consumption: int = 0
@@ -501,7 +504,7 @@ class FrlgWildRngConfig:
 | ユニット | `test_teachy_tv_advance_calculation` | おしえテレビのフレーム逆算が正しいこと |
 | ユニット | `test_effective_advance_with_teachy_tv` | おしえテレビありの effective_advance が正しく差し引かれること |
 | ユニット | `test_timer_wait_calculation` | `(frame1 + frame1_offset) / fps` の算出が正しいこと |
-| ユニット | `test_advance_wait_calculation` | `(target_advance + advance_offset) / (fps × rng_multiplier)` の算出が正しいこと |
+| ユニット | `test_advance_wait_calculation` | `(target_advance + platform_offset + user_offset) / (fps × rng_multiplier)` の算出が正しいこと |
 | ユニット | `test_restart_game_returns_timer` | `restart_game()` が `float` を返し `start_timer()` 相当の時刻であること |
 | ユニット | `test_skip_opening_returns_timer` | `skip_opening_and_continue()` が `float` を返し `start_timer()` 相当の時刻であること |
 | 実機 | `test_wild_rng_no_teachy_tv` | おしえテレビなしでエンカウントまでの操作が正常に動作すること |

@@ -20,7 +20,8 @@ class FrlgWildRngConfig:
 
     # === フレーム・RNG 補正 ===
     frame1_offset: float = 7.0
-    advance_offset: int = -148
+    platform_offset: int = -148
+    user_offset: int = 0
     rng_multiplier: int = 2
 
     # === おしえテレビ設定 ===
@@ -41,7 +42,8 @@ class FrlgWildRngConfig:
 
         # フレーム・RNG 補正
         cfg.frame1_offset = float(args.get("frame1_offset", cfg.frame1_offset))
-        cfg.advance_offset = int(args.get("advance_offset", cfg.advance_offset))
+        cfg.platform_offset = int(args.get("platform_offset", cfg.platform_offset))
+        cfg.user_offset = int(args.get("user_offset", cfg.user_offset))
         cfg.rng_multiplier = int(args.get("rng_multiplier", cfg.rng_multiplier))
 
         # おしえテレビ設定
