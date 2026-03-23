@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from macros.shared.timer import consume_timer, start_timer
+from macros.shared.frlg_opening import skip_opening_and_continue
+from macros.shared.game_restart import restart_game
+from macros.shared.timer import consume_timer
 from nyxpy.framework.core.constants import Button, LStick
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
@@ -124,22 +126,22 @@ class FrlgGorgeousResortMacro(MacroBase):
             cmd.log(f"--- ループ {i} ---", level="INFO")
 
             # Step 1: ゲーム再起動
-            self._restart_game(cmd)
+            t0 = restart_game(cmd)
 
             # Step 2: frame1 タイマー消化
             consume_timer(
                 cmd,
-                self._t1,
+                t0,
                 cfg.frame1 + cfg.frame1_offset,
                 cfg.fps,
             )
 
             # Step 3: OP送り → つづきから → 回想スキップ → アキホに話しかける
-            t2 = start_timer()
-            self._navigate_to_akiho(cmd)
+            t1 = skip_opening_and_continue(cmd)
+            self._talk_to_akiho(cmd)
 
             # Step 4: advance タイマー消化
-            consume_timer(cmd, t2, self._effective_advance, self._advance_wait_fps)
+            consume_timer(cmd, t1, self._effective_advance, self._advance_wait_fps)
 
             # Step 5: テキスト送り（ポケモン名表示）
             cmd.press(Button.B, dur=0.10, wait=0.70)
@@ -173,28 +175,11 @@ class FrlgGorgeousResortMacro(MacroBase):
         )
 
     # --------------------------------------------------------
-    # Step 1: ゲーム再起動
+    # Step 3: アキホに話しかける
     # --------------------------------------------------------
 
-    def _restart_game(self, cmd: Command) -> None:
-        """HOME メニュー経由でゲームを終了→再起動する。"""
-        cmd.press(Button.HOME, dur=0.15, wait=1.00)
-        cmd.press(Button.X, dur=0.20, wait=0.60)
-        cmd.press(Button.A, dur=0.20, wait=1.20)
-        cmd.press(Button.A, dur=0.20, wait=0.80)
-        self._t1 = start_timer()
-        cmd.press(Button.A, dur=0.20)
-
-    # --------------------------------------------------------
-    # Step 3: OP 送り → つづきから → 回想スキップ → アキホに話しかける
-    # --------------------------------------------------------
-
-    def _navigate_to_akiho(self, cmd: Command) -> None:
-        """OP スキップからアキホへの話しかけまでの操作。"""
-        cmd.press(Button.A, dur=3.50, wait=1.00)   # OP を A で飛ばす
-        cmd.press(Button.A, dur=0.20, wait=0.30)   # つづきからはじめる
-        cmd.press(Button.B, dur=1.00, wait=1.80)   # 回想を B で飛ばす
-        # アキホに話しかける（1回目：ポケモン決定処理をトリガー）
+    def _talk_to_akiho(self, cmd: Command) -> None:
+        """アキホへの話しかけ操作（1回目：ポケモン決定処理をトリガー）。"""
         cmd.press(Button.A, dur=0.10, wait=0.70)   # 話しかけ
         cmd.press(Button.B, dur=0.10, wait=0.70)   # テキスト送り
         cmd.press(Button.B, dur=0.10, wait=0.50)   # テキスト送り
