@@ -131,7 +131,7 @@ macros/frlg_wild_rng/
 | `nyxpy.framework` | `MacroBase`, `Command`, `Button`, `LStick` | フレームワーク基盤 |
 | `macros.shared.timer` | `start_timer()`, `consume_timer()` | フレーム精度タイマー |
 | `macros.shared.game_restart` | `restart_game()` | ゲーム再起動（新規共通化） |
-| `macros.shared.frlg_opening` | `skip_opening_and_continue()`, `skip_opening_and_continue_with_frame2()` | FRLG OP スキップ〜回想スキップ（新規共通化） |
+| `macros.shared.frlg_opening` | `skip_opening_and_continue()` | FRLG OP スキップ〜回想スキップ（新規共通化） |
 
 #### ゲーム再起動の共通化
 
@@ -160,40 +160,35 @@ def restart_game(cmd: Command) -> float:
 
 #### OP スキップ〜回想スキップの共通化
 
-OP スキップ → つづきから → 回想スキップの操作シーケンスも `frlg_gorgeous_resort`・`frlg_initial_seed` で共通である。これを `macros/shared/frlg_opening.py` に切り出す。
+OP スキップ → frame2 待機 → つづきから → 回想スキップの操作シーケンスも `frlg_gorgeous_resort`・`frlg_initial_seed` で共通である。これを `macros/shared/frlg_opening.py` に切り出す。
 
 ```python
 # macros/shared/frlg_opening.py
-def skip_opening_and_continue(cmd: Command) -> float:
-    """省略… (従来通り)"""
-    ...
+_FRAME2: float = 300.0  # 初期Seed決定〜つづきからはじめる (5.000s × 60fps)
+_FPS: float = 60.0
 
-def skip_opening_and_continue_with_frame2(
-    cmd: Command,
-    frame2: float,
-    fps: float,
-) -> float:
+def skip_opening_and_continue(cmd: Command) -> float:
     """OP スキップ → frame2 待機 → つづきからはじめる → 回想スキップ。
 
-    初期 Seed 決定から「つづきからはじめる」までの累計時間を frame2/fps 秒に
-    安定させるための待機タイマーを挥む。
+    初期 Seed 決定から「つづきからはじめる」までの累計時間を _FRAME2/_FPS 秒に
+    安定させるための待機タイマーを内部で挟む。
 
     Returns:
         start_timer() による timer1 開始時刻
     """
     t1 = start_timer()
     cmd.press(Button.A, dur=3.50, wait=1.00)   # OP スキップ
-    consume_timer(cmd, t1, frame2, fps)         # frame2 タイマー消化
+    consume_timer(cmd, t1, _FRAME2, _FPS)      # frame2 タイマー消化
     cmd.press(Button.A, dur=0.20, wait=0.30)   # つづきからはじめる
     cmd.press(Button.B, dur=1.00, wait=1.80)   # 回想スキップ
     return t1
 ```
 
-**`skip_opening_and_continue_with_frame2()` の設計**:
+**frame2 タイマーの設計**:
 
-- **frame2 タイマーの目的**: 初期 Seed 決定から「つづきからはじめる」選択までの時間を一定に保つことで、その時点での advance を安定させる
+- **目的**: 初期 Seed 決定から「つづきからはじめる」選択までの時間を一定 (5.000s) に保つことで、その時点での advance を安定させる
 - **timer1 との基準時刻共有**: frame2 タイマーは timer1 の開始時刻 (`t1`) を基準に使用する。別のタイマーを起こす必要はない
-- **従来関数との併存**: `skip_opening_and_continue()` はそのまま残し、他マクロ（ゴージャスリゾート等）が引き続き使用する
+- **値のハードコード**: `_FRAME2 = 300.0` (5.000s × 60fps) と `_FPS = 60.0` は `frlg_opening.py` 内にハードコードする。Switch 固定値のため設定ファイルには公開しない
 - 既存の `frlg_gorgeous_resort`・`frlg_initial_seed` も本関数への移行を推奨する（別タスク）
 
 - 副作用（ボタン入力・待機）は `Command` 経由に集約し、設定値管理は `config.py` に分離する
@@ -368,19 +363,18 @@ consume_timer(cmd, self._t0, cfg.frame1 + cfg.frame1_offset, cfg.fps)
 
 #### Step 3: OP スキップ → frame2 待機 → つづきからはじめる → 回想スキップ
 
-frame1 タイマー消化完了直後に共通ヘルパー `skip_opening_and_continue_with_frame2()` を呼び出す。
+frame1 タイマー消化完了直後に共通ヘルパー `skip_opening_and_continue()` を呼び出す。
 関数内部で timer1（advance タイマー）が開始され、OP スキップ後に frame2 タイマーで
 初期 Seed 決定から 5.000s 経過するまで待機し、その後「つづきからはじめる」を選択する。
+frame2 の値 (300F = 5.000s) は `frlg_opening.py` 内にハードコードされている。
 
 ```python
-from macros.shared.frlg_opening import skip_opening_and_continue_with_frame2
+from macros.shared.frlg_opening import skip_opening_and_continue
 
-_FRAME2: float = 300.0  # 初期Seed決定〜つづきからはじめる (5.000s × 60fps)
-
-t1 = skip_opening_and_continue_with_frame2(cmd, _FRAME2, cfg.fps)  # ★ timer1 開始時刻が返る
+t1 = skip_opening_and_continue(cmd)  # ★ timer1 開始時刻が返る
 ```
 
-`skip_opening_and_continue_with_frame2()` の内部操作:
+`skip_opening_and_continue()` の内部操作:
 
 ```
 ★ timer1 = start_timer()
@@ -393,7 +387,7 @@ B    (dur=1.00, wait=1.80)   # 回想を B で飛ばす
 
 > **frame2 タイマーの目的**: 初期 Seed 決定から「つづきからはじめる」までの時間を一定 (5.000s) に保つことで、
 > その時点での advance を安定させる。OP スキップの dur/wait の微妙な変動を吸収する効果がある。
-> `_FRAME2` はマクロ内定数 (300F = 5.000s) として定義され、設定ファイルには公開しない。
+> `_FRAME2` と `_FPS` は `frlg_opening.py` 内にハードコードされ、設定ファイルには公開しない。
 
 #### Step 4: おしえテレビ（オプション）
 

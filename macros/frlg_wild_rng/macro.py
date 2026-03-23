@@ -10,7 +10,7 @@ Switch (720p) 専用。
 
 from __future__ import annotations
 
-from macros.shared.frlg_opening import skip_opening_and_continue_with_frame2
+from macros.shared.frlg_opening import skip_opening_and_continue
 from macros.shared.game_restart import restart_game
 from macros.shared.timer import consume_timer, start_timer
 from nyxpy.framework.core.constants import Button, LStick
@@ -25,7 +25,6 @@ from .config import FrlgWildRngConfig
 
 _OVERHEAD_RESTART: float = 4.35
 _OVERHEAD_POST: float = 15.0
-_FRAME2: float = 300.0  # 初期Seed決定〜つづきからはじめる (5.000s × 60fps)
 
 
 # ============================================================
@@ -85,7 +84,7 @@ class FrlgWildRngMacro(MacroBase):
         consume_timer(cmd, t0, cfg.frame1 + cfg.frame1_offset, cfg.fps)
 
         # Step 3: OP スキップ → frame2 待機 → つづきからはじめる → 回想スキップ
-        t1 = skip_opening_and_continue_with_frame2(cmd, _FRAME2, cfg.fps)
+        t1 = skip_opening_and_continue(cmd)
 
         # Step 4: おしえテレビ（オプション）
         if cfg.use_teachy_tv:

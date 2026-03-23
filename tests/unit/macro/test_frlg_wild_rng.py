@@ -241,24 +241,3 @@ class TestSkipOpeningReturnsTimer:
         cmd = _make_mock_cmd()
         skip_opening_and_continue(cmd)
         assert cmd.press.call_count == 3
-
-
-class TestSkipOpeningWithFrame2:
-    """skip_opening_and_continue_with_frame2() のテスト"""
-
-    def test_returns_float(self):
-        from shared.frlg_opening import skip_opening_and_continue_with_frame2
-
-        cmd = _make_mock_cmd()
-        result = skip_opening_and_continue_with_frame2(cmd, 300.0, 60.0)
-        assert isinstance(result, float)
-        assert result > 0
-
-    def test_calls_press_three_times(self):
-        from shared.frlg_opening import skip_opening_and_continue_with_frame2
-
-        cmd = _make_mock_cmd()
-        skip_opening_and_continue_with_frame2(cmd, 300.0, 60.0)
-        # A (OP skip) + A (continue) + B (recap skip) = 3 press calls
-        # consume_timer は cmd.wait() を呼ぶが cmd.press ではない
-        assert cmd.press.call_count == 3
