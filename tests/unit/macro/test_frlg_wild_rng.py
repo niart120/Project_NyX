@@ -35,6 +35,7 @@ class TestConfigFromArgsDefaults:
         assert cfg.platform_offset == -148
         assert cfg.user_offset == 0
         assert cfg.rng_multiplier == 2
+        assert cfg.use_odd_correction is False
         assert cfg.use_teachy_tv is False
         assert cfg.teachy_tv_consumption == 0
         assert cfg.teachy_tv_adv_per_frame == 314

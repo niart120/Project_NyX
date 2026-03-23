@@ -92,14 +92,23 @@ class FrlgWildRngMacro(MacroBase):
         # Step 3: OP スキップ → frame2 待機 → つづきからはじめる → 回想スキップ
         t1 = skip_opening_and_continue(cmd)
 
-        # Step 4: おしえテレビ（オプション）
+        # Step 4: 奇数ズレ補正（オプション）
+        if cfg.use_odd_correction:
+            cmd.press(Button.X, dur=0.10, wait=0.50)   # メニュー開く
+            cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
+            cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
+            cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
+            cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
+            cmd.press(Button.B, dur=0.10, wait=0.50)   # メニュー閉じる
+
+        # Step 5: おしえテレビ（オプション）
         if cfg.use_teachy_tv:
             timer_teachy = start_timer()
             cmd.press(Button.Y, dur=0.10, wait=1.00)  # おしえテレビ起動
             consume_timer(cmd, timer_teachy, self._teachy_tv_frames, cfg.fps)
             cmd.press(Button.B, dur=0.10, wait=1.00)  # おしえテレビ終了
 
-        # Step 5: メニュー操作 → あまいかおり選択
+        # Step 6: メニュー操作 → あまいかおり選択
         cmd.press(Button.X, dur=0.10, wait=0.50)  # メニューを開く
         cmd.press(LStick.DOWN, dur=0.10, wait=0.30)  # "ポケモン" にカーソル
         cmd.press(Button.A, dur=0.10, wait=1.00)  # ポケモンメニューを開く
@@ -108,11 +117,11 @@ class FrlgWildRngMacro(MacroBase):
         cmd.press(Button.A, dur=0.10, wait=0.30)  # コンテキストメニューを開く
         cmd.press(LStick.DOWN, dur=0.10, wait=0.20)  # "あまいかおり" にカーソル
 
-        # Step 6: timer1 消化 → あまいかおり実行
+        # Step 7: timer1 消化 → あまいかおり実行
         consume_timer(cmd, t1, self._effective_advance, self._advance_wait_fps)
         cmd.press(Button.A, dur=0.10)  # あまいかおり実行
 
-        # Step 7: マクロ終了
+        # Step 8: マクロ終了
         cmd.log("あまいかおり実行完了 — エンカウント待ち", level="INFO")
 
     def finalize(self, cmd: Command) -> None:

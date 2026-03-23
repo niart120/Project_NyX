@@ -24,6 +24,9 @@ class FrlgWildRngConfig:
     user_offset: int = 0
     rng_multiplier: int = 2
 
+    # === 奇数ズレ補正 ===
+    use_odd_correction: bool = False
+
     # === おしえテレビ設定 ===
     use_teachy_tv: bool = False
     teachy_tv_consumption: int = 0
@@ -45,6 +48,9 @@ class FrlgWildRngConfig:
         cfg.platform_offset = int(args.get("platform_offset", cfg.platform_offset))
         cfg.user_offset = int(args.get("user_offset", cfg.user_offset))
         cfg.rng_multiplier = int(args.get("rng_multiplier", cfg.rng_multiplier))
+
+        # 奇数ズレ補正
+        cfg.use_odd_correction = bool(args.get("use_odd_correction", cfg.use_odd_correction))
 
         # おしえテレビ設定
         cfg.use_teachy_tv = bool(args.get("use_teachy_tv", cfg.use_teachy_tv))
