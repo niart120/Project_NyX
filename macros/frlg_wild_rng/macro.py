@@ -52,13 +52,9 @@ class FrlgWildRngMacro(MacroBase):
         # おしえテレビによる消費分を差し引く
         if cfg.use_teachy_tv:
             self._teachy_tv_frames = (
-                cfg.teachy_tv_consumption
-                - cfg.teachy_tv_transition_correction
+                cfg.teachy_tv_consumption - cfg.teachy_tv_transition_correction
             ) / cfg.teachy_tv_adv_per_frame
-            teachy_excess = (
-                cfg.teachy_tv_consumption
-                - cfg.rng_multiplier * self._teachy_tv_frames
-            )
+            teachy_excess = cfg.teachy_tv_consumption - cfg.rng_multiplier * self._teachy_tv_frames
             self._effective_advance -= teachy_excess
             cmd.log(
                 f"おしえテレビ: "
@@ -66,6 +62,16 @@ class FrlgWildRngMacro(MacroBase):
                 f"換算フレーム {self._teachy_tv_frames:.1f}F "
                 f"(correction {cfg.teachy_tv_transition_correction})",
                 level="INFO",
+            )
+
+        # バリデーション: effective_advance が負の場合は設定ミス
+        if self._effective_advance < 0:
+            raise ValueError(
+                f"effective_advance が負の値です ({self._effective_advance:.0f})。"
+                f"teachy_tv_consumption ({cfg.teachy_tv_consumption}) が "
+                f"target_advance 補正後の値 "
+                f"({cfg.target_advance + cfg.platform_offset + cfg.user_offset}) を "
+                f"超過しています。設定を見直してください。"
             )
 
         # 見積り
@@ -94,13 +100,13 @@ class FrlgWildRngMacro(MacroBase):
             cmd.press(Button.B, dur=0.10, wait=1.00)  # おしえテレビ終了
 
         # Step 5: メニュー操作 → あまいかおり選択
-        cmd.press(Button.X, dur=0.10, wait=0.50)       # メニューを開く
-        cmd.press(LStick.DOWN, dur=0.10, wait=0.30)    # "ポケモン" にカーソル
-        cmd.press(Button.A, dur=0.10, wait=1.00)       # ポケモンメニューを開く
-        cmd.press(LStick.UP, dur=0.10, wait=0.20)      # カーソル上移動
-        cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 最下段にカーソル
-        cmd.press(Button.A, dur=0.10, wait=0.30)       # コンテキストメニューを開く
-        cmd.press(LStick.DOWN, dur=0.10, wait=0.20)    # "あまいかおり" にカーソル
+        cmd.press(Button.X, dur=0.10, wait=0.50)  # メニューを開く
+        cmd.press(LStick.DOWN, dur=0.10, wait=0.30)  # "ポケモン" にカーソル
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # ポケモンメニューを開く
+        cmd.press(LStick.UP, dur=0.10, wait=0.20)  # カーソル上移動
+        cmd.press(LStick.UP, dur=0.10, wait=0.20)  # 最下段にカーソル
+        cmd.press(Button.A, dur=0.10, wait=0.30)  # コンテキストメニューを開く
+        cmd.press(LStick.DOWN, dur=0.10, wait=0.20)  # "あまいかおり" にカーソル
 
         # Step 6: timer1 消化 → あまいかおり実行
         consume_timer(cmd, t1, self._effective_advance, self._advance_wait_fps)

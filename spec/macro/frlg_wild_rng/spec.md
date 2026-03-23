@@ -257,6 +257,10 @@ def skip_opening_and_continue(cmd: Command) -> float:
 >
 > `target_advance` には外部ツールの値をそのまま入力すればよく、
 > おしえテレビの ON/OFF 切替時に変更する必要はない。
+>
+> **制約**: `teachy_tv_consumption` は `effective_advance`（= `target_advance + platform_offset + user_offset`）を
+> 超えてはならない。超えた場合、おしえテレビだけで目標 advance を超過し timer1 が成立しないため、
+> マクロは `ValueError` を送出して停止する。
 
 #### 待機時間の導出式
 
@@ -313,6 +317,16 @@ def initialize(self, cmd: Command, args: dict) -> None:
             - cfg.rng_multiplier * self._teachy_tv_frames
         )
         self._effective_advance -= teachy_excess
+
+    # バリデーション: effective_advance が負の場合は設定ミス
+    if self._effective_advance < 0:
+        raise ValueError(
+            f"effective_advance が負の値です ({self._effective_advance:.0f})。"
+            f"teachy_tv_consumption ({cfg.teachy_tv_consumption}) が "
+            f"target_advance 補正後の値 "
+            f"({cfg.target_advance + cfg.platform_offset + cfg.user_offset}) を "
+            f"超過しています。設定を見直してください。"
+        )
 
     # 見積り
     t_frame1 = (cfg.frame1 + cfg.frame1_offset) / cfg.fps
@@ -520,6 +534,7 @@ class FrlgWildRngConfig:
 | ユニット | `test_effective_advance_with_teachy_tv` | おしえテレビありの effective_advance が正しく差し引かれること |
 | ユニット | `test_timer_wait_calculation` | `(frame1 + frame1_offset) / fps` の算出が正しいこと |
 | ユニット | `test_advance_wait_calculation` | `(target_advance + platform_offset + user_offset) / (fps × rng_multiplier)` の算出が正しいこと |
+| ユニット | `test_effective_advance_negative_raises` | `teachy_tv_consumption` 超過で `effective_advance < 0` のとき `ValueError` が送出されること |
 | ユニット | `test_restart_game_returns_timer` | `restart_game()` が `float` を返し `start_timer()` 相当の時刻であること |
 | ユニット | `test_skip_opening_returns_timer` | `skip_opening_and_continue()` が `float` を返し `start_timer()` 相当の時刻であること |
 | 実機 | `test_wild_rng_no_teachy_tv` | おしえテレビなしでエンカウントまでの操作が正常に動作すること |
