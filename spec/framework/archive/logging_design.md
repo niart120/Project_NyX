@@ -1,8 +1,8 @@
 # ログ管理設計詳細
 
-このドキュメントでは、Project NyX におけるログ管理機能の設計方針と実装状況について説明します。
+このドキュメントでは、Project NyX におけるログ管理機能の設計方針と実装状況について説明します。旧 `docs` から移設したアーカイブであり、現行コードでは `src/nyxpy/framework/core/logger/log_manager.py` が正本です。
 
-**実装状況: ✅ LogManager は実装済み (`src/nyxpy/framework/core/logger/log_manager.py`)**
+**実装状況: LogManager は実装済み (`src/nyxpy/framework/core/logger/log_manager.py`)**
 
 ---
 
@@ -94,8 +94,8 @@
 
 ### 3.3 ログのフォーマット
 - **標準フォーマット:**  
-  `[タイムスタンプ] [ログレベル] [コンポーネント名] メッセージ`  
-  例: `[2025-01-01 12:00:00] [INFO] [MacroExecutor] マクロの初期化を開始`
+  `YYYY-MM-DD HH:mm:ss.SSS | LEVEL - [component] message`  
+  例: `2025-01-01 12:00:00.000 | INFO - [MacroExecutor] マクロの初期化を開始`
 
 ### 3.4 ログのモジュール化
 - ログ管理は専用の `LogManager` クラスで一元管理します。
@@ -105,7 +105,7 @@
 
 ## 4. 実装状況
 
-### 4.1 LogManager クラス ✅ **実装済み**
+### 4.1 LogManager クラス（実装済み）
 - **責務:**  
   ログの出力先やフォーマット、ログレベルの設定を管理。
 - **実装場所:** `src/nyxpy/framework/core/logger/log_manager.py`
@@ -114,7 +114,9 @@
   - `set_level(level)`: 全てのハンドラのログレベルを設定
   - `set_console_level(level)`: コンソール出力のみのログレベルを設定
   - `set_file_level(level)`: ファイル出力のみのログレベルを設定
-  - `add_custom_handler(handler)`: カスタムハンドラーを追加
+  - `add_handler(handler, level)`: カスタムハンドラーを追加
+  - `set_custom_handler_level(handler, level)`: 指定カスタムハンドラーのログレベルを変更
+  - `remove_handler(handler)`: カスタムハンドラーを削除
 
 **実装詳細:**
 - Loguru ライブラリを使用
@@ -122,12 +124,12 @@
 - ログファイルは `logs/logfile.log` に保存、1MBでローテーション
 - カスタムハンドラーの動的追加サポート
 
-### 4.2 ログの統合 ✅ **実装済み**
+### 4.2 ログの統合（実装済み）
 - **CLI:** `cli_main` 関数でログレベル設定と統合
-- **フレームワーク:** `singletons.py` でシングルトンとして管理
+- **フレームワーク:** `log_manager.py` でグローバルインスタンス `log_manager` として管理
 - **マクロ:** Command インターフェースを通してアクセス可能
 
-### 4.3 ユーザー通知ログの分離 ✅ **実装済み**
+### 4.3 ユーザー通知ログの分離（実装済み）
 - 外部通知システム (`NotificationHandler`) が実装済み
 - Discord, Bluesky 通知をサポート
 - 通知設定は `SecretsSettings` で管理
@@ -136,11 +138,11 @@
 
 ## 5. 将来的な拡張
 
-- **GUIとの連携:** ✅ **実装済み**  
+- **GUIとの連携:** 実装済み  
   ログをリアルタイムでGUIに表示する機能が実装済み
-- **外部通知システム:** ✅ **実装済み**  
+- **外部通知システム:** 実装済み  
   Discord, Bluesky への通知機能が実装済み
-- **ログのフィルタリング:** 🔄 **部分実装**  
+- **ログのフィルタリング:** 部分実装  
   コンソール/ファイル別のログレベル設定が可能、GUI でのフィルタリングは今後の検討課題
 
 ---

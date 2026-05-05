@@ -182,7 +182,7 @@ class SampleMacro(MacroBase):
 - `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
 - カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
 
-詳細は `docs/macro_design.md` を参照ください。
+詳細は `spec/framework/archive/macro_design.md` を参照ください。
 
 ## 5. 設定ファイル
 
@@ -245,4 +245,4 @@ class SampleMacro(MacroBase):
 - バグ報告や機能リクエストは GitHub Issues にお願いします
 - コントリビューションは Pull Request で受け付けています
 
-開発者向けの詳細なドキュメントは `docs/` ディレクトリを参照してください。
+開発者向けの旧設計ドキュメントは `spec/framework/archive/` に移設しています。現行仕様を確認する場合は `src/nyxpy/` 配下の実装を正としてください。
