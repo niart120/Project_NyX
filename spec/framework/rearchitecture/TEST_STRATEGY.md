@@ -16,7 +16,7 @@
 | 用語 | 定義 |
 |------|------|
 | import 互換テスト | 既存マクロが利用する import path が削除・移動されていないことを検証するテスト |
-| signature 互換テスト | `MacroBase` lifecycle、`Command` API、`MacroExecutor` API の呼び出しシグネチャを検証するテスト |
+| signature 互換テスト | `MacroBase` lifecycle、`Command` API の呼び出しシグネチャを検証するテスト。`MacroExecutor` は既存マクロ互換 API ではなく、残す場合だけ legacy adapter gate で検証する |
 | 既存マクロ fixture | リポジトリ内の代表マクロ、または同等構造を `tmp_path` に複製した互換検証用 fixture |
 | MacroRegistry | マクロ発見、識別、ロード診断、descriptor 一覧を担当するコンポーネント |
 | MacroFactory | 実行ごとに新しい `MacroBase` インスタンスを生成するコンポーネント |
@@ -97,7 +97,7 @@ import/signature 互換テストは最初の保護線である。次の import p
 | `nyxpy.framework.core.macro.base.MacroBase` | import でき、`initialize(self, cmd, args)`, `run(self, cmd)`, `finalize(self, cmd)` を持つ |
 | `nyxpy.framework.core.macro.command.Command` | 既存 `press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `save_img`, `load_img`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` を持つ |
 | `nyxpy.framework.core.macro.command.DefaultCommand` | import path を維持し、既存コンストラクタ互換を持つ |
-| `nyxpy.framework.core.macro.executor.MacroExecutor` | `reload_macros()`, `set_active_macro()`, `execute(cmd, exec_args={})`, `macros`, `macro` を維持 |
+| `nyxpy.framework.core.macro.executor.MacroExecutor` | 既存マクロ互換 API ではない。旧 GUI/CLI/テスト入口として残す場合だけ `reload_macros()`, `set_active_macro()`, `execute(cmd, exec_args={})`, `macros`, `macro` を一時 adapter gate で検証 |
 | `nyxpy.framework.core.constants` | `Button`, `Hat`, `LStick`, `RStick`, `KeyType` を import できる |
 
 ### 後方互換性

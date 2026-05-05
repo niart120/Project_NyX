@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\hardware\`
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。
-> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`
+> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `RESOURCE_FILE_IO.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\api\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
 > **破壊的変更**: なし。既存マクロが参照する import path と `Command` API は維持する。
 
@@ -30,7 +30,9 @@
 | RunResult | マクロ実行の終了状態、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を表す値オブジェクト |
 | ControllerOutputPort | ボタン、スティック、キーボード入力をコントローラー出力へ送る基本 Port。touch と sleep は optional capability に分離する |
 | FrameSourcePort | キャプチャデバイスまたはテスト用フレームソースから最新フレームを取得する Port |
-| ResourceStorePort | static 配下の画像保存・読み込みを行い、パス検証と書き込み結果検証を担当する Port。settings TOML 解決は担当しない |
+| ResourceStorePort | Resource File I/O の assets 読み込みを行う Port。詳細は `RESOURCE_FILE_IO.md` を正とし、settings TOML 解決は担当しない |
+| RunArtifactStore | Resource File I/O の writable outputs 保存を行う Port。実行 ID ごとの成果物 root、atomic write、overwrite policy を担当する |
+| MacroResourceScope | 1 つのマクロ ID に紐づく assets root、macro root、legacy static root を表す値 |
 | MacroSettingsResolver | `static/<macro_name>/settings.toml` 互換と manifest settings path を解決する専用コンポーネント |
 | NotificationPort | Discord / Bluesky などの外部通知へ発行する Port |
 | LoggerPort | loguru ベースの `LogManager` またはテスト用ロガーへログを出力する Port |
@@ -51,8 +53,8 @@
 | dummy fallback | `SerialManager.get_active_device()` と `CaptureManager.get_active_device()` が未選択時にダミーデバイスを自動選択する | 設定誤りや実機未接続を成功扱いし、CLI/GUI 上で失敗原因が見えない |
 | async detection race | `auto_register_devices()` がバックグラウンド検出を開始し、CLI は直後に `list_devices()` を参照する | 検出完了前に「デバイスなし」と判定する競合が起きる |
 | frame readiness | `AsyncCaptureDevice.initialize()` はスレッド開始直後に戻り、`get_frame()` は初回フレーム未取得時に例外を投げる | 実行直後の `cmd.capture()` がデバイス初期化成功後でも失敗する |
-| resource path escape | `StaticResourceIO.save_image()` / `load_image()` は `root / filename` 後の解決済みパス検証を行わない | `..` や絶対パスで static root 外へアクセスできる余地がある |
-| `cv2.imwrite` return | `StaticResourceIO.save_image()` が `cv2.imwrite()` の戻り値を検証しない | 書き込み失敗が成功扱いになり、後続の load で原因が遅れて表面化する |
+| resource path escape | `StaticResourceIO.save_image()` / `load_image()` は `root / filename` 後の解決済みパス検証を行わない | `RESOURCE_FILE_IO.md` の path guard で root 外アクセスを拒否する必要がある |
+| `cv2.imwrite` return | `StaticResourceIO.save_image()` が `cv2.imwrite()` の戻り値を検証しない | `RESOURCE_FILE_IO.md` の write policy で保存失敗を即時例外化する必要がある |
 | GUI/CLI 重複構築 | `run_cli.py` と `main_window.py` が個別に `DefaultCommand` を構築する | 設定反映、通知、キャンセル、リソース解放の仕様が二重管理になる |
 | cancellation latency | `DefaultCommand.wait()` が `time.sleep()` を直接呼ぶ | 長い待機中にキャンセル要求へ即応できない |
 | logging boundary | `DefaultCommand.log()` がグローバル `log_manager` に直接依存する | テスト時のログ検証と GUI/CLI ごとのログ出力差し替えが難しい |
@@ -66,8 +68,8 @@
 | 暗黙 dummy fallback | 未選択時に自動有効化 | 本番実行では禁止。`allow_dummy=True` の明示時のみ使用 |
 | デバイス検出完了待ち | 呼び出し側で保証なし | `detect(timeout_sec)` が完了、タイムアウト、失敗を明示的に返す |
 | 初回 frame readiness | `get_frame()` 呼び出し時に偶発的に判明 | Runtime 起動前に `FrameSourcePort.await_ready()` で検証 |
-| static root 外アクセス | 保存・読み込み先の最終パス検証なし | `resolve_resource_path()` で root 配下のみ許可 |
-| 画像書き込み失敗検出 | `cv2.imwrite()` 失敗を無視 | `ResourceWriteError` を即時送出 |
+| static root 外アクセス | 保存・読み込み先の最終パス検証なし | `RESOURCE_FILE_IO.md` の path guard で root 配下のみ許可 |
+| 画像書き込み失敗検出 | `cv2.imwrite()` 失敗を無視 | `RESOURCE_FILE_IO.md` の atomic write と `ResourceWriteError` で即時検出 |
 | 既存マクロ import 互換 | `Command` / `DefaultCommand` を直接 import 可能 | 同じ import path を維持 |
 | キャンセル応答 | `wait()` 指定秒数まで遅延 | 50 ms 以下の周期で `CancellationToken` を確認 |
 
@@ -92,7 +94,7 @@
 | `src\nyxpy\framework\core\runtime\runtime.py` | 新規 | `MacroRuntime` の同期・非同期実行を実装 |
 | `src\nyxpy\framework\core\runtime\builder.py` | 新規 | GUI/CLI 設定から Runtime と Ports を組み立てる。通知設定は `SecretsSettings` から読む |
 | `src\nyxpy\framework\core\io\__init__.py` | 新規 | Port インターフェースと標準実装の再 export |
-| `src\nyxpy\framework\core\io\ports.py` | 新規 | `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `NotificationPort`, `LoggerPort` を定義 |
+| `src\nyxpy\framework\core\io\ports.py` | 新規 | `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` を定義 |
 | `src\nyxpy\framework\core\io\controller.py` | 新規 | `SerialControllerOutputPort`, `DummyControllerOutputPort` を実装 |
 | `src\nyxpy\framework\core\io\frame_source.py` | 新規 | `CaptureFrameSourcePort`, `DummyFrameSourcePort`, frame readiness を実装 |
 | `src\nyxpy\framework\core\io\resource_store.py` | 新規 | 安全な static root 解決と画像 I/O を実装。settings TOML 解決は扱わない |
@@ -102,7 +104,7 @@
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `CommandFacade` を追加し、`DefaultCommand` を互換ラッパーとして Ports 利用へ移行 |
 | `src\nyxpy\framework\core\hardware\serial_comm.py` | 変更 | 既存 API は維持し、Runtime 経路では暗黙 dummy fallback を使わない。明示的な検出完了待ち API を追加 |
 | `src\nyxpy\framework\core\hardware\capture.py` | 変更 | 既存 API は維持し、Runtime 経路で使う検出完了待ち、frame readiness、release join timeout を追加 |
-| `src\nyxpy\framework\core\hardware\resource.py` | 変更 | `StaticResourceIO` を `ResourceStorePort` adapter へ移行、パス検証と `cv2.imwrite` 戻り値検証を追加 |
+| `src\nyxpy\framework\core\hardware\resource.py` | 変更 | `StaticResourceIO` を Resource File I/O の legacy adapter へ移行 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | `NotificationPort` adapter から使える失敗ログ方針を整理 |
 | `src\nyxpy\framework\core\singletons.py` | 変更 | Runtime/Port 関連シングルトンが必要な場合のみ登録し、`reset_for_testing()` で初期化 |
 | `src\nyxpy\cli\run_cli.py` | 変更 | CLI 固有の組み立てを `MacroRuntimeBuilder` 呼び出しへ置換 |
@@ -131,7 +133,7 @@ MacroRegistry / MacroFactory / MacroRunner
     ↓
 CommandFacade implements Command
     ↓
-ControllerOutputPort / FrameSourcePort / ResourceStorePort / NotificationPort / LoggerPort
+ControllerOutputPort / FrameSourcePort / ResourceStorePort / RunArtifactStore / NotificationPort / LoggerPort
     ↓
 SerialComm / AsyncCaptureDevice / static resources / NotificationHandler / LogManager
 ```
@@ -197,7 +199,7 @@ SerialComm / AsyncCaptureDevice / static resources / NotificationHandler / LogMa
 - `ExecutionContext` は実行中に差し替えない。不変データとして扱い、Port の内部状態だけが同期対象になる。
 - `ControllerOutputPort` は `threading.Lock` で送信順序を直列化する。GUI の仮想コントローラーとマクロが同一 serial device を共有する場合も bytes の interleave を防ぐ。
 - `FrameSourcePort` は最新フレームの参照更新とコピーを lock で保護する。返却値は呼び出し側が破壊しても内部キャッシュに影響しない copy とする。
-- `ResourceStorePort` はパス解決を stateless に行う。保存時のディレクトリ作成と書き込みは同一 root 内に限定し、同一ファイルへの同時書き込みは呼び出し側の責務ではなく Port の per-path lock で保護する。
+- `ResourceStorePort` は assets 読み込みのパス解決を stateless に行う。outputs 保存時のディレクトリ作成、atomic write、同一ファイルへの同時書き込みは `RunArtifactStore` が per-path lock で保護する。
 - `NotificationPort` は通知先ごとの例外を握りつぶさず `LoggerPort` に警告として記録する。Runtime の成功・失敗判定は通知失敗で変更しない。
 - `LoggerPort` は `LogManager` の thread-safe 性に委譲する。テスト用実装は list への追記を lock で保護する。
 
@@ -215,7 +217,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
-from typing import Any, Protocol
+from typing import Any, BinaryIO, Protocol
 
 import cv2
 
@@ -250,6 +252,7 @@ class ExecutionContext:
     controller: ControllerOutputPort
     frame_source: FrameSourcePort
     resources: ResourceStorePort
+    artifacts: RunArtifactStore
     notifications: NotificationPort
     logger: LoggerPort
     options: RuntimeOptions = field(default_factory=RuntimeOptions)
@@ -328,6 +331,7 @@ class MacroRuntime:
         controller: ControllerOutputPort,
         frame_source: FrameSourcePort,
         resources: ResourceStorePort,
+        artifacts: RunArtifactStore,
         notifications: NotificationPort,
         logger: LoggerPort,
         options: RuntimeOptions | None = None,
@@ -402,13 +406,20 @@ class FrameSourcePort(ABC):
 
 class ResourceStorePort(ABC):
     @abstractmethod
-    def resolve_resource_path(self, filename: str | Path) -> Path: ...
-
-    @abstractmethod
-    def save_image(self, filename: str | Path, image: cv2.typing.MatLike) -> None: ...
+    def resolve_asset_path(self, filename: str | Path) -> Path: ...
 
     @abstractmethod
     def load_image(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
+
+    def close(self) -> None: ...
+
+
+class RunArtifactStore(ABC):
+    @abstractmethod
+    def save_image(self, filename: str | Path, image: cv2.typing.MatLike) -> Path: ...
+
+    @abstractmethod
+    def open_output(self, filename: str | Path, mode: str = "xb") -> BinaryIO: ...
 
     def close(self) -> None: ...
 
@@ -457,6 +468,7 @@ class DefaultCommand(CommandFacade):
         serial_device: SerialCommInterface | None = None,
         capture_device: CaptureDeviceInterface | None = None,
         resource_io: StaticResourceIO | ResourceStorePort | None = None,
+        artifact_store: RunArtifactStore | None = None,
         protocol: SerialProtocolInterface | None = None,
         ct: CancellationToken | None = None,
         notification_handler: NotificationHandler | NotificationPort | None = None,
@@ -514,8 +526,8 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `wait(wait)` | `CancellationToken` aware wait | 50 ms 以下で停止確認 |
 | `stop()` | `cancellation_token.request_stop()` | `MacroStopException` を送出 |
 | `capture(crop_region, grayscale)` | `frame_source.latest_frame()` | 1280x720 resize、crop、grayscale は CommandFacade で互換維持 |
-| `save_img()` | `resources.save_image()` | 失敗時は例外 |
-| `load_img()` | `resources.load_image()` | `None` 読み込みは例外 |
+| `save_img()` | `artifacts.save_image()` | outputs 保存。詳細な保存先と overwrite policy は `RESOURCE_FILE_IO.md` |
+| `load_img()` | `resources.load_image()` | assets 読み込み。探索順序は `RESOURCE_FILE_IO.md` |
 | `keyboard()` / `type()` | `controller.keyboard()` / `controller.type_key()` | `type(key: str | KeyCode | SpecialKeyCode)` を受け、テキスト検証は互換維持 |
 | `notify()` | `notifications.publish()` | 通知失敗はログ化し、マクロ失敗にしない |
 | `log()` | `logger.log()` | component は既存同様 caller class 名を既定にする |
@@ -535,21 +547,11 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 `DummyFrameSourcePort` はテストと明示 dummy 実行用であり、黒画面または指定 frame を即時 ready とする。
 
-#### ResourceStorePort
+#### ResourceStorePort / RunArtifactStore
 
-`StaticResourceStorePort` は画像保存・読み込みだけを担当する。`static/<macro_name>/settings.toml` 互換と manifest settings path は `MacroSettingsResolver` が担当し、設定解決と画像リソース保存先を混同しない。
+`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。`static/<macro_name>/settings.toml` 互換と manifest settings path は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
-`MacroSettingsResolver` は manifest `settings` を次のように解決する。`static/...` のような通常パスは `project_root` 相対、`./settings.toml` のように `./` で始まるパスは manifest を置いた macro root 相対である。絶対パスと `..` による root 外参照は拒否する。legacy fallback は `project_root/static/<macro_name>/settings.toml` を優先し、`cwd` fallback は非推奨警告付きで残す。
-
-`StaticResourceStorePort` は root を `Path.cwd() / "static"` またはマクロ固有 static root として受け取る。`resolve_resource_path()` は次を満たす場合だけパスを返す。
-
-1. `filename` が空でない。
-2. `filename` が `str | Path` である。
-3. `filename` が絶対パスでない。
-4. `(root / filename).resolve()` が `root.resolve()` 配下である。
-5. 保存時、親ディレクトリ作成後も解決済み親ディレクトリが root 配下である。
-
-`cv2.imwrite(str(path), image)` が `False` を返した場合は `ResourceWriteError` を送出する。
+標準配置、legacy static 互換、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`CommandFacade.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
 
 #### NotificationPort
 
@@ -621,7 +623,9 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | `serial_protocol` | `str` | `"CH552"` | `ProtocolFactory` で解決する serial protocol 名 |
 | `serial_baud` | `int | None` | `None` | 明示 baudrate。`None` は protocol 既定値 |
 | `capture_device` | `str` | `""` | GUI/CLI で選択する capture device 名 |
-| `static_root` | `Path | None` | `Path.cwd() / "static"` | `ResourceStorePort` の root |
+| `resource.assets_root` | `Path | None` | `project_root / "resources"` | `ResourceStorePort` の assets root。詳細は `RESOURCE_FILE_IO.md` |
+| `resource.runs_root` | `Path | None` | `project_root / "runs"` | `RunArtifactStore` の outputs root。詳細は `RESOURCE_FILE_IO.md` |
+| `resource.legacy_static_root` | `Path | None` | `project_root / "static"` | legacy static 互換 root。settings lookup には使わない |
 | `notification.discord.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
 | `notification.bluesky.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
 
@@ -635,9 +639,9 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | `DummyDeviceNotAllowedError` | `allow_dummy=False` で dummy device を選択しようとした |
 | `FrameNotReadyError` | `FrameSourcePort.await_ready()` が timeout、または ready 前に `latest_frame()` が呼ばれた |
 | `FrameReadError` | capture device が `None` frame または空 frame を返した |
-| `ResourcePathError` | static root 外、絶対パス、空 filename、不正型の resource path が指定された |
-| `ResourceWriteError` | `cv2.imwrite()` が `False` を返す、または保存後にファイルが存在しない |
-| `ResourceReadError` | `cv2.imread()` が `None` を返す |
+| `ResourcePathError` | Resource File I/O の許可 root 外、絶対パス、空 filename、不正型の path が指定された。詳細は `RESOURCE_FILE_IO.md` |
+| `ResourceWriteError` | Resource File I/O の保存、atomic replace、OpenCV 書き込み検証に失敗した。詳細は `RESOURCE_FILE_IO.md` |
+| `ResourceReadError` | Resource File I/O の assets 読み込みに失敗した。詳細は `RESOURCE_FILE_IO.md` |
 | `ControllerOutputError` | serial send に失敗した |
 | `MacroStopException` | `CommandFacade.stop()` またはキャンセル検知時に送出され、Runtime では `RunStatus.CANCELLED` に変換 |
 
@@ -656,8 +660,8 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | dummy fallback | `get_active_device()` の暗黙 dummy 選択を Runtime builder から使わない。互換 API として残す場合も warning を出し、新 Runtime 経路では `allow_dummy` を必須判定にする |
 | async detection race | `SerialManager.detect(timeout)` / `CaptureManager.detect(timeout)` または builder 内の `DeviceDiscoveryResult` により完了を待つ。CLI は完了前の `list_devices()` を見ない |
 | frame readiness | `FrameSourcePort.initialize()` 後、`await_ready()` が成功するまで Runtime 実行を開始しない。GUI preview は ready 前に placeholder を表示する |
-| resource path escape | `ResourceStorePort.resolve_resource_path()` が root と最終 path の `resolve()` 結果を比較する。絶対 filename と root 外 symlink を拒否する |
-| `cv2.imwrite` return | `False` の場合に `ResourceWriteError`。保存後に `path.exists()` が false の場合も同じ例外 |
+| resource path escape | `RESOURCE_FILE_IO.md` の `ResourcePathGuard` が root と最終 path の `resolve()` 結果を比較する。絶対 filename と root 外 symlink を拒否する |
+| `cv2.imwrite` return | `RESOURCE_FILE_IO.md` の atomic write 仕様に従い、`False`、保存後未存在、replace 失敗を `ResourceWriteError` にする |
 | GUI/CLI 重複構築 | `MacroRuntimeBuilder` に protocol、serial、capture、resource、notification、logger の組み立てを集約する |
 | CLI notification settings | Runtime builder が `SecretsSettings` から `NotificationPort` を構築する。CLI 独自設定や `GlobalSettings` 由来の secret 値は持たない |
 
@@ -676,9 +680,9 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | ユニット | `test_controller_output_port_serializes_send_operations` | 複数スレッド送信で serial bytes が interleave しない |
 | ユニット | `test_frame_source_await_ready_success_after_first_frame` | 初回 frame 取得後に readiness が true になる |
 | ユニット | `test_frame_source_await_ready_timeout` | frame 未取得なら `FrameNotReadyError` または false を返す |
-| ユニット | `test_resource_store_rejects_path_escape` | `..\outside.png`、絶対パス、root 外 symlink を拒否する |
-| ユニット | `test_macro_settings_resolver_is_separate_from_resource_store` | settings TOML 解決が `ResourceStorePort` に依存しないことを検証する |
-| ユニット | `test_resource_store_raises_when_imwrite_returns_false` | `cv2.imwrite` false を `ResourceWriteError` に変換する |
+| ユニット | `test_resource_file_io_contract_is_injected_into_context` | `MacroResourceScope` と `RunArtifactStore` が `ExecutionContext` 経由で `CommandFacade` に渡る |
+| ユニット | `test_macro_settings_resolver_is_separate_from_resource_store` | settings TOML 解決が Resource File I/O に依存しないことを検証する |
+| ユニット | `test_resource_file_io_path_and_write_policy` | path guard と atomic write の詳細は `RESOURCE_FILE_IO.md` のテストで検証する |
 | ユニット | `test_notification_port_logs_notifier_failure` | notifier 失敗が warning log になり、例外がマクロへ伝播しない |
 | 結合 | `test_cli_uses_macro_runtime_builder` | CLI が `DefaultCommand` を直接構築せず Runtime 経由で実行する |
 | 結合 | `test_cli_notification_settings_come_from_secrets_settings` | CLI の Discord / Bluesky 通知設定が `SecretsSettings` だけから構築されることを検証する |
@@ -695,7 +699,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 
 ## 6. 実装チェックリスト
 
-- [ ] `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `NotificationPort`, `LoggerPort` のシグネチャ確定
+- [ ] `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` のシグネチャ確定
 - [ ] `ExecutionContext`, `RunHandle`, `RunResult`, `RuntimeOptions` のシグネチャ確定
 - [ ] `MacroRuntime` の同期実行 `run()` 実装
 - [ ] `MacroRuntime` の非同期実行 `start()` と `RunHandle` 実装
@@ -703,8 +707,8 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 - [ ] `DefaultCommand` の import path 維持と旧コンストラクタ互換
 - [ ] `SerialControllerOutputPort` 実装
 - [ ] `CaptureFrameSourcePort` と frame readiness 実装
-- [ ] `StaticResourceStorePort` の path escape 防止
-- [ ] `StaticResourceStorePort` の `cv2.imwrite()` 戻り値検証
+- [ ] Resource File I/O の path traversal 防止を `RESOURCE_FILE_IO.md` に従って実装
+- [ ] Resource File I/O の atomic write と overwrite policy を `RESOURCE_FILE_IO.md` に従って実装
 - [ ] `NotificationHandlerPort` と `NoopNotificationPort` 実装
 - [ ] `LogManagerPort` 実装
 - [ ] serial/capture detection race を避ける検出完了待ち API 実装

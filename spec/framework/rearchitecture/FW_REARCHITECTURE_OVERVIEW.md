@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src\nyxpy\framework\core\macro\` および将来追加する `src\nyxpy\framework\core\runtime\`
 > **目的**: 既存マクロ資産の import 互換を維持しながら、マクロ発見・生成・実行・中断・結果取得を `MacroRuntime` 中心に再整理する。
-> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `spec\framework\archive\architecture.md`
+> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `spec\framework\archive\architecture.md`, `ARCHITECTURE_DIAGRAMS.md`, `DEPRECATION_AND_MIGRATION.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `RUNTIME_AND_IO_PORTS.md`, `OBSERVABILITY_AND_GUI_CLI.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\base.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\macro\executor.py`, `src\nyxpy\framework\core\singletons.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
 > **破壊的変更**: なし。特に `nyxpy.framework.core.macro.base.MacroBase` と `nyxpy.framework.core.macro.command.Command` の import は維持する。
 
@@ -135,6 +135,27 @@ Legacy Compatibility Layer
   -> nyxpy.framework.core.macro.executor.MacroExecutor  # 残す場合のみ
 ```
 
+詳細な図は [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) を参照する。最重要の依存方向は、GUI/CLI と既存マクロが上位利用者であり、Runtime 中核が Ports/Adapters を介してハードウェア/外部 I/O へ到達することである。
+
+```mermaid
+flowchart TB
+    GUI["GUI adapter"] --> Builder["MacroRuntimeBuilder"]
+    CLI["CLI adapter"] --> Builder
+    Builder --> Runtime["MacroRuntime"]
+    Macro["existing user macros"] --> Contract["Import Contract<br/>MacroBase / Command / DefaultCommand / constants / MacroStopException"]
+    Runtime --> Registry["MacroRegistry"]
+    Runtime --> Factory["MacroFactory"]
+    Runtime --> Context["ExecutionContext"]
+    Runtime --> Runner["MacroRunner"]
+    Runner --> Contract
+    Runtime --> CommandFacade["CommandFacade"]
+    CommandFacade --> Ports["Controller / Frame / Resource / Notification / Logger Ports"]
+    Ports --> Adapters["Serial / Capture / Resource / Notification / Logger Adapters"]
+    Adapters --> IO["hardware / external services / logs"]
+    Guard["禁止: framework core から GUI/CLI/個別マクロへ静的依存しない"]
+    Runtime -.-> Guard
+```
+
 `MacroRuntime` はマクロ実行の組み立て点である。registry 解決、factory 呼び出し、Ports 準備、`CommandFacade(context)` 生成、Port close だけを担当し、`initialize -> run -> finalize` と `RunResult` 生成は `MacroRunner` へ委譲する。GUI と CLI は実行中核ではなく、入力値の受け取り、進捗表示、終了表示、設定反映を担当する adapter である。フレームワーク層は GUI へ依存せず、GUI は `RunHandle` と `RunResult` を Qt の signal に変換する。
 
 ### 3.2 公開 API 方針
@@ -151,7 +172,7 @@ Legacy Compatibility Layer
 
 #### 新規 API
 
-正 API は本 Overview の 4.1.2 に集約する。詳細な Port とエラー仕様は `RUNTIME_AND_IO_PORTS.md` と `ERROR_CANCELLATION_LOGGING.md` を正とする。新規コードは `nyxpy.framework.core.runtime` を優先して参照するが、`MacroRegistry` の正配置は `src\nyxpy\framework\core\macro\registry.py` である。既存マクロは変更不要であり、マクロ作者に `MacroRuntime` 利用を強制しない。
+正 API は本 Overview の 4.1.2 に集約する。詳細な Port とエラー仕様は `RUNTIME_AND_IO_PORTS.md` と `ERROR_CANCELLATION_LOGGING.md` を正とする。Resource File I/O の配置・path guard・atomic write は `RESOURCE_FILE_IO.md`、sink・backend・ログ保持・GUI 表示イベントは `LOGGING_FRAMEWORK.md` を正とする。新規コードは `nyxpy.framework.core.runtime` を優先して参照するが、`MacroRegistry` の正配置は `src\nyxpy\framework\core\macro\registry.py` である。既存マクロは変更不要であり、マクロ作者に `MacroRuntime` 利用を強制しない。
 
 #### 互換ポリシー
 
@@ -160,6 +181,8 @@ Legacy Compatibility Layer
 | 永久維持 | `MacroBase` / `Command` / `DefaultCommand` import path、constants import、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッド、`MacroStopException()` / `MacroStopException("stop")`、`static/<macro_name>/settings.toml` lookup | 既存マクロ変更不要の前提で維持する。 |
 | 一時 adapter / 廃止候補 | `MacroExecutor`, legacy loader, `cwd` fallback | 既存 GUI/CLI/テスト移行に必要な場合だけ残す。残す場合の責務は Runtime / Ports / Registry への委譲に限定し、既存ユーザーマクロが直接依存していないなら廃止できる。 |
 | 非推奨後削除候補 | 暗黙 dummy fallback、恒久的な `sys.path` 変更、`cwd` 起点だけに依存する探索、settings path の曖昧解決 | 非推奨警告と移行期間を置き、削除可否は別仕様で判断する。 |
+
+廃止候補の削除条件、代替 API、互換影響、テストゲート、移行順は `DEPRECATION_AND_MIGRATION.md` を正とする。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、`static\<macro_name>\settings.toml` lookup は廃止候補に含めない。
 
 ### 3.3 後方互換性
 
@@ -202,7 +225,7 @@ nyxpy.framework.*     -> macros\{macro_name}\           禁止。ただし impor
 
 #### 提案
 
-`Command` の公開 API は維持し、構築時の依存だけを Ports/Adapters に寄せる。最初の実装では既存 `SerialCommInterface`、`CaptureDeviceInterface`、`SerialProtocolInterface`、`StaticResourceIO`、`NotificationHandler` を Port として扱い、新しい抽象を増やしすぎない。追加抽象が必要な境界は `SettingsPort`、`ClockPort`、`RuntimeThreadPort` に限定する。
+`Command` の公開 API は維持し、構築時の依存だけを Ports/Adapters に寄せる。Resource File I/O の詳細は `RESOURCE_FILE_IO.md`、ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` に分け、本 Overview では接続境界だけを扱う。最初の実装では既存 `SerialCommInterface`、`CaptureDeviceInterface`、`SerialProtocolInterface`、`StaticResourceIO`、`NotificationHandler` を Port として扱い、新しい抽象を増やしすぎない。追加抽象が必要な境界は `SettingsPort`、`ClockPort`、`RuntimeThreadPort` に限定する。
 
 ### 3.6 性能要件
 

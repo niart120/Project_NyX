@@ -1,0 +1,406 @@
+# ロギングフレームワーク再設計 仕様書
+
+> **対象モジュール**: `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\gui\panes\`
+> **目的**: 現行 `LogManager` を、実行単位コンテキスト、ユーザー表示イベント、技術ログ、差し替え可能な sink を持つロギング基盤へ再設計する。
+> **関連ドキュメント**: `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `IMPLEMENTATION_PLAN.md`, `..\archive\logging_design.md`
+> **既存ソース**: `src\nyxpy\framework\core\logger\log_manager.py`, `src\nyxpy\gui\panes\log_pane.py`
+> **破壊的変更**: なし。既存 `log_manager.log(level, message, component="")` と GUI のログ表示概念は互換 adapter で維持する。
+
+## 1. 概要
+
+### 1.1 目的
+
+ロギング基盤を、loguru のグローバル logger に直接依存する実装から、`LoggerPort` と `LogSink` を境界にした差し替え可能な設計へ移行する。保存用の `TechnicalLog` と GUI/CLI 向けの `UserEvent` を分離し、すべての実行ログを `run_id` / `macro_id` で追跡できるようにする。
+
+### 1.2 用語定義
+
+| 用語 | 定義 |
+|------|------|
+| LogManager | 既存の統合ログ管理シングルトン。移行後は `LoggerPort` の既定実装または adapter として振る舞う |
+| LoggerPort | Runtime、Command、通知、設定処理から見えるロギング抽象。backend や GUI 実装へ直接依存しない |
+| LogEvent | ログ発生時の共通封筒。時刻、level、component、event、message、`run_id`、`macro_id`、`extra`、例外情報を持つ |
+| TechnicalLog | ファイル保存、障害調査、集計に使う技術ログ。traceback、例外型、詳細辞書を持てるが secret 値は含めない |
+| UserEvent | GUI/CLI へ表示する短いイベント。traceback、secret 値、内部絶対パス、通知 payload を含めない |
+| LogSink | `LogEvent`、`TechnicalLog`、`UserEvent` のいずれかを受け取る出力先。ファイル、コンソール、GUI、テスト用 memory sink を含む |
+| RunLogContext | 1 回の実行に紐づく `run_id`、`macro_id`、`macro_name`、入口種別、開始時刻を保持する immutable な値 |
+| backend | 実際のログ出力を担う実装。候補は loguru、Python logging、structlog、独自 JSON writer である |
+| Structured Log | JSON Lines など機械処理しやすい形式の技術ログ。検索、集計、障害解析の入力にする |
+| GuiLogSink | GUI へ `UserEvent` を配信する sink。Qt 型を core 層へ持ち込まず、GUI adapter が Qt Signal へ変換する |
+| TestLogSink | テストでログをメモリに保持し、イベント名、context、secret マスク、配信順序を検証する sink |
+
+### 1.3 背景・問題
+
+現行 `log_manager.py` は module import 時に `log_manager = LogManager()` を生成し、`LogManager.__init__()` で `logger.remove()` を呼んで loguru のグローバル handler を全削除する。その後、標準出力 handler と `logs/logfile.log` handler を固定設定で追加するため、import だけでファイル出力、handler 変更、ログパス作成が発生し得る。
+
+`LogPane` は `log_manager.add_handler(self._emit_append, level=...)` で loguru の文字列 handler を直接購読する。GUI 表示は保存ログと同じ整形済み文字列を受け取り、`set_custom_handler_level()` 失敗を広い `except Exception` で握るため、handler 状態の破損や解除漏れを診断しにくい。
+
+現行 API は `component` 文字列以外の相関情報を持たない。複数マクロ実行、GUI/CLI の同時操作、通知失敗、キャンセル、終了処理失敗を `run_id` / `macro_id` で追跡できず、ユーザー向け短文と開発者向け traceback も同じログ経路に混在する。
+
+handler 管理は `custom_handlers` の dict と loguru の handler ID に依存し、`RLock`、snapshot 配信、handler 例外隔離、再帰防止方針がない。`set_level()` は dict 反復中に handler ID を差し替えるため、将来の並行登録や GUI close と衝突しやすい。
+
+### 1.4 期待効果
+
+| 指標 | 現状 | 目標 |
+|------|------|------|
+| import 時副作用 | `log_manager` import で global handler 削除と handler 追加が走る | 明示的な `configure()` まで backend handler を変更しない |
+| ログ相関 | `component` 文字列のみ | Runtime 経由の全技術ログに `run_id` / `macro_id` / `event` を付与 |
+| GUI 表示 | loguru の整形済み文字列を直接表示 | `UserEvent` を GUI adapter が表示文言へ変換 |
+| 技術ログ | `logs/logfile.log` に人間向け format で保存 | JSON Lines と人間向け tail を分離し、検索可能な構造を保持 |
+| backend 依存 | core が loguru の global logger に密結合 | `LoggerPort` と `LogSink` により backend を差し替え可能 |
+| handler 例外 | 方針未定義 | sink 例外は技術ログへ記録し、他 sink とマクロ実行を継続 |
+| テスト容易性 | loguru handler ID と実ファイルに依存 | `TestLogSink` で実ファイルなしに検証可能 |
+| secret 保護 | 呼び出し側の注意に依存 | `LogEvent` 正規化時に mask 済み `extra` だけを sink へ渡す |
+
+### 1.5 着手条件
+
+- `ERROR_CANCELLATION_LOGGING.md` の `RunResult`、`ErrorInfo`、`MacroCancelled` 方針が確定している。
+- `RUNTIME_AND_IO_PORTS.md` または Runtime 実装側で `ExecutionContext` / `RunLogContext` の保持場所が決まっている。
+- 既存 `log_manager.log(level, message, component="")` 呼び出しを壊さない adapter を先に用意する。
+- core 層から `nyxpy.gui`、Qt 型、CLI 表示実装へ依存しない。
+- 実装前に `uv run pytest tests\unit\` のベースラインを確認する。
+
+## 2. 対象ファイル
+
+| ファイル | 変更種別 | 変更内容 |
+|----------|----------|----------|
+| `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md` | 新規 | 本仕様書 |
+| `src\nyxpy\framework\core\logger\events.py` | 新規 | `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext`、event 名を定義 |
+| `src\nyxpy\framework\core\logger\ports.py` | 新規 | `LoggerPort`、`LogSink`、`LogBackend` の抽象を定義 |
+| `src\nyxpy\framework\core\logger\log_manager.py` | 変更 | 既存 API 互換 adapter、sink 管理、context bind、backend 初期化、secret mask を実装 |
+| `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、GUI、test sink の標準実装を定義 |
+| `src\nyxpy\framework\core\io\ports.py` | 変更 | Runtime から使う `LoggerPort` を io port 群へ re-export するか参照境界を整理 |
+| `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` または同等情報を `ExecutionContext` に含める |
+| `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI/Legacy 用の logger 構成と `LoggerPort` 注入を担当 |
+| `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` / `technical()` へ接続 |
+| `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
+| `src\nyxpy\gui\panes\log_pane.py` | 変更 | loguru 文字列 handler ではなく `GuiLogSink` 由来の `UserEvent` を購読 |
+| `tests\unit\framework\logger\test_logging_framework.py` | 新規 | logger port、sink 配信、secret mask、context、handler 例外隔離を検証 |
+| `tests\gui\test_log_pane_user_event.py` | 新規 | `LogPane` が `UserEvent` を Qt Signal 経由で表示することを検証 |
+| `tests\perf\test_logging_framework_perf.py` | 新規 | sink 配信と構造化ログの性能を検証 |
+
+## 3. 設計方針
+
+### アーキテクチャ上の位置づけ
+
+ロギングは Runtime と GUI/CLI の間にある横断的な port である。Runtime、Command、通知、設定は `LoggerPort` にだけ依存し、LogManager の backend、ファイル形式、GUI 表示方法を知らない。
+
+```text
+MacroRuntime / Command / NotificationHandler
+  -> LoggerPort
+  -> LogManager
+  -> LogSink[]
+       -> TechnicalFileSink
+       -> ConsoleSink
+       -> GuiLogSink
+       -> TestLogSink
+```
+
+core 層は Qt 型へ依存しない。GUI は `GuiLogSink` に callback を登録し、受け取った `UserEvent` を Qt Signal で GUI スレッドへ渡す。
+
+### 公開 API 方針
+
+既存 API は adapter として残す。
+
+```python
+log_manager.log("INFO", "message", component="MacroExecutor")
+```
+
+上記は `event="log.message"`、`technical=True`、`user_visible=False` の `TechnicalLog` に変換する。既存 GUI が段階移行中に `add_handler()` を使う場合は非推奨警告を出しつつ `UserEvent` ではなく旧文字列を渡す互換 layer とする。新規コードは `LoggerPort` を使う。
+
+### 後方互換性
+
+破壊的変更は行わない。`log_manager` グローバル変数、`LogManager.log()`、`set_level()`、`set_console_level()`、`set_file_level()`、`add_handler()`、`set_custom_handler_level()`、`remove_handler()` は残す。旧 `add_handler()` は loguru handler 直結ではなく `LegacyStringSink` へ接続し、移行期間後に `DeprecationWarning` の対象にする。
+
+`logs/logfile.log` は読み取り対象として残す必要はないが、移行後 1 リリースは同名ファイルへの人間向けログ出力を任意で有効化できる設定を用意する。
+
+### レイヤー構成
+
+| レイヤー | 責務 | 禁止事項 |
+|----------|------|----------|
+| Runtime / Command | `RunLogContext` を付与し、event 名と message を決める | backend、ファイル path、Qt Signal を扱う |
+| LoggerPort | 技術ログとユーザー表示イベントの抽象 API を提供 | loguru の global logger を公開する |
+| LogManager | sink 管理、mask、level filter、handler 例外隔離、backend 初期化 | GUI widget へ直接依存する |
+| LogSink | 出力先ごとの書き込み、flush、close | 他 sink の失敗を制御する |
+| GUI adapter | `UserEvent` を GUI スレッドへ転送して表示する | traceback や secret を表示する |
+
+### ロギングフレームワーク選定
+
+| 候補 | 利点 | 懸念 | 採用判断 |
+|------|------|------|----------|
+| loguru 継続 | 現行依存を維持でき、rotation と sink 追加が簡単 | global logger 前提が強く、`logger.remove()` の影響範囲を制御しにくい | 短期 backend として採用可。ただし `LoggerPort` の裏側へ閉じ込める |
+| Python logging への回帰 | 標準ライブラリで長期保守しやすく、ライブラリとの相性がよい | 構造化ログと context bind は自前実装が増える | 依存削減を優先する場合の候補。設計は回帰可能にする |
+| structlog 等の構造化ログ導入 | context、processor、JSON 出力が強い | 新規依存と学習コストが増え、GUI sink との境界設計は別途必要 | JSON Lines と context 要件が増えた段階で採用を再判断 |
+| 自前薄ラッパ + backend 差し替え | Project NyX 固有の `UserEvent` / `TechnicalLog` を安定 API にできる | ラッパ設計を誤ると標準機能を再実装し過ぎる | 採用方針。backend は実装詳細として loguru から開始する |
+
+採用判断基準は次の順で評価する。
+
+| 基準 | 判定内容 |
+|------|----------|
+| 互換性 | 既存 `log_manager` 呼び出しとログファイル運用を段階移行できる |
+| 構造化 | `run_id`、`macro_id`、`event`、`component`、`extra` を欠落なく保存できる |
+| 表示分離 | `UserEvent` と `TechnicalLog` を別 sink へ送れる |
+| 副作用制御 | import 時に global handler を変更せず、明示初期化できる |
+| テスト容易性 | `TestLogSink` でファイル、標準出力、GUI なしに検証できる |
+| スレッド安全性 | sink 登録解除と配信が snapshot 方式で deadlock しない |
+| 運用 | rotation、保持期間、flush、close、障害時 fallback を設定できる |
+
+本仕様の結論は「自前薄ラッパ + backend 差し替え」を採用し、初期 backend は loguru adapter とする。Python logging または structlog への移行は、`LogBackend` 実装の差し替えで行う。
+
+### 性能要件
+
+| 指標 | 目標値 |
+|------|--------|
+| handler なし `LoggerPort.technical()` | 1 件 2 ms 未満 |
+| sink 3 件への配信 | 1 件 5 ms 未満 |
+| GUI sink 10 件への `UserEvent` 配信 | 1 件 10 ms 未満 |
+| `RunLogContext` bind | 1 回 1 ms 未満 |
+| 1 実行あたり structured JSONL flush | 1 秒以内または終了時確実に flush |
+| sink 例外時の他 sink 継続 | 100% |
+
+### 並行性・スレッド安全性
+
+sink 登録、解除、level 変更、configure、close は `threading.RLock` で保護する。配信時は lock 内で sink と level filter の snapshot を作り、lock 外で sink を呼ぶ。sink が `LoggerPort` を再利用しても deadlock しないよう、例外記録には GUI sink を通さない内部技術ログ経路を使う。
+
+`RunLogContext` は immutable とし、`LoggerPort.bind_context(context)` は context を持つ軽量 logger を返す。非同期実行では contextvars を補助的に使ってよいが、Runtime は `ExecutionContext` から明示的に `LoggerPort` を渡すことを正とする。
+
+## 4. 実装仕様
+
+### 公開インターフェース
+
+```python
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
+from typing import Any, Protocol
+
+
+class LogLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+@dataclass(frozen=True)
+class RunLogContext:
+    run_id: str
+    macro_id: str
+    macro_name: str = ""
+    entrypoint: str = "runtime"
+    started_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class LogEvent:
+    timestamp: datetime
+    level: LogLevel
+    component: str
+    event: str
+    message: str
+    run_id: str | None = None
+    macro_id: str | None = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
+    exception_type: str | None = None
+    traceback: str | None = None
+
+
+@dataclass(frozen=True)
+class TechnicalLog:
+    event: LogEvent
+    include_traceback: bool = True
+
+
+@dataclass(frozen=True)
+class UserEvent:
+    timestamp: datetime
+    level: LogLevel
+    component: str
+    event: str
+    message: str
+    run_id: str | None = None
+    macro_id: str | None = None
+    code: str | None = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
+
+
+class LoggerPort(Protocol):
+    def bind_context(self, context: RunLogContext) -> "LoggerPort": ...
+
+    def technical(
+        self,
+        level: str,
+        message: str,
+        *,
+        component: str,
+        event: str = "log.message",
+        extra: Mapping[str, Any] | None = None,
+        exc: BaseException | None = None,
+    ) -> None: ...
+
+    def user(
+        self,
+        level: str,
+        message: str,
+        *,
+        component: str,
+        event: str,
+        code: str | None = None,
+        extra: Mapping[str, Any] | None = None,
+    ) -> None: ...
+
+
+class LogSink(ABC):
+    @abstractmethod
+    def emit_technical(self, event: TechnicalLog) -> None: ...
+
+    def emit_user(self, event: UserEvent) -> None: ...
+    def flush(self) -> None: ...
+    def close(self) -> None: ...
+
+
+class LogManager(LoggerPort):
+    def configure(self, config: "LoggingConfig") -> None: ...
+    def add_sink(self, sink: LogSink, *, level: str = "INFO") -> str: ...
+    def remove_sink(self, sink_id: str) -> None: ...
+    def add_gui_handler(self, handler: Callable[[UserEvent], None], *, level: str = "INFO") -> str: ...
+    def remove_gui_handler(self, handler_id: str) -> None: ...
+    def log(self, level: str, message: str, component: str = "") -> None: ...
+```
+
+### 内部設計
+
+#### 初期化
+
+`LogManager.__init__()` は状態初期化だけを行い、backend handler、ファイル、標準出力を作成しない。アプリ起動時に CLI/GUI/テスト fixture が `configure()` を呼び、sink を登録する。互換のため、未設定状態で `log()` が呼ばれた場合は最小の標準エラー出力 sink を遅延設定してよいが、loguru の global handler は削除しない。
+
+#### 配信手順
+
+```text
+LoggerPort.technical() / user()
+  -> LogEvent 正規化
+  -> secret mask と JSON 化可能性を検査
+  -> RLock 内で sink snapshot を作成
+  -> lock 外で sink.emit_* を呼ぶ
+  -> sink 例外を内部技術ログへ記録
+  -> 他 sink と呼び出し元処理を継続
+```
+
+`LoggerPort.user()` は `UserEvent` と、対応する要約 `TechnicalLog` の両方を生成する。ユーザーに見せた文言も調査時に追跡できるようにするためである。`LoggerPort.technical()` は `user_visible=False` 相当であり、GUI/CLI へは出さない。
+
+#### UserEvent と TechnicalLog の分離
+
+| 項目 | UserEvent | TechnicalLog |
+|------|-----------|--------------|
+| 主用途 | GUI log pane、CLI 表示、status 表示 | 障害調査、検索、集計、サポート情報 |
+| message | 1 行の短文 | 詳細でもよいが secret mask 済み |
+| traceback | 含めない | DEBUG 詳細として保持可 |
+| 内部 path | 原則含めない | 相対 path または mask 済みで保持可 |
+| 通知 payload | 含めない | secret と本文を mask した要約のみ |
+| sink | GUI、CLI | JSONL file、人間向け file、console debug |
+
+#### 実行単位コンテキスト
+
+Runtime は実行開始時に `RunLogContext(run_id, macro_id, macro_name, entrypoint)` を作成する。`ExecutionContext` は `LoggerPort.bind_context(run_log_context)` の戻り値を保持し、`Command`、`NotificationPort`、`MacroRunner` に渡す。実行終了時は `macro.finished`、中断時は `macro.cancelled`、失敗時は `macro.failed` を同じ context で記録する。
+
+#### テスト用 sink
+
+`TestLogSink` は `TechnicalLog` と `UserEvent` をそれぞれ list に保持する。テストは次を直接検証できる。
+
+- event 名と level
+- `run_id` / `macro_id` の付与
+- traceback が `UserEvent` に含まれないこと
+- secret 値が `extra` に残らないこと
+- sink 例外時に後続 sink が呼ばれること
+- close / flush が実行終了時に呼ばれること
+
+#### ログファイル配置、ローテーション、保持ポリシー
+
+| 種別 | 既定 path | 形式 | rotation | retention | 用途 |
+|------|-----------|------|----------|-----------|------|
+| 人間向け技術ログ | `logs\nyxpy.log` | text | 10 MB | 14 日 | 開発中の tail と簡易確認 |
+| 実行単位構造化ログ | `logs\runs\{yyyyMMdd}\{run_id}.jsonl` | JSON Lines | 実行ごと | 30 日 | マクロ実行の調査、GUI/CLI の相関 |
+| framework 構造化ログ | `logs\framework.jsonl` | JSON Lines | 10 MB | 30 日 | 起動、設定、デバイス検出、通知失敗 |
+| 旧互換ログ | `logs\logfile.log` | text | 1 MB | 7 日 | 移行期間の互換出力。既定では無効化可能 |
+
+保持期間を過ぎたファイルは起動時または `configure()` 時に削除対象としてよい。削除失敗は `log.retention_cleanup_failed` の技術ログに残し、アプリ起動は継続する。ファイル書き込みに失敗した場合、該当 sink を無効化して console sink へ警告を出す。
+
+### 設定パラメータ
+
+| パラメータ | 型 | デフォルト | 説明 |
+|------------|-----|-----------|------|
+| `logging.backend` | `str` | `"loguru"` | `loguru`、`logging`、`structlog`、`json_writer` のいずれか |
+| `logging.base_dir` | `str` | `"logs"` | ログ出力の基準ディレクトリ |
+| `logging.file_level` | `str` | `"DEBUG"` | 技術ログファイルの最低 level |
+| `logging.console_level` | `str` | `"INFO"` | CLI/コンソール向け最低 level |
+| `logging.gui_level` | `str` | `"INFO"` | GUI `UserEvent` の最低 level |
+| `logging.structured_enabled` | `bool` | `True` | JSON Lines の構造化ログを出すか |
+| `logging.human_log_enabled` | `bool` | `True` | 人間向け text ログを出すか |
+| `logging.legacy_logfile_enabled` | `bool` | `False` | `logs\logfile.log` 互換出力を有効化するか |
+| `logging.rotation_size_mb` | `int` | `10` | 人間向けログと framework JSONL の rotation サイズ |
+| `logging.run_retention_days` | `int` | `30` | 実行単位構造化ログの保持日数 |
+| `logging.framework_retention_days` | `int` | `30` | framework 構造化ログの保持日数 |
+| `logging.human_retention_days` | `int` | `14` | 人間向け text ログの保持日数 |
+| `logging.include_traceback` | `bool` | `True` | 技術ログへ traceback を保存するか |
+| `logging.mask_secret_keys` | `list[str]` | `[]` | 追加で mask する key 名。既定 secret key 群に加える |
+
+### エラーハンドリング
+
+| 例外クラス | 発生条件 |
+|------------|----------|
+| `LoggingConfigurationError` | 不正な level、backend 名、ログ path、rotation 設定を受け取った |
+| `LogSinkError` | sink が emit、flush、close に失敗した。外部へは再送出せず内部技術ログへ変換する |
+| `LogSerializationError` | `extra` が JSON 化できない。`repr()` に縮退し技術ログへ記録する |
+| `SecretMaskingError` | mask 処理に失敗した。元値を出さず key 名だけ記録する |
+
+sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ sink がすべて失敗した場合は、`LogManager.health()` が degraded を返し、GUI/CLI が「ログ保存に失敗しています」を表示できるようにする。
+
+### シングルトン管理
+
+`log_manager` グローバルインスタンスは互換のため維持するが、backend 初期化は `configure()` まで遅延する。`singletons.py` の `reset_for_testing()` が存在する場合は、`LogManager.reset_for_testing()` を呼んで sink、context、level、legacy handler、backend handler を初期化する。
+
+`RunLogContext`、`LoggerPort.bind_context()` の戻り値、`TestLogSink` は実行またはテストごとのオブジェクトであり、`singletons.py` へ登録しない。
+
+## 5. テスト方針
+
+| テスト種別 | テスト名 | 検証内容 |
+|------------|----------|----------|
+| ユニット | `test_log_manager_import_has_no_backend_side_effect` | import だけで loguru global handler 削除とファイル sink 追加が行われない |
+| ユニット | `test_legacy_log_api_emits_technical_log` | `log_manager.log(level, message, component)` が互換形式で技術ログになる |
+| ユニット | `test_logger_port_binds_run_context` | `bind_context()` 後のログに `run_id` / `macro_id` が入る |
+| ユニット | `test_user_event_does_not_include_traceback_or_secret` | `UserEvent` が traceback、secret、内部詳細を含まない |
+| ユニット | `test_technical_log_masks_secret_values` | `TechnicalLog.extra` の secret 値が mask される |
+| ユニット | `test_sink_exception_is_logged_and_ignored` | 失敗 sink があっても後続 sink と呼び出し元処理が継続する |
+| ユニット | `test_sink_snapshot_allows_remove_during_emit` | sink 呼び出し中に登録解除しても deadlock しない |
+| ユニット | `test_test_log_sink_records_user_and_technical_events` | `TestLogSink` で user / technical を個別検証できる |
+| ユニット | `test_logging_config_rejects_invalid_level` | 不正 level を `LoggingConfigurationError` にする |
+| ユニット | `test_log_serialization_falls_back_to_repr` | JSON 化不能な `extra` を安全に縮退する |
+| 結合 | `test_command_log_emits_macro_message_with_context` | 既存 `Command.log()` が `macro.message` と実行 context を付与する |
+| 結合 | `test_notification_failure_is_technical_log_only` | 通知失敗は secret mask 済み技術ログに残り、原則 GUI 表示しない |
+| GUI | `test_log_pane_receives_user_event` | `LogPane` が `UserEvent` を Qt Signal で表示する |
+| GUI | `test_log_pane_level_filter_uses_gui_sink` | DEBUG 表示切替が GUI sink の level に反映される |
+| パフォーマンス | `test_logging_sink_dispatch_perf` | sink 3 件への配信が 1 件 5 ms 未満 |
+| パフォーマンス | `test_gui_user_event_dispatch_perf` | GUI sink 10 件への配信が 1 件 10 ms 未満 |
+
+## 6. 実装チェックリスト
+
+- [ ] `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext` のシグネチャ確定
+- [ ] `LoggerPort`、`LogSink`、`LogBackend` の抽象定義
+- [ ] `LogManager.__init__()` から backend handler 初期化と global `logger.remove()` を排除
+- [ ] `configure()` による明示初期化と未設定時 fallback を実装
+- [ ] 既存 `LogManager.log()` と handler API の互換 adapter を実装
+- [ ] `UserEvent` と `TechnicalLog` の分離配信を実装
+- [ ] `RunLogContext` を `ExecutionContext` と `Command.log()` へ接続
+- [ ] secret mask と JSON 化不能値の縮退処理を実装
+- [ ] sink 登録解除の `RLock`、snapshot 配信、handler 例外隔離を実装
+- [ ] `TestLogSink` を実装
+- [ ] ログファイル配置、rotation、保持期間、cleanup を実装
+- [ ] `LogPane` を `UserEvent` 購読へ移行
+- [ ] 通知失敗と Runtime 失敗を技術ログへ記録
+- [ ] ユニットテスト作成・パス
+- [ ] GUI テスト作成・パス
+- [ ] パフォーマンステスト作成・パス
+- [ ] `uv run ruff check .` がパス
+- [ ] `uv run pytest tests\unit\` がパス

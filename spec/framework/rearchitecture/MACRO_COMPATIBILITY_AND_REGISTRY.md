@@ -145,7 +145,7 @@ nyxpy.framework.* -> macros/<name>       NG
 | 一時 adapter / 廃止候補 | `MacroExecutor`, legacy loader, `cwd` fallback | 既存 GUI/CLI/テスト移行に必要な場合だけ残し、内部は Runtime / Registry / Ports へ委譲する。既存ユーザーマクロが直接依存していないなら削除できる。 |
 | 非推奨後削除候補 | 恒久的な `sys.path` 変更、曖昧な class 名選択、暗黙 dummy fallback、`cwd` のみに依存する探索 | 移行期間後、別仕様で削除可否を判断する。 |
 
-### レイヤー構成### レイヤー構成
+### レイヤー構成
 
 | レイヤー | 責務 | 主要クラス |
 |----------|------|------------|
