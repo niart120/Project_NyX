@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`
 > **目的**: Nintendo 3DS 向けシリアル通信デバイスを NyX の `SerialProtocolInterface` 経由で利用可能にする。
-> **関連ドキュメント**: `docs/protocol_design.md`, `docs/hardware_design.md`
+> **関連ドキュメント**: `../../../framework/archive/protocol_design.md`, `../../../framework/archive/hardware_design.md`
 > **参考資料**: ユーザ提供の通信仕様スクリーンショット、<https://www.3dscontroller.com/>
 > **破壊的変更**: なし
 

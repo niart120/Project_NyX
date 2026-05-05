@@ -25,8 +25,8 @@
   3. 実行設定画面  
 
 **設計要点**:
-- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理され、DeviceModel経由でGUI各所に注入される。
-- デバイス切替や状態変更はEventBusで伝播し、各Pane/Widgetは疎結合に保たれる。
+- Manager系（SerialManager, CaptureManager, GlobalSettings, SecretsSettings）は`singletons.py`で一元管理される。
+- デバイス切替やプロトコル変更はEventBusで伝播し、各Pane/Widgetは疎結合に保たれる。
 - PreviewPaneやVirtualControllerPane等は、アクティブなデバイスを外部から受け取り、それを主軸に操作する。
 
 ---
@@ -37,7 +37,7 @@
 - マクロ名（Python クラス名）  
 - 説明文（`MacroBase.description` プロパティから取得）  
 - **タグ/カテゴリ**  
-  - 現状の `MacroBase` 実装にはタグ情報がないため、GUI要件に合わせて `MacroBase.tags: list[str]` を追加する改修を行う  
+  - `MacroBase.tags: list[str]` から取得する  
 
 ### 4.2 機能要件
 - インクリメンタルサーチ  
@@ -98,7 +98,7 @@
 - キャプチャデバイスをプルダウンで選択  
 - 同時出力は非対応  
 - FPS は設定画面から指定  
-- **デバイス切替はDeviceModel経由で行い、状態変更はEventBusで伝播する**
+- **デバイス切替はManagerとEventBusを経由して反映する**
 
 ### 7.2 スナップショット
 - トリガー：「スナップショット」ボタン押下  
@@ -120,7 +120,7 @@
 - キャプチャデバイス：プルダウン形式（OpenCV）  
 - シリアルデバイス：プルダウン形式（PySerial）  
 - ボーレート／FPS 等は個別入力  
-- **設定変更時はDeviceModelのchange_xxx_device()を呼び、状態変更はEventBusで伝播する**
+- **設定変更時はGlobalSettings / SecretsSettingsへ保存し、MainWindow.apply_app_settings() がManagerとEventBusへ反映する**
 
 ### 8.3 設定保存
 - ユーザー設定を永続化  
@@ -135,7 +135,7 @@
 - マクロ実行／キャプチャ取得はバックグラウンドスレッド  
 - フレームワーク：PySide6 推奨  
 - GUIテスト：pytest-qt or Playwright 等で自動テスト整備  
-- ドキュメント：README + 専用ユーザーガイド（docs/ 以下）  
+- ドキュメント：README + 仕様書（`spec/` 以下）  
 - ログローテーション等は `log_manager.py` 側で担保  
 - 多言語対応：日本語優先、英語は将来検討  
 
@@ -162,7 +162,7 @@
 
 ## 追加: アーキテクチャ設計要点
 
-- Manager系（SerialManager, CaptureManager, SettingsService）は`singletons.py`で一元管理
-- DeviceModelがアクティブデバイスの切替・参照・イベント発行を担当
-- GUIコンポーネントやコマンドはDeviceModel/Managerからデバイスを受け取り、直接操作
+- Manager系（SerialManager, CaptureManager, GlobalSettings, SecretsSettings）は`singletons.py`で一元管理
+- EventBusがアクティブデバイスやプロトコルの変更を通知
+- GUIコンポーネントやコマンドはManagerからデバイスを受け取り、直接操作
 - 状態変更はEventBusで伝播し、疎結合な設計を実現
