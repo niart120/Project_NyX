@@ -22,21 +22,40 @@ from .config import FrlgInitialSeedConfig
 
 # 共有用 (initial_seeds.csv)
 CSV_FIELDNAMES: list[str] = [
-    "frame", "seed",
-    "region", "version", "edition",
-    "sound_mode", "button_mode", "keyinput",
-    "hardware", "fps",
+    "frame",
+    "seed",
+    "region",
+    "version",
+    "edition",
+    "sound_mode",
+    "button_mode",
+    "keyinput",
+    "hardware",
+    "fps",
     "note",
 ]
 
 # 詳細ログ (initial_seeds_details.csv)
 CSV_DETAIL_FIELDNAMES: list[str] = [
-    "frame", "seed",
-    "region", "version", "edition",
-    "sound_mode", "button_mode", "keyinput",
-    "hardware", "fps",
-    "advance", "pokemon", "level",
-    "hp", "atk", "def", "spa", "spd", "spe",
+    "frame",
+    "seed",
+    "region",
+    "version",
+    "edition",
+    "sound_mode",
+    "button_mode",
+    "keyinput",
+    "hardware",
+    "fps",
+    "advance",
+    "pokemon",
+    "level",
+    "hp",
+    "atk",
+    "def",
+    "spa",
+    "spd",
+    "spe",
     "note",
 ]
 

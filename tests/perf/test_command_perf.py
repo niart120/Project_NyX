@@ -125,13 +125,13 @@ def test_press_overhead(protocol_cls, proto_name):
 
     print(
         f"[overhead] {proto_name}: "
-        f"median={stats['overhead_median']*1000:.3f}ms, "
-        f"avg={stats['overhead_avg']*1000:.3f}ms, "
-        f"max={stats['overhead_max']*1000:.3f}ms"
+        f"median={stats['overhead_median'] * 1000:.3f}ms, "
+        f"avg={stats['overhead_avg'] * 1000:.3f}ms, "
+        f"max={stats['overhead_max'] * 1000:.3f}ms"
     )
     assert stats["overhead_median"] < OVERHEAD_THRESHOLD_S, (
-        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S*1000:.0f}ms を超過: "
-        f"median={stats['overhead_median']*1000:.3f}ms"
+        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S * 1000:.0f}ms を超過: "
+        f"median={stats['overhead_median'] * 1000:.3f}ms"
     )
 
 
@@ -183,11 +183,10 @@ def test_press_overhead_mixed_input(protocol_cls, proto_name):
     avg = sum(overheads) / n
     print(
         f"[overhead-mixed] {proto_name}: "
-        f"median={median*1000:.3f}ms, avg={avg*1000:.3f}ms, "
-        f"max={max(overheads)*1000:.3f}ms"
+        f"median={median * 1000:.3f}ms, avg={avg * 1000:.3f}ms, "
+        f"max={max(overheads) * 1000:.3f}ms"
     )
     assert median < OVERHEAD_THRESHOLD_S, (
-        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S*1000:.0f}ms を超過: "
-        f"median={median*1000:.3f}ms"
+        f"処理オーバーヘッド中央値が {OVERHEAD_THRESHOLD_S * 1000:.0f}ms を超過: "
+        f"median={median * 1000:.3f}ms"
     )
-

@@ -58,9 +58,11 @@ def test_update_preview_success(window: MainWindow, qtbot):
 
     # Prepare dummy frame 100x160x3 (より大きなサイズを使用)
     frame = np.full((100, 160, 3), 128, dtype=np.uint8)
+
     class DummyDevice:
         def get_frame(self):
             return frame
+
     # 新設計: PreviewPaneに直接デバイスを注入
     window.preview_pane.set_capture_device(DummyDevice())
 
@@ -94,6 +96,7 @@ def test_update_preview_failure(window: MainWindow, qtbot):
     class BadDevice:
         def get_frame(self):
             raise RuntimeError("fail capture")
+
     # 新設計: PreviewPaneに直接デバイスを注入
     window.preview_pane.set_capture_device(BadDevice())
     # 失敗前のPixmapを保存

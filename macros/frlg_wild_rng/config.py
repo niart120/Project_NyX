@@ -54,7 +54,9 @@ class FrlgWildRngConfig:
 
         # おしえテレビ設定
         cfg.use_teachy_tv = bool(args.get("use_teachy_tv", cfg.use_teachy_tv))
-        cfg.teachy_tv_consumption = int(args.get("teachy_tv_consumption", cfg.teachy_tv_consumption))
+        cfg.teachy_tv_consumption = int(
+            args.get("teachy_tv_consumption", cfg.teachy_tv_consumption)
+        )
         cfg.teachy_tv_adv_per_frame = int(
             args.get("teachy_tv_adv_per_frame", cfg.teachy_tv_adv_per_frame)
         )

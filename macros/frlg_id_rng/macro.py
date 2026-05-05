@@ -59,9 +59,7 @@ class FrlgIdRngMacro(MacroBase):
         # --- 基本設定 ---
         self._region: str = str(args.get("region", "JPN"))
         if self._region not in _VALID_REGIONS:
-            raise ValueError(
-                f"未対応のリージョン: {self._region} (対応: {sorted(_VALID_REGIONS)})"
-            )
+            raise ValueError(f"未対応のリージョン: {self._region} (対応: {sorted(_VALID_REGIONS)})")
 
         self._tid: int = int(args.get("tid", 0))
         if not 0 <= self._tid <= _TID_MAX:
@@ -82,9 +80,7 @@ class FrlgIdRngMacro(MacroBase):
         self._fps: float = float(args.get("fps", 60))
 
         # --- インクリメントモード ---
-        self._frame_increment_mode: bool = bool(
-            args.get("frame_increment_mode", False)
-        )
+        self._frame_increment_mode: bool = bool(args.get("frame_increment_mode", False))
         self._frame1_min: float = float(args.get("frame1_min", 1200))
         self._frame1_max: float = float(args.get("frame1_max", 1500))
         self._frame2_min: float = float(args.get("frame2_min", 1200))
@@ -286,7 +282,6 @@ class FrlgIdRngMacro(MacroBase):
             cmd.press(Hat.DOWN, dur=0.20, wait=0.335)
             cmd.press(Button.A, dur=0.1, wait=1.674)
 
-
         # ヘルプ画面: 操作方法の説明 (3回A) → 暗転 → ゲームプレイの目的 (3回A)
         # ヘルプ画面はセーブデータの有無にかかわらず常に表示される
         cmd.press(Button.A, dur=0.2, wait=1.0)
@@ -341,7 +336,7 @@ class FrlgIdRngMacro(MacroBase):
         一定時間の B 連打でまとめて突破する。
         """
 
-         # 名前確定後の会話を2行進める
+        # 名前確定後の会話を2行進める
         cmd.press(Button.A, dur=0.1, wait=0.5)
         cmd.press(Button.A, dur=0.1, wait=0.5)
         end_time = time.perf_counter() + self._RUSH_DURATION
@@ -357,9 +352,7 @@ class FrlgIdRngMacro(MacroBase):
     _SAVE_PADDING: int = 40
     """ROI の各辺に加える白パディング (px)。OCR 精度向上と保存画像の視認性を兼ねる。"""
 
-    def _recognize_tid(
-        self, cmd: Command
-    ) -> tuple[int | None, cv2.typing.MatLike | None]:
+    def _recognize_tid(self, cmd: Command) -> tuple[int | None, cv2.typing.MatLike | None]:
         """Step 15: キャプチャして TID を OCR 認識。
 
         ROI をクロップし、白パディングを付与した画像で OCR を実行する。
@@ -376,7 +369,11 @@ class FrlgIdRngMacro(MacroBase):
         cropped = image[y : y + h, x : x + w]
         pad = self._SAVE_PADDING
         padded = cv2.copyMakeBorder(
-            cropped, pad, pad, pad, pad,
+            cropped,
+            pad,
+            pad,
+            pad,
+            pad,
             borderType=cv2.BORDER_CONSTANT,
             value=(255, 255, 255),
         )
@@ -433,18 +430,14 @@ class FrlgIdRngMacro(MacroBase):
     # 名前入力
     # --------------------------------------------------------
 
-    def _enter_name(
-        self, cmd: Command, name: str, *, is_trainer: bool = False
-    ) -> None:
+    def _enter_name(self, cmd: Command, name: str, *, is_trainer: bool = False) -> None:
         """ソフトキーボードで名前を入力する。"""
         keyboard = self._keyboard
         cursor_x, cursor_y = 0, 0
         current_mode = 0
 
         for i, char in enumerate(name):
-            target_char, need_dakuten, need_handakuten = self._resolve_char(
-                char, keyboard
-            )
+            target_char, need_dakuten, need_handakuten = self._resolve_char(char, keyboard)
             result = find_char_in_keyboard(keyboard, target_char)
             if result is None:
                 cmd.log(
@@ -466,9 +459,7 @@ class FrlgIdRngMacro(MacroBase):
                 offset = keyboard.compute_offset(target_char, i)
 
             # カーソル移動 → 文字入力
-            cursor_x, cursor_y = self._move_cursor(
-                cmd, cursor_x, cursor_y, tx + offset, ty
-            )
+            cursor_x, cursor_y = self._move_cursor(cmd, cursor_x, cursor_y, tx + offset, ty)
             cmd.press(Button.A, dur=0.2, wait=0.2)
 
             # 濁点処理
@@ -494,9 +485,7 @@ class FrlgIdRngMacro(MacroBase):
         cmd.press(Button.PLUS, dur=0.1, wait=0.5)
 
     @staticmethod
-    def _resolve_char(
-        char: str, keyboard: RegionKeyboard
-    ) -> tuple[str, bool, bool]:
+    def _resolve_char(char: str, keyboard: RegionKeyboard) -> tuple[str, bool, bool]:
         """入力文字を (ベース文字, 濁点要否, 半濁点要否) に分解する。"""
         if keyboard.dakuten_map and char in keyboard.dakuten_map:
             return keyboard.dakuten_map[char], True, False

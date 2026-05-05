@@ -10,9 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 
-def frame_sweep(
-    min_val: float, max_val: float, step: float = 1.0
-) -> Iterator[float]:
+def frame_sweep(min_val: float, max_val: float, step: float = 1.0) -> Iterator[float]:
     """min_val から max_val まで step ずつフレーム値を列挙する。
 
     >>> list(frame_sweep(10, 13))

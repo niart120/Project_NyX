@@ -40,6 +40,7 @@ _FONT_CANDIDATES = [
 # ヘルパー
 # ---------------------------------------------------------------------------
 
+
 def make_text_image(
     text: str,
     width: int = 600,
@@ -72,6 +73,7 @@ def make_text_image(
 # フィクスチャ
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def ocr_en() -> OCRProcessor:
     return OCRProcessor(language="en")
@@ -85,6 +87,7 @@ def ocr_ja() -> OCRProcessor:
 # ---------------------------------------------------------------------------
 # OCRProcessor 初期化テスト
 # ---------------------------------------------------------------------------
+
 
 class TestOCRProcessorInit:
     def test_init_en_succeeds(self):
@@ -104,6 +107,7 @@ class TestOCRProcessorInit:
 # ---------------------------------------------------------------------------
 # recognize_text テスト
 # ---------------------------------------------------------------------------
+
 
 class TestRecognizeText:
     def test_returns_list(self, ocr_en):
@@ -140,6 +144,7 @@ class TestRecognizeText:
 # get_best_text テスト
 # ---------------------------------------------------------------------------
 
+
 class TestGetBestText:
     def test_returns_string(self, ocr_en):
         img = make_text_image("12345")
@@ -160,6 +165,7 @@ class TestGetBestText:
 # ---------------------------------------------------------------------------
 # extract_digits テスト
 # ---------------------------------------------------------------------------
+
 
 class TestExtractDigits:
     def test_extracts_exact_digits(self, ocr_en):

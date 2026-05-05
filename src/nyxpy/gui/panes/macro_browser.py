@@ -37,7 +37,7 @@ class MacroBrowserPane(QWidget):
         self.reload_button = QPushButton(self)
         self.reload_button.setToolTip("マクロを再読み込み")
         # アイコンがあれば設定（なければテキスト）
-        icon_path = os.path.join(os.path.dirname(__file__), '../../assets/reload.png')
+        icon_path = os.path.join(os.path.dirname(__file__), "../../assets/reload.png")
         if os.path.exists(icon_path):
             self.reload_button.setIcon(QIcon(icon_path))
         else:
@@ -59,14 +59,12 @@ class MacroBrowserPane(QWidget):
         self.reload_button.clicked.connect(self.on_reload_button_clicked)
 
         self.table.selectionModel().selectionChanged.connect(
-            lambda: self.selection_changed.emit(
-                self.table.selectionModel().hasSelection()
-            )
+            lambda: self.selection_changed.emit(self.table.selectionModel().hasSelection())
         )
 
     def on_reload_button_clicked(self):
         # macrosを再取得し、テーブルを更新
-        if hasattr(self.executor, 'reload_macros'):
+        if hasattr(self.executor, "reload_macros"):
             self.executor.reload_macros()
             self.macros = self.executor.macros
         else:

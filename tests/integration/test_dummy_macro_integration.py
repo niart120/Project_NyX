@@ -21,8 +21,10 @@ from nyxpy.framework.core.utils.cancellation import CancellationToken
 class MockNotificationHandler:
     def __init__(self):
         self.calls = []
+
     def publish(self, text, img=None):
         self.calls.append((text, img))
+
 
 # --- Fake デバイス実装 ---
 

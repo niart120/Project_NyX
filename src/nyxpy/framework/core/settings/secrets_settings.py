@@ -30,8 +30,8 @@ class SecretsSettings:
 
     def get(self, key, default=None):
         # ドット区切りキーでネストdictにも対応
-        if '.' in key:
-            parts = key.split('.')
+        if "." in key:
+            parts = key.split(".")
             d = self.data
             for p in parts[:-1]:
                 d = d.get(p, {})
@@ -40,8 +40,8 @@ class SecretsSettings:
 
     def set(self, key, value):
         # ドット区切りキーでネストdictにも対応
-        if '.' in key:
-            parts = key.split('.')
+        if "." in key:
+            parts = key.split(".")
             d = self.data
             for p in parts[:-1]:
                 if p not in d or not isinstance(d[p], dict):

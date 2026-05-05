@@ -555,12 +555,22 @@ class TestCSVHelper:
     def test_append_creates_with_header(self, tmp_path):
         """ファイルが存在しない場合、ヘッダー付きで作成される"""
         csv_path = tmp_path / CSV_FILENAME
-        append_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2",
-            "region": "JPN", "version": "FR", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-            "hardware": "Switch", "fps": "60.0", "note": "",
-        })
+        append_csv_row(
+            csv_path,
+            {
+                "frame": "2120",
+                "seed": "72C2",
+                "region": "JPN",
+                "version": "FR",
+                "edition": "Switch",
+                "sound_mode": "モノラル",
+                "button_mode": "ヘルプ",
+                "keyinput": "none",
+                "hardware": "Switch",
+                "fps": "60.0",
+                "note": "",
+            },
+        )
 
         with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -575,16 +585,31 @@ class TestCSVHelper:
     def test_append_detail_creates_with_header(self, tmp_path):
         """詳細CSV: ファイルが存在しない場合、ヘッダー付きで作成される"""
         csv_path = tmp_path / CSV_DETAIL_FILENAME
-        append_detail_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2",
-            "region": "JPN", "version": "FR", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-            "hardware": "Switch", "fps": "60.0",
-            "advance": "1340", "pokemon": "ルギア", "level": "70",
-            "hp": "253", "atk": "168", "def": "220",
-            "spa": "172", "spd": "258", "spe": "194",
-            "note": "",
-        })
+        append_detail_csv_row(
+            csv_path,
+            {
+                "frame": "2120",
+                "seed": "72C2",
+                "region": "JPN",
+                "version": "FR",
+                "edition": "Switch",
+                "sound_mode": "モノラル",
+                "button_mode": "ヘルプ",
+                "keyinput": "none",
+                "hardware": "Switch",
+                "fps": "60.0",
+                "advance": "1340",
+                "pokemon": "ルギア",
+                "level": "70",
+                "hp": "253",
+                "atk": "168",
+                "def": "220",
+                "spa": "172",
+                "spd": "258",
+                "spe": "194",
+                "note": "",
+            },
+        )
 
         with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -599,12 +624,22 @@ class TestCSVHelper:
         """複数回 append してもヘッダーは 1 回のみ"""
         csv_path = tmp_path / CSV_FILENAME
         for seed in ("AAAA", "BBBB"):
-            append_csv_row(csv_path, {
-                "frame": "2120", "seed": seed,
-                "region": "JPN", "version": "FR", "edition": "Switch",
-                "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-                "hardware": "Switch", "fps": "60.0", "note": "",
-            })
+            append_csv_row(
+                csv_path,
+                {
+                    "frame": "2120",
+                    "seed": seed,
+                    "region": "JPN",
+                    "version": "FR",
+                    "edition": "Switch",
+                    "sound_mode": "モノラル",
+                    "button_mode": "ヘルプ",
+                    "keyinput": "none",
+                    "hardware": "Switch",
+                    "fps": "60.0",
+                    "note": "",
+                },
+            )
 
         with open(csv_path, encoding="utf-8") as f:
             lines = f.readlines()
@@ -614,12 +649,22 @@ class TestCSVHelper:
     def test_csv_contains_metadata_columns(self, tmp_path):
         """CSV に hardware/fps/note を含む全カラムが存在する"""
         csv_path = tmp_path / CSV_FILENAME
-        append_csv_row(csv_path, {
-            "frame": "2120", "seed": "72C2",
-            "region": "JPN", "version": "FR", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-            "hardware": "Switch", "fps": "60.0", "note": "",
-        })
+        append_csv_row(
+            csv_path,
+            {
+                "frame": "2120",
+                "seed": "72C2",
+                "region": "JPN",
+                "version": "FR",
+                "edition": "Switch",
+                "sound_mode": "モノラル",
+                "button_mode": "ヘルプ",
+                "keyinput": "none",
+                "hardware": "Switch",
+                "fps": "60.0",
+                "note": "",
+            },
+        )
 
         with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -637,16 +682,31 @@ class TestCSVHelper:
     def test_detail_csv_contains_stats_columns(self, tmp_path):
         """詳細CSV に advance/pokemon/level/hp〜spe が含まれる"""
         csv_path = tmp_path / CSV_DETAIL_FILENAME
-        append_detail_csv_row(csv_path, {
-            "frame": "2120", "seed": "MULT",
-            "region": "JPN", "version": "FR", "edition": "Switch",
-            "sound_mode": "モノラル", "button_mode": "ヘルプ", "keyinput": "none",
-            "hardware": "Switch", "fps": "60.0",
-            "advance": "", "pokemon": "ルギア", "level": "70",
-            "hp": "250", "atk": "162", "def": "218",
-            "spa": "166", "spd": "264", "spe": "188",
-            "note": "候補2つ",
-        })
+        append_detail_csv_row(
+            csv_path,
+            {
+                "frame": "2120",
+                "seed": "MULT",
+                "region": "JPN",
+                "version": "FR",
+                "edition": "Switch",
+                "sound_mode": "モノラル",
+                "button_mode": "ヘルプ",
+                "keyinput": "none",
+                "hardware": "Switch",
+                "fps": "60.0",
+                "advance": "",
+                "pokemon": "ルギア",
+                "level": "70",
+                "hp": "250",
+                "atk": "162",
+                "def": "218",
+                "spa": "166",
+                "spd": "264",
+                "spe": "188",
+                "note": "候補2つ",
+            },
+        )
 
         with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -659,4 +719,3 @@ class TestCSVHelper:
         assert rows[0]["seed"] == "MULT"
         assert rows[0]["advance"] == ""
         assert rows[0]["note"] == "候補2つ"
-

@@ -55,7 +55,8 @@ class MacroExecutor:
                 # importlib.reload() はトップレベルの __init__.py しか再実行しないため、
                 # サブモジュール (例: macros.frlg_id_rng.region_timing) の変更が反映されない。
                 stale_keys = [
-                    key for key in sys.modules
+                    key
+                    for key in sys.modules
                     if key == module_name or key.startswith(module_name + ".")
                 ]
                 for key in stale_keys:

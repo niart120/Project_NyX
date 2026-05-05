@@ -26,9 +26,7 @@ class StaticResourceIO:
 
         self.root_dir_path = root_dir_path
 
-    def save_image(
-        self, filename: str | pathlib.Path, image: cv2.typing.MatLike
-    ) -> None:
+    def save_image(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
         """
         画像を指定されたパスに保存します。
         ディレクトリが存在しない場合は作成します。

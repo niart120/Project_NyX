@@ -27,7 +27,7 @@ def skip_opening_and_continue(cmd: Command) -> float:
     """
     t1 = start_timer()
     cmd.press(Button.A, dur=3.50, wait=1.00)  # OP スキップ
-    consume_timer(cmd, t1, _FRAME2, _FPS)     # frame2 タイマー消化
+    consume_timer(cmd, t1, _FRAME2, _FPS)  # frame2 タイマー消化
     cmd.press(Button.A, dur=0.20, wait=0.30)  # つづきからはじめる
     cmd.press(Button.B, dur=1.00, wait=1.80)  # 回想スキップ
     return t1
