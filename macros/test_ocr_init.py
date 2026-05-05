@@ -24,6 +24,7 @@ class TestOcrInitMacro(MacroBase):
         cmd.log("Step 1: PaddleOCR を初期化します...")
         try:
             from nyxpy.framework.core.imgproc import OCRProcessor
+
             ocr = OCRProcessor(language=self.lang)
             cmd.log("PaddleOCR の初期化に成功しました")
         except Exception as e:
@@ -47,6 +48,7 @@ class TestOcrInitMacro(MacroBase):
         if frame is not None:
             try:
                 from nyxpy.framework.core.imgproc import ImageProcessor
+
                 processor = ImageProcessor(frame)
                 text = processor.get_text(language=self.lang, preprocess=True)
                 cmd.log(f"  キャプチャ OCR 結果: '{text}'")

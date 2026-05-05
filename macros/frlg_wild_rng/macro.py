@@ -94,12 +94,12 @@ class FrlgWildRngMacro(MacroBase):
 
         # Step 4: 奇数ズレ補正（オプション）
         if cfg.use_odd_correction:
-            cmd.press(Button.X, dur=0.10, wait=0.50)   # メニュー開く
-            cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
-            cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
-            cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
-            cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
-            cmd.press(Button.B, dur=0.10, wait=0.50)   # メニュー閉じる
+            cmd.press(Button.X, dur=0.10, wait=0.50)  # メニュー開く
+            cmd.press(Button.A, dur=0.10, wait=1.40)  # 図鑑開く
+            cmd.press(Button.B, dur=0.10, wait=1.40)  # 図鑑閉じる
+            cmd.press(Button.A, dur=0.10, wait=1.40)  # 図鑑開く
+            cmd.press(Button.B, dur=0.10, wait=1.40)  # 図鑑閉じる
+            cmd.press(Button.B, dur=0.10, wait=0.50)  # メニュー閉じる
 
         # Step 5: おしえテレビ（オプション）
         if cfg.use_teachy_tv:

@@ -16,7 +16,7 @@ from nyxpy.framework.core.singletons import capture_manager, serial_manager
 
 
 class DeviceSettingsTab(QWidget):
-    def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):
+    def __init__(self, settings: GlobalSettings, secrets: SecretsSettings, parent=None):
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets
@@ -37,7 +37,7 @@ class DeviceSettingsTab(QWidget):
         cap_row.addWidget(self.cap_device)
         cap_row.addWidget(refresh_btn)
         cap_form.addRow(QLabel("Device:"), cap_row)
-        
+
         # プレビューFPS
         fps_options = ["15", "30", "60"]
         self.preview_fps = QComboBox()
@@ -72,11 +72,20 @@ class DeviceSettingsTab(QWidget):
         current_protocol = self.settings.get("serial_protocol", "")
         if current_protocol in protocol_options:
             self.ser_protocol.setCurrentText(current_protocol)
+        self.ser_protocol.currentTextChanged.connect(self._apply_protocol_default_baud)
 
         # シリアルボーレート
         self.ser_baud = QComboBox()
         baud_options = [
-            "1200", "2400", "4800", "9600", "14400", "19200", "38400", "57600", "115200",
+            "1200",
+            "2400",
+            "4800",
+            "9600",
+            "14400",
+            "19200",
+            "38400",
+            "57600",
+            "115200",
         ]
         self.ser_baud.addItems(baud_options)
         current_baud = str(self.settings.get("serial_baud", 9600))
@@ -88,6 +97,12 @@ class DeviceSettingsTab(QWidget):
         ser_form.addRow(QLabel("Baud Rate:"), self.ser_baud)
         ser_group_layout.addLayout(ser_form)
         layout.addWidget(ser_group)
+
+    def _apply_protocol_default_baud(self, protocol_name: str):
+        default_baud = str(ProtocolFactory.get_default_baudrate(protocol_name))
+        if self.ser_baud.findText(default_baud) < 0:
+            self.ser_baud.addItem(default_baud)
+        self.ser_baud.setCurrentText(default_baud)
 
     def refresh_capture_devices(self):
         devices = capture_manager.list_devices()

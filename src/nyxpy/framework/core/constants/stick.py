@@ -32,10 +32,8 @@ class LStick:
 
         # 小数点演算誤差を考慮する必要は無い
         self.x = math.ceil(127.5 * math.cos(rad) * self.mag + 127.5)
-        self.y = 255 - math.ceil(
-            127.5 * math.sin(rad) * self.mag + 127.5
-        )  # y軸のみ反転を考慮する
-    
+        self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
+
     def __repr__(self):
         return f"LStick(x={self.x}, y={self.y})"
 
@@ -77,10 +75,8 @@ class RStick:
 
         # 小数点演算誤差を考慮する必要は無い
         self.x = math.ceil(127.5 * math.cos(rad) * self.mag + 127.5)
-        self.y = 255 - math.ceil(
-            127.5 * math.sin(rad) * self.mag + 127.5
-        )  # y軸のみ反転を考慮する
-    
+        self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
+
     def __repr__(self):
         return f"RStick(x={self.x}, y={self.y})"
 

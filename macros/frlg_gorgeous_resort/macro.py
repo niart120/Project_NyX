@@ -63,9 +63,7 @@ class FrlgGorgeousResortMacro(MacroBase):
         self._pokedex_internal: set[int] | None = None
         if cfg.pokedex:
             self._pokedex_internal = {
-                NATIONAL_TO_INTERNAL[n]
-                for n in cfg.pokedex
-                if n in NATIONAL_TO_INTERNAL
+                NATIONAL_TO_INTERNAL[n] for n in cfg.pokedex if n in NATIONAL_TO_INTERNAL
             }
             for name in cfg.target_pokemon:
                 nat = NAME_TO_NATIONAL.get(name)
@@ -80,8 +78,7 @@ class FrlgGorgeousResortMacro(MacroBase):
                         level="WARNING",
                     )
             cmd.log(
-                f"図鑑登録数: {len(cfg.pokedex)}種"
-                f" → 内部コード {len(self._pokedex_internal)}種",
+                f"図鑑登録数: {len(cfg.pokedex)}種 → 内部コード {len(self._pokedex_internal)}種",
                 level="INFO",
             )
 
@@ -101,9 +98,7 @@ class FrlgGorgeousResortMacro(MacroBase):
             level="INFO",
         )
         cmd.notify(
-            f"アキホおねだりマクロを開始"
-            f" ({cfg.target_item} ×{cfg.target_count})。"
-            f" ETA: {eta_str}",
+            f"アキホおねだりマクロを開始 ({cfg.target_item} ×{cfg.target_count})。 ETA: {eta_str}",
         )
 
         cmd.log(
@@ -180,9 +175,9 @@ class FrlgGorgeousResortMacro(MacroBase):
 
     def _talk_to_akiho(self, cmd: Command) -> None:
         """アキホへの話しかけ操作（1回目：ポケモン決定処理をトリガー）。"""
-        cmd.press(Button.A, dur=0.10, wait=0.70)   # 話しかけ
-        cmd.press(Button.B, dur=0.10, wait=0.70)   # テキスト送り
-        cmd.press(Button.B, dur=0.10, wait=0.50)   # テキスト送り
+        cmd.press(Button.A, dur=0.10, wait=0.70)  # 話しかけ
+        cmd.press(Button.B, dur=0.10, wait=0.70)  # テキスト送り
+        cmd.press(Button.B, dur=0.10, wait=0.50)  # テキスト送り
 
     # --------------------------------------------------------
     # Step 6: 1回目の会話を終了 → 改めて話しかける
@@ -209,9 +204,9 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(Button.B, dur=0.10, wait=0.70)
         cmd.press(Button.B, dur=0.10, wait=0.80)
         cmd.press(Button.B, dur=0.10, wait=0.50)
-        cmd.press(Button.B, dur=0.10, wait=2.50)   # アイテム渡しアニメーション
+        cmd.press(Button.B, dur=0.10, wait=2.50)  # アイテム渡しアニメーション
         cmd.press(Button.B, dur=0.10, wait=0.40)
-        cmd.press(Button.B, dur=0.10, wait=2.00)   # アイテム取得テキスト表示
+        cmd.press(Button.B, dur=0.10, wait=2.00)  # アイテム取得テキスト表示
 
     # --------------------------------------------------------
     # Step 9: レポート書き → 退出 → 再入場
@@ -233,9 +228,9 @@ class FrlgGorgeousResortMacro(MacroBase):
         cmd.press(LStick.UP, dur=0.10, wait=0.10)
         cmd.press(LStick.UP, dur=0.10, wait=0.10)
         cmd.press(LStick.UP, dur=0.10, wait=0.10)
-        cmd.press(Button.A, dur=0.10, wait=1.00)   # 「レポートをかく」
-        cmd.press(Button.A, dur=0.10, wait=1.00)   # 確認
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # 「レポートをかく」
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # 確認
         cmd.press(Button.A, dur=0.10, wait=0.10)  # 「はい」を選択
-        cmd.press(Button.A, dur=0.10, wait=1.00)   # レポート書き込み実行
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # レポート書き込み実行
 
-        cmd.press(Button.A, dur=0.10, wait=1.00)   # レポート完了確認
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # レポート完了確認

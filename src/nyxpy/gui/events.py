@@ -9,6 +9,7 @@ class EventType(Enum):
     PROTOCOL_CHANGED = auto()
     # その他必要なイベント
 
+
 class EventBus:
     _instance = None
 

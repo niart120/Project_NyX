@@ -124,7 +124,7 @@ class TestLoadMacroSettings:
 
         static_dir = tmp_path / "static"
         # stem 名 'macro' のディレクトリに罠を仕掛ける
-        _write_settings_toml(static_dir, "macro", 'wrong = true\n')
+        _write_settings_toml(static_dir, "macro", "wrong = true\n")
         # 正しいパッケージ名には設定を置かない
 
         monkeypatch.chdir(tmp_path)

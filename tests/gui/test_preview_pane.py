@@ -22,7 +22,7 @@ def preview_pane(qtbot):
         mock_cv2.INTER_LINEAR = cv2.INTER_LINEAR
         pane = PreviewPane(
             capture_device=device_mock,
-            preview_fps=20       # プレビュー用のみ
+            preview_fps=20,  # プレビュー用のみ
         )
     qtbot.addWidget(pane)
     yield pane
@@ -53,9 +53,7 @@ class TestPreviewPane:
             test_frame, (1280, 720), interpolation=mock_cv2.INTER_AREA
         )
         mock_cv2.imwrite.assert_called_once_with(str(expected_path), test_frame)
-        signal_mock.emit.assert_called_once_with(
-            f"スナップショット保存: {mock_timestamp}.png"
-        )
+        signal_mock.emit.assert_called_once_with(f"スナップショット保存: {mock_timestamp}.png")
         assert result == f"スナップショット保存: {mock_timestamp}.png"
 
     @patch("nyxpy.gui.panes.preview_pane.cv2")

@@ -45,10 +45,12 @@ class LogPane(QWidget):
         # Clearボタンのシグナル接続
         self.clear_button.clicked.connect(self.view.clear)
         # loguruにはself._emit_appendを登録
-        log_manager.add_handler(self._emit_append, level=("DEBUG" if self.debug_checkbox.isChecked() else "INFO"))
+        log_manager.add_handler(
+            self._emit_append, level=("DEBUG" if self.debug_checkbox.isChecked() else "INFO")
+        )
         # Signal to append log messages to the view
         self.append_signal.connect(self._append_to_view)
-        
+
         self.debug_checkbox.stateChanged.connect(self._on_debug_checkbox_changed)
 
     def _emit_append(self, message: str):

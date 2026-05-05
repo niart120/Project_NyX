@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 
 import cv2
@@ -9,15 +8,18 @@ from .exceptions import InvalidImageError, TemplateMatchingError, ThresholdNotMe
 @dataclass
 class MatchResult:
     """テンプレートマッチングの結果"""
+
     position: tuple[int, int]  # (x, y)
     confidence: float
     bounding_box: tuple[int, int, int, int]  # (x, y, width, height)
 
 
-def find_template(source_image: cv2.typing.MatLike, 
-                  template_image: cv2.typing.MatLike,
-                  threshold: float = 0.8,
-                  method: int = cv2.TM_CCOEFF_NORMED) -> MatchResult:
+def find_template(
+    source_image: cv2.typing.MatLike,
+    template_image: cv2.typing.MatLike,
+    threshold: float = 0.8,
+    method: int = cv2.TM_CCOEFF_NORMED,
+) -> MatchResult:
     """
     テンプレートマッチングを実行し、最良の結果を返す
 
@@ -36,21 +38,25 @@ def find_template(source_image: cv2.typing.MatLike,
         raise InvalidImageError("Source image or template image is empty")
 
     # 画像サイズチェック
-    if (template_image.shape[0] > source_image.shape[0] or 
-        template_image.shape[1] > source_image.shape[1]):
+    if (
+        template_image.shape[0] > source_image.shape[0]
+        or template_image.shape[1] > source_image.shape[1]
+    ):
         raise InvalidImageError("Template image is larger than source image")
 
     try:
         # テンプレートマッチング実行
         result = cv2.matchTemplate(source_image, template_image, method)
-        
+
         # 最大値または最小値とその位置を取得
         if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
             match_val = min_val
             match_loc = min_loc
             # SQDIFF系は値が小さいほど良いマッチ
-            confidence = 1.0 - match_val if method == cv2.TM_SQDIFF_NORMED else 1.0 / (1.0 + match_val)
+            confidence = (
+                1.0 - match_val if method == cv2.TM_SQDIFF_NORMED else 1.0 / (1.0 + match_val)
+            )
         else:
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
             match_val = max_val
@@ -67,23 +73,21 @@ def find_template(source_image: cv2.typing.MatLike,
         h, w = template_image.shape[:2]
         bounding_box = (match_loc[0], match_loc[1], w, h)
 
-        return MatchResult(
-            position=match_loc,
-            confidence=confidence,
-            bounding_box=bounding_box
-        )
+        return MatchResult(position=match_loc, confidence=confidence, bounding_box=bounding_box)
 
     except cv2.error as e:
         raise TemplateMatchingError(f"OpenCV template matching failed: {e}")
 
 
-def contains_template(source_image: cv2.typing.MatLike,
-                     template_image: cv2.typing.MatLike,
-                     threshold: float = 0.8,
-                     method: int = cv2.TM_CCOEFF_NORMED) -> bool:
+def contains_template(
+    source_image: cv2.typing.MatLike,
+    template_image: cv2.typing.MatLike,
+    threshold: float = 0.8,
+    method: int = cv2.TM_CCOEFF_NORMED,
+) -> bool:
     """
     指定されたテンプレートが画像内に含まれているかを判定
-    
+
     :param source_image: 検索対象の画像
     :param template_image: テンプレート画像
     :param threshold: マッチング閾値（0.0-1.0）

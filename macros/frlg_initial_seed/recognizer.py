@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 # ステータス ROI: (x, y, w, h) — HP, Atk, Def, SpA, SpD, Spe の順
 ROI_STATS: tuple[tuple[int, int, int, int], ...] = (
-    (1015, 90, 155, 60),   # HP
+    (1015, 90, 155, 60),  # HP
     (1005, 170, 170, 60),  # こうげき
     (1005, 225, 170, 60),  # ぼうぎょ
     (1005, 280, 170, 60),  # とくこう
@@ -58,7 +58,7 @@ def calc_stat_valid_ranges(
         return lo, hi
 
     return {
-        "HP":  _hp_range(b_hp),
+        "HP": _hp_range(b_hp),
         "Atk": _stat_range(b_atk),
         "Def": _stat_range(b_def),
         "SpA": _stat_range(b_spa),
@@ -66,14 +66,13 @@ def calc_stat_valid_ranges(
         "Spe": _stat_range(b_spe),
     }
 
+
 # ============================================================
 # 認識関数
 # ============================================================
 
 
-def crop_and_pad(
-    image: np.ndarray, roi: tuple[int, int, int, int]
-) -> np.ndarray:
+def crop_and_pad(image: np.ndarray, roi: tuple[int, int, int, int]) -> np.ndarray:
     """ROI クロップ → 白パディング付与。"""
     return _shared_crop_and_pad(image, roi, pad=_PADDING)
 

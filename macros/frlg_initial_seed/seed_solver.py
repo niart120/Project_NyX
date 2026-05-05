@@ -94,7 +94,7 @@ def solve_initial_seed(
         nature_ids = (pid % np.uint32(25)).astype(np.intp)
 
         # ---- IV 抽出 ----
-        iv_hp  = hab & np.uint32(0x1F)
+        iv_hp = hab & np.uint32(0x1F)
         iv_atk = (hab >> np.uint32(5)) & np.uint32(0x1F)
         iv_def = (hab >> np.uint32(10)) & np.uint32(0x1F)
         iv_spe = scd & np.uint32(0x1F)

@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
         self.preview_pane = PreviewPane(
             capture_device=capture_manager.get_active_device(),
             parent=self,
-            preview_fps=global_settings.get("preview_fps", 30)
+            preview_fps=global_settings.get("preview_fps", 30),
         )
         right_layout.addWidget(self.preview_pane, stretch=1)
 
@@ -119,9 +119,7 @@ class MainWindow(QMainWindow):
         # Connect pane signals fully delegated
         self.macro_browser.selection_changed.connect(self.control_pane.set_selection)
         self.control_pane.run_requested.connect(self.execute_macro_immediate)
-        self.control_pane.run_with_params_requested.connect(
-            self.execute_macro_with_params
-        )
+        self.control_pane.run_with_params_requested.connect(self.execute_macro_with_params)
         self.control_pane.cancel_requested.connect(self.cancel_macro)
         # Delegate snapshot to PreviewPane and status via signal
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
@@ -153,38 +151,46 @@ class MainWindow(QMainWindow):
         # 差分がある項目のみ反映・イベント発行
         if "serial_device" in diff_keys or "serial_baud" in diff_keys:
             try:
-                serial_manager.set_active(cur_global.get("serial_device"), cur_global.get("serial_baud", 9600))
-                EventBus.get_instance().publish(EventType.SERIAL_DEVICE_CHANGED, {
-                    'name': cur_global.get("serial_device"),
-                    'baudrate': cur_global.get("serial_baud", 9600),
-                    'device': serial_manager.get_active_device()
-                })
+                serial_manager.set_active(
+                    cur_global.get("serial_device"), cur_global.get("serial_baud", 9600)
+                )
+                EventBus.get_instance().publish(
+                    EventType.SERIAL_DEVICE_CHANGED,
+                    {
+                        "name": cur_global.get("serial_device"),
+                        "baudrate": cur_global.get("serial_baud", 9600),
+                        "device": serial_manager.get_active_device(),
+                    },
+                )
                 log_manager.log(
                     "INFO",
                     f"シリアルデバイスを切り替えました: {cur_global.get('serial_device')} ({cur_global.get('serial_baud', 9600)} bps)",
                     "MainWindow",
                 )
             except Exception as e:
-                log_manager.log(
-                    "ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow"
-                )
+                log_manager.log("ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow")
         if "capture_device" in diff_keys:
             try:
                 capture_manager.set_active(cur_global.get("capture_device"))
-                EventBus.get_instance().publish(EventType.CAPTURE_DEVICE_CHANGED, {
-                    'name': cur_global.get("capture_device"),
-                    'device': capture_manager.get_active_device()
-                })
+                EventBus.get_instance().publish(
+                    EventType.CAPTURE_DEVICE_CHANGED,
+                    {
+                        "name": cur_global.get("capture_device"),
+                        "device": capture_manager.get_active_device(),
+                    },
+                )
                 log_manager.log(
-                    "INFO", f"キャプチャデバイスを切り替えました: {cur_global.get('capture_device')}", "MainWindow"
+                    "INFO",
+                    f"キャプチャデバイスを切り替えました: {cur_global.get('capture_device')}",
+                    "MainWindow",
                 )
             except Exception as e:
-                log_manager.log(
-                    "ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow"
-                )
+                log_manager.log("ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow")
         if "serial_protocol" in diff_keys:
             try:
-                protocol = ProtocolFactory.create_protocol(cur_global.get("serial_protocol", "CH552"))
+                protocol = ProtocolFactory.create_protocol(
+                    cur_global.get("serial_protocol", "CH552")
+                )
                 EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
                 protocol_name = cur_global.get("serial_protocol", "CH552")
                 log_manager.log(
@@ -197,29 +203,29 @@ class MainWindow(QMainWindow):
         if "preview_fps" in diff_keys:
             self.preview_pane.preview_fps = cur_global.get("preview_fps", 30)
             self.preview_pane.apply_fps()
-        
+
         # シークレット設定から通知関連の設定変更を確認
-        if "notification.discord.enabled" in diff_keys or "notification.bluesky.enabled" in diff_keys:
-        
+        if (
+            "notification.discord.enabled" in diff_keys
+            or "notification.bluesky.enabled" in diff_keys
+        ):
             enabled_services = []
             if secrets_settings.get("notification.discord.enabled", False):
                 enabled_services.append("Discord")
             if secrets_settings.get("notification.bluesky.enabled", False):
                 enabled_services.append("Bluesky")
-            
+
             if enabled_services:
                 log_manager.log(
                     "INFO",
                     f"通知設定が変更されました。有効なサービス: {', '.join(enabled_services)}",
-                    "MainWindow"
+                    "MainWindow",
                 )
             else:
                 log_manager.log(
-                    "INFO",
-                    "通知設定が変更されました。全てのサービスが無効です。",
-                    "MainWindow"
+                    "INFO", "通知設定が変更されました。全てのサービスが無効です。", "MainWindow"
                 )
-                
+
         # ...他の設定も必要に応じて追加...
         self._last_settings = deepcopy(cur_global)
         self._last_secrets = deepcopy(cur_secrets)
@@ -230,9 +236,7 @@ class MainWindow(QMainWindow):
 
     def execute_macro_with_params(self):
         """パラメータ付き実行モード：パラメータ入力ダイアログを表示して実行する"""
-        macro_name = self.macro_browser.table.item(
-            self.macro_browser.table.currentRow(), 0
-        ).text()
+        macro_name = self.macro_browser.table.item(self.macro_browser.table.currentRow(), 0).text()
         dlg = MacroParamsDialog(self, macro_name)
         if dlg.exec() != QDialog.Accepted:
             return
@@ -249,9 +253,7 @@ class MainWindow(QMainWindow):
         Args:
             exec_args: マクロに渡す引数辞書
         """
-        macro_name = self.macro_browser.table.item(
-            self.macro_browser.table.currentRow(), 0
-        ).text()
+        macro_name = self.macro_browser.table.item(self.macro_browser.table.currentRow(), 0).text()
         resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
         ct = CancellationToken()
@@ -283,7 +285,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "worker") and self.worker.isRunning():
             self.worker.cmd.stop()
             if not self.worker.wait(5000):  # 最大5秒待機
-                log_manager.log("WARNING", "ワーカースレッドの終了がタイムアウトしました", "MainWindow")
+                log_manager.log(
+                    "WARNING", "ワーカースレッドの終了がタイムアウトしました", "MainWindow"
+                )
                 self.worker.terminate()
                 self.worker.wait(2000)
 

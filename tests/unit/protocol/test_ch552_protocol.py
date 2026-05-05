@@ -91,9 +91,7 @@ def test_release_reset_all(protocol):
     # まず、押下状態を作る
     _ = protocol.build_press_command((Button.A, LStick.UP))
     release_data = protocol.build_release_command(())
-    expected = bytearray(
-        [0xAB, 0x00, 0x00, Hat.CENTER, 0x80, 0x80, 0x80, 0x80, 0x00, 0x00, 0x00]
-    )
+    expected = bytearray([0xAB, 0x00, 0x00, Hat.CENTER, 0x80, 0x80, 0x80, 0x80, 0x00, 0x00, 0x00])
     assert release_data == bytes(expected)
 
 
@@ -141,9 +139,7 @@ def test_keytype_command_release(protocol):
 
 def test_keytype_command_special_press(protocol):
     # 特殊キー押下のテスト
-    kb_data = protocol.build_keytype_command(
-        SpecialKeyCode.ENTER, KeyboardOp.SPECIAL_PRESS
-    )
+    kb_data = protocol.build_keytype_command(SpecialKeyCode.ENTER, KeyboardOp.SPECIAL_PRESS)
     expected = bytearray(
         [
             0xAB,

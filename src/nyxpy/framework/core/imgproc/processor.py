@@ -1,5 +1,3 @@
-
-
 import cv2
 
 from .exceptions import InvalidImageError
@@ -13,7 +11,7 @@ class ImageProcessor:
     画像処理ラッパークラス
     対象画像をコンストラクタで受け取り、シンプルなAPIを提供
     """
-    
+
     def __init__(self, image: cv2.typing.MatLike):
         """
         :param image: 処理対象の画像（OpenCV形式）
@@ -22,15 +20,17 @@ class ImageProcessor:
             raise InvalidImageError("画像が無効です")
         self.image = image
         self.preprocessor = ImagePreprocessor()
-    
-    def contains_template(self, 
-                         template: cv2.typing.MatLike, 
-                         threshold: float = 0.8,
-                         method: int = cv2.TM_CCOEFF_NORMED,
-                         preprocess: bool = False) -> bool:
+
+    def contains_template(
+        self,
+        template: cv2.typing.MatLike,
+        threshold: float = 0.8,
+        method: int = cv2.TM_CCOEFF_NORMED,
+        preprocess: bool = False,
+    ) -> bool:
         """
         指定されたテンプレートが画像内に含まれているかを判定
-        
+
         :param template: テンプレート画像
         :param threshold: マッチング閾値
         :param method: マッチング手法
@@ -39,21 +39,23 @@ class ImageProcessor:
         """
         source_img = self.image
         template_img = template
-        
+
         if preprocess:
             source_img = self.preprocessor.enhance_for_template_matching(source_img)
             template_img = self.preprocessor.enhance_for_template_matching(template_img)
-        
+
         return contains_template(source_img, template_img, threshold, method)
-    
-    def find_template(self,
-                     template: cv2.typing.MatLike,
-                     threshold: float = 0.8,
-                     method: int = cv2.TM_CCOEFF_NORMED,
-                     preprocess: bool = False) -> MatchResult:
+
+    def find_template(
+        self,
+        template: cv2.typing.MatLike,
+        threshold: float = 0.8,
+        method: int = cv2.TM_CCOEFF_NORMED,
+        preprocess: bool = False,
+    ) -> MatchResult:
         """
         テンプレートマッチングを実行し、結果を返す
-        
+
         :param template: テンプレート画像
         :param threshold: マッチング閾値
         :param method: マッチング手法
@@ -62,20 +64,22 @@ class ImageProcessor:
         """
         source_img = self.image
         template_img = template
-        
+
         if preprocess:
             source_img = self.preprocessor.enhance_for_template_matching(source_img)
             template_img = self.preprocessor.enhance_for_template_matching(template_img)
-        
+
         return find_template(source_img, template_img, threshold, method)
-    
-    def get_text(self, 
-                 language: str = 'ja',
-                 region: tuple[int, int, int, int] | None = None,
-                 preprocess: bool = False) -> str:
+
+    def get_text(
+        self,
+        language: str = "ja",
+        region: tuple[int, int, int, int] | None = None,
+        preprocess: bool = False,
+    ) -> str:
         """
         画像からテキストを認識し、最も信頼度の高い文字列を返す
-        
+
         :param language: 認識言語 ('ja', 'en')
         :param region: 認識領域 (x, y, width, height) - 指定しない場合は全体
         :param preprocess: OCR用前処理を行うか
@@ -83,27 +87,29 @@ class ImageProcessor:
         """
         # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
         ocr = OCRProcessor.get_instance(language)
-        
+
         # 認識対象画像の決定
         target_image = self.image
         if region is not None:
             x, y, w, h = region
-            target_image = self.image[y:y+h, x:x+w]
-        
+            target_image = self.image[y : y + h, x : x + w]
+
         # 前処理
         if preprocess:
             target_image = self.preprocessor.enhance_for_ocr(target_image)
-        
+
         # OCR実行
         return ocr.get_best_text(target_image)
-    
-    def get_digits(self, 
-                   language: str = 'en',
-                   region: tuple[int, int, int, int] | None = None,
-                   preprocess: bool = False) -> str:
+
+    def get_digits(
+        self,
+        language: str = "en",
+        region: tuple[int, int, int, int] | None = None,
+        preprocess: bool = False,
+    ) -> str:
         """
         画像から数字のみを認識して返す
-        
+
         :param language: 認識言語 ('ja', 'en')
         :param region: 認識領域 (x, y, width, height)
         :param preprocess: OCR用前処理を行うか
@@ -111,29 +117,31 @@ class ImageProcessor:
         """
         # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
         ocr = OCRProcessor.get_instance(language)
-        
+
         # 認識対象画像の決定
         target_image = self.image
         if region is not None:
             x, y, w, h = region
-            target_image = self.image[y:y+h, x:x+w]
-        
+            target_image = self.image[y : y + h, x : x + w]
+
         # 前処理
         if preprocess:
             target_image = self.preprocessor.enhance_for_ocr(target_image)
-        
+
         # 数字抽出
         return ocr.extract_digits(target_image)
-    
-    def find_text_region_with_template(self,
-                                      template: cv2.typing.MatLike,
-                                      roi_offset: tuple[int, int, int, int] = (0, 0, 0, 0),
-                                      language: str = 'ja',
-                                      template_threshold: float = 0.8,
-                                      preprocess: bool = False) -> str:
+
+    def find_text_region_with_template(
+        self,
+        template: cv2.typing.MatLike,
+        roi_offset: tuple[int, int, int, int] = (0, 0, 0, 0),
+        language: str = "ja",
+        template_threshold: float = 0.8,
+        preprocess: bool = False,
+    ) -> str:
         """
         テンプレートマッチングでテキスト領域を特定し、OCR実行
-        
+
         :param template: テンプレート画像
         :param roi_offset: マッチ位置からの相対オフセット (x_offset, y_offset, w_offset, h_offset)
         :param language: OCR認識言語
@@ -144,10 +152,10 @@ class ImageProcessor:
         # テンプレートマッチング
         match = self.find_template(template, template_threshold, preprocess=preprocess)
         x, y, w, h = match.bounding_box
-        
+
         # オフセット適用
         x_off, y_off, w_off, h_off = roi_offset
         roi = (x + x_off, y + y_off, w + w_off, h + h_off)
-        
+
         # OCR実行
         return self.get_text(language, roi, preprocess)

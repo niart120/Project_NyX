@@ -144,7 +144,8 @@ class FrlgInitialSeedMacro(MacroBase):
                 )
 
                 seed_result, advance, observed_stats = self._run_trial_with_retry(
-                    cmd, frame1,
+                    cmd,
+                    frame1,
                 )
 
                 # 共通メタデータ
@@ -184,8 +185,7 @@ class FrlgInitialSeedMacro(MacroBase):
 
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
-                    f"{frame_label}F ({trial + 1}/{cfg.trials})"
-                    f"：{seed_result} (adv={adv_str})",
+                    f"{frame_label}F ({trial + 1}/{cfg.trials})：{seed_result} (adv={adv_str})",
                     level="INFO",
                 )
 
@@ -200,9 +200,7 @@ class FrlgInitialSeedMacro(MacroBase):
     # trial ループ
     # --------------------------------------------------------
 
-    def _run_trial_with_retry(
-        self, cmd: Command, frame1: int
-    ) -> TrialResult:
+    def _run_trial_with_retry(self, cmd: Command, frame1: int) -> TrialResult:
         """1 trial を実行し、認識失敗時は最大 _MAX_RETRIES 回まで再試行する。
 
         リトライ時も frame2 は設定値のまま変更しない。
@@ -226,9 +224,7 @@ class FrlgInitialSeedMacro(MacroBase):
     # 1回分の試行 (ゲーム再起動 〜 Seed 逆算)
     # --------------------------------------------------------
 
-    def _run_single_trial(
-        self, cmd: Command, frame1: int, frame2: int
-    ) -> TrialResult | None:
+    def _run_single_trial(self, cmd: Command, frame1: int, frame2: int) -> TrialResult | None:
         """1 回分の試行を実行する。
 
         Returns:
@@ -272,8 +268,8 @@ class FrlgInitialSeedMacro(MacroBase):
 
     def _trigger_encounter(self, cmd: Command) -> None:
         """ルギアに話しかけてエンカウントを発生させる。"""
-        cmd.press(Button.A, dur=0.10, wait=11.00)   # 話しかける → エンカウント
-        cmd.press(Button.A, dur=0.10, wait=3.00)   # メッセージ送り(ルギアが あらわれた！)
+        cmd.press(Button.A, dur=0.10, wait=11.00)  # 話しかける → エンカウント
+        cmd.press(Button.A, dur=0.10, wait=3.00)  # メッセージ送り(ルギアが あらわれた！)
 
     # --------------------------------------------------------
     # Phase 2: 捕獲 → ステータス表示
@@ -284,12 +280,12 @@ class FrlgInitialSeedMacro(MacroBase):
 
         操作手順: → A → → → A(マスターボール選択) A(つかう) [捕獲完了待機]
         """
-        cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)   # 「バッグ」を選択
-        cmd.press(Button.A, dur=0.10, wait=1.20)     # バッグを開く
+        cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)  # 「バッグ」を選択
+        cmd.press(Button.A, dur=0.10, wait=1.20)  # バッグを開く
         cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)  # ポケット移動
         cmd.press(LStick.RIGHT, dur=0.10, wait=0.30)  # ポケット移動
-        cmd.press(Button.A, dur=0.10, wait=0.30)    # マスターボールを選択
-        cmd.press(Button.A, dur=0.10, wait=8.00)    # 「つかう」→ 捕獲アニメーション
+        cmd.press(Button.A, dur=0.10, wait=0.30)  # マスターボールを選択
+        cmd.press(Button.A, dur=0.10, wait=8.00)  # 「つかう」→ 捕獲アニメーション
 
     def _dismiss_post_capture(self, cmd: Command) -> None:
         """捕獲後のダイアログを B ボタン連打で処理する。
@@ -306,14 +302,14 @@ class FrlgInitialSeedMacro(MacroBase):
         性格画面を経由せず、ステータス画面で右入力して
         実数値ページを直接表示する。
         """
-        cmd.press(Button.PLUS, dur=0.10, wait=0.30) # メニューを開く
-        cmd.press(LStick.DOWN, dur=0.10, wait=0.10)    # カーソルを移動
-        cmd.press(Button.A, dur=0.10, wait=1.20)    # ポケモンを選択
-        cmd.press(LStick.UP, dur=0.10, wait=0.10)    # カーソルを移動
-        cmd.press(LStick.UP, dur=0.10, wait=0.10)    # カーソルを移動
-        cmd.press(Button.A, dur=0.10, wait=0.30)    # ルギアを選択
-        cmd.press(Button.A, dur=0.10, wait=0.30)    # 「つよさをみる」
-        cmd.press(Button.A, dur=0.10, wait=1.00)    # ステータス画面表示
+        cmd.press(Button.PLUS, dur=0.10, wait=0.30)  # メニューを開く
+        cmd.press(LStick.DOWN, dur=0.10, wait=0.10)  # カーソルを移動
+        cmd.press(Button.A, dur=0.10, wait=1.20)  # ポケモンを選択
+        cmd.press(LStick.UP, dur=0.10, wait=0.10)  # カーソルを移動
+        cmd.press(LStick.UP, dur=0.10, wait=0.10)  # カーソルを移動
+        cmd.press(Button.A, dur=0.10, wait=0.30)  # ルギアを選択
+        cmd.press(Button.A, dur=0.10, wait=0.30)  # 「つよさをみる」
+        cmd.press(Button.A, dur=0.10, wait=1.00)  # ステータス画面表示
         cmd.press(LStick.RIGHT, dur=0.10, wait=1.00)  # 実数値ページへ遷移
 
     # --------------------------------------------------------

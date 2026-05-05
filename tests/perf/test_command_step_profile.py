@@ -45,6 +45,8 @@ def test_press_step_profile():
     t5 = time.perf_counter()
     time.sleep(wait)
     t6 = time.perf_counter()
-    print(f"[step profile] build_press: {(t1-t0)*1000:.3f}ms, send_press: {(t2-t1)*1000:.3f}ms, wait_dur: {(t3-t2)*1000:.3f}ms, build_release: {(t4-t3)*1000:.3f}ms, send_release: {(t5-t4)*1000:.3f}ms, wait_post: {(t6-t5)*1000:.3f}ms")
+    print(
+        f"[step profile] build_press: {(t1 - t0) * 1000:.3f}ms, send_press: {(t2 - t1) * 1000:.3f}ms, wait_dur: {(t3 - t2) * 1000:.3f}ms, build_release: {(t4 - t3) * 1000:.3f}ms, send_release: {(t5 - t4) * 1000:.3f}ms, wait_post: {(t6 - t5) * 1000:.3f}ms"
+    )
     # 合計も出力
-    print(f"[step profile] total: {(t6-t0)*1000:.3f}ms")
+    print(f"[step profile] total: {(t6 - t0) * 1000:.3f}ms")

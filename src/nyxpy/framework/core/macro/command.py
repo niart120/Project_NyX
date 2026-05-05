@@ -77,9 +77,7 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def log(
-        self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG"
-    ) -> None:
+    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         """
         ログ出力を行います。
 
@@ -116,9 +114,7 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def load_img(
-        self, filename: str | pathlib.Path, grayscale: bool = False
-    ) -> cv2.typing.MatLike:
+    def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
         """
         指定されたパスから画像を読み込みます。
         画像が存在しない場合は例外をスローします。
@@ -157,6 +153,18 @@ class Command(ABC):
         """
         pass
 
+    def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
+        raise NotImplementedError("Current serial protocol does not support touch input.")
+
+    def touch_down(self, x: int, y: int) -> None:
+        raise NotImplementedError("Current serial protocol does not support touch input.")
+
+    def touch_up(self) -> None:
+        raise NotImplementedError("Current serial protocol does not support touch input.")
+
+    def disable_sleep(self, enabled: bool = True) -> None:
+        raise NotImplementedError("Current serial protocol does not support sleep control.")
+
 
 class DefaultCommand(Command):
     """
@@ -175,7 +183,7 @@ class DefaultCommand(Command):
         resource_io: StaticResourceIO,
         protocol: SerialProtocolInterface,
         ct: CancellationToken,
-        notification_handler:NotificationHandler
+        notification_handler: NotificationHandler,
     ) -> None:
         self.serial_device = serial_device
         self.capture_device = capture_device
@@ -207,6 +215,38 @@ class DefaultCommand(Command):
         release_data = self.protocol.build_release_command(keys)
         self.serial_device.send(release_data)
 
+    def _build_protocol_command(self, method_name: str, *args) -> bytes:
+        method = getattr(self.protocol, method_name, None)
+        if method is None:
+            feature = "touch input" if method_name.startswith("build_touch") else "sleep control"
+            raise NotImplementedError(f"Current serial protocol does not support {feature}.")
+        return method(*args)
+
+    @check_interrupt
+    def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
+        self.touch_down(x, y)
+        self.wait(dur)
+        self.touch_up()
+        self.wait(wait)
+
+    @check_interrupt
+    def touch_down(self, x: int, y: int) -> None:
+        self.log(f"Touch down: ({x}, {y})", level="DEBUG")
+        touch_data = self._build_protocol_command("build_touch_down_command", x, y)
+        self.serial_device.send(touch_data)
+
+    @check_interrupt
+    def touch_up(self) -> None:
+        self.log("Touch up", level="DEBUG")
+        touch_data = self._build_protocol_command("build_touch_up_command")
+        self.serial_device.send(touch_data)
+
+    @check_interrupt
+    def disable_sleep(self, enabled: bool = True) -> None:
+        self.log(f"Disable sleep: {enabled}", level="DEBUG")
+        command_data = self._build_protocol_command("build_disable_sleep_command", enabled)
+        self.serial_device.send(command_data)
+
     @check_interrupt
     def wait(self, wait: float) -> None:
         self.log(f"Waiting for {wait} seconds", level="DEBUG")
@@ -217,9 +257,7 @@ class DefaultCommand(Command):
         self.ct.request_stop()
         raise MacroStopException("Macro execution interrupted.")
 
-    def log(
-        self, *values, sep: str = " ", end: str = "\n", level: str = "INFO"
-    ) -> None:
+    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "INFO") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         caller_class = get_caller_class_name()
         log_manager.log(level, message, component=caller_class)
@@ -234,9 +272,7 @@ class DefaultCommand(Command):
             self.log("Capture failed", level="ERROR")
             return None
         target_resolution = (1280, 720)
-        frame = cv2.resize(
-            capture_data, target_resolution, interpolation=cv2.INTER_AREA
-        )
+        frame = cv2.resize(capture_data, target_resolution, interpolation=cv2.INTER_AREA)
         if crop_region is not None:
             x, y, w, h = crop_region
             if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:

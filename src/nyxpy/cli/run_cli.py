@@ -5,10 +5,8 @@ from typing import Any
 from nyxpy.framework.core.api.notification_handler import (
     create_notification_handler_from_settings,
 )
-from nyxpy.framework.core.hardware.protocol import (
-    CH552SerialProtocol,
-    SerialProtocolInterface,
-)
+from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.command import Command, DefaultCommand
@@ -51,14 +49,7 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
     Raises:
         ValueError: プロトコル名が不明な場合
     """
-    if not protocol_name:
-        raise ValueError("Protocol name cannot be empty")
-
-    match protocol_name.upper():
-        case "CH552SERIAL" | "CH552":
-            return CH552SerialProtocol()
-        case _:
-            raise ValueError(f"Unknown protocol: {protocol_name}")
+    return ProtocolFactory.create_protocol(protocol_name)
 
 
 def create_command(
@@ -122,9 +113,7 @@ def execute_macro(
     except MacroStopException as mse:
         cmd.log("Macro execution was interrupted:", mse, level="WARNING")
     except Exception as e:
-        cmd.log(
-            "An unexpected error occurred during macro execution:", e, level="ERROR"
-        )
+        cmd.log("An unexpected error occurred during macro execution:", e, level="ERROR")
         raise e
     finally:
         cmd.log("Macro execution completed.")
@@ -155,10 +144,10 @@ def cli_main(args: argparse.Namespace) -> int:
         if args.serial not in available_serial_devices:
             available_devices_str = ", ".join(available_serial_devices)
             raise ValueError(
-                f"Serial port '{args.serial}' not found. "
-                f"Available devices: {available_devices_str}"
+                f"Serial port '{args.serial}' not found. Available devices: {available_devices_str}"
             )
-        serial_manager.set_active(args.serial)
+        baudrate = ProtocolFactory.resolve_baudrate(args.protocol, getattr(args, "baud", None))
+        serial_manager.set_active(args.serial, baudrate)
 
         available_capture_devices = capture_manager.list_devices()
         print(f"Available capture devices: {available_capture_devices}")
@@ -216,28 +205,21 @@ def main():
     コマンドライン引数を解析してcli_mainを呼び出します
     """
     import argparse
-    
-    parser = argparse.ArgumentParser(
-        description="NyX CLI - Nintendo Switch Automation Tool"
-    )
+
+    parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
     parser.add_argument("macro_name", help="実行するマクロ名")
     parser.add_argument("--serial", required=True, help="シリアルデバイス名")
     parser.add_argument("--capture", required=True, help="キャプチャデバイス名")
-    parser.add_argument(
-        "--protocol", default="ch552", help="通信プロトコル (default: ch552)"
-    )
-    parser.add_argument(
-        "--silence", action="store_true", help="ログ出力を最小限に抑制"
-    )
-    parser.add_argument(
-        "--verbose", action="store_true", help="詳細なログ出力を有効化"
-    )
+    parser.add_argument("--protocol", default="ch552", help="通信プロトコル (default: ch552)")
+    parser.add_argument("--baud", type=int, default=None, help="シリアルボーレート")
+    parser.add_argument("--silence", action="store_true", help="ログ出力を最小限に抑制")
+    parser.add_argument("--verbose", action="store_true", help="詳細なログ出力を有効化")
     parser.add_argument(
         "--define",
         action="append",
         help="マクロ実行時の変数定義 (key=value形式)",
     )
-    
+
     args = parser.parse_args()
     exit_code = cli_main(args)
     exit(exit_code)

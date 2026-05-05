@@ -9,6 +9,8 @@ from nyxpy.framework.core.constants import (
     LStick,
     RStick,
     SpecialKeyCode,
+    ThreeDSButton,
+    TouchState,
 )
 
 
@@ -52,9 +54,7 @@ class SerialProtocolInterface(ABC):
         pass
 
     @abstractmethod
-    def build_keytype_command(
-        self, key: KeyCode | SpecialKeyCode, op: KeyboardOp
-    ) -> bytes:
+    def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
         """
         キーボード個別キー操作のコマンドデータを生成する
 
@@ -64,6 +64,10 @@ class SerialProtocolInterface(ABC):
         :raises NotImplementedError: プロトコルが対応していない場合
         """
         pass
+
+
+class UnsupportedKeyError(ValueError):
+    """指定されたキーが対象プロトコルで表現できない場合の例外。"""
 
 
 class CH552SerialProtocol(SerialProtocolInterface):
@@ -115,6 +119,8 @@ class CH552SerialProtocol(SerialProtocolInterface):
             elif isinstance(key, RStick):
                 self.key_state[6] = key.x
                 self.key_state[7] = key.y
+            elif isinstance(key, ThreeDSButton | TouchState):
+                raise UnsupportedKeyError(f"CH552 protocol does not support {key!r}.")
 
         # 生成された状態をそのままコマンドデータとして返す
         return bytes(self.key_state)
@@ -136,6 +142,8 @@ class CH552SerialProtocol(SerialProtocolInterface):
             elif isinstance(key, RStick):
                 self.key_state[6] = key.x
                 self.key_state[7] = key.y
+            elif isinstance(key, ThreeDSButton | TouchState):
+                raise UnsupportedKeyError(f"CH552 protocol does not support {key!r}.")
 
         # 生成された状態をそのままコマンドデータとして返す
         return bytes(self.key_state)
@@ -157,6 +165,8 @@ class CH552SerialProtocol(SerialProtocolInterface):
                 elif isinstance(key, RStick):
                     self.key_state[6] = 0x80
                     self.key_state[7] = 0x80
+                elif isinstance(key, ThreeDSButton | TouchState):
+                    raise UnsupportedKeyError(f"CH552 protocol does not support {key!r}.")
 
         return bytes(self.key_state)
 
@@ -166,9 +176,7 @@ class CH552SerialProtocol(SerialProtocolInterface):
             "CH552 protocol does not support text mode keyboard input. Use build_keytype_command instead."
         )
 
-    def build_keytype_command(
-        self, key: KeyCode | SpecialKeyCode, op: KeyboardOp
-    ) -> bytes:
+    def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
         # キーボード個別キー操作の状態を更新する
         # キーボード操作のヘッダーを設定
         self.key_state[8] = int(op)
@@ -223,12 +231,14 @@ class PokeConSerialProtocol(SerialProtocolInterface):
             elif isinstance(key, RStick):
                 self.key_state[4] = key.x
                 self.key_state[5] = key.y
+            elif isinstance(key, ThreeDSButton | TouchState):
+                raise UnsupportedKeyError(f"PokeCon protocol does not support {key!r}.")
 
         # 生成された状態を16進数の文字列に変換後、バイト列として返す
         hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
         # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
         return hex_string.encode("utf-8")
-    
+
     def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
         # キー入力状態をリセット
         self._initialize_key_state()
@@ -245,6 +255,8 @@ class PokeConSerialProtocol(SerialProtocolInterface):
             elif isinstance(key, RStick):
                 self.key_state[4] = key.x
                 self.key_state[5] = key.y
+            elif isinstance(key, ThreeDSButton | TouchState):
+                raise UnsupportedKeyError(f"PokeCon protocol does not support {key!r}.")
 
         # 生成された状態を16進数の文字列に変換後、バイト列として返す
         hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
@@ -267,6 +279,8 @@ class PokeConSerialProtocol(SerialProtocolInterface):
                 elif isinstance(key, RStick):
                     self.key_state[4] = 0x80
                     self.key_state[5] = 0x80
+                elif isinstance(key, ThreeDSButton | TouchState):
+                    raise UnsupportedKeyError(f"PokeCon protocol does not support {key!r}.")
         # 生成された状態を16進数の文字列に変換後、バイト列として返す
         hex_string = f"{self.key_state[0]:#X} {self.key_state[1]:X} {self.key_state[2]:X} {self.key_state[3]:X} {self.key_state[4]:X} {self.key_state[5]:X}\r\n"
         # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
@@ -278,9 +292,7 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         encoded = f'"{key}"'.encode("utf-8", errors="ignore")
         return encoded + b"\r\n"
 
-    def build_keytype_command(
-        self, key: KeyCode | SpecialKeyCode, op: KeyboardOp
-    ) -> bytes:
+    def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
         # キーボード個別キー操作の種類に応じて、コマンドを生成する
         match op:
             case KeyboardOp.SPECIAL_PUSH:
@@ -315,3 +327,209 @@ class PokeConSerialProtocol(SerialProtocolInterface):
                 )
             case _:
                 raise ValueError("Unsupported keyboard operation type")
+
+
+class ThreeDSSerialProtocol(SerialProtocolInterface):
+    """Nintendo 3DS 向け S2/T3 シリアルプロトコル実装。"""
+
+    _BUTTON_MASKS: dict[Button, int] = {
+        Button.Y: 0x0080,
+        Button.B: 0x0020,
+        Button.A: 0x0010,
+        Button.X: 0x0040,
+        Button.L: 0x0100,
+        Button.R: 0x0200,
+        Button.ZL: 0x4000,
+        Button.ZR: 0x8000,
+        Button.MINUS: 0x1000,
+        Button.PLUS: 0x0800,
+        Button.HOME: 0x0400,
+    }
+
+    _HAT_MASKS: dict[Hat, int] = {
+        Hat.LEFT: 0x01,
+        Hat.DOWN: 0x02,
+        Hat.RIGHT: 0x04,
+        Hat.UP: 0x08,
+        Hat.UPRIGHT: 0x0C,
+        Hat.DOWNRIGHT: 0x06,
+        Hat.DOWNLEFT: 0x03,
+        Hat.UPLEFT: 0x09,
+        Hat.CENTER: 0x00,
+    }
+
+    def __init__(self):
+        self._initialize_key_state()
+
+    def _initialize_key_state(self) -> None:
+        self.button_mask = 0x0000
+        self.slide_x = 0x80
+        self.slide_y = 0x80
+        self.c_stick_x = 0x00
+        self.c_stick_y = 0x00
+        self.touch_pressed = False
+        self.touch_x = 0
+        self.touch_y = 0
+
+    def _build_frame(self) -> bytes:
+        touch_flag = 0x01 if self.touch_pressed else 0x00
+        x_high = (self.touch_x >> 8) & 0xFF if self.touch_pressed else 0x00
+        x_low = self.touch_x & 0xFF if self.touch_pressed else 0x00
+        y_low = self.touch_y & 0xFF if self.touch_pressed else 0x00
+        return bytes(
+            [
+                0xA1,
+                self.button_mask & 0xFF,
+                (self.button_mask >> 8) & 0xFF,
+                0xA2,
+                self.slide_x,
+                self.slide_y,
+                0xA4,
+                self.c_stick_x,
+                self.c_stick_y,
+                0xB2,
+                touch_flag,
+                x_high,
+                x_low,
+                y_low,
+            ]
+        )
+
+    def _apply_press_key(self, key: KeyType) -> None:
+        if isinstance(key, Button | ThreeDSButton):
+            self.button_mask |= self._button_mask(key)
+        elif isinstance(key, Hat):
+            self.button_mask |= self._hat_mask(key)
+        elif isinstance(key, LStick):
+            self.slide_x = self._convert_slide_axis(key.x)
+            self.slide_y = self._convert_slide_axis(key.y)
+        elif isinstance(key, RStick):
+            self.c_stick_x = self._convert_c_stick_axis(key.x)
+            self.c_stick_y = self._convert_c_stick_axis(key.y)
+        elif isinstance(key, TouchState):
+            self._set_touch_state(key)
+
+    def _apply_release_key(self, key: KeyType) -> None:
+        if isinstance(key, Button | ThreeDSButton):
+            self.button_mask &= ~self._button_mask(key) & 0xFFFF
+        elif isinstance(key, Hat):
+            self.button_mask &= ~self._hat_mask(key) & 0xFFFF
+        elif isinstance(key, LStick):
+            self.slide_x = 0x80
+            self.slide_y = 0x80
+        elif isinstance(key, RStick):
+            self.c_stick_x = 0x00
+            self.c_stick_y = 0x00
+        elif isinstance(key, TouchState):
+            self._set_touch_up()
+
+    def _button_mask(self, key: Button | ThreeDSButton) -> int:
+        if isinstance(key, ThreeDSButton):
+            if key == ThreeDSButton.POWER:
+                return 0x2000
+            raise UnsupportedKeyError(f"3DS protocol does not support {key!r}.")
+        if key not in self._BUTTON_MASKS:
+            raise UnsupportedKeyError(f"3DS protocol does not support {key!r}.")
+        return self._BUTTON_MASKS[key]
+
+    def _hat_mask(self, key: Hat) -> int:
+        return self._HAT_MASKS[key]
+
+    def _set_touch_state(self, touch: TouchState) -> None:
+        if touch.pressed:
+            self._validate_touch(touch.x, touch.y)
+            self.touch_pressed = True
+            self.touch_x = touch.x
+            self.touch_y = touch.y
+        else:
+            self._set_touch_up()
+
+    def _set_touch_up(self) -> None:
+        self.touch_pressed = False
+        self.touch_x = 0
+        self.touch_y = 0
+
+    @staticmethod
+    def _validate_touch(x: int, y: int) -> None:
+        if not 0 <= x <= 320:
+            raise ValueError("Touch X must be in range 0..320")
+        if not 0 <= y <= 240:
+            raise ValueError("Touch Y must be in range 0..240")
+
+    @staticmethod
+    def _convert_slide_axis(value: int) -> int:
+        if not 0 <= value <= 255:
+            raise ValueError("Stick axis must be in range 0..255")
+        if value <= 128:
+            return round(0x7E + (value / 128) * (0x80 - 0x7E))
+        return round(0x80 + ((value - 128) / 127) * (0xFA - 0x80))
+
+    @staticmethod
+    def _convert_c_stick_axis(value: int) -> int:
+        if not 0 <= value <= 255:
+            raise ValueError("Stick axis must be in range 0..255")
+        if value in (127, 128):
+            return 0x00
+        return max(-128, min(127, value - 128)) & 0xFF
+
+    @staticmethod
+    def _validate_calibration_values(values: tuple[int, ...]) -> None:
+        for value in values:
+            if not 0 <= value <= 255:
+                raise ValueError("Touch calibration value must be in range 0..255")
+
+    def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        for key in keys:
+            self._apply_press_key(key)
+        return self._build_frame()
+
+    def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        self._initialize_key_state()
+        for key in keys:
+            self._apply_press_key(key)
+        return self._build_frame()
+
+    def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
+        if not keys:
+            self._initialize_key_state()
+        else:
+            for key in keys:
+                self._apply_release_key(key)
+        return self._build_frame()
+
+    def build_touch_down_command(self, x: int, y: int) -> bytes:
+        self._set_touch_state(TouchState.down(x, y))
+        return self._build_frame()
+
+    def build_touch_up_command(self) -> bytes:
+        self._set_touch_up()
+        return self._build_frame()
+
+    def build_disable_sleep_command(self, enabled: bool) -> bytes:
+        return bytes([0xFC, 0x01 if enabled else 0x00])
+
+    def build_touch_calibration_write_command(
+        self,
+        x_min: int,
+        x_max: int,
+        y_min: int,
+        y_max: int,
+        *,
+        factory: bool = False,
+    ) -> bytes:
+        values = (x_min, x_max, y_min, y_max)
+        self._validate_calibration_values(values)
+        header = 0xB6 if factory else 0xB3
+        return bytes([header, *values])
+
+    def build_touch_calibration_read_command(self) -> bytes:
+        return bytes([0xB4])
+
+    def build_touch_calibration_factory_reset_command(self) -> bytes:
+        return bytes([0xB5])
+
+    def build_keyboard_command(self, text: str) -> bytes:
+        raise NotImplementedError("3DS protocol does not support keyboard input.")
+
+    def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
+        raise NotImplementedError("3DS protocol does not support keyboard input.")

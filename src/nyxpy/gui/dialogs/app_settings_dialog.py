@@ -10,7 +10,7 @@ from .settings.tab_widget import SettingsTabWidget
 class AppSettingsDialog(QDialog):
     settings_applied = Signal()
 
-    def __init__(self, parent, settings:GlobalSettings=None, secrets:SecretsSettings=None):
+    def __init__(self, parent, settings: GlobalSettings = None, secrets: SecretsSettings = None):
         super().__init__(parent)
         self.setWindowTitle("デバイス・通知・一般設定")
         self.resize(500, 400)

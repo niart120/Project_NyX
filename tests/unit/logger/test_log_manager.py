@@ -29,9 +29,7 @@ class TestLogManager:
 
         # ハンドラによりメッセージが記録されることを検証
         assert len(self.log_records) == 1
-        assert any(
-            "debug message" in msg and "UnitTest" in msg for msg in self.log_records
-        )
+        assert any("debug message" in msg and "UnitTest" in msg for msg in self.log_records)
 
     def test_set_level_changes_all_handlers(self):
         # カスタムハンドラを追加してログレベル設定の変更を検証

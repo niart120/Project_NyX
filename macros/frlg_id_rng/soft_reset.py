@@ -37,7 +37,10 @@ class FrlgSoftResetMacro(MacroBase):
         for i in range(1, self._repeat + 1):
             cmd.log(f"ソフトリセット {i}/{self._repeat}", level="INFO")
             cmd.press(
-                Button.A, Button.B, Button.X, Button.Y,
+                Button.A,
+                Button.B,
+                Button.X,
+                Button.Y,
                 dur=self._press_dur,
                 wait=self._wait_dur,
             )

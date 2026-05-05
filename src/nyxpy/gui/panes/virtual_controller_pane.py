@@ -1,4 +1,3 @@
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
@@ -12,9 +11,7 @@ from nyxpy.gui.widgets.controller.dpad import DPad
 class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
 
-    def __init__(
-        self, parent: QWidget | None = None
-    ) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.model = VirtualControllerModel()
         self.initUI()
@@ -37,12 +34,8 @@ class VirtualControllerPane(QWidget):
         trigger_layout_left.setSpacing(2)
 
         # 外側にZLを配置
-        self.btn_zl = ControllerButton(
-            "ZL", self, Button.ZL, size=(30, 20), is_rectangular=True
-        )
-        self.btn_l = ControllerButton(
-            "L", self, Button.L, size=(30, 20), is_rectangular=True
-        )
+        self.btn_zl = ControllerButton("ZL", self, Button.ZL, size=(30, 20), is_rectangular=True)
+        self.btn_l = ControllerButton("L", self, Button.L, size=(30, 20), is_rectangular=True)
 
         trigger_layout_left.addWidget(self.btn_zl)
         trigger_layout_left.addWidget(self.btn_l)
@@ -53,12 +46,8 @@ class VirtualControllerPane(QWidget):
         system_layout_left.setAlignment(Qt.AlignRight)  # 右寄せに設定
         system_layout_left.setSpacing(4)
 
-        self.btn_minus = ControllerButton(
-            "-", self, Button.MINUS, size=(35, 25), radius=12
-        )
-        self.btn_capture = ControllerButton(
-            "📷", self, Button.CAP, size=(35, 25), radius=12
-        )
+        self.btn_minus = ControllerButton("-", self, Button.MINUS, size=(35, 25), radius=12)
+        self.btn_capture = ControllerButton("📷", self, Button.CAP, size=(35, 25), radius=12)
 
         system_layout_left.addWidget(self.btn_minus)
         system_layout_left.addWidget(self.btn_capture)
@@ -76,9 +65,7 @@ class VirtualControllerPane(QWidget):
         self.left_stick.valueChanged.connect(self.model.set_left_stick)
 
         # LS（左スティック押し込み）ボタン
-        self.btn_ls = ControllerButton(
-            "LS", self, Button.LS, size=(30, 20), is_rectangular=True
-        )
+        self.btn_ls = ControllerButton("LS", self, Button.LS, size=(30, 20), is_rectangular=True)
 
         left_stick_container.addWidget(self.left_stick, alignment=Qt.AlignCenter)
         left_stick_container.addWidget(self.btn_ls, alignment=Qt.AlignCenter)
@@ -103,12 +90,8 @@ class VirtualControllerPane(QWidget):
         trigger_layout_right.setSpacing(2)
 
         # 外側にZRを配置
-        self.btn_r = ControllerButton(
-            "R", self, Button.R, size=(30, 20), is_rectangular=True
-        )
-        self.btn_zr = ControllerButton(
-            "ZR", self, Button.ZR, size=(30, 20), is_rectangular=True
-        )
+        self.btn_r = ControllerButton("R", self, Button.R, size=(30, 20), is_rectangular=True)
+        self.btn_zr = ControllerButton("ZR", self, Button.ZR, size=(30, 20), is_rectangular=True)
 
         trigger_layout_right.addWidget(self.btn_r)
         trigger_layout_right.addWidget(self.btn_zr)
@@ -122,12 +105,8 @@ class VirtualControllerPane(QWidget):
         system_layout_right.setAlignment(Qt.AlignLeft)  # 左寄せに設定
         system_layout_right.setSpacing(4)
 
-        self.btn_home = ControllerButton(
-            "🏠", self, Button.HOME, size=(35, 25), radius=12
-        )
-        self.btn_plus = ControllerButton(
-            "+", self, Button.PLUS, size=(35, 25), radius=12
-        )
+        self.btn_home = ControllerButton("🏠", self, Button.HOME, size=(35, 25), radius=12)
+        self.btn_plus = ControllerButton("+", self, Button.PLUS, size=(35, 25), radius=12)
 
         system_layout_right.addWidget(self.btn_home)
         system_layout_right.addWidget(self.btn_plus)
@@ -156,9 +135,7 @@ class VirtualControllerPane(QWidget):
         self.right_stick.valueChanged.connect(self.model.set_right_stick)
 
         # RS（右スティック押し込み）ボタン
-        self.btn_rs = ControllerButton(
-            "RS", self, Button.RS, size=(30, 20), is_rectangular=True
-        )
+        self.btn_rs = ControllerButton("RS", self, Button.RS, size=(30, 20), is_rectangular=True)
 
         right_stick_container.addWidget(self.right_stick, alignment=Qt.AlignCenter)
         right_stick_container.addWidget(self.btn_rs, alignment=Qt.AlignCenter)

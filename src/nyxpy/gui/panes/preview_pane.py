@@ -21,7 +21,9 @@ class PreviewPane(QWidget):
     Pane for showing camera preview and handling snapshots.
     """
 
-    def __init__(self, capture_device: CaptureDeviceInterface | None = None, parent=None, preview_fps=30):
+    def __init__(
+        self, capture_device: CaptureDeviceInterface | None = None, parent=None, preview_fps=30
+    ):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         self.label = AspectRatioLabel(16, 9)
@@ -30,7 +32,7 @@ class PreviewPane(QWidget):
         layout.addWidget(self.label)
 
         self.capture_device: CaptureDeviceInterface = capture_device
-        self.preview_fps = preview_fps      # プレビュー用のみ
+        self.preview_fps = preview_fps  # プレビュー用のみ
         self.event_bus = EventBus.get_instance()
         self.event_bus.subscribe(EventType.CAPTURE_DEVICE_CHANGED, self.on_capture_device_changed)
 
@@ -40,7 +42,7 @@ class PreviewPane(QWidget):
         QTimer.singleShot(500, self.update_preview)
 
     def on_capture_device_changed(self, data):
-        self.set_capture_device(data['device'])
+        self.set_capture_device(data["device"])
 
     def set_capture_device(self, device: CaptureDeviceInterface):
         self.capture_device = device
@@ -56,16 +58,15 @@ class PreviewPane(QWidget):
         except RuntimeError:
             return
         size = self.label.size()
-        target_w, target_h = calc_aspect_size(
-            size, self.label.aspect_w, self.label.aspect_h
+        target_w, target_h = calc_aspect_size(size, self.label.aspect_w, self.label.aspect_h)
+        target_w, target_h = (
+            int(target_w * self.devicePixelRatio()),
+            int(target_h * self.devicePixelRatio()),
         )
-        target_w, target_h = int(target_w*self.devicePixelRatio()), int(target_h*self.devicePixelRatio())
 
         frame = np.ascontiguousarray(frame)
         resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
-        image = QImage(
-            resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888
-        )
+        image = QImage(resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888)
         pix = QPixmap.fromImage(image)
         pix.setDevicePixelRatio(self.devicePixelRatio())
         self.label.setPixmap(pix)

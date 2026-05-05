@@ -1,4 +1,4 @@
-﻿"""FRLG ゴージャスリゾート アキホおねだりマクロ — ユニットテスト
+"""FRLG ゴージャスリゾート アキホおねだりマクロ — ユニットテスト
 
 species_data / selphy_logic / frame_search / recognizer / config のテストを提供する。
 """
@@ -193,9 +193,7 @@ class TestFrameSearch:
 
     @pytest.fixture()
     def full_pokedex(self) -> set[int]:
-        return set(range(1, 412)) - set(
-            range(DUMMY_CODE_START, DUMMY_CODE_END + 1)
-        )
+        return set(range(1, 412)) - set(range(DUMMY_CODE_START, DUMMY_CODE_END + 1))
 
     def test_returns_correct_frame_count(self, full_pokedex: set[int]):
         """指定フレーム範囲内の結果数が正しい"""
