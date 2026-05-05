@@ -1,0 +1,551 @@
+# 異常系・中断・ログ再設計 仕様書
+
+> **対象モジュール**: `src/nyxpy/framework/core/macro/`, `src/nyxpy/framework/core/utils/`, `src/nyxpy/framework/core/logger/`, `src/nyxpy/framework/core/settings/`
+> **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果、ロギングを再設計する。
+> **関連ドキュメント**: `spec/framework/archive/logging_design.md`
+> **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`
+> **破壊的変更**: なし。既存マクロの import 互換と `finalize(cmd)` 互換を維持する。
+
+## 1. 概要
+
+### 1.1 目的
+
+マクロ実行基盤で発生する入力不備、設定不備、デバイス不具合、リソース不備、処理中断を `FrameworkError` 階層と `RunResult` に正規化する。既存マクロ資産の import 互換を維持しつつ、GUI/CLI が例外文字列ではなく構造化された実行結果と表示イベントを扱える状態にする。
+
+### 1.2 用語定義
+
+| 用語 | 定義 |
+|------|------|
+| Command | マクロがハードウェア操作、待機、キャプチャ、ログ、通知を行うための高レベル API |
+| MacroBase | ユーザ定義マクロの抽象基底クラス。`initialize` / `run` / `finalize` ライフサイクルを持つ |
+| MacroExecutor | 旧 GUI/CLI/テスト入口で使われる既存クラス。残す場合は `MacroRuntime` へ委譲するだけの一時 adapter とし、既存ユーザーマクロが直接依存していない限り公開互換契約から外す |
+| MacroRuntime | 新方式の実行中核。例外正規化、キャンセル、`RunResult` 生成は Runtime / Runner 側で扱い、旧 `MacroExecutor` を残す場合は一時 adapter として接続する |
+| MacroRegistry | 利用可能マクロを発見し、安定 ID とメタデータを保持するレジストリ |
+| MacroFactory | 実行ごとに新しい `MacroBase` インスタンスを生成するファクトリ |
+| MacroRunner | `initialize -> run -> finalize` を実行し、例外・中断を `RunResult` に変換するコンポーネント |
+| RunHandle | 非同期実行中のマクロに対する中断要求、完了待ち、結果取得を提供するハンドル |
+| ExecutionContext | 1 回のマクロ実行に必要な `run_id`、`macro_id`、Ports、中断トークン、options、`exec_args`、`metadata` を束ねる値オブジェクト。`Command` は保持しない |
+| Ports/Adapters | Runtime 中核がハードウェア・通知・ログ・GUI/CLI に直接依存しないための抽象境界と接続実装 |
+| Legacy Compatibility Layer | 既存マクロと既存 GUI/CLI import を壊さない互換層。旧パス・旧クラス名・旧メソッドシグネチャを維持する |
+| CancellationToken | `threading.Event` ベースのスレッドセーフな協調キャンセル機構 |
+| MacroCancelled | マクロ実行スレッド内で中断を表す新しい例外。既存 `MacroStopException` との互換を持つ |
+| MacroStopException | 既存マクロ・GUI・CLI が import している中断例外名。削除せず adapter として維持する |
+| FrameworkError | フレームワークが利用者へ返す異常を表す基底例外。分類、コード、コンポーネント、詳細を保持する |
+| DeviceError | シリアルデバイス、キャプチャデバイス、プロトコル操作の失敗を表す `FrameworkError` |
+| ResourceError | 画像、設定ファイル、マクロリソース、ログファイルなどの読み書き失敗を表す `FrameworkError` |
+| ConfigurationError | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の検証失敗を表す `FrameworkError` |
+| RunResult | 1 回のマクロ実行の開始、終了、成功、失敗、中断、失敗情報、`run_id` を保持する値オブジェクト |
+| run_id | 1 回のマクロ実行を識別する UUID 文字列。構造化ログ、GUI 表示イベント、`RunResult` を関連付ける |
+| macro_id | 実行対象マクロを識別する文字列。原則としてパッケージ名または単一ファイル名を使う |
+| component | ログまたは例外の発生元を示す安定した名前。例: `MacroExecutor`, `DefaultCommand`, `GlobalSettings` |
+| 構造化ログ | `run_id`, `macro_id`, `component`, `level`, `event`, `extra` を持ち、検索・解析に使うログ |
+| GUI 表示イベント | GUI のログペインやステータス表示に渡す短い表示用イベント。永続ログとは別経路で扱う |
+
+### 1.3 背景・問題
+
+現行コードでは中断例外が `MacroStopException` だけであり、入力不備、デバイス不具合、リソース不備、設定不備が `ValueError` や任意の例外として混在している。`DefaultCommand.wait()` は `time.sleep()` 中に `CancellationToken` を確認しないため、長い待機中の GUI cancel が即時に反映されない。
+
+`MainWindow.cancel_macro()` と `closeEvent()` は GUI スレッドから `cmd.stop()` を呼び出しており、`cmd.stop()` が `MacroStopException` を送出するため GUI 操作側で例外が発生し得る。`MacroExecutor.execute()` は失敗情報を返さず、`finalize(cmd)` へ成功・失敗・中断の outcome を渡せない。新設計では outcome は `MacroBase.finalize(cmd)` の抽象契約には含めず、受け取り可能なマクロだけの opt-in 拡張にする。
+
+`LogManager` は文字列メッセージと `component` のみを扱うため、同時実行や GUI 表示で `run_id` / `macro_id` とログを関連付けられない。GUI log handler の例外処理と lock 方針も明文化されていない。`parse_define_args()` は `list[str]` 前提だが GUI 側から文字列が渡される経路があり、`GlobalSettings` / `SecretsSettings` は TOML 読み込み後の schema 検証を持たない。CLI 通知設定の入力元が `SecretsSettings` に統一されていない場合、GUI/CLI で Discord / Bluesky の挙動がずれる。
+
+### 1.4 期待効果
+
+| 指標 | 現状 | 目標 |
+|------|------|------|
+| 既存 `MacroStopException` import | `exceptions.py` に単独定義 | import パスと `except MacroStopException` の捕捉互換を維持 |
+| マクロ実行結果 | `execute()` は `None`、失敗情報はログ文字列のみ | `RunResult` に `status`, `error`, `cancelled_reason`, `run_id`, `macro_id` を保持 |
+| GUI cancel の例外 | GUI スレッドから `cmd.stop()` を呼ぶと例外が出る | GUI は中断要求のみを行い、例外送出はマクロ実行スレッドに限定 |
+| `Command.wait()` 中断反映 | 待機秒数が終わるまで反映されない | `CancellationToken` 発火後 100 ms 以内に `MacroCancelled` を送出 |
+| ログ相関 | `component` 文字列のみ | 構造化ログに `run_id`, `macro_id`, `component` を常時付与 |
+| GUI 表示 | loguru の文字列を直接表示 | 永続ログと GUI 表示イベントを分離し、表示用文言を短く保つ |
+| 設定・引数検証 | TOML パース後の型検証なし | schema に基づき実行前に `ConfigurationError` として検出 |
+
+### 1.5 着手条件
+
+- 現行コードを正とし、`spec/framework/archive/logging_design.md` は背景情報としてのみ扱う。
+- 既存マクロの `from nyxpy.framework.core.macro.exceptions import MacroStopException` を変更不要にする。
+- 既存マクロの `finalize(self, cmd)` を変更不要にする。
+- `Command.log(*values, sep=" ", end="\n", level="...")` の既存呼び出しを変更不要にする。
+- GUI からの cancel は例外を直接送出せず、マクロ実行スレッド側の協調キャンセルで処理する。
+- 実装前に `uv run pytest tests/unit/` のベースラインを確認する。
+
+## 2. 対象ファイル
+
+| ファイル | 変更種別 | 変更内容 |
+|----------|----------|----------|
+| `spec/framework/rearchitecture/ERROR_CANCELLATION_LOGGING.md` | 新規 | 本仕様書 |
+| `src/nyxpy/framework/core/macro/exceptions.py` | 変更 | `FrameworkError` 階層、`MacroCancelled`、`MacroStopException` adapter、失敗情報モデルを定義 |
+| `src/nyxpy/framework/core/utils/cancellation.py` | 変更 | `CancellationToken` に理由、要求元、時刻、`throw_if_requested()`、即時待機 API を追加 |
+| `src/nyxpy/framework/core/macro/decorators.py` | 変更 | `@check_interrupt` が `MacroCancelled` を送出し、既存 `MacroStopException` 捕捉互換を保つ |
+| `src/nyxpy/framework/core/macro/command.py` | 変更 | `Command.wait()` の即時キャンセル対応、GUI 用中断要求 API、構造化ログ対応、デバイス/リソース例外の正規化 |
+| `src/nyxpy/framework/core/macro/executor.py` | 変更または削除 | `MacroExecutor` を残す場合は旧 `execute()` の戻り値 `None` と例外再送出を維持しつつ、内部結果を `RunResult` として Runtime / Runner へ接続。不要なら GUI/CLI を Runtime へ直接移行して削除 |
+| `src/nyxpy/framework/core/macro/base.py` | 変更 | `finalize(cmd)` 抽象シグネチャを維持し、outcome 受け取りは opt-in 拡張として説明する |
+| `src/nyxpy/framework/core/logger/log_manager.py` | 変更 | 構造化ログ API、GUI 表示イベント API、`run_id` / `macro_id` / `component` の付与を実装 |
+| `src/nyxpy/framework/core/settings/global_settings.py` | 変更 | `GlobalSettings` schema、既定値、型検証、設定読み込み失敗時の `ConfigurationError` を実装 |
+| `src/nyxpy/framework/core/settings/secrets_settings.py` | 変更 | `SecretsSettings` schema、秘匿値のログマスク、型検証、読み込み失敗時の `ConfigurationError` を実装 |
+| `src/nyxpy/framework/core/utils/helper.py` | 変更 | `parse_define_args()` を `str` / `Iterable[str]` 対応にし、パース失敗を `ConfigurationError` に正規化 |
+| `src/nyxpy/framework/core/api/notification_handler.py` | 変更 | 通知失敗を飲み込むだけでなく、秘匿情報を除いた `ResourceError` 相当の構造化ログに記録 |
+| `src/nyxpy/gui/main_window.py` | 変更 | GUI cancel が例外を送出しない経路へ変更し、`RunResult` に基づき完了/中断/失敗を表示 |
+| `src/nyxpy/gui/panes/log_pane.py` | 変更 | loguru 文字列 handler ではなく GUI 表示イベント handler を購読 |
+| `src/nyxpy/cli/run_cli.py` | 変更 | `RunResult` に基づく終了コード、エラーメッセージ、キャンセル表示へ変更。通知設定は `SecretsSettings` から取得 |
+| `tests/unit/` | 新規/変更 | 例外階層、キャンセル、入力検証、構造化ログ、executor outcome の単体テスト |
+| `tests/integration/` | 新規/変更 | GUI/CLI を含まないマクロ実行結果と `finalize` 互換の結合テスト |
+
+## 3. 設計方針
+
+### アーキテクチャ上の位置づけ
+
+異常系と中断は `core/macro/` と `core/utils/` に集約し、GUI/CLI は `RunResult` と GUI 表示イベントを消費する上位レイヤーに留める。フレームワーク層から `nyxpy.gui` へ依存しない。
+
+ログ管理は `core/logger/LogManager` が担う。永続ログ、コンソールログ、GUI 表示イベントは同じ発生情報を共有するが、表示用文言と保存用構造は分ける。`NotificationHandler` は外部サービス失敗をユーザー操作の失敗にしないが、失敗情報を構造化ログに残す。
+
+### 公開 API 方針
+
+既存ユーザーマクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と主要メソッド名、settings lookup は維持する。旧 `MacroExecutor.execute()` は残す場合だけ戻り値 `None` と失敗時の例外再送出を維持し、`RunResult` は `MacroRuntime` / `MacroRunner` の新方式 API が返す。既存 `Command.log()` は呼び出し形式を維持し、内部で構造化ログと GUI 表示イベントへ変換する。
+
+`Command.stop()` はマクロ内から呼ばれる既存用途を考慮し、中断要求と例外送出を継続する。GUI/CLI の外部操作は `DefaultCommand` / `CommandFacade` の opt-in API である `request_cancel()` または `CancellationToken.request_cancel()` を使い、呼び出しスレッドで例外を送出しない。
+
+### 後方互換性
+
+破壊的変更は行わない。`MacroStopException` は削除せず、`MacroCancelled` との adapter 関係を定義する。推奨 API は `MacroCancelled` だが、既存の `except MacroStopException` は `MacroCancelled` を捕捉できる。
+
+`MacroBase.finalize(self, cmd)` の抽象シグネチャは変更しない。これは唯一の抽象契約である。新方式で outcome を受け取りたいマクロだけが `SupportsFinalizeOutcome` Protocol 相当の opt-in 拡張として `finalize(self, cmd, outcome)` または `finalize(self, cmd, **kwargs)` を実装できる。Runner が `inspect.signature()` で `outcome` 引数または `**kwargs` の有無を判定し、受け取れるマクロにだけ `outcome` を渡す。
+
+### レイヤー構成
+
+| レイヤー | 対象 | 責務 | 禁止事項 |
+|----------|------|------|----------|
+| ユーティリティ | `CancellationToken` | スレッドセーフな中断状態、待機、理由保持 | GUI 型への依存 |
+| マクロ実行 | `MacroRuntime`, `MacroRunner`, `Command`, `decorators` | 実行制御、例外正規化、キャンセル送出、outcome 生成 | GUI/CLI 固有表示 |
+| ログ | `LogManager` | 構造化ログ、GUI 表示イベント配信、handler 管理 | 秘密情報の平文出力 |
+| 設定 | `GlobalSettings`, `SecretsSettings`, `parse_define_args` | schema 検証、入力正規化、`ConfigurationError` 生成 | マクロ固有ロジックへの依存 |
+| 上位 UI | GUI, CLI | ユーザー入力、cancel 要求、`RunResult` 表示 | フレームワーク内部例外への過剰依存 |
+
+### 性能要件
+
+| 指標 | 目標値 |
+|------|--------|
+| `CancellationToken` 発火から `Command.wait()` 解除までの遅延 | 100 ms 以下 |
+| `@check_interrupt` の通常時オーバーヘッド | 1 回あたり 100 µs 以下 |
+| `LogManager.log()` の通常時オーバーヘッド | 1 回あたり 1 ms 以下 |
+| `RunResult` 生成 | 1 実行あたり 1 回、追加スレッドなし |
+| GUI 表示イベント配信 | GUI handler 未登録時は永続ログのみで動作 |
+
+### 並行性・スレッド安全性
+
+`CancellationToken` は `threading.Event` と `threading.Lock` を使い、中断要求の理由、要求元、時刻を一貫して読めるようにする。複数回 `request_cancel()` が呼ばれた場合、最初の理由を保持し、後続呼び出しは冪等に扱う。
+
+`LogManager` の handler 追加・削除・GUI handler 配列はロックで保護する。GUI 表示イベントはフレームワーク層ではただの callback として扱い、GUI 実装側が Qt Signal で GUI スレッドへ転送する。
+
+`Command.wait()` は `CancellationToken.wait(timeout)` を使い、`time.sleep()` による単純待機を廃止する。デバイス I/O 中の強制割り込みは行わず、I/O 呼び出し前後の safe point でキャンセルを確認する。
+
+## 4. 実装仕様
+
+### 公開インターフェース
+
+```python
+from abc import ABC
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
+from typing import Any, Mapping, Protocol
+
+from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.command import Command
+
+
+class ErrorKind(StrEnum):
+    CANCELLED = "cancelled"
+    DEVICE = "device"
+    RESOURCE = "resource"
+    CONFIGURATION = "configuration"
+    VALIDATION = "validation"
+    MACRO = "macro"
+    INTERNAL = "internal"
+
+
+class FrameworkError(Exception):
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: ErrorKind,
+        code: str,
+        component: str,
+        recoverable: bool = False,
+        details: Mapping[str, Any] | None = None,
+        cause: BaseException | None = None,
+    ) -> None: ...
+
+
+class MacroStopException(FrameworkError):
+    """既存 import 互換のため維持する中断例外 adapter。"""
+
+    def __init__(self, *args: object, **kwargs: object) -> None: ...
+
+
+class MacroCancelled(MacroStopException):
+    """協調キャンセルによりマクロ実行スレッドで送出される例外。"""
+
+
+class DeviceError(FrameworkError): ...
+class ResourceError(FrameworkError): ...
+class ConfigurationError(FrameworkError): ...
+class MacroRuntimeError(FrameworkError): ...
+
+
+@dataclass(frozen=True)
+class ErrorInfo:
+    kind: ErrorKind
+    code: str
+    message: str
+    component: str
+    exception_type: str
+    recoverable: bool
+    details: dict[str, Any] = field(default_factory=dict)
+    traceback: str | None = None
+
+
+class RunStatus(StrEnum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class RunResult:
+    run_id: str
+    macro_id: str
+    status: RunStatus
+    started_at: datetime
+    finished_at: datetime
+    error: ErrorInfo | None = None
+    cleanup_warnings: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool: ...
+
+    @property
+    def duration_seconds(self) -> float: ...
+```
+
+```python
+class CancellationToken:
+    def stop_requested(self) -> bool: ...
+    def request_stop(self) -> None: ...
+    def request_cancel(self, reason: str = "", source: str = "") -> None: ...
+    def clear(self) -> None: ...
+    def reason(self) -> str | None: ...
+    def source(self) -> str | None: ...
+    def requested_at(self) -> datetime | None: ...
+    def wait(self, timeout: float) -> bool: ...
+    def throw_if_requested(self) -> None: ...
+```
+
+```python
+class Command(ABC):
+    def wait(self, wait: float) -> None: ...
+    def stop(self) -> None: ...
+    def log(
+        self,
+        *values: object,
+        sep: str = " ",
+        end: str = "\n",
+        level: str = "INFO",
+    ) -> None: ...
+
+
+class CancellableCommand(Command):
+    def request_cancel(self, reason: str = "", source: str = "") -> None: ...
+    def log_event(
+        self,
+        *values: object,
+        sep: str = " ",
+        end: str = "\n",
+        level: str = "INFO",
+        event: str = "macro.message",
+        extra: Mapping[str, Any] | None = None,
+        gui: bool = True,
+    ) -> None: ...
+```
+
+```python
+class RunContext: ...
+class ExecutionContext: ...
+
+
+class SupportsFinalizeOutcome(Protocol):
+    def finalize(self, cmd: Command, outcome: RunResult) -> None: ...
+
+
+class MacroRunner:
+    def run(
+        self,
+        macro: MacroBase,
+        cmd: Command,
+        exec_args: Mapping[str, Any],
+        run_context: RunContext,
+    ) -> RunResult: ...
+
+
+# MacroExecutor は残す場合だけ提供する一時 adapter であり、公開互換契約ではない。
+class MacroExecutor:
+    def execute(self, cmd: Command, exec_args: dict = {}) -> None: ...
+
+
+class MacroRuntime:
+    def run(self, context: ExecutionContext) -> RunResult: ...
+```
+
+```python
+@dataclass(frozen=True)
+class GuiLogEvent:
+    run_id: str | None
+    macro_id: str | None
+    level: str
+    component: str
+    message: str
+    event: str
+    timestamp: datetime
+
+
+class LogManager:
+    def log(
+        self,
+        level: str,
+        message: str,
+        component: str = "",
+        *,
+        run_id: str | None = None,
+        macro_id: str | None = None,
+        event: str = "log.message",
+        extra: Mapping[str, Any] | None = None,
+    ) -> None: ...
+
+    def emit_gui_event(self, event: GuiLogEvent) -> None: ...
+    def add_gui_handler(self, handler: Callable[[GuiLogEvent], None], level: str = "INFO") -> None: ...
+    def remove_gui_handler(self, handler: Callable[[GuiLogEvent], None]) -> None: ...
+```
+
+### 例外階層
+
+| 例外クラス | 親 | `kind` | 発生条件 |
+|------------|----|--------|----------|
+| `FrameworkError` | `Exception` | 個別指定 | フレームワークが正規化して扱う全異常の基底 |
+| `MacroStopException` | `FrameworkError` | `cancelled` | 既存互換用。既存コードが直接送出した場合も中断として扱う |
+| `MacroCancelled` | `MacroStopException` | `cancelled` | `CancellationToken` 発火、`Command.stop()`、`@check_interrupt`、`Command.wait()` で送出 |
+| `DeviceError` | `FrameworkError` | `device` | シリアル送信、キャプチャ取得、プロトコル変換、デバイス未接続の失敗 |
+| `ResourceError` | `FrameworkError` | `resource` | 画像読み書き、マクロリソース、設定ファイル、ログファイル、通知先 I/O の失敗 |
+| `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の schema 検証失敗 |
+| `MacroRuntimeError` | `FrameworkError` | `macro` | マクロ実装由来の未分類例外を executor が正規化したもの |
+
+`MacroStopException` は削除しない。`MacroStopException()` と `MacroStopException("stop")` は破壊しない。constructor は `__init__(*args, **kwargs)` で旧呼び出しを受け、`kind` 未指定時は `ErrorKind.CANCELLED`、`code` 未指定時は `NYX_MACRO_CANCELLED`、`component` 未指定時は `MacroStopException` を既定値にする。新規コードは `MacroCancelled` を送出するが、`MacroCancelled` が `MacroStopException` を継承するため、既存の `except MacroStopException` は中断を捕捉できる。既存マクロが `MacroStopException` を直接送出した場合、`MacroRunner` は `MacroCancelled` 相当の `RunResult(status=RunStatus.CANCELLED)` に正規化する。
+
+### RunResult と失敗情報
+
+`RunResult` は `MacroRunner` が生成し、`MacroRuntime.run()` が返す。旧 `MacroExecutor.execute()` を残す場合は戻り値 `None` を維持し、失敗時は現行どおり例外を再送出する。成功時は `RunStatus.SUCCESS`、協調キャンセル時は `RunStatus.CANCELLED`、それ以外の失敗は `RunStatus.FAILED` とする。Runtime は Port close 失敗だけを `cleanup_warnings` に追記する。
+
+失敗時の `ErrorInfo` は以下を保持する。
+
+| フィールド | 内容 |
+|------------|------|
+| `kind` | `ErrorKind`。GUI/CLI の表示分類と終了コード判定に使う |
+| `code` | 安定したエラーコード。例: `NYX_DEVICE_CAPTURE_FAILED` |
+| `message` | ユーザーへ表示可能な短いメッセージ。秘密情報を含めない |
+| `component` | 発生元。例: `DefaultCommand.capture` |
+| `exception_type` | 元例外のクラス名 |
+| `recoverable` | リトライ可能性の目安 |
+| `details` | JSON 化できる詳細情報。パスやキー名はよいが secret 値は入れない |
+| `traceback` | DEBUG ログ用。GUI 表示には出さない |
+
+### CancellationToken と協調キャンセル
+
+`CancellationToken.request_cancel()` は GUI/CLI/内部処理から安全に呼べる中断要求 API であり、例外を送出しない。`request_stop()` は既存互換の別名として残し、内部では `request_cancel(reason="stop requested", source="legacy")` を呼ぶ。
+
+`CancellationToken.throw_if_requested()` はマクロ実行スレッドの safe point で呼び、発火済みなら `MacroCancelled` を送出する。`@check_interrupt` は `self.ct.throw_if_requested()` を使う。
+
+`Command.wait(seconds)` は以下の手順で動作する。
+
+1. `seconds < 0` は `ConfigurationError(code="NYX_INVALID_WAIT_SECONDS")` とする。
+2. 待機前に `ct.throw_if_requested()` を呼ぶ。
+3. `ct.wait(seconds)` を呼び、中断要求が来たら即座に `MacroCancelled` を送出する。
+4. 待機後に再度 `ct.throw_if_requested()` を呼ぶ。
+
+`Command.stop()` はマクロ内部から「ここで処理を止める」用途で使うため、`request_cancel()` の後に `MacroCancelled` を送出する。GUI cancel は `Command.stop()` を呼ばず、`Command.request_cancel(reason="user cancelled", source="gui")` を呼ぶ。
+
+### finalize への outcome 伝達
+
+`MacroBase.finalize(cmd)` を唯一の抽象契約として維持する。outcome 伝達は `SupportsFinalizeOutcome` Protocol または signature inspection による opt-in 拡張であり、既存マクロへ `finalize(cmd, outcome)` 実装を要求しない。
+
+`MacroRunner` は `initialize`、`run`、例外正規化、暫定 `RunResult` 生成の後に必ず `finalize` を呼ぶ。`finalize` の呼び出しは以下の互換ルールに従う。
+
+| マクロ側シグネチャ | Runner の呼び出し |
+|--------------------|------------------|
+| `finalize(self, cmd)` | `finalize(cmd)` |
+| `finalize(self, cmd, outcome)` | `finalize(cmd, outcome)` |
+| `finalize(self, cmd, *, outcome=None)` | `finalize(cmd, outcome=result)` |
+| `finalize(self, cmd, **kwargs)` | `finalize(cmd, outcome=result)` |
+
+`finalize` 自体が例外を送出した場合、元の `run` 失敗情報を失わせない。実行本体が成功していた場合は `finalize` 失敗を `RunStatus.FAILED` とする。実行本体がすでに失敗または中断していた場合は、`RunResult.error.details["finalize_error"]` に要約を追加し、構造化ログへ `event="macro.finalize_failed"` を出す。
+
+旧 `MacroExecutor` を残す場合もこの処理を実装せず、Runtime / Runner へ委譲する。
+
+### 入力検証### 入力検証
+
+#### macro args schema
+
+マクロは任意で `args_schema` を定義できる。未定義マクロは既存互換のため schema 検証をスキップする。schema 定義時も未知キー拒否は opt-in とし、既存 `settings.toml` や `-D` 引数を壊さない。
+
+```python
+@dataclass(frozen=True)
+class ArgSpec:
+    type: type | tuple[type, ...]
+    required: bool = False
+    default: object = None
+    choices: tuple[object, ...] | None = None
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class MacroArgsSchema:
+    fields: dict[str, ArgSpec]
+    strict: bool = False
+```
+
+検証順序は `static/<macro_id>/settings.toml`、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
+
+#### GlobalSettings / SecretsSettings schema
+
+`GlobalSettings` は既定値と型を schema として定義する。現行の `capture_device`, `serial_device`, `serial_baud`, `serial_protocol` は維持する。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|------------|-----|-----------|------|
+| `capture_device` | `str` | `""` | 利用するキャプチャデバイス名 |
+| `serial_device` | `str` | `""` | 利用するシリアルデバイス名 |
+| `serial_baud` | `int` | `9600` | シリアル通信速度 |
+| `serial_protocol` | `str` | `"CH552"` | 利用するシリアルプロトコル |
+| `logging.file_level` | `str` | `"DEBUG"` | ファイルログの最低レベル |
+| `logging.console_level` | `str` | `"INFO"` | コンソールログの最低レベル |
+| `logging.gui_level` | `str` | `"INFO"` | GUI 表示イベントの最低レベル |
+
+`SecretsSettings` は通知設定を schema として定義する。CLI/GUI/Runtime builder は Discord / Bluesky 通知設定を `SecretsSettings` からのみ読み、`GlobalSettings` や CLI 独自構造に secret 値を複製しない。secret 値は `LogManager` に渡す前にマスクする。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|------------|-----|-----------|------|
+| `notification.discord.enabled` | `bool` | `False` | Discord 通知の有効化 |
+| `notification.discord.webhook_url` | `str` | `""` | Discord webhook URL。ログではマスクする |
+| `notification.bluesky.enabled` | `bool` | `False` | Bluesky 通知の有効化 |
+| `notification.bluesky.identifier` | `str` | `""` | Bluesky identifier。ログでは一部マスクする |
+| `notification.bluesky.password` | `str` | `""` | Bluesky password。ログでは全体をマスクする |
+
+既存ファイルに schema 外キーがある場合は保持する。型不一致は `ConfigurationError` とし、自動変換は `int` など安全な範囲に限る。TOML 破損時は元ファイルを上書きせず、エラーを返す。
+
+#### parse_define_args
+
+`parse_define_args()` は既存 import パスと関数名を維持し、入力型を広げる。
+
+| 入力 | 扱い |
+|------|------|
+| `None` | `{}` |
+| `list[str]` / `tuple[str, ...]` | 各要素を TOML 行として結合 |
+| `str` | GUI 入力として受け取り、改行または空白区切りの `key=value` 群を TOML へ変換 |
+| TOML パース失敗 | `ConfigurationError(code="NYX_DEFINE_PARSE_FAILED")` |
+| `key` のみ、空 key、重複で型衝突 | `ConfigurationError(code="NYX_DEFINE_INVALID")` |
+
+値の型は TOML に従う。文字列を渡す場合は `"name=\"abc\" count=3"` のような表現を許容するが、曖昧なクォートや秘密値はログへ出さない。
+
+### ロギング設計
+
+`LogManager` は loguru を継続利用する。保存用ログは `logger.bind(run_id=..., macro_id=..., component=..., event=..., extra=...)` 相当で構造化し、出力フォーマットに `run_id`, `macro_id`, `component` を含める。
+
+GUI 表示イベントは `GuiLogEvent` として別に配信する。GUI の `LogPane` は `LogManager.add_gui_handler()` でイベントを購読し、Qt Signal で GUI スレッドに転送する。handler 配列の追加・削除・走査は `RLock` で保護する。handler 呼び出し中の deadlock を避けるため、配信時は lock 内で handler の snapshot を作り、lock 外で callback を呼ぶ。handler が例外を送出した場合は他 handler への配信を継続し、`event="log.gui_handler_failed"` を DEBUG または WARNING に記録するが、`LogManager.log()` 自体は失敗させない。これによりログファイル向けの traceback や詳細 JSON と、ユーザー向けの短い表示文言を分離する。
+
+| イベント | 保存ログ | GUI 表示 |
+|----------|----------|----------|
+| `macro.started` | `run_id`, `macro_id`, `args_keys` | `マクロを開始しました` |
+| `macro.message` | `Command.log()` の構造化情報 | マクロ作者が出したメッセージ |
+| `macro.cancel_requested` | `source`, `reason` | `中断を要求しました` |
+| `macro.cancelled` | `RunResult`, `cancelled_reason` | `マクロを中断しました` |
+| `macro.failed` | `ErrorInfo`, traceback | `マクロ実行中にエラーが発生しました` |
+| `macro.finalize_failed` | finalize 例外詳細 | `終了処理でエラーが発生しました` |
+| `notification.failed` | 通知先種別、マスク済み詳細 | 原則表示しない。必要時のみ warning 表示 |
+
+### エラーハンドリング
+
+| 発生箇所 | 正規化先 | 備考 |
+|----------|----------|------|
+| `serial_device.send()` | `DeviceError` | 送信データ本体はログに出さない |
+| `capture_device.get_frame()` が `None` | `DeviceError` | 現行の `None` 返却を失敗として扱う |
+| `StaticResourceIO` の読み書き | `ResourceError` | パスは相対化して記録 |
+| `load_macro_settings()` の TOML 破損 | `ConfigurationError` | ファイルを上書きしない |
+| `parse_define_args()` の TOML 破損 | `ConfigurationError` | 入力全文は INFO 以上のログに出さない |
+| `GlobalSettings` / `SecretsSettings` 型不一致 | `ConfigurationError` | secret 値はマスク |
+| マクロ `initialize` / `run` の任意例外 | `MacroRuntimeError` | 元例外名と traceback を DEBUG ログに保存 |
+| `NotificationHandler.publish()` の通知失敗 | `ResourceError` 相当の構造化ログ | マクロ実行は継続 |
+| GUI log handler の例外 | `log.gui_handler_failed` 構造化ログ | 他 handler への配信とマクロ実行は継続 |
+| CLI 通知設定ソース不一致 | `ConfigurationError` | Runtime builder が `SecretsSettings` 以外から secret 値を受け取った場合 |
+
+### シングルトン管理
+
+`LogManager` は現行どおり `log_manager` グローバルインスタンスを維持する。GUI handler を追加するため、`reset_for_testing()` がある場合は `LogManager` の handler 状態も初期化対象に含める。新しい `RunResult` や `CancellationToken` は実行ごとのオブジェクトであり、`singletons.py` への登録は不要である。
+
+## 5. テスト方針
+
+| テスト種別 | テスト名 | 検証内容 |
+|------------|----------|----------|
+| ユニット | `test_macro_cancelled_is_macro_stop_exception_compatible` | `MacroCancelled` が既存 `except MacroStopException` で捕捉できる |
+| ユニット | `test_macro_stop_exception_constructor_keeps_legacy_calls` | `MacroStopException()` と `MacroStopException("stop")` が成功し、既定 `kind` / `code` / `component` を持つ |
+| ユニット | `test_framework_error_contains_kind_code_component` | `FrameworkError` 階層が `kind`, `code`, `component`, `details` を保持する |
+| ユニット | `test_cancellation_token_request_cancel_is_idempotent` | 複数回 cancel しても最初の理由と要求元を保持する |
+| ユニット | `test_command_wait_returns_immediately_on_cancel` | 長い `wait()` 中に token 発火後 100 ms 以内で `MacroCancelled` になる |
+| ユニット | `test_command_request_cancel_does_not_raise` | GUI 用中断要求 API が呼び出し元スレッドで例外を送出しない |
+| ユニット | `test_runtime_returns_run_result_on_success` | 成功時 `RunResult(status="success", error=None)` を返す |
+| ユニット | `test_macro_executor_execute_keeps_legacy_none_return_if_kept` | `MacroExecutor` を残す場合、旧 `execute()` は成功時に `None` を返し、旧 GUI/CLI/テスト入口の互換を維持する |
+| ユニット | `test_runtime_returns_run_result_on_framework_error` | `ConfigurationError` 等を `RunResult.error` に格納する |
+| ユニット | `test_runtime_returns_cancelled_for_legacy_macro_stop_exception` | 既存 `MacroStopException` 送出を `status="cancelled"` に正規化する |
+| ユニット | `test_finalize_receives_outcome_when_supported` | `finalize(cmd, outcome)` 形式のマクロへ `RunResult` を渡す |
+| ユニット | `test_finalize_cmd_only_remains_supported` | 既存 `finalize(cmd)` 形式が変更なしで呼ばれる |
+| ユニット | `test_parse_define_args_accepts_list_and_string` | CLI list 入力と GUI string 入力の両方を辞書へ変換する |
+| ユニット | `test_parse_define_args_raises_configuration_error` | 不正 TOML と不正 key を `ConfigurationError` にする |
+| ユニット | `test_global_settings_schema_validation` | `GlobalSettings` の型不一致と既定値を検証する |
+| ユニット | `test_secrets_settings_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |
+| ユニット | `test_log_manager_emits_structured_log_with_run_context` | `run_id`, `macro_id`, `component` が保存ログに含まれる |
+| ユニット | `test_log_manager_gui_event_is_separate_from_file_log` | GUI 表示イベントと保存ログが別 handler で受け取れる |
+| ユニット | `test_gui_log_handler_exception_is_logged_and_ignored` | GUI handler の例外が他 handler と `LogManager.log()` を失敗させない |
+| ユニット | `test_cli_notification_settings_source_is_secrets_settings` | CLI 通知設定が `SecretsSettings` に統一されていることを検証する |
+| 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `RunResult(cancelled)` を確認する |
+| 結合 | `test_cli_uses_run_result_exit_code` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
+| GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
+| ハードウェア | `test_device_error_on_serial_disconnect` | `@pytest.mark.realdevice`。シリアル切断時に `DeviceError` へ正規化する |
+| ハードウェア | `test_device_error_on_capture_disconnect` | `@pytest.mark.realdevice`。キャプチャ取得失敗時に `DeviceError` へ正規化する |
+| パフォーマンス | `test_command_wait_cancel_latency_perf` | cancel latency が 100 ms 以下である |
+| パフォーマンス | `test_structured_logging_overhead_perf` | 構造化ログ追加後の 1 件あたりオーバーヘッドが 1 ms 以下である |
+
+## 6. 実装チェックリスト
+
+- [ ] `FrameworkError` 階層、`ErrorKind`、`ErrorInfo`、`RunResult` のシグネチャ確定
+- [ ] `MacroStopException` import 互換、constructor 互換、`MacroCancelled` adapter 方針の実装
+- [ ] `CancellationToken` の理由・要求元・時刻・即時 wait・`throw_if_requested()` 実装
+- [ ] `@check_interrupt` の `MacroCancelled` 送出対応
+- [ ] `Command.wait()` の即時キャンセル対応
+- [ ] GUI/CLI cancel が例外を送出しない中断要求 API へ移行
+- [ ] `MacroExecutor` を残す場合の `None` 戻り値互換と、Runtime / Runner での `RunResult` 生成・例外正規化・`finalize` outcome 伝達
+- [ ] 既存 `finalize(cmd)` マクロの互換テスト作成
+- [ ] `macro args schema` と検証処理の実装
+- [ ] `GlobalSettings` / `SecretsSettings` schema 検証と secret マスク実装
+- [ ] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
+- [ ] `LogManager` の構造化ログ API 実装
+- [ ] `LogManager` の GUI 表示イベント API、handler lock、handler 例外記録の実装
+- [ ] `LogPane` を GUI 表示イベント購読へ移行
+- [ ] `NotificationHandler` の通知失敗ログを構造化
+- [ ] CLI 通知設定ソースを `SecretsSettings` に統一
+- [ ] ユニットテスト作成・パス
+- [ ] 結合テスト作成・パス
+- [ ] GUI テスト作成・パス
+- [ ] ハードウェアテストに `@pytest.mark.realdevice` を指定
+- [ ] パフォーマンステスト作成・パス
+- [ ] `uv run ruff check .` がパス
+- [ ] `uv run pytest tests/unit/` がパス
+- [ ] 公開 API のドキュメントコメント更新
