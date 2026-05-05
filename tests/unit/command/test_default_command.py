@@ -10,14 +10,17 @@ from nyxpy.framework.core.macro.command import DefaultCommand
 class MockSerialDevice:
     def __init__(self):
         self.sent_data = []
+
     def send(self, data):
         self.sent_data.append(data)
+
 
 # Mock for CaptureDeviceInterface
 class MockCaptureDevice:
     def __init__(self):
         self._frame = None
         self.captured = False
+
     def get_frame(self):
         self.captured = True
         return self._frame
@@ -43,7 +46,7 @@ class MockProtocol:
     def build_press_command(self, keys):
         self.calls.append(("press", keys))
         return b"press:" + b"-".join(str(k).encode() for k in keys)
-    
+
     def build_hold_command(self, keys):
         self.calls.append(("hold", keys))
         return b"hold:" + b"-".join(str(k).encode() for k in keys)
@@ -59,6 +62,20 @@ class MockProtocol:
     def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp):
         self.calls.append(("keyboard", key, op))
         return f"keyboard:{key}:{op.name}".encode()
+
+
+class MockTouchProtocol(MockProtocol):
+    def build_touch_down_command(self, x: int, y: int):
+        self.calls.append(("touch_down", x, y))
+        return f"touch_down:{x}:{y}".encode()
+
+    def build_touch_up_command(self):
+        self.calls.append(("touch_up",))
+        return b"touch_up"
+
+    def build_disable_sleep_command(self, enabled: bool):
+        self.calls.append(("disable_sleep", enabled))
+        return f"disable_sleep:{enabled}".encode()
 
 
 # CH552のようにbuild_keyboard_commandが例外を投げるプロトコル用のモック
@@ -119,6 +136,25 @@ def dummy_command_keyboard_not_supported(monkeypatch):
     return cmd, serial_device, capture_device, resource_io, protocol, ct
 
 
+@pytest.fixture
+def dummy_command_touch(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda x: None)
+    serial_device = MockSerialDevice()
+    capture_device = MockCaptureDevice()
+    resource_io = MockResourceIO()
+    protocol = MockTouchProtocol()
+    ct = MockCancellationToken()
+    cmd = DefaultCommand(
+        serial_device=serial_device,
+        capture_device=capture_device,
+        resource_io=resource_io,
+        protocol=protocol,
+        ct=ct,
+        notification_handler=None,
+    )
+    return cmd, serial_device, capture_device, resource_io, protocol, ct
+
+
 def test_press_and_release(dummy_command):
     cmd, serial_device, capture_device, resource_io, protocol, ct = dummy_command
     cmd.press(Button.A, Button.B, dur=0.2, wait=0.1)
@@ -140,6 +176,49 @@ def test_release(dummy_command):
     cmd.release(Button.Y)
     assert protocol.calls[0][0] == "release"
     assert serial_device.sent_data[0].startswith(b"release:")
+
+
+def test_touch_sequence(dummy_command_touch):
+    cmd, serial_device, _, _, protocol, _ = dummy_command_touch
+
+    cmd.touch(120, 80, dur=0.2, wait=0.1)
+
+    assert protocol.calls == [("touch_down", 120, 80), ("touch_up",)]
+    assert serial_device.sent_data == [b"touch_down:120:80", b"touch_up"]
+
+
+def test_touch_down(dummy_command_touch):
+    cmd, serial_device, _, _, protocol, _ = dummy_command_touch
+
+    cmd.touch_down(120, 80)
+
+    assert protocol.calls == [("touch_down", 120, 80)]
+    assert serial_device.sent_data == [b"touch_down:120:80"]
+
+
+def test_touch_up(dummy_command_touch):
+    cmd, serial_device, _, _, protocol, _ = dummy_command_touch
+
+    cmd.touch_up()
+
+    assert protocol.calls == [("touch_up",)]
+    assert serial_device.sent_data == [b"touch_up"]
+
+
+def test_disable_sleep(dummy_command_touch):
+    cmd, serial_device, _, _, protocol, _ = dummy_command_touch
+
+    cmd.disable_sleep(True)
+
+    assert protocol.calls == [("disable_sleep", True)]
+    assert serial_device.sent_data == [b"disable_sleep:True"]
+
+
+def test_touch_not_supported(dummy_command):
+    cmd, *_ = dummy_command
+
+    with pytest.raises(NotImplementedError, match="touch input"):
+        cmd.touch_down(120, 80)
 
 
 def test_wait(dummy_command):
@@ -177,13 +256,13 @@ def test_keyboard_text_mode(dummy_command):
 
 def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
     """テキストモード非対応プロトコルでのkeyboardメソッドのテスト（keytype委譲）"""
-    cmd, serial_device, capture_device, resource_io, protocol, _ = dummy_command_keyboard_not_supported
+    cmd, serial_device, capture_device, resource_io, protocol, _ = (
+        dummy_command_keyboard_not_supported
+    )
     cmd.keyboard("Hello")
 
     # 各文字ごとに押下→解放のシーケンスが実行されることを確認
-    assert (
-        len(protocol.calls) == 11
-    )  # "Hello"の5文字 × 2 (押下・解放) + 1 (ALL_RELEASE)
+    assert len(protocol.calls) == 11  # "Hello"の5文字 × 2 (押下・解放) + 1 (ALL_RELEASE)
 
     # 最初の文字 'H' の押下
     assert protocol.calls[0][0] == "keyboard"
@@ -206,11 +285,7 @@ def test_keyboard_keytype_mode(dummy_command_keyboard_not_supported):
     assert protocol.calls[10][2] == KeyboardOp.ALL_RELEASE
 
     # 送信されたデータが正しいか確認
-    assert (
-        serial_device.sent_data[0]
-        .decode()
-        .startswith(f"keyboard:{KeyCode('H')}:PRESS")
-    )
+    assert serial_device.sent_data[0].decode().startswith(f"keyboard:{KeyCode('H')}:PRESS")
 
 
 def test_keyboard_empty_string(dummy_command):
@@ -345,6 +420,7 @@ def test_keyboard_type(dummy_command):
 class MockNotificationHandler:
     def __init__(self):
         self.calls = []
+
     def publish(self, text, img=None):
         self.calls.append((text, img))
 

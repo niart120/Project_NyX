@@ -11,7 +11,7 @@ from nyxpy.cli.run_cli import (
     create_protocol,
     execute_macro,
 )
-from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, ThreeDSSerialProtocol
 from nyxpy.framework.core.macro.exceptions import MacroStopException
 
 
@@ -33,6 +33,8 @@ class MockSerialManager:
     def __init__(self, devices=None):
         self.devices = devices or {}
         self.active_device = None
+        self.active_name = None
+        self.active_baudrate = None
 
     def auto_register_devices(self):
         pass
@@ -43,6 +45,8 @@ class MockSerialManager:
     def set_active(self, name, baudrate=9600):
         if name not in self.devices:
             raise ValueError(f"SerialManager: Device '{name}' not registered.")
+        self.active_name = name
+        self.active_baudrate = baudrate
         self.active_device = self.devices[name]
         return True
 
@@ -109,9 +113,7 @@ def mock_capture_manager():
 
 @pytest.fixture
 def mock_executor():
-    return MockMacroExecutor(
-        {"TestMacro": "success", "FailMacro": "fail", "StopMacro": "stop"}
-    )
+    return MockMacroExecutor({"TestMacro": "success", "FailMacro": "fail", "StopMacro": "stop"})
 
 
 # configure_logging のテスト
@@ -139,6 +141,11 @@ def test_create_protocol_valid():
     assert isinstance(protocol, CH552SerialProtocol)
 
 
+def test_create_protocol_3ds():
+    protocol = create_protocol("3DS")
+    assert isinstance(protocol, ThreeDSSerialProtocol)
+
+
 def test_create_protocol_empty():
     with pytest.raises(ValueError, match="Protocol name cannot be empty"):
         create_protocol("")
@@ -153,16 +160,18 @@ def test_create_protocol_unknown():
 def test_create_command_default_path(monkeypatch):
     mock_protocol = MagicMock()
     mock_resource_io = MagicMock()
+    monkeypatch.setattr("nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io)
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io
+        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial")
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial"))
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
+        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture")
+    )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: (
+            "command"
+        ),
     )
     result = create_command(mock_protocol)
     assert result == "command"
@@ -172,16 +181,18 @@ def test_create_command_custom_path(monkeypatch):
     mock_protocol = MagicMock()
     mock_resource_io = MagicMock()
     custom_path = pathlib.Path("custom/path")
+    monkeypatch.setattr("nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io)
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io
+        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial")
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.serial_manager", MagicMock(get_active_device=lambda: "serial"))
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture"))
+        "nyxpy.cli.run_cli.capture_manager", MagicMock(get_active_device=lambda: "capture")
+    )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.DefaultCommand",
-        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: "command",
+        lambda serial_device, capture_device, resource_io, protocol, ct, notification_handler: (
+            "command"
+        ),
     )
     result = create_command(mock_protocol, resources_dir=custom_path)
     assert result == "command"
@@ -236,6 +247,7 @@ def test_cli_main_success(monkeypatch, mock_serial_manager, mock_capture_manager
     args.serial = "COM1"
     args.capture = "Camera1"
     args.protocol = "CH552"
+    args.baud = None
     args.macro_name = "TestMacro"
     args.silence = False
     args.verbose = False
@@ -260,13 +272,68 @@ def test_cli_main_success(monkeypatch, mock_serial_manager, mock_capture_manager
 
     assert result == 0
     mock_configure.assert_called_once()
+    assert mock_serial_manager.active_baudrate == 9600
 
 
-def test_cli_main_value_error(monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager):
+def test_cli_main_uses_3ds_default_baudrate(monkeypatch, mock_serial_manager, mock_capture_manager):
+    args = MagicMock()
+    args.serial = "COM1"
+    args.capture = "Camera1"
+    args.protocol = "3DS"
+    args.baud = None
+    args.macro_name = "TestMacro"
+    args.silence = False
+    args.verbose = False
+    args.define = []
+
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_command", lambda protocol: MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
+    monkeypatch.setattr("nyxpy.cli.run_cli.MacroExecutor", MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", MagicMock())
+
+    result = cli_main(args)
+
+    assert result == 0
+    assert mock_serial_manager.active_name == "COM1"
+    assert mock_serial_manager.active_baudrate == 115200
+
+
+def test_cli_main_baud_override(monkeypatch, mock_serial_manager, mock_capture_manager):
+    args = MagicMock()
+    args.serial = "COM1"
+    args.capture = "Camera1"
+    args.protocol = "3DS"
+    args.baud = 9600
+    args.macro_name = "TestMacro"
+    args.silence = False
+    args.verbose = False
+    args.define = []
+
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_command", lambda protocol: MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
+    monkeypatch.setattr("nyxpy.cli.run_cli.MacroExecutor", MagicMock())
+    monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", MagicMock())
+
+    result = cli_main(args)
+
+    assert result == 0
+    assert mock_serial_manager.active_baudrate == 9600
+
+
+def test_cli_main_value_error(
+    monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager
+):
     args = MagicMock()
     args.serial = "COM3"  # 存在しないシリアルポート
     args.capture = "Camera1"
     args.protocol = "CH552"
+    args.baud = None
 
     monkeypatch.setattr("nyxpy.cli.run_cli.log_manager", mock_log_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
@@ -279,24 +346,29 @@ def test_cli_main_value_error(monkeypatch, mock_log_manager, mock_serial_manager
     assert any(log[0] == "ERROR" for log in mock_log_manager.logs)
 
 
-def test_cli_main_exception(monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager):
+def test_cli_main_exception(
+    monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager
+):
     args = MagicMock()
 
-    args.serial = "COM1" 
+    args.serial = "COM1"
     args.capture = "Camera1"
     args.protocol = "CH552"
+    args.baud = None
 
     monkeypatch.setattr("nyxpy.cli.run_cli.log_manager", mock_log_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock())
     monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
     # create_protocolで例外を発生させる
-    monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: (_ for _ in ()).throw(Exception("Unexpected error")))
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_protocol",
+        lambda name: (_ for _ in ()).throw(Exception("Unexpected error")),
+    )
 
     result = cli_main(args)
 
     assert result == 2
     assert any(
-        log[0] == "ERROR" and "Unhandled exception" in log[1]
-        for log in mock_log_manager.logs
+        log[0] == "ERROR" and "Unhandled exception" in log[1] for log in mock_log_manager.logs
     )

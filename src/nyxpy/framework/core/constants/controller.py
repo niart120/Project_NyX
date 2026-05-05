@@ -1,9 +1,6 @@
-"""
-コントローラーボタン関連の定数
+"""コントローラーボタン関連の定数。"""
 
-このモジュールはコントローラーのボタンおよびHAT（十字キー）関連の定数を定義します。
-"""
-
+from dataclasses import dataclass
 from enum import IntEnum
 
 
@@ -51,3 +48,29 @@ class Hat(IntEnum):
 
     def __repr__(self):
         return f"Hat.{self.name}"
+
+
+class ThreeDSButton(IntEnum):
+    """3DS 固有のボタンを表す定数。"""
+
+    POWER = 0x2000
+
+    def __repr__(self):
+        return f"ThreeDSButton.{self.name}"
+
+
+@dataclass(frozen=True)
+class TouchState:
+    """3DS タッチパネルの入力状態。"""
+
+    pressed: bool
+    x: int = 0
+    y: int = 0
+
+    @classmethod
+    def down(cls, x: int, y: int) -> "TouchState":
+        return cls(True, x, y)
+
+    @classmethod
+    def up(cls) -> "TouchState":
+        return cls(False)

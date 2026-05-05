@@ -34,14 +34,10 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="nyxpy", description="NyX Macro Framework for Nintendo Switch automation"
     )
-    subparsers = parser.add_subparsers(
-        dest="command", required=True, help="Command to execute"
-    )
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Command to execute")
 
     # CLIサブコマンドパーサー
-    cli_parser = subparsers.add_parser(
-        "cli", help="Run macro via command line interface"
-    )
+    cli_parser = subparsers.add_parser("cli", help="Run macro via command line interface")
 
     cli_parser.add_argument(
         "-s", "--serial", type=str, required=True, help="Serial port name (e.g., COM3)"
@@ -61,6 +57,13 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         default="CH552",
         help="Protocol name (default: CH552)",
+    )
+
+    cli_parser.add_argument(
+        "--baud",
+        type=int,
+        default=None,
+        help="Serial baudrate (default: protocol-specific)",
     )
 
     cli_parser.add_argument(
