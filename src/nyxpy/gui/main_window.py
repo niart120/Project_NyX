@@ -1,7 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, Signal
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDialog,
@@ -18,9 +18,9 @@ from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.logger import create_default_logging
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import create_legacy_runtime_builder
-from nyxpy.framework.core.runtime.context import ExecutionContext, RuntimeBuildRequest
-from nyxpy.framework.core.runtime.result import RunStatus
-from nyxpy.framework.core.runtime.runtime import MacroRuntime
+from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
+from nyxpy.framework.core.runtime.handle import RunHandle
+from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.singletons import (
     capture_manager,
     global_settings,
@@ -50,6 +50,10 @@ class MainWindow(QMainWindow):
         self.macro_catalog = MacroCatalog(self.registry)
         self._last_settings = {}
         self._last_secrets = {}
+        self.run_handle: RunHandle | None = None
+        self.last_run_result: RunResult | None = None
+        self._run_poll_timer = QTimer(self)
+        self._run_poll_timer.timeout.connect(self._poll_run_handle)
         self.setup_ui()
         QTimer.singleShot(100, self.deferred_init)
 
@@ -284,14 +288,12 @@ class MainWindow(QMainWindow):
         """
         macro_name = self.macro_browser.table.item(self.macro_browser.table.currentRow(), 0).text()
         builder = self._create_runtime_builder()
-        context = builder.build(
+        self.run_handle = builder.start(
             RuntimeBuildRequest(macro_id=macro_name, entrypoint="gui", exec_args=exec_args)
         )
-        self.worker = WorkerThread(builder.runtime, context)
-        self.worker.finished.connect(self.on_finished)
         self.control_pane.set_running(True)
         self.status_label.setText("実行中")
-        self.worker.start()
+        self._run_poll_timer.start(global_settings.get("runtime.gui_poll_interval_ms", 100))
 
     def _create_runtime_builder(self):
         protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
@@ -310,9 +312,30 @@ class MainWindow(QMainWindow):
         )
 
     def cancel_macro(self):
-        if hasattr(self, "worker"):
-            self.worker.cancel()
-            self.control_pane.set_running(False)  # 状態管理に統一
+        if self.run_handle is not None and not self.run_handle.done():
+            self.run_handle.cancel()
+            self.status_label.setText("中断要求中")
+        self.control_pane.set_running(False)  # 状態管理に統一
+
+    def _poll_run_handle(self) -> None:
+        if self.run_handle is None or not self.run_handle.done():
+            return
+        self._run_poll_timer.stop()
+        try:
+            self.last_run_result = self.run_handle.result()
+            status = self._format_run_result(self.last_run_result)
+        except Exception as exc:
+            status = f"エラー: {exc}"
+        self.run_handle = None
+        self.on_finished(status)
+
+    def _format_run_result(self, result: RunResult) -> str:
+        if result.status is RunStatus.SUCCESS:
+            return "完了"
+        if result.status is RunStatus.CANCELLED:
+            return "中断"
+        message = result.error.message if result.error is not None else "不明なエラー"
+        return f"エラー: {message}"
 
     def closeEvent(self, event):
         """ウィンドウ終了時にリソースを確実に解放する。"""
@@ -323,18 +346,16 @@ class MainWindow(QMainWindow):
             event="application.closing",
         )
 
-        # 1. マクロ実行中なら停止を要求し、ワーカースレッドの終了を待つ
-        if hasattr(self, "worker") and self.worker.isRunning():
-            self.worker.cancel()
-            if not self.worker.wait(5000):  # 最大5秒待機
+        # 1. マクロ実行中なら停止を要求し、完了を待つ
+        if self.run_handle is not None and not self.run_handle.done():
+            self.run_handle.cancel()
+            if not self.run_handle.wait(5):
                 self.logger.technical(
                     "WARNING",
-                    "ワーカースレッドの終了がタイムアウトしました",
+                    "Runtime handle の終了がタイムアウトしました",
                     component="MainWindow",
                     event="macro.cancelled",
                 )
-                self.worker.terminate()
-                self.worker.wait(2000)
 
         # 2. プレビュータイマーを停止
         self.preview_pane.timer.stop()
@@ -398,28 +419,3 @@ class MacroCatalog:
             definition.class_name: definition
             for definition in self.registry.list(include_failed=False)
         }
-
-
-class WorkerThread(QThread):
-    finished = Signal(str)
-
-    def __init__(self, runtime: MacroRuntime, context: ExecutionContext):
-        super().__init__()
-        self.runtime = runtime
-        self.context = context
-
-    def cancel(self) -> None:
-        self.context.cancellation_token.request_cancel(reason="user cancelled", source="gui_or_cli")
-
-    def run(self):
-        try:
-            result = self.runtime.run(self.context)
-            if result.status is RunStatus.SUCCESS:
-                self.finished.emit("完了")
-            elif result.status is RunStatus.CANCELLED:
-                self.finished.emit("中断")
-            else:
-                message = result.error.message if result.error is not None else "不明なエラー"
-                self.finished.emit(f"エラー: {message}")
-        except Exception as e:
-            self.finished.emit(f"エラー: {e}")
