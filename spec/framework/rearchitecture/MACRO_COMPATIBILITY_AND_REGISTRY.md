@@ -5,7 +5,7 @@
 > **目的**: 既存マクロの import / lifecycle 互換を維持しつつ、ロード・識別・実行基盤をレジストリ中心へ再設計する
 > **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
 > **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`  
-> **破壊的変更**: Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コンストラクタはマクロ側移行を前提に破壊的変更を許容する。`MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。
+> **破壊的変更**: 維持する既存マクロ互換契約は本書を正とする。互換契約外の破壊的変更、削除条件、代替 API、テストゲートは `DEPRECATION_AND_MIGRATION.md` を正とする。
 
 ## 1. 概要
 

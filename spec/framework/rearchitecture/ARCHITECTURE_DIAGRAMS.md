@@ -4,7 +4,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`  
 > **目的**: フレームワーク再設計における互換境界、Runtime 中核、Ports/Adapters、GUI/CLI、ハードウェア/外部 I/O の依存方向を Mermaid 図で固定する。  
 > **関連ドキュメント**: `spec/framework/rearchitecture/FW_REARCHITECTURE_OVERVIEW.md`, `spec/framework/rearchitecture/RUNTIME_AND_IO_PORTS.md`, `spec/framework/rearchitecture/MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec/framework/rearchitecture/RESOURCE_FILE_IO.md`, `spec/framework/rearchitecture/LOGGING_FRAMEWORK.md`, `spec/framework/rearchitecture/OBSERVABILITY_AND_GUI_CLI.md`, `spec/framework/rearchitecture/DEPRECATION_AND_MIGRATION.md`
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象外であり、削除可否は `DEPRECATION_AND_MIGRATION.md` を正とする。
+> **破壊的変更**: 破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書は図版上の互換境界と依存方向だけを示す。
 
 ## 1. 概要
 
@@ -151,7 +151,7 @@ flowchart TB
         SerialAdapter["SerialControllerOutputPort"]
         CaptureAdapter["CaptureFrameSourcePort"]
         ResourceAdapter["StaticResourceStorePort"]
-        NotificationAdapter["NotificationHandlerPort"]
+        NotificationAdapter["NotificationHandlerAdapter"]
         LoggerAdapter["LoggerPortAdapter"]
     end
 
@@ -283,7 +283,7 @@ flowchart TB
         CapturePort["CaptureFrameSourcePort"]
         DummyFrame["DummyFrameSourcePort<br/>テスト・明示実行"]
         StaticStore["StaticResourceStorePort"]
-        NotificationHandlerPort["NotificationHandlerPort / NoopNotificationPort"]
+        NotificationHandlerAdapter["NotificationHandlerAdapter / NoopNotificationAdapter"]
         LoggerPortAdapter["LoggerPortAdapter"]
     end
 
@@ -314,8 +314,8 @@ flowchart TB
     Capture --> DummyFrame
     Resource --> StaticStore --> StaticRoot
     StaticStore -. "settings は扱わない" .-> SettingsResolver
-    Notify --> NotificationHandlerPort --> Discord
-    NotificationHandlerPort --> Bluesky
+    Notify --> NotificationHandlerAdapter --> Discord
+    NotificationHandlerAdapter --> Bluesky
     Logger --> LoggerPortAdapter --> LoggerComponents
 
     classDef port fill:#fff8e1,stroke:#f57f17,stroke-width:2px;
@@ -325,7 +325,7 @@ flowchart TB
 
     class DefaultCommandImpl commandimpl;
     class Controller,Capture,Resource,Notify,Logger,Touch,Sleep port;
-    class SerialPort,DummyController,CapturePort,DummyFrame,StaticStore,NotificationHandlerPort,LoggerPortAdapter adapter;
+    class SerialPort,DummyController,CapturePort,DummyFrame,StaticStore,NotificationHandlerAdapter,LoggerPortAdapter adapter;
     class SerialComm,Protocol,CaptureDevice,StaticRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
 ```
 

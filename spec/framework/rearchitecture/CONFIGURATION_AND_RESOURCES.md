@@ -4,7 +4,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\settings\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`  
 > **目的**: 通常設定、秘密設定、マクロ設定 lookup の境界を分離し、画像・ファイル I/O の詳細を Resource File I/O 仕様へ独立させる。  
 > **関連ドキュメント**: `spec/framework/rearchitecture/FW_REARCHITECTURE_OVERVIEW.md`, `spec/framework/rearchitecture/MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec/framework/rearchitecture/RUNTIME_AND_IO_PORTS.md`, `spec/framework/rearchitecture/RESOURCE_FILE_IO.md`, `spec/framework/rearchitecture/ERROR_CANCELLATION_LOGGING.md`
-> **破壊的変更**: settings lookup は破壊的変更を許容する。`static\<macro_name>\settings.toml` と `Path.cwd()` fallback は互換維持対象に含めず、manifest または class metadata の明示 settings source と明示 `project_root` へ移行する。
+> **破壊的変更**: settings lookup の破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書は `MacroSettingsResolver`、settings schema、secret 境界の詳細だけを定義する。
 
 ## 1. 概要
 

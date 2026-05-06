@@ -4,7 +4,7 @@
 > **対象モジュール**: `macros\`, `resources\`, `static\`, `macro.toml`, `src\nyxpy\framework\core\macro\`
 > **目的**: Resource I/O、settings lookup、entrypoint、`DefaultCommand` 直接生成の破壊的変更に対して、マクロ側で必要な修正手順を定義する。
 > **関連ドキュメント**: `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RESOURCE_FILE_IO.md`, `CONFIGURATION_AND_RESOURCES.md`, `RUNTIME_AND_IO_PORTS.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。旧 `static` リソース配置、旧 settings fallback、旧 auto discovery、`DefaultCommand` 旧コンストラクタは維持しない。
+> **破壊的変更**: 破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本ガイドはマクロ作者、テスト作者、adapter 実装者が必要な移行手順を説明する。
 
 ## 1. 概要
 
@@ -250,10 +250,11 @@ with cmd.artifacts.open_output("result.csv", mode="w", encoding="utf-8") as fp:
 cmd = DefaultCommand(serial_device=serial, capture_device=capture)
 ```
 
-テストで Command が必要な場合は、`MacroRuntimeBuilder` から `ExecutionContext` を作成して `DefaultCommand(context=...)` を使うか、対象ロジックを `Command` 不要の純粋関数に分離する。
+テストで Command が必要な場合は、`tests\support\fake_execution_context.py` の fake `ExecutionContext` fixture または `MacroRuntimeBuilder` から `ExecutionContext` を作成して `DefaultCommand(context=...)` を使う。adapter 実装者は builder から渡された context を利用し、旧具象引数を再導入しない。マクロ固有ロジックは可能な範囲で `Command` 不要の純粋関数に分離する。
 
 ```python
 # 移行後: テスト用に context を明示する
+context = fake_execution_context()
 cmd = DefaultCommand(context=context)
 ```
 

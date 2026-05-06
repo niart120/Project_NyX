@@ -5,7 +5,7 @@
 > **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果を再設計し、ログ出力は `LOGGING_FRAMEWORK.md` の基盤へ接続する。  
 > **関連ドキュメント**: `LOGGING_FRAMEWORK.md`, `spec/framework/archive/logging_design.md`  
 > **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`  
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、`DefaultCommand` 旧コンストラクタ、legacy loader、`Command.stop()` の即時例外送出依存はマクロ側移行を前提に破壊的変更を許容する。
+> **破壊的変更**: 破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書では `Command.stop()` の即時例外送出廃止、例外正規化、キャンセル互換の異常系契約だけを扱う。
 
 ## 1. 概要
 
@@ -379,7 +379,7 @@ def cancellation_aware_wait(seconds: float, token: CancellationToken) -> bool:
             return False
 ```
 
-`safe_point_latency` は token 発火から `MacroCancelled` 送出までの時間である。GUI 操作から token 発火までの `cancel_request_latency`、`RunHandle.cancel()` から `RunResult.cancelled` までの `cancel_result_latency` とは分けて測定する。
+`safe_point_latency` は token 発火から `MacroCancelled` 送出までの時間である。GUI 操作から token 発火までの `cancel_request_latency`、`RunHandle.cancel()` から `result.status == RunStatus.CANCELLED` までの `cancel_result_latency` とは分けて測定する。
 
 キャンセル API は 3 層に分ける。
 
@@ -480,9 +480,9 @@ class MacroArgsSchema:
 
 ### ロギング連携
 
-ロギングフレームワーク選定、event catalog、`LoggerPort`、`LogEvent`、`LogSink`、`UserEvent` と `TechnicalLog` の分離、実行単位コンテキスト、テスト用 sink、ログファイル配置、rotation、保持期間は `LOGGING_FRAMEWORK.md` を正とする。本書は異常系・中断系から event を発行するタイミングだけを定義する。
+ロギングフレームワーク選定、event catalog、`LoggerPort`、`LogEvent`、`LogSink`、`UserEvent` と `TechnicalLog` の分離、実行単位コンテキスト、テスト用 sink、ログファイル配置、rotation、保持期間は `LOGGING_FRAMEWORK.md` を正とする。本書は異常系・中断系から `LOGGING_FRAMEWORK.md` の event catalog ID を発行するタイミングだけを定義し、新しい event 名は定義しない。
 
-| タイミング | 発行 event |
+| タイミング | 参照する event catalog ID |
 |------------|------------|
 | `RunHandle.cancel()` または `Command.stop()` が中断要求を登録した | `macro.cancel_requested` |
 | `MacroRunner` が `RunStatus.CANCELLED` を確定した | `macro.cancelled` |
@@ -534,7 +534,7 @@ class MacroArgsSchema:
 | ユニット | `test_secrets_store_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |
 | ユニット | `test_error_events_use_logger_port` | 異常・中断 event が `LOGGING_FRAMEWORK.md` の `LoggerPort` へ渡る |
 | ユニット | `test_cli_notification_settings_source_is_secrets_store` | CLI 通知設定が `SecretsStore` 由来の secrets snapshot に統一されていることを検証する |
-| 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `RunResult(cancelled)` を確認する |
+| 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `result.status == RunStatus.CANCELLED` を確認する |
 | 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
 | ハードウェア | `test_device_error_on_serial_disconnect` | `@pytest.mark.realdevice`。シリアル切断時に `DeviceError` へ正規化する |

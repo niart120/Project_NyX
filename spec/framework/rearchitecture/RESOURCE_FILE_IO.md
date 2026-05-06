@@ -4,7 +4,7 @@
 > **目的**: マクロが参照する read-only assets と実行中に生成する writable outputs の配置、解決、読み書きを Runtime Port と互換 Command API へ分離する。  
 > **関連ドキュメント**: `CONFIGURATION_AND_RESOURCES.md`, `RUNTIME_AND_IO_PORTS.md`, `IMPLEMENTATION_PLAN.md`  
 > **既存ソース**: `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\utils\helper.py`, `src\nyxpy\framework\core\macro\command.py`  
-> **破壊的変更**: `cmd.load_img()` / `cmd.save_img()` のメソッド名と基本シグネチャは維持する。`static\<macro_name>\...` 参照、legacy static 書き込み、`StaticResourceIO` 直接利用は互換維持対象に含めず、マクロ側移行を前提に削除する。
+> **破壊的変更**: Resource File I/O の破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書は `cmd.load_img()` / `cmd.save_img()` の維持範囲、assets / outputs 配置、path guard、atomic write を定義する。
 
 ## 1. 概要
 
