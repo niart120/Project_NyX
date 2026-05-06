@@ -1,6 +1,6 @@
 # マクロ互換性とレジストリ再設計 仕様書
 
-> **文書種別**: 仕様書。既存マクロ import / lifecycle 互換契約、`MacroRegistry`、`MacroDefinition`、manifest 任意採用、settings lookup の正本である。
+> **文書種別**: 仕様書。既存マクロ import / lifecycle 互換契約、`MacroRegistry`、`MacroDefinition`、manifest 任意採用、class metadata、`MacroDefinition.settings_path` の正本である。settings lookup の解決と読み込みは `CONFIGURATION_AND_RESOURCES.md` を正本とする。
 > **対象モジュール**: `src/nyxpy/framework/core/macro/`  
 > **目的**: 既存マクロの import / lifecycle 互換を維持しつつ、ロード・識別・実行基盤をレジストリ中心へ再設計する
 > **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
@@ -338,7 +338,7 @@ class Command(ABC):
     def save_img(self, filename: str | Path, image) -> None: ...
     def load_img(self, filename: str | Path, grayscale: bool = False): ...
     def keyboard(self, text: str) -> None: ...
-    def type(self, key: str | KeyCode | SpecialKeyCode) -> None: ...
+    def type(self, key: KeyCode | SpecialKeyCode) -> None: ...
     def notify(self, text: str, img=None) -> None: ...
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None: ...
     def touch_down(self, x: int, y: int) -> None: ...
@@ -471,7 +471,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | ユニット | `test_settings_static_lookup_is_not_supported` | `static/<macro_name>/settings.toml` を互換 settings として読み込まない |
 | ユニット | `test_exec_args_override_file_settings` | file settings より `exec_args` が優先される |
 | ユニット | `test_command_method_names_are_compatible` | `Command` が互換契約のメソッド名を持つ |
-| ユニット | `test_command_type_accepts_str_keycode_special_keycode` | `Command.type(key: str | KeyCode | SpecialKeyCode)` の呼び出し互換を検証する |
+| ユニット | `test_command_type_accepts_keycode_special_keycode_only` | `Command.type(key: KeyCode \| SpecialKeyCode)` の呼び出し互換と `str` 非対応を検証する |
 | ユニット | `test_explicit_settings_path_resolution` | manifest / class metadata settings が project-root 相対と macro-root 相対を区別して解決される |
 | ユニット | `test_macro_executor_removed` | `MacroExecutor` を新 API、互換契約、移行 adapter として公開しない |
 | ユニット | `test_constants_import_contract` | `from nyxpy.framework.core.constants import Button, Hat, LStick, RStick, KeyType` が成功する |
@@ -495,7 +495,9 @@ uv run ruff check .
 
 ## 6. 実装チェックリスト
 
-本チェックリストは仕様確定項目である。実装タスクと検証タスクは `IMPLEMENTATION_PLAN.md` のフェーズ別チェックリストを正とする。
+実装タスクと検証タスクは `IMPLEMENTATION_PLAN.md` のフェーズ別チェックリストを正とする。
+
+### 6.1 仕様チェックリスト
 
 - [x] 既存 import path の互換契約を明記
 - [x] lifecycle signature の互換契約を明記

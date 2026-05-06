@@ -182,7 +182,7 @@ class DeprecationCandidate:
 | `ResourceStorePort` による settings TOML 探索 | `MacroSettingsResolver` が settings を解決し、ResourceStore は画像 I/O だけを扱う | `MacroSettingsResolver.resolve()`, `MacroSettingsResolver.load()` | `static\<macro_name>\settings.toml` 互換は削除 | `test_macro_settings_resolver_is_separate_from_resource_store`, `test_migrated_macro_settings_load_from_explicit_source` | settings resolver 実装 → ResourceStore から settings 探索を排除 |
 | GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, cancel latency test | RunHandle 導入 → GUI cancel 移行 → GUI からの直接 `cmd.stop()` を削除 |
 
-### 4.3 設定パラメータ
+### 4.4 設定パラメータ
 
 | パラメータ | 型 | デフォルト | 所有者 | 説明 |
 |------------|-----|-----------|--------|------|
@@ -191,7 +191,7 @@ class DeprecationCandidate:
 | `runtime.frame_ready_timeout_sec` | `float` | `3.0` | `RuntimeOptions` | 初回フレーム readiness の最大待機秒数 |
 | `migration.require_manifest_for_ambiguous_entrypoint` | `bool` | `True` | `MacroRegistry` | convention discovery が曖昧な場合に manifest entrypoint を要求するか |
 
-### 4.4 エラーハンドリング
+### 4.5 エラーハンドリング
 
 | 例外クラス | 発生条件 |
 |------------|----------|
@@ -203,7 +203,7 @@ class DeprecationCandidate:
 
 Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コンストラクタは、互換 shim を長期維持しない。必要な場合でも移行作業中の短期 shim に限定し、最終仕様では削除する。GUI / CLI 内部経路、旧 worker、旧 helper、旧 settings 適用処理は警告期間を置かず、新 Runtime 入口へ置換した commit 内で削除する。
 
-### 4.5 シングルトン管理
+### 4.6 シングルトン管理
 
 `singletons.py` の既存 `serial_manager`、`capture_manager`、`global_settings`、`secrets_settings`、`log_manager` は互換 shim として段階廃止する。新 Runtime 経路では GUI/CLI/Command/Runtime がこれらを直接参照せず、GUI / CLI composition root が `MacroRuntimeBuilder`、Port factory、device discovery、settings/secrets store、logging components を必要な lifetime で生成する。`MacroRuntimeBuilder`、`MacroRuntime`、`MacroRegistry`、`MacroSettingsResolver`、`ResourceStorePort`、`RunHandle`、Port 実体はシングルトンにしない。
 
@@ -256,6 +256,10 @@ rg "^## (1\. 概要|2\. 対象ファイル|3\. 設計方針|4\. 実装仕様|5\.
 ```
 
 ## 6. 実装チェックリスト
+
+本書は廃止判断を固定する仕様である。実装タスクと検証タスクは `IMPLEMENTATION_PLAN.md` のフェーズ別チェックリストを正とする。
+
+### 6.1 仕様チェックリスト
 
 - [x] 仕様分割レビューを記載
 - [x] 現在の分割で妥当な仕様を整理

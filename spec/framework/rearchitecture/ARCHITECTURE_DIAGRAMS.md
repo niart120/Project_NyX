@@ -123,6 +123,9 @@ flowchart TB
         ConstantsNode["Button / Hat / LStick / RStick / KeyType"]
         StopNode["MacroStopException"]
         SettingsNode["settings metadata<br/>manifest / class metadata"]
+    end
+
+    subgraph Legacy["Legacy removal target<br/>互換契約外"]
         ExecutorNode["MacroExecutor<br/>(legacy entrypoint)"]
     end
 
@@ -204,6 +207,7 @@ flowchart TB
     classDef port fill:#fff8e1,stroke:#f57f17,stroke-width:2px;
     classDef adapter fill:#f3e5f5,stroke:#6a1b9a,stroke-width:1px;
     classDef io fill:#eeeeee,stroke:#424242,stroke-width:1px;
+    classDef legacy fill:#fff3e0,stroke:#ef6c00,stroke-width:1px;
     classDef guard fill:#ffebee,stroke:#c62828,stroke-width:2px;
 
     class MacroBaseNode,CommandNode,ConstantsNode,StopNode,SettingsNode stable;
@@ -211,6 +215,7 @@ flowchart TB
     class ControllerPort,FramePort,ResourcePort,NotificationPortNode,LoggerPortNode port;
     class SerialAdapter,CaptureAdapter,ResourceAdapter,NotificationAdapter,LoggerAdapter adapter;
     class SerialIO,CaptureIO,StaticIO,ExternalIO,LogIO io;
+    class ExecutorNode legacy;
     class Guard guard;
 ```
 
@@ -451,6 +456,10 @@ flowchart LR
 | ドキュメント | `placeholder_scan` | 対象 2 ファイルに未確定プレースホルダが残っていないことを確認する。 |
 
 ## 6. 実装チェックリスト
+
+本仕様は文書追加であり、実装タスクは発生しない。図版作成と正本仕様との同期確認を本チェックリストで扱う。
+
+### 6.1 図版作成チェックリスト
 
 - [x] 関連 4 仕様を読み、Runtime、Ports、互換境界、GUI/CLI の責務を反映
 - [x] 全体レイヤー図を Mermaid で作成

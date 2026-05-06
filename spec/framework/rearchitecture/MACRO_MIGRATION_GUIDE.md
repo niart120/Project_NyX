@@ -98,7 +98,33 @@ Markdown の説明文では Windows 配置例として `\` を使う。`macro.to
 
 ## 4. 実装仕様
 
-### 4.1 manifest の追加
+### 4.1 公開インターフェース
+
+本ガイドは呼び出し側の移行手順を示す。`MacroRuntime`、`DefaultCommand`、Resource File I/O、settings lookup の公開 API 正本は、それぞれ `RUNTIME_AND_IO_PORTS.md`、`RESOURCE_FILE_IO.md`、`CONFIGURATION_AND_RESOURCES.md` を参照する。
+
+移行後のマクロ側で使う公開面は次の範囲である。
+
+```python
+from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.command import Command, DefaultCommand
+
+
+class FrlgIdRngMacro(MacroBase):
+    macro_id = "frlg_id_rng"
+    display_name = "FRLG ID RNG"
+    settings_path = "project:resources/frlg_id_rng/settings.toml"
+
+    def initialize(self, cmd: Command, args: dict) -> None: ...
+    def run(self, cmd: Command) -> None: ...
+    def finalize(self, cmd: Command) -> None: ...
+
+
+cmd = DefaultCommand(context=context)
+```
+
+`DefaultCommand(context=...)` はテストや adapter 実装で必要な場合だけ使う。通常のマクロは GUI/CLI 経路から渡された `cmd` を受け取り、`DefaultCommand` を直接生成しない。
+
+### 4.2 manifest の追加
 
 `macro.toml` は必須ではない。次の条件に該当するマクロだけ `macros\<macro_id>\macro.toml` を追加する。
 
@@ -129,7 +155,7 @@ class FrlgIdRngMacro(MacroBase):
     settings_path = "project:resources/frlg_id_rng/settings.toml"
 ```
 
-### 4.2 settings の移行
+### 4.3 settings の移行
 
 旧配置（Windows 表記例）:
 
@@ -159,7 +185,7 @@ class FrlgIdRngMacro(MacroBase):
 
 相対パスを使う場合は macro root 相対とする。`project:` prefix を付けた場合は `project_root` 相対とする。`Path.cwd()` からの探索は行わない。
 
-### 4.3 assets の移行
+### 4.4 assets の移行
 
 旧配置（Windows 表記例）:
 
@@ -193,7 +219,7 @@ template = cmd.load_img("frlg_id_rng/templates/title.png")
 template = cmd.load_img("templates/title.png")
 ```
 
-### 4.4 outputs の移行
+### 4.5 outputs の移行
 
 `cmd.save_img("result.png", image)` の保存先は次に固定する。
 
@@ -215,7 +241,7 @@ with cmd.artifacts.open_output("result.csv", mode="w", encoding="utf-8") as fp:
     fp.write(csv_text)
 ```
 
-### 4.5 `DefaultCommand` 直接生成の修正
+### 4.6 `DefaultCommand` 直接生成の修正
 
 マクロは GUI/CLI 経路から渡された `cmd` を使う。次の直接生成は削除する。
 
@@ -237,7 +263,7 @@ def decide_next_button(state: dict[str, int]) -> Button:
     return Button.A if state["ready"] else Button.B
 ```
 
-### 4.5A `Command.stop()` の移行
+### 4.7 `Command.stop()` の移行
 
 現行 `DefaultCommand.stop()` は停止要求後に即時 `MacroStopException` を送出していた。再設計後の `Command.stop()` は協調キャンセル専用とし、停止要求だけを登録する。即時例外送出の互換引数は提供しないため、長い処理から脱出したい箇所は `cmd.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point に寄せる。
 
@@ -252,7 +278,7 @@ cmd.stop()
 cmd.wait(0)
 ```
 
-### 4.6 設定パラメータ
+### 4.8 設定パラメータ
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|------------|------|
@@ -262,7 +288,7 @@ cmd.wait(0)
 | `MacroBase.settings_path` | `str | None` | `None` | manifest なし、または manifest に settings がない場合の settings TOML path |
 | `project:` prefix | `str` | なし | `project_root` 相対 path を表す |
 
-### 4.7 エラーハンドリング
+### 4.9 エラーハンドリング
 
 | エラー | 発生条件 |
 |--------|----------|

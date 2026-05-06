@@ -241,7 +241,7 @@ class Command(ABC):
         *values: object,
         sep: str = " ",
         end: str = "\n",
-        level: str = "INFO",
+        level: str = "DEBUG",
     ) -> None: ...
 
 
@@ -251,7 +251,7 @@ class CancellableCommand(Command):
         *values: object,
         sep: str = " ",
         end: str = "\n",
-        level: str = "INFO",
+        level: str = "DEBUG",
         event: str = "macro.message",
         extra: Mapping[str, LogExtraValue] | None = None,
         gui: bool = True,
@@ -405,6 +405,10 @@ class MacroArgsSchema:
 ```
 
 検証順序は manifest または class metadata settings path から読み込んだ settings と、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。旧 `static/<macro_id>/settings.toml` は探索しない。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
+
+### 設定パラメータ
+
+設定 schema の正本は `CONFIGURATION_AND_RESOURCES.md` とする。本書では、異常系・入力検証で参照する代表的な設定項目だけを示す。
 
 #### SettingsStore / SecretsStore schema
 
