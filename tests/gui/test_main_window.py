@@ -1,5 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
 
+from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.main_window import MainWindow
 
 
@@ -56,3 +59,85 @@ def test_search_filter(window):
     assert window.macro_browser.table.isRowHidden(0)
     window.macro_browser.search_box.clear()
     assert not window.macro_browser.table.isRowHidden(0)
+
+
+class FakeRunHandle:
+    def __init__(self, result: RunResult | None = None, *, done: bool = False) -> None:
+        self._result = result
+        self._done = done
+        self.cancelled = False
+        self.wait_called_with = None
+
+    @property
+    def run_id(self) -> str:
+        return "run-1"
+
+    @property
+    def cancellation_token(self):
+        return None
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+    def done(self) -> bool:
+        return self._done
+
+    def wait(self, timeout=None) -> bool:
+        self.wait_called_with = timeout
+        return self._done
+
+    def result(self):
+        if self._result is None:
+            raise RuntimeError("no result")
+        return self._result
+
+
+def run_result(status: RunStatus) -> RunResult:
+    from datetime import datetime
+
+    now = datetime.now()
+    return RunResult(
+        run_id="run-1",
+        macro_id="DummyMacro",
+        macro_name="DummyMacro",
+        status=status,
+        started_at=now,
+        finished_at=now,
+    )
+
+
+def test_main_window_uses_run_handle(window, monkeypatch):
+    handle = FakeRunHandle()
+    builder = type("Builder", (), {"start": MagicMock(return_value=handle)})()
+    monkeypatch.setattr(window, "_create_runtime_builder", lambda: builder)
+    window.macro_browser.table.selectRow(0)
+
+    window._start_macro({"count": 1})
+
+    assert window.run_handle is handle
+    request = builder.start.call_args.args[0]
+    assert request.macro_id == "DummyMacro"
+    assert request.entrypoint == "gui"
+    assert request.exec_args == {"count": 1}
+    assert window.control_pane.cancel_btn.isEnabled()
+
+
+def test_main_window_cancel_calls_handle_cancel(window):
+    handle = FakeRunHandle(done=False)
+    window.run_handle = handle
+
+    window.cancel_macro()
+
+    assert handle.cancelled is True
+    assert window.status_label.text() == "中断要求中"
+
+
+def test_main_window_poll_updates_status_from_run_result(window):
+    window.run_handle = FakeRunHandle(run_result(RunStatus.SUCCESS), done=True)
+    window.control_pane.set_running(True)
+
+    window._poll_run_handle()
+
+    assert window.status_label.text() == "完了"
+    assert window.run_handle is None
+    assert window.last_run_result.status is RunStatus.SUCCESS
