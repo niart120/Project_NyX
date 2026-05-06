@@ -76,7 +76,7 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 | `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、test sink の標準実装を定義。GUI sink は置かない |
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | Logger は `core\logger\ports.py` を正とし、io port 群へ再定義しない |
 | `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` を `ExecutionContext.run_log_context` に含める |
-| `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI 用の logger 構成と `LoggerPort` 注入を担当 |
+| `src\nyxpy\framework\core\runtime\builder.py` | 変更 | composition root から受け取った `LoggerPort` を `ExecutionContext` へ注入する。CLI/GUI 用 logger 構成は担当しない |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` / `technical()` へ接続 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
 | `src\nyxpy\gui\log_sink.py` | 新規 | `GuiLogSink` を定義し、`UserEvent` を Qt Signal へ変換する GUI 層 adapter |
@@ -312,6 +312,8 @@ LoggerPort.technical() / user()
 |---------|------|----------|--------|---------|------------------|------------------------|----------|
 | `sink_lock` | `threading.RLock` | sink registry、level、配信先 snapshot | 全体 5 番目。`frame_lock` より後、他 lock 取得中の logging 呼び出しでは取得しない | 1 秒 | `LogSinkError(code="logging.sink_lock_timeout")` を fallback stderr へ出し、呼び出し元へ再送出しない | sink `emit_*()`、backend write、Qt Signal emit、retention cleanup | `test_log_sink_dispatcher_snapshot_lock_order` |
 
+fallback stderr は通常 sink 経路が使えない場合の最後の通知先であるため、出力内容を固定文言、event code、component、例外型、mask 済み要約に限定する。元例外の message を出す場合も `LogSanitizer.mask_text()` 相当を必ず通し、secret、通知 payload、内部 token、絶対 path を平文で出力しない。
+
 他コンポーネントが `registry_reload_lock`、`run_start_lock`、`run_handle_lock`、`frame_lock` を保持したまま `LoggerPort` を呼ぶ設計は禁止する。ログを残す必要がある場合は、保護対象の値を局所変数へ退避し、lock を解放してから `LoggerPort` を呼ぶ。
 
 #### GUI sink の境界
@@ -338,6 +340,7 @@ LoggerPort.user()
 | message | 1 行の短文 | 詳細でもよいが secret mask 済み |
 | traceback | 含めない | DEBUG 詳細として保持可 |
 | 内部 path | 原則含めない | 相対 path または mask 済みで保持可 |
+| secret 値 | 含めない | `LogSanitizer` を通した mask 済み要約のみ |
 | 通知 payload | 含めない | secret と本文を mask した要約のみ |
 | sink | GUI 層の `GuiLogSink`、CLI presenter | JSONL file、人間向け file、console debug |
 
@@ -432,6 +435,8 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 | ユニット | `test_user_event_does_not_include_traceback_or_secret` | `UserEvent` が traceback、secret、内部詳細を含まない |
 | ユニット | `test_technical_log_masks_secret_values` | `TechnicalLog.extra` の secret 値が mask される |
 | ユニット | `test_sink_exception_is_logged_and_ignored` | 失敗 sink があっても後続 sink と呼び出し元処理が継続する |
+| ユニット | `test_log_sink_dispatcher_exception_isolation` | GUI sink 相当の sink が例外を送出しても後続 sink が呼ばれる |
+| ユニット | `test_fallback_stderr_masks_secret_values` | `sink_lock` timeout 時の fallback stderr に secret、通知 payload、絶対 path が平文で出ない |
 | ユニット | `test_sink_snapshot_allows_remove_during_emit` | sink 呼び出し中に登録解除しても deadlock しない |
 | ユニット | `test_test_log_sink_records_user_and_technical_events` | `TestLogSink` で user / technical を個別検証できる |
 | ユニット | `test_logging_config_rejects_invalid_level` | 不正 level を `LoggingConfigurationError` にする |

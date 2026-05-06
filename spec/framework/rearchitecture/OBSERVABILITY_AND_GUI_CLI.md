@@ -31,7 +31,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 
 ### 1.3 背景・問題
 
-既存仕様では Runtime と I/O Ports の分離、異常系、構造化ログの方向性が定義されている。ただし、GUI/CLI をどの段階で `MacroRuntime` 入口へ寄せるか、CLI 通知設定ソースを secrets snapshot に統一する問題、ユーザー表示と技術ログの境界は独立した観点として明文化が不足していた。sink 例外・ロック方針は `LOGGING_FRAMEWORK.md` を正とする。
+既存仕様では Runtime と I/O Ports の分離、異常系、構造化ログの方向性が定義されている。ただし、GUI/CLI をどの段階で `MacroRuntime` 入口へ寄せるか、通知 secret を `SecretsStore` 由来の secrets snapshot に統一する問題、ユーザー表示と技術ログの境界は独立した観点として明文化が不足していた。sink 例外・ロック方針は `LOGGING_FRAMEWORK.md` を正とする。
 
 現行 GUI/CLI がそれぞれ `DefaultCommand` を組み立てると、通知設定、キャンセル、logger 注入、デバイス検出完了待ちが入口ごとにずれる。再設計ではマクロ実行契約を維持し、入口側の組み立てを `MacroRuntimeBuilder` へ集約する。
 
@@ -70,7 +70,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 | `src\nyxpy\gui\main_window.py` | 変更 | `MacroRuntime.start()` と `RunHandle` を使う実行制御へ移行 |
 | `src\nyxpy\gui\panes\log_pane.py` | 変更 | `UserEvent` を表示し、保存ログ sink へ直接依存しない |
 | `tests\unit\framework\logger\test_logging_framework.py` | 新規 | ロギング基盤の詳細テストは `LOGGING_FRAMEWORK.md` に従う |
-| `tests\integration\test_cli_runtime_entry.py` | 新規 | CLI が Runtime 入口と secrets snapshot を使うことを検証 |
+| `tests\integration\test_cli_runtime_entry.py` | 新規 | CLI が Runtime 入口と `SecretsStore` 由来の secrets snapshot を使うことを検証 |
 | `tests\gui\test_runtime_entry.py` | 新規 | GUI が `RunHandle` と GUI 表示イベントで実行状態を反映することを検証 |
 
 ## 3. 設計方針
@@ -124,7 +124,7 @@ GUI は application lifetime で `AppServices` 相当の集約オブジェクト
 | GUI `UserEvent` 受信から Qt Signal emit | 1 event 10 ms 未満 |
 | sink 例外発生時の GUI/CLI 継続 | `LOGGING_FRAMEWORK.md` の隔離方針に従い 100% |
 | CLI 起動時の Runtime builder 追加コスト | デバイス検出を除き 100 ms 未満 |
-| GUI cancel ボタンから中断要求発火 | 100 ms 未満 |
+| `cancel_request_latency` | GUI cancel ボタンから中断要求発火まで 100 ms 未満 |
 
 ### 並行性・スレッド安全性
 
@@ -181,16 +181,16 @@ run_cli.main()
 
 GUI は起動時に `MacroRuntimeBuilder` を構成し、実行ボタンで `RuntimeBuildRequest(entrypoint="gui", ...)` を作成して `builder.start(request)` を呼ぶ。GUI cancel は `RunHandle.cancel()` のみを呼び、`Command.stop()` を GUI スレッドから直接呼ばない。
 
-#### CLI 通知設定ソース
-
-通知 secret は `SecretsStore` 由来の secrets snapshot が唯一の入力元である。CLI 引数で通知先を直接受け取る場合でも、その値を一時 secrets snapshot として扱い、通常設定やログ context へ平文を渡さない。Runtime builder が secrets snapshot 以外から secret 値を受け取った場合は `ConfigurationError` とする。
+#### 通知 secret 入力元
 
 | 入力元 | 変換責務 | Runtime へ渡す形 | 禁止事項 |
 |--------|----------|------------------|----------|
-| CLI 引数 | CLI adapter が一時 secrets snapshot を作る | `RuntimeBuildRequest.secrets` | CLI args の値を通常設定、ログ context、`exec_args` へ複製しない |
-| GUI 設定画面 | GUI adapter が保存済み secrets snapshot または一時 snapshot を渡す | `RuntimeBuildRequest.secrets` | widget の平文値を structured log や status 表示へ渡さない |
-| 既存 secrets file | `SecretsStore` が読み込み、mask 済み snapshot を logger へ渡す | secrets snapshot | 通常設定 schema に secret field を追加しない |
+| CLI | CLI 引数では通知 secret を受け取らない。composition root が `SecretsStore` を読み込む | builder lifetime の secrets snapshot | CLI args、通常設定、ログ context、`exec_args` へ secret を渡さない |
+| GUI 設定画面 | GUI adapter が `SecretsStore` へ保存し、保存後の secrets snapshot を使う | builder lifetime の secrets snapshot | widget の平文値を structured log や status 表示へ渡さない |
+| 既存 secrets file | `SecretsStore` が読み込み、Runtime builder へ渡す | builder lifetime の secrets snapshot | 通常設定 schema に secret field を追加しない |
 | 通知 adapter | Runtime builder が secrets snapshot から `NotificationPort` を構築する | `NotificationPort` | Discord / Bluesky credential を Port 生成後の log extra に残さない |
+
+CLI 経由で Discord webhook URL や Bluesky password を一時指定する機能は設けない。通知 secret は `RuntimeBuildRequest` のフィールドではなく、GUI/CLI composition root が生成する `MacroRuntimeBuilder` の lifetime に属する。実行ごとに通知先を切り替える必要がある場合も、先に `SecretsStore` を更新して builder を再構成する。
 
 #### ロギング基盤との接続
 
@@ -219,7 +219,7 @@ Runtime worker thread
 
 | 例外クラス | 発生条件 |
 |------------|----------|
-| `ConfigurationError` | 通知 secret を secrets snapshot 以外から受け取った、ログレベル不正、CLI 引数不正 |
+| `ConfigurationError` | 通知 secret を `SecretsStore` / secrets snapshot 以外から受け取った、ログレベル不正、CLI 引数不正 |
 | `GuiSinkError` | GUI sink 例外の内部表現。外部へ再送出せず `LOGGING_FRAMEWORK.md` の sink 例外隔離へ渡す |
 | `LoggingConfigurationError` | loguru sink 作成失敗、ログファイル path 不正 |
 | `MacroRuntimeError` | マクロ実行中の未分類例外。`RunResult.error` と技術ログへ記録 |
@@ -237,22 +237,22 @@ Runtime worker thread
 | ユニット | `test_user_message_excludes_traceback` | GUI/CLI の `UserMessage` に traceback が含まれない |
 | ユニット | `test_runtime_builder_passes_logger_port` | Runtime builder が `LOGGING_FRAMEWORK.md` の `LoggerPort` を実行 context へ渡す |
 | ユニット | `test_cli_presenter_exit_codes` | 成功 0、失敗 2、中断 130 の終了コードを返す |
-| ユニット | `test_runtime_builder_rejects_cli_secret_outside_secrets_snapshot` | CLI 通知 secret の入力元違反を `ConfigurationError` にする |
+| ユニット | `test_cli_does_not_accept_notification_secret_args` | CLI 引数で通知 secret を受け取らない |
 | 結合 | `test_cli_uses_macro_runtime_entry` | CLI が `DefaultCommand` 直接構築ではなく Runtime builder を使う |
-| 結合 | `test_cli_notification_settings_source_is_secrets_snapshot` | CLI 通知設定が secrets snapshot に統一される |
+| 結合 | `test_cli_notification_settings_source_is_secrets_store` | CLI 通知設定が `SecretsStore` 由来の secrets snapshot に統一される |
 | GUI | `test_main_window_uses_run_handle` | GUI 実行開始で `MacroRuntime.start()` の `RunHandle` を保持する |
 | GUI | `test_main_window_cancel_calls_handle_cancel` | GUI cancel が `Command.stop()` ではなく `RunHandle.cancel()` を呼ぶ |
 | GUI | `test_gui_log_pane_displays_user_event_from_sink` | `LogPane` が `UserEvent` を表示する |
 | GUI | `test_gui_log_sink_emits_qt_signal` | `GuiLogSink` が `UserEvent` を Qt Signal へ変換し、LogPane slot が GUI thread で受け取る |
 | ハードウェア | `test_realdevice_cli_runtime_logging` | `@pytest.mark.realdevice`。実機 CLI 実行で run_id 付きログが残る |
 | 性能 | `test_gui_user_event_dispatch_perf` | GUI `UserEvent` 受信から Qt Signal emit まで 10 ms 未満 |
-| 性能 | `test_cancel_button_to_token_latency_perf` | GUI cancel から token 発火まで 100 ms 未満 |
+| 性能 | `test_cancel_request_latency_perf` | GUI cancel から token 発火までの `cancel_request_latency` が 100 ms 未満 |
 
 ## 6. 実装チェックリスト
 
 - [ ] GUI/CLI の `DefaultCommand` 直接構築箇所を Runtime builder へ寄せる
 - [ ] `GuiLogSink` を GUI 層 adapter として実装し、core 層の Qt 依存を禁止
-- [ ] CLI 通知設定ソースを secrets snapshot に統一
+- [ ] CLI 通知設定ソースを `SecretsStore` 由来の secrets snapshot に統一
 - [ ] `LOGGING_FRAMEWORK.md` の `LoggerPort` / `UserEvent` を GUI/CLI 入口へ接続
 - [ ] ユーザー表示から traceback、secret、内部詳細を除外
 - [ ] CLI 終了コードを `RunResult` から決定

@@ -57,7 +57,7 @@
 | 既存 `MacroStopException` import | `exceptions.py` に単独定義 | import パスと `except MacroStopException` の捕捉互換を維持 |
 | マクロ実行結果 | `execute()` は `None`、失敗情報はログ文字列のみ | `RunResult` に `status`, `error`, `cancelled_reason`, `run_id`, `macro_id` を保持 |
 | GUI cancel の例外 | GUI スレッドから `cmd.stop()` を呼ぶと例外が出る | GUI は中断要求のみを行い、例外送出はマクロ実行スレッドに限定 |
-| `Command.wait()` 中断反映 | 待機秒数が終わるまで反映されない | `CancellationToken` 発火後 100 ms 未満で `MacroCancelled` を送出 |
+| `Command.wait()` 中断反映 | 待機秒数が終わるまで反映されない | `safe_point_latency`: `CancellationToken` 発火後 100 ms 未満で `MacroCancelled` を送出 |
 | ログ相関 | `component` 文字列のみ | 構造化ログに `run_id`, `macro_id`, `component` を常時付与 |
 | GUI 表示 | loguru の文字列を直接表示 | 永続ログと GUI 表示イベントを分離し、表示用文言を短く保つ |
 | 設定・引数検証 | TOML パース後の型検証なし | schema に基づき実行前に `ConfigurationError` として検出 |
@@ -128,7 +128,7 @@
 
 | 指標 | 目標値 |
 |------|--------|
-| `CancellationToken` 発火から `Command.wait()` 解除までの遅延 | 100 ms 以下 |
+| `safe_point_latency` | `CancellationToken` 発火から `MacroCancelled` 送出まで 100 ms 以下 |
 | `@check_interrupt` の通常時オーバーヘッド | 1 回あたり 100 µs 以下 |
 | 異常・中断 event 発行 | 1 回あたり 1 ms 以下 |
 | `RunResult` 生成 | 1 実行あたり 1 回、追加スレッドなし |
@@ -358,8 +358,28 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 
 1. `seconds < 0` は `ConfigurationError(code="NYX_INVALID_WAIT_SECONDS")` とする。
 2. 待機前に `ct.throw_if_requested()` を呼ぶ。
-3. `ct.wait(seconds)` を呼ぶ。`CancellationToken.wait()` は `threading.Event.wait()` 相当であり、中断要求で即時復帰する。polling interval は持たない。
+3. `cancellation_aware_wait(seconds, ct)` を呼ぶ。
 4. 待機後に再度 `ct.throw_if_requested()` を呼ぶ。
+
+`cancellation_aware_wait()` は長時間待機でも待機精度を大きく崩さず、かつ中断要求を 100 ms 未満で反映するため、単純な `time.sleep(seconds)` は使わない。deadline は `time.monotonic()` で計算し、各待機 slice は `min(0.05, remaining)` 以下にする。戻り値が `False` の場合、呼び出し側は直後に `ct.throw_if_requested()` を呼ぶ。
+
+```python
+def cancellation_aware_wait(seconds: float, token: CancellationToken) -> bool:
+    if seconds < 0:
+        raise ConfigurationError(code="NYX_INVALID_WAIT_SECONDS")
+
+    deadline = time.monotonic() + seconds
+    while True:
+        token.throw_if_requested()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return True
+
+        if token.wait(timeout=min(0.05, remaining)):
+            return False
+```
+
+`safe_point_latency` は token 発火から `MacroCancelled` 送出までの時間である。GUI 操作から token 発火までの `cancel_request_latency`、`RunHandle.cancel()` から `RunResult.cancelled` までの `cancel_result_latency` とは分けて測定する。
 
 キャンセル API は 3 層に分ける。
 
@@ -498,7 +518,7 @@ class MacroArgsSchema:
 | ユニット | `test_macro_stop_exception_constructor_keeps_legacy_calls` | `MacroStopException()` と `MacroStopException("stop")` が成功し、既定 `kind` / `code` / `component` を持つ |
 | ユニット | `test_framework_error_contains_kind_code_component` | `FrameworkError` 階層が `kind`, `code`, `component`, `details` を保持する |
 | ユニット | `test_cancellation_token_request_cancel_is_idempotent` | 複数回 cancel しても最初の理由と要求元を保持する |
-| ユニット | `test_command_wait_returns_immediately_on_cancel` | 長い `wait()` 中に token 発火後 100 ms 以内で `MacroCancelled` になる |
+| ユニット | `test_command_wait_returns_immediately_on_cancel` | 長い `wait()` 中に token 発火後、`safe_point_latency` が 100 ms 未満で `MacroCancelled` になる |
 | ユニット | `test_run_handle_cancel_does_not_raise` | 外部操作 API の `RunHandle.cancel()` が呼び出し元スレッドで例外を送出しない |
 | ユニット | `test_command_stop_requests_cancel_without_raising` | マクロ内部の `Command.stop()` は停止要求だけを登録し、即時例外を送出しない |
 | ユニット | `test_command_stop_rejects_raise_immediately_argument` | `Command.stop(raise_immediately=True)` を互換引数として受け付けない |
@@ -513,13 +533,13 @@ class MacroArgsSchema:
 | ユニット | `test_settings_store_schema_validation` | settings snapshot の型不一致と既定値を検証する |
 | ユニット | `test_secrets_store_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |
 | ユニット | `test_error_events_use_logger_port` | 異常・中断 event が `LOGGING_FRAMEWORK.md` の `LoggerPort` へ渡る |
-| ユニット | `test_cli_notification_settings_source_is_secrets_snapshot` | CLI 通知設定が secrets snapshot に統一されていることを検証する |
+| ユニット | `test_cli_notification_settings_source_is_secrets_store` | CLI 通知設定が `SecretsStore` 由来の secrets snapshot に統一されていることを検証する |
 | 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `RunResult(cancelled)` を確認する |
 | 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
 | ハードウェア | `test_device_error_on_serial_disconnect` | `@pytest.mark.realdevice`。シリアル切断時に `DeviceError` へ正規化する |
 | ハードウェア | `test_device_error_on_capture_disconnect` | `@pytest.mark.realdevice`。キャプチャ取得失敗時に `DeviceError` へ正規化する |
-| 性能 | `test_command_wait_cancel_latency_perf` | cancel latency が 100 ms 以下である |
+| 性能 | `test_command_wait_cancel_latency_perf` | `safe_point_latency` が 100 ms 以下である |
 | 性能 | `test_structured_logging_overhead_perf` | 構造化ログ追加後の 1 件あたりオーバーヘッドが 1 ms 以下である |
 
 ## 6. 実装チェックリスト

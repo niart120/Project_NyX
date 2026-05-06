@@ -219,6 +219,8 @@ flowchart TB
     class Guard guard;
 ```
 
+参照: [FW_REARCHITECTURE_OVERVIEW.md](FW_REARCHITECTURE_OVERVIEW.md)、[RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[RESOURCE_FILE_IO.md](RESOURCE_FILE_IO.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)。
+
 ### 4.2 MacroRuntime 実行フロー
 
 実行要求が registry、`definition.factory.create()`、context、runner、result へ流れる順序を示す。`MacroExecutor` が残る場合も、同じ Runtime 経路へ委譲する。
@@ -254,6 +256,8 @@ flowchart LR
     class Lifecycle macro;
     class ResultStep,Cleanup result;
 ```
+
+参照: [RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[MACRO_COMPATIBILITY_AND_REGISTRY.md](MACRO_COMPATIBILITY_AND_REGISTRY.md)、[ERROR_CANCELLATION_LOGGING.md](ERROR_CANCELLATION_LOGGING.md)。
 
 ### 4.3 I/O Port 図
 
@@ -324,6 +328,8 @@ flowchart TB
     class SerialPort,DummyController,CapturePort,DummyFrame,StaticStore,NotificationHandlerPort,LoggerPortAdapter adapter;
     class SerialComm,Protocol,CaptureDevice,StaticRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
 ```
+
+参照: [RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[RESOURCE_FILE_IO.md](RESOURCE_FILE_IO.md)、[CONFIGURATION_AND_RESOURCES.md](CONFIGURATION_AND_RESOURCES.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)。
 
 ### 4.4 互換境界図
 
@@ -398,6 +404,8 @@ flowchart TB
     class Executor,LegacyLoader,CwdFallback,SysPath,DummyFallback,AmbiguousClass deprecated;
 ```
 
+参照: [MACRO_COMPATIBILITY_AND_REGISTRY.md](MACRO_COMPATIBILITY_AND_REGISTRY.md)、[DEPRECATION_AND_MIGRATION.md](DEPRECATION_AND_MIGRATION.md)、[MACRO_MIGRATION_GUIDE.md](MACRO_MIGRATION_GUIDE.md)。
+
 ### 4.5 GUI/CLI と可観測性の境界
 
 GUI/CLI は Runtime の利用者であり、結果や表示イベントを自身の出力へ変換する。Runtime 本体は Qt、argparse、標準出力へ依存しない。
@@ -428,6 +436,8 @@ flowchart LR
     class Logger,Dispatcher,TechLog,UserEvent obs;
 ```
 
+参照: [OBSERVABILITY_AND_GUI_CLI.md](OBSERVABILITY_AND_GUI_CLI.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)、[RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)。
+
 ### 設定パラメータ
 
 | パラメータ | 型 | デフォルト | 説明 |
@@ -450,6 +460,7 @@ flowchart LR
 |------------|----------|----------|
 | ドキュメント | `test_architecture_diagrams_has_required_sections` | 本仕様に必須 6 セクションが存在することを確認する。 |
 | ドキュメント | `test_architecture_diagrams_has_mermaid_blocks` | Mermaid コードブロックが 4 つ以上存在することを確認する。 |
+| ドキュメント | `manual_mermaid_render_check` | GitHub Web UI で Mermaid 図が描画できることを手動確認する。 |
 | ドキュメント | `test_architecture_diagrams_keep_import_contract` | `MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException` が互換境界として記載されていることを確認する。 |
 | ドキュメント | `test_architecture_diagrams_match_canonical_specs` | 各図の参照先仕様と主要ノード名が同期していることを確認する。 |
 | ドキュメント | `git_diff_check` | `git diff --check` で Markdown の空白エラーがないことを確認する。 |

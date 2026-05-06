@@ -260,7 +260,7 @@ nyxpy.framework.*     -> macros\{macro_name}\           禁止。ただし impor
 
 #### 提案
 
-`Command` の公開 API は維持し、構築時の依存だけを Ports/Adapters に寄せる。追加の別 `Command` 実装クラスは置かず、既存 import path の `DefaultCommand` を `ExecutionContext` と Ports に接続する具象実装にする。Resource File I/O の詳細は `RESOURCE_FILE_IO.md`、ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` に分け、本 Overview では接続境界だけを扱う。最初の実装では既存 `SerialCommInterface`、`CaptureDeviceInterface`、`SerialProtocolInterface`、`StaticResourceIO`、`NotificationHandler` を adapter に閉じ込め、新しい抽象を増やしすぎない。追加抽象が必要な境界は `SettingsPort`、`ClockPort`、`RuntimeThreadPort` に限定する。
+`Command` の公開 API は維持し、構築時の依存だけを Ports/Adapters に寄せる。追加の別 `Command` 実装クラスは置かず、既存 import path の `DefaultCommand` を `ExecutionContext` と Ports に接続する具象実装にする。Resource File I/O の詳細は `RESOURCE_FILE_IO.md`、ロギング基盤の詳細は `LOGGING_FRAMEWORK.md`、通知境界は `RUNTIME_AND_IO_PORTS.md` に分け、本 Overview では接続境界だけを扱う。最初の実装では既存 `SerialCommInterface`、`CaptureDeviceInterface`、`SerialProtocolInterface`、`StaticResourceIO`、`NotificationHandler` を adapter に閉じ込める。新しい抽象を追加する場合は、正本となる個別仕様に公開 API、責務、テスト方針を記載し、Overview では抽象名を制約しない。
 
 ### 3.6 性能要件
 
@@ -270,7 +270,7 @@ nyxpy.framework.*     -> macros\{macro_name}\           禁止。ただし impor
 | マクロ reload | 既存 `macros` ディレクトリ規模で 2 秒以内 |
 | 実行ごとの factory 生成 | 1 マクロあたり 10 ms 未満を目安とする |
 | `Command.press()` など既存操作 | runtime 導入前後で追加待機時間を発生させない |
-| GUI 中断反映 | 中断要求から UI 状態更新まで 100 ms 未満を目標とする |
+| GUI 中断反映 | `cancel_request_latency` は 100 ms 未満、UI 状態更新は 500 ms 未満を目標とする |
 
 性能要件は CI と開発 PC で差が出るため、初回は測定値を記録し、しきい値は実測後に調整する。
 

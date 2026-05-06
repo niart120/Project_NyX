@@ -165,6 +165,9 @@ class DeprecationCandidate:
 | `Command.stop()` の即時例外送出 | 即時例外送出を廃止し、互換引数を提供しない | `Command.stop()`, `CancellationToken.throw_if_requested()` | `cmd.stop()` 呼び出し直後に例外が出る前提のマクロは修正が必要 | `test_command_stop_requests_cancel_without_raising`, `test_command_stop_rejects_raise_immediately_argument` | 移行ガイド追記 → 代表マクロ確認 → 即時例外経路を削除 |
 
 `MacroExecutor` には非推奨期間を設けない。削除後に `nyxpy.framework.core.macro.executor` の import 互換 shim も作らない。
+`test_macro_executor_removed` は `nyxpy.framework.core.macro.executor` の import が `ModuleNotFoundError` になることを確認する。`test_gui_cli_do_not_import_macro_executor` は GUI/CLI entrypoint の import graph に `MacroExecutor` が含まれないことを確認する。
+
+Resource I/O legacy static 互換と settings legacy fallback の代表マクロは `MACRO_MIGRATION_GUIDE.md` の「移行対象代表マクロ」表を正とする。本書では代表マクロ名を重複管理せず、削除条件とテストゲートだけを扱う。
 
 ### 4.3 廃止候補一覧
 
@@ -180,7 +183,7 @@ class DeprecationCandidate:
 | 恒久的な `sys.path` 変更 | entrypoint import が必要な範囲だけ context manager で一時追加され、load 後に復元される | `EntryPointLoader` の scoped import path 管理 | manifest entrypoint または convention discovery で package / single-file とも実行可能 | `test_registry_reload_restores_sys_path`, `test_migrated_repository_macros_load_with_optional_manifest` | scoped loader 実装 → reload テスト追加 → 恒久 append を削除 |
 | 曖昧な class 名 alias 選択 | 衝突時に `AmbiguousMacroError` と候補 ID を返し、後勝ち上書きを行わない | `Qualified Macro ID`, `MacroDefinition.id`, `MacroRegistry.resolve()` | class 名だけで選んでいた外部コードは修正が必要。既存マクロ本体は変更不要 | `test_class_name_collision_requires_qualified_id`, `test_class_name_alias_is_available_when_unique` | ID 生成追加 → 一意 alias 維持 → 衝突時診断追加 → 後勝ち上書きを削除 |
 | `ResourceStorePort` による settings TOML 探索 | `MacroSettingsResolver` が settings を解決し、ResourceStore は画像 I/O だけを扱う | `MacroSettingsResolver.resolve()`, `MacroSettingsResolver.load()` | `static\<macro_name>\settings.toml` 互換は削除 | `test_macro_settings_resolver_is_separate_from_resource_store`, `test_migrated_macro_settings_load_from_explicit_source` | settings resolver 実装 → ResourceStore から settings 探索を排除 |
-| GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, cancel latency test | RunHandle 導入 → GUI cancel 移行 → GUI からの直接 `cmd.stop()` を削除 |
+| GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, `test_cancel_request_latency_perf` | RunHandle 導入 → GUI cancel 移行 → GUI からの直接 `cmd.stop()` を削除 |
 
 ### 4.4 設定パラメータ
 

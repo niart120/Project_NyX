@@ -308,6 +308,8 @@ Resource File I/O の `name` は実行時 API の path 引数であるため、W
 
 画像保存は OpenCV がファイルパスを要求するため、`tempfile.NamedTemporaryFile(dir=output_root, delete=False, suffix=final_path.suffix)` 相当で同一ディレクトリに一時ファイルを作る。成功後は `Path.replace()` で最終ファイルへ置換する。同一ディレクトリ内の rename を前提に atomicity を確保するため、別ファイルシステムをまたぐ一時ディレクトリは使わない。`cv2.imwrite()` が `False` を返す、保存後に一時ファイルが存在しない、replace 後に最終ファイルが存在しない場合は `ResourceWriteError` とする。別ファイルシステム上の atomic write や NFS の rename semantics は後続課題とし、本仕様では保証しない。
 
+atomic write の失敗時は一時ファイルを残さないことを原則とする。`cv2.imwrite()` が `False` を返した、一時ファイル作成に失敗した、`Path.replace()` が例外を送出した、最終ファイル検証に失敗した、または最大サイズ検証に失敗した場合は、存在する一時ファイルを削除してから `ResourceWriteError` を送出する。一時ファイル削除にも失敗した場合は、元の書き込み失敗を主エラーとし、削除失敗の例外型と mask 済み相対 path を `ResourceWriteError.details["cleanup_error"]` に保持する。
+
 ### 設定パラメータ
 
 | パラメータ | 型 | デフォルト | 説明 |

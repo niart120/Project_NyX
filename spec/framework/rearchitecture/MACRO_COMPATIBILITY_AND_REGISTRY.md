@@ -165,6 +165,8 @@ nyxpy.framework.* -> macros/<name>       NG
 - `class_name` が衝突した場合、`set_active_macro("ClassName")` は `AmbiguousMacroError` を送出し、候補 ID をメッセージに含める。
 - GUI/CLI は `MacroRegistry.resolve()` の `AmbiguousMacroError` を表示用エラーへ変換する。`MacroExecutor.set_active_macro()` の旧互換は保証しない。
 
+GUI/CLI の通常一覧は表示名の肥大化を避けるため、`display_name` と安定 ID を別列で表示する。幅が限られる CLI では `display_name` を主表示にし、`--verbose` または衝突検出時だけ `ID: macro_id` を併記する。衝突時のエラーは `Ambiguous class name 'ClassName'. Use macro id: a, b` のように、選択に使える `MacroDefinition.id` だけを列挙する。
+
 ### cwd / sys.path 依存の扱い
 
 `MacroRegistry(project_root: Path)` を主経路にし、`Path.cwd()` fallback は使わない。manifest entrypoint または convention discovery 対象を import する際に探索対象 root を一時的に `sys.path` へ追加する必要がある場合は context manager で囲み、ロード後に元へ戻す。恒久的な `sys.path.append(str(Path.cwd()))` は廃止する。
@@ -238,11 +240,13 @@ class AmbiguousMacroError(ValueError):
 @dataclass(frozen=True)
 class MacroLoadDiagnostic:
     macro_id: str | None
+    entrypoint: str | None
     source_path: Path
     module_name: str
+    error_type: str
     exception_type: str
     message: str
-    traceback: str
+    traceback_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -438,7 +442,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | `ValueError` | `set_active_macro()` で存在しない名前を指定。現行互換のため維持 |
 | `FileNotFoundError` | 明示 settings が存在必須と指定された将来拡張で未検出 |
 
-ロード中の例外は `MacroRegistry.diagnostics` に蓄積し、reload 全体は継続する。実行中の例外は `MacroRunner` が `RunResult` へ正規化する。
+ロード中の例外は `MacroRegistry.diagnostics` に蓄積し、reload 全体は継続する。`MacroLoadDiagnostic.error_type` は `"manifest_parse_error"`, `"module_import_error"`, `"entrypoint_not_found"`, `"ambiguous_entrypoint"`, `"invalid_macro_class"`, `"sys_path_restore_error"` のいずれかを標準値とする。GUI/CLI は `error_type` に応じた短い表示文言を出し、詳細 traceback は `traceback_path` を持つ技術ログへ分離する。実行中の例外は `MacroRunner` が `RunResult` へ正規化する。
 
 ### シングルトン管理
 
@@ -467,7 +471,9 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | ユニット | `test_registry_requires_manifest_when_convention_is_ambiguous` | 複数 `MacroBase` 候補がある場合に診断し、manifest entrypoint を要求する |
 | ユニット | `test_class_name_alias_is_available_when_unique` | class 名が一意なら `set_active_macro("ClassName")` が通る |
 | ユニット | `test_class_name_collision_requires_qualified_id` | 同名 class が複数ある場合に `AmbiguousMacroError` と候補 ID を返す |
+| ユニット | `test_macro_list_displays_stable_id_for_collisions` | class 名衝突時に GUI/CLI 一覧で安定 ID を確認できる |
 | ユニット | `test_load_failure_is_reported_without_stopping_reload` | 1 件 import 失敗しても他マクロが登録され、diagnostics に失敗理由が残る |
+| ユニット | `test_load_diagnostic_has_error_type` | manifest parse、import、entrypoint、class 検証の失敗種別が `MacroLoadDiagnostic.error_type` に残る |
 | ユニット | `test_registry_reload_swaps_snapshot_atomically` | reload 中に `definitions` と `diagnostics` の中途半端な snapshot が見えない |
 | ユニット | `test_execute_creates_new_instance_each_time` | 2 回 execute して `definition.factory.create()` が 2 回呼ばれ、状態が共有されない |
 | ユニット | `test_settings_without_explicit_source_returns_empty_dict` | manifest / class metadata の settings source がない場合は settings file を暗黙探索しない |

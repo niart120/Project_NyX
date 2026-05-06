@@ -297,6 +297,16 @@ cmd.wait(0)
 | `ResourcePathError` | assets / outputs の root 外参照、未許可拡張子、ディレクトリ指定 |
 | `ResourceWriteError` | `cmd.save_img()` の書き込みまたは atomic replace に失敗 |
 
+### 4.10 移行対象代表マクロ
+
+代表マクロは、全マクロを一度に修正する前に移行手順とテストゲートを固定するための対象である。代表マクロの追加・削除は本表を更新し、`DEPRECATION_AND_MIGRATION.md` と `TEST_STRATEGY.md` では本表を参照する。
+
+| macro_id | 採用理由 | 必要な移行項目 | 必須テスト |
+|----------|----------|----------------|------------|
+| `frlg_id_rng` | settings、画像リソース、output 保存を含む代表例 | 明示 settings source、assets root 相対 path、run outputs 保存 | `test_migrated_frlg_id_rng_save_img_outputs`, `test_migrated_macro_settings_load_from_explicit_source` |
+| `sample_turbo_a_macro` | single-file convention discovery の最小例 | manifest なし discovery、公開 import 契約 | `test_registry_loads_convention_single_file_macro` |
+| `frlg_initial_seed` | package 型 macro の代表例 | package entrypoint、class metadata、settings 未指定時の `{}` | `test_migrated_repository_macros_load_with_optional_manifest` |
+
 ## 5. テスト方針
 
 | テスト種別 | テスト名 | 検証内容 |

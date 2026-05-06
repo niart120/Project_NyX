@@ -73,7 +73,7 @@
 | static root 外アクセス | 保存・読み込み先の最終パス検証なし | `RESOURCE_FILE_IO.md` の path guard で root 配下のみ許可 |
 | 画像書き込み失敗検出 | `cv2.imwrite()` 失敗を無視 | `RESOURCE_FILE_IO.md` の atomic write と `ResourceWriteError` で即時検出 |
 | 既存マクロ import 互換 | `Command` / `DefaultCommand` を直接 import 可能 | 同じ import path を維持 |
-| キャンセル応答 | `wait()` 指定秒数まで遅延 | 中断要求から 100 ms 未満で `CancellationToken` を確認し中断へ進む |
+| キャンセル応答 | `wait()` 指定秒数まで遅延 | `safe_point_latency` を 100 ms 未満にし、中断へ進む |
 
 ### 1.5 着手条件
 
@@ -149,12 +149,13 @@ GUI/CLI
   -> MacroRegistry.resolve(macro_id)
   -> MacroSettingsResolver.load(definition)
   -> MacroResourceScope.from_definition(definition, project_root)
-  -> ResourceStorePort / RunArtifactStore / ControllerOutputPort / FrameSourcePort / NotificationPort / LoggerPort を生成
+  -> ResourceStorePort / RunArtifactStore / ControllerOutputPort / FrameSourcePort / LoggerPort を生成
+  -> builder lifetime の secrets snapshot から NotificationPort を生成
   -> ExecutionContext を生成
   -> MacroRuntime.run(context) または MacroRuntime.start(context)
 ```
 
-`MacroSettingsResolver.load()` が返す settings は `ExecutionContext.exec_args` の初期値であり、GUI/CLI から渡された実行引数が同一 key を上書きする。`MacroRuntimeBuilder` は設定ファイル探索規則や resource path guard を再実装せず、各仕様の公開 API だけを呼ぶ。
+`MacroSettingsResolver.load()` が返す settings は `ExecutionContext.exec_args` の初期値であり、GUI/CLI から渡された実行引数が同一 key を上書きする。`MacroRuntimeBuilder` は設定ファイル探索規則や resource path guard を再実装せず、各仕様の公開 API だけを呼ぶ。secrets snapshot は `NotificationPort` 構築時にだけ参照し、`RuntimeBuildRequest`、`ExecutionContext.exec_args`、`ExecutionContext.metadata` へ複製しない。
 
 依存方向は次の制約を守る。
 
@@ -203,11 +204,11 @@ GUI/CLI
 |------|--------|
 | `DefaultCommand.press()` の Port 委譲オーバーヘッド | 既存 `DefaultCommand.press()` 比 +1 ms 未満 |
 | `FrameSourcePort.latest_frame()` のロック保持時間 | 1280x720 BGR frame copy を含め 10 ms 未満 |
-| `FrameSourcePort.await_ready()` 既定タイムアウト | 3 秒 |
+| `FrameSourcePort.await_ready()` の `frame_ready_timeout` | Runtime が `RuntimeOptions.frame_ready_timeout_sec` から渡す。既定 3 秒 |
 | デバイス検出の CLI 既定タイムアウト | 5 秒 |
 | GUI 起動時の同期ブロック | 200 ms 未満。長い検出はバックグラウンド化し、完了イベントで UI 更新 |
-| `DefaultCommand.wait()` キャンセル応答 | 中断要求から 100 ms 未満 |
-| `RunHandle.cancel()` から `RunResult.cancelled` までの目標 | マクロが `Command` API 内にいる場合 100 ms 以下 |
+| `DefaultCommand.wait()` の `safe_point_latency` | token 発火から `MacroCancelled` 送出まで 100 ms 未満 |
+| `RunHandle.cancel()` から `RunResult.cancelled` までの `cancel_result_latency` | マクロが `Command` API 内にいる場合 100 ms 以下 |
 | `release()` / `close()` の join timeout | 2 秒以下。超過時は警告ログを出し、結果に cleanup warning を残す |
 
 ### 並行性・スレッド安全性
@@ -244,7 +245,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
-from typing import BinaryIO, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import cv2
 
@@ -253,13 +254,12 @@ from nyxpy.framework.core.errors import ErrorInfo, FrameworkValue
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.logger.ports import LoggerPort
 from nyxpy.framework.core.macro.command import Command
-from nyxpy.framework.core.io.resources import OverwritePolicy, ResourceRef
+from nyxpy.framework.core.settings import SecretsSnapshot
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 
 type RuntimeValue = FrameworkValue
 type SettingsSnapshot = Mapping[str, FrameworkValue]
-type SecretsSnapshot = Mapping[str, FrameworkValue]
 
 
 class RunStatus(StrEnum):
@@ -282,6 +282,14 @@ class CleanupWarning(Exception):
     message: str
 
     def __init__(self, port_name: str, exception_type: str, message: str) -> None: ...
+
+
+class NotificationError(Exception):
+    notifier: str
+    message: str
+    retryable: bool
+
+    def __init__(self, notifier: str, message: str, *, retryable: bool = False) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -445,7 +453,7 @@ class FrameSourcePort(ABC):
     def initialize(self) -> None: ...
 
     @abstractmethod
-    def await_ready(self, timeout: float | None = None) -> bool: ...
+    def await_ready(self, timeout: float) -> bool: ...
 
     @abstractmethod
     def latest_frame(self) -> cv2.typing.MatLike: ...
@@ -454,41 +462,8 @@ class FrameSourcePort(ABC):
     def close(self) -> None: ...
 
 
-class ResourceStorePort(ABC):
-    @abstractmethod
-    def resolve_asset_path(self, filename: str | Path) -> ResourceRef: ...
-
-    @abstractmethod
-    def load_image(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
-
-    def close(self) -> None: ...
-
-
-class RunArtifactStore(ABC):
-    @abstractmethod
-    def resolve_output_path(self, filename: str | Path) -> ResourceRef: ...
-
-    @abstractmethod
-    def save_image(
-        self,
-        filename: str | Path,
-        image: cv2.typing.MatLike,
-        *,
-        overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
-        atomic: bool = True,
-    ) -> ResourceRef: ...
-
-    @abstractmethod
-    def open_output(
-        self,
-        filename: str | Path,
-        mode: str = "xb",
-        *,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
-        atomic: bool = True,
-    ) -> BinaryIO: ...
-
-    def close(self) -> None: ...
+# ResourceStorePort / RunArtifactStore の公開シグネチャは
+# RESOURCE_FILE_IO.md を正本とし、本書では Runtime からの委譲関係だけを定義する。
 
 
 class NotificationPort(ABC):
@@ -575,7 +550,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `press(*keys, dur, wait)` | `controller.press(keys)`, `wait(dur)`, `controller.release(keys)`, `wait(wait)` | 既存の press/release sequence を維持 |
 | `hold(*keys)` | `controller.hold(keys)` | 送信 lock は Port 側 |
 | `release(*keys)` | `controller.release(keys)` | 空 tuple は全解放 |
-| `wait(wait)` | `CancellationToken` aware wait | 中断要求から 100 ms 未満で停止確認 |
+| `wait(wait)` | `CancellationToken` aware wait | `safe_point_latency` を 100 ms 未満にする |
 | `stop()` | `cancellation_token.request_cancel(reason="stop requested", source="macro")` | 停止要求だけを登録し、即時例外は送出しない。`raise_immediately` 互換引数は提供しない |
 | `capture(crop_region, grayscale)` | `frame_source.latest_frame()` | 1280x720 resize、crop、grayscale は `DefaultCommand` で互換維持 |
 | `save_img()` | `artifacts.save_image()` | outputs 保存。詳細な保存先と overwrite policy は `RESOURCE_FILE_IO.md` |
@@ -585,7 +560,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `log()` | `logger.user()` | component は既存同様 caller class 名を既定にする。対応する技術ログ生成は `LOGGING_FRAMEWORK.md` の `LoggerPort.user()` に従う |
 | `touch*()` / `disable_sleep()` | `controller` | 未対応 protocol は `NotImplementedError` |
 
-`DefaultCommand.press()` は `controller.press(keys)`、`DefaultCommand.wait(dur)`、`controller.release(keys)`、`DefaultCommand.wait(wait)` の順に実行する。`dur <= 0` の場合は押下直後に release し、`wait <= 0` の場合は後続 wait を省略する。2 回の wait はどちらも `CancellationToken` aware wait を使うため、長い `dur` / `wait` 中でも cancellation safe point になる。
+`DefaultCommand.press()` は `controller.press(keys)`、`DefaultCommand.wait(dur)`、`controller.release(keys)`、`DefaultCommand.wait(wait)` の順に実行する。`dur <= 0` の場合は押下直後に release し、`wait <= 0` の場合は後続 wait を省略する。2 回の wait はどちらも `ERROR_CANCELLATION_LOGGING.md` の `cancellation_aware_wait()` 契約に従うため、長い `dur` / `wait` 中でも cancellation safe point になる。
 
 `DefaultCommand` は `context` だけを受け取る。`serial_device`、`capture_device`、`resource_io`、`protocol`、`ct`、`notification_handler`、`logger` など旧形式の具象引数を受け取った場合は `TypeError` とし、互換 shim は作らない。GUI/CLI は `MacroRuntimeBuilder` から得た context を渡す。
 
@@ -601,7 +576,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 `CaptureFrameSourcePort` は現行 `AsyncCaptureDevice` または `CaptureDeviceInterface` を包む。`initialize()` 後に capture loop が最初の frame を取得した時点で internal `Event` を set し、`await_ready()` はこの Event を待つ。`latest_frame()` は readiness 未達なら `FrameNotReadyError` を送出する。
 
-`FrameSourcePort.await_ready(timeout)` は timeout 到達時に `False` を返し、例外を送出しない。`timeout=None` は無期限待機、`timeout < 0` は `ValueError` とする。Runtime は `False` を `FrameNotReadyError(code="NYX_FRAME_NOT_READY")` に変換して `RunResult.failed` にする。
+`FrameSourcePort.await_ready(timeout)` は timeout 到達時に `False` を返し、例外を送出しない。Runtime は `context.options.frame_ready_timeout_sec` を必ず渡す。Port は独自の既定 timeout を持たず、`timeout is None` または `timeout < 0` は `ValueError` とする。Runtime は `False` を `FrameNotReadyError(code="NYX_FRAME_NOT_READY")` に変換して `RunResult.failed` にする。
 
 `FrameSourcePort.latest_frame()` は adapter が受け取った最新 frame の copy を返す。返却値は BGR、`uint8`、shape `(height, width, 3)` とし、サイズは capture device の native size のままにする。既存 `Command.capture()` 互換の 1280x720 resize、crop、grayscale 変換は `DefaultCommand.capture()` が担当する。
 
@@ -611,13 +586,15 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 `ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。manifest または class metadata の settings source と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
-標準配置、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
+標準配置、path traversal 防止、atomic write、overwrite policy、`ResourceStorePort` / `RunArtifactStore` の公開シグネチャは `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `ResourceStorePort` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
 
 Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `CleanupWarning(port_name, exception_type, message)` として `cleanup_warnings` へ追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
 
 #### NotificationPort
 
-`NotificationHandlerPort` は現行 `NotificationHandler` を adapter として包む。`NotificationHandler` が `None` の場合は `NoopNotificationPort` を使う。個別 notifier の失敗は `LoggerPort` に `WARNING` で記録し、`NYX_NOTIFICATION_FAILED` を技術ログへ残す。`publish()` は通知失敗を再送出せず、マクロ本体の `RunResult` は変更しない。
+`NotificationHandlerPort` は現行 `NotificationHandler` を adapter として包む。`NotificationHandler` が `None` の場合は `NoopNotificationPort` を使う。通知先設定の不足や secret 境界違反は Runtime builder 構築時の `ConfigurationError` とし、`NotificationPort.publish()` では扱わない。
+
+個別 notifier の送信失敗は `NotificationError(notifier, message, retryable=...)` に正規化し、`LoggerPort` に `WARNING` で記録する。技術ログは `event="notification.failed"`、`code="NYX_NOTIFICATION_FAILED"`、`extra={"notifier": ..., "retryable": ..., "message": mask済み要約}` を持つ。複数 notifier の一部だけが失敗した場合も成功した notifier は取り消さず、失敗分をそれぞれ warning として記録する。`publish()` は通知失敗を再送出せず、マクロ本体の `RunResult` は変更しない。
 
 #### LoggerPort
 
@@ -738,7 +715,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
 | ユニット | `test_default_command_press_delegates_to_controller_port` | `press()` が press、待機、release の順で `ControllerOutputPort` を呼ぶ |
-| ユニット | `test_default_command_wait_observes_cancellation_token` | 長い wait 中に cancellation が要求されたら 100 ms 未満で `MacroStopException` へ進む |
+| ユニット | `test_default_command_wait_observes_cancellation_token` | 長い wait 中に cancellation が要求されたら `safe_point_latency` 100 ms 未満で `MacroStopException` へ進む |
 | ユニット | `test_default_command_capture_resizes_crops_and_grayscales` | 既存 `DefaultCommand.capture()` と同じ 1280x720 resize、crop 範囲検証、grayscale 変換を行う |
 | ユニット | `test_default_command_rejects_legacy_constructor_args` | 旧形式の `DefaultCommand(serial_device=..., ...)` を受け付けず、Builder 経由の context を要求する |
 | ユニット | `test_runtime_success_calls_finalize_and_closes_ports` | 正常終了時に `finalize()` と各 Port の close が一度だけ呼ばれ `RunStatus.SUCCESS` になる |
@@ -753,10 +730,10 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | ユニット | `test_resource_file_io_path_and_write_policy` | path guard と atomic write の詳細は `RESOURCE_FILE_IO.md` のテストで検証する |
 | ユニット | `test_notification_port_logs_notifier_failure` | notifier 失敗が warning log になり、例外がマクロへ伝播しない |
 | 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `DefaultCommand` を直接構築せず Runtime 経由で実行し、`RunResult` から終了コードを決める |
-| 結合 | `test_cli_notification_settings_come_from_secrets_snapshot` | CLI の Discord / Bluesky 通知設定が secrets snapshot だけから構築されることを検証する |
+| 結合 | `test_cli_notification_settings_come_from_secrets_store` | CLI の Discord / Bluesky 通知設定が `SecretsStore` 由来の secrets snapshot だけから構築されることを検証する |
 | 結合 | `test_cli_device_detection_waits_until_complete` | 非同期検出が遅れても timeout 内なら成功し、race で失敗しない |
 | GUI | `test_gui_start_uses_runtime_handle` | Run button が Runtime `start()` を呼び、`RunHandle` を保持する |
-| GUI | `test_gui_cancel_response` | Cancel button が `RunHandle.cancel()` を呼び、token を 100 ms 以内に発火させる |
+| GUI | `test_gui_cancel_response` | Cancel button が `RunHandle.cancel()` を呼び、`cancel_request_latency` が 100 ms 未満である |
 | GUI | `test_virtual_controller_uses_controller_output_port` | 仮想コントローラー操作が Port 経由で送信される |
 | ハードウェア | `test_serial_controller_output_port_realdevice` | `@pytest.mark.realdevice`。実 serial device へ CH552 press/release bytes を送信できる |
 | ハードウェア | `test_capture_frame_source_realdevice_ready` | `@pytest.mark.realdevice`。実 capture device が timeout 内に ready になる |
