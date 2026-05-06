@@ -24,7 +24,6 @@ from nyxpy.framework.core.io.resources import (
     RunArtifactStore,
 )
 from nyxpy.framework.core.logger.ports import (
-    LogExtraValue,
     LoggerPort,
     RunLogContext,
 )
@@ -123,7 +122,7 @@ def create_legacy_runtime_builder(
     capture_device,
     protocol: SerialProtocolInterface,
     notification_handler,
-    log_manager,
+    logger: LoggerPort,
 ) -> MacroRuntimeBuilder:
     """Phase 8 まで既存具象実装を Port 契約へ閉じ込める最小 adapter。"""
 
@@ -145,7 +144,7 @@ def create_legacy_runtime_builder(
         notification_factory=lambda _request, _definition: _LegacyNotificationPort(
             notification_handler
         ),
-        logger_factory=lambda _request, _definition: _LegacyLoggerPort(log_manager),
+        logger_factory=lambda _request, _definition: logger,
     )
 
 
@@ -231,36 +230,3 @@ class _LegacyNotificationPort(NotificationPort):
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         if self.notification_handler is not None:
             self.notification_handler.publish(text, img)
-
-
-class _LegacyLoggerPort(LoggerPort):
-    def __init__(self, log_manager, context: RunLogContext | None = None) -> None:
-        self.log_manager = log_manager
-        self.context = context
-
-    def bind_context(self, context: RunLogContext) -> _LegacyLoggerPort:
-        return _LegacyLoggerPort(self.log_manager, context)
-
-    def technical(
-        self,
-        level: str,
-        message: str,
-        *,
-        component: str,
-        event: str = "log.message",
-        extra: dict[str, LogExtraValue] | None = None,
-        exc: BaseException | None = None,
-    ) -> None:
-        self.log_manager.log(level, message, component=component)
-
-    def user(
-        self,
-        level: str,
-        message: str,
-        *,
-        component: str,
-        event: str,
-        code: str | None = None,
-        extra: dict[str, LogExtraValue] | None = None,
-    ) -> None:
-        self.log_manager.log(level, message, component=component)

@@ -1,11 +1,10 @@
-
 from PySide6.QtCore import QObject, Signal
 
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import LoggerPort
 from nyxpy.gui.events import EventBus, EventType
 
 
@@ -17,10 +16,12 @@ class VirtualControllerModel(QObject):
 
     def __init__(
         self,
+        logger: LoggerPort,
         serial_device: SerialCommInterface | None = None,
         protocol: SerialProtocolInterface | None = None,
     ) -> None:
         super().__init__()
+        self.logger = logger
         self.serial_device = serial_device
         self.protocol = protocol or ProtocolFactory.create_protocol("CH552")
         self.event_bus = EventBus.get_instance()
@@ -96,40 +97,40 @@ class VirtualControllerModel(QObject):
                 self.send_release_command((previous_stick,))
             self.current_r_stick = RStick.CENTER
 
-    def send_release_command(
-        self, keys: tuple[Button | Hat | LStick | RStick, ...]
-    ) -> None:
+    def send_release_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
         if not self.serial_device:
             return
         try:
             command_data = self.protocol.build_release_command(keys)
             self.serial_device.send(command_data)
         except Exception as e:
-            log_manager.log(
+            self.logger.technical(
                 "ERROR",
-                f"コントローラー解放コマンド送信エラー: {e}",
-                "VirtualController",
+                "コントローラー解放コマンド送信エラー",
+                component="VirtualController",
+                event="controller.release_failed",
+                exc=e,
             )
             raise e
 
-    def send_press_command(
-        self, keys: tuple[Button | Hat | LStick | RStick, ...]
-    ) -> None:
+    def send_press_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
         if not self.serial_device:
             return
         try:
             command_data = self.protocol.build_press_command(keys)
             self.serial_device.send(command_data)
         except Exception as e:
-            log_manager.log(
+            self.logger.technical(
                 "ERROR",
-                f"コントローラー押下コマンド送信エラー: {e}",
-                "VirtualController",
+                "コントローラー押下コマンド送信エラー",
+                component="VirtualController",
+                event="controller.press_failed",
+                exc=e,
             )
             raise e
 
     def on_serial_device_changed(self, data):
-        self.set_serial_device(data['device'])
+        self.set_serial_device(data["device"])
 
     def on_protocol_changed(self, data):
-        self.set_protocol(data['protocol'])
+        self.set_protocol(data["protocol"])

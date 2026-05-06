@@ -7,7 +7,7 @@ from nyxpy.framework.core.api.notification_handler import (
 )
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import LoggerPort, LoggingComponents, create_default_logging
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_legacy_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
@@ -17,7 +17,7 @@ from nyxpy.framework.core.singletons import capture_manager, serial_manager
 from nyxpy.framework.core.utils.helper import parse_define_args
 
 
-def configure_logging(silence: bool = False, verbose: bool = False) -> None:
+def configure_logging(silence: bool = False, verbose: bool = False) -> LoggingComponents:
     """
     コマンドライン引数に基づいてログレベルを設定します。
 
@@ -25,14 +25,16 @@ def configure_logging(silence: bool = False, verbose: bool = False) -> None:
         silence: Trueの場合、ほとんどのログ出力を抑制します
         verbose: Trueの場合、デバッグレベルのログを有効にします
     """
+    logging = create_default_logging(base_dir=pathlib.Path.cwd() / "logs")
     if silence:
         print("Running in silent mode; logging is disabled.")
-        log_manager.set_level("ERROR")
+        logging.set_all_levels("ERROR")
     elif verbose:
         print("Verbose logging enabled.")
-        log_manager.set_level("DEBUG")
+        logging.set_all_levels("DEBUG")
     else:
-        log_manager.set_level("INFO")
+        logging.set_console_level("INFO")
+    return logging
 
 
 def create_protocol(protocol_name: str) -> SerialProtocolInterface:
@@ -53,6 +55,7 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
 
 def create_runtime_builder(
     protocol: SerialProtocolInterface,
+    logger: LoggerPort,
     resources_dir: pathlib.Path | None = None,
 ) -> MacroRuntimeBuilder:
     """
@@ -60,6 +63,7 @@ def create_runtime_builder(
 
     Args:
         protocol: 使用するプロトコル実装
+        logger: Runtime に注入する logger
         resources_dir: 旧互換引数。指定時はプロジェクトルートとして扱います。
 
     Returns:
@@ -71,7 +75,7 @@ def create_runtime_builder(
     serial_device = serial_manager.get_active_device()
     capture_device = capture_manager.get_active_device()
     global_settings = GlobalSettings()
-    notification_handler = create_notification_handler_from_settings(global_settings)
+    notification_handler = create_notification_handler_from_settings(global_settings, logger=logger)
     return create_legacy_runtime_builder(
         project_root=project_root,
         registry=registry,
@@ -79,12 +83,15 @@ def create_runtime_builder(
         capture_device=capture_device,
         protocol=protocol,
         notification_handler=notification_handler,
-        log_manager=log_manager,
+        logger=logger,
     )
 
 
 def execute_macro(
-    runtime_builder: MacroRuntimeBuilder, macro_name: str, exec_args: dict[str, Any]
+    runtime_builder: MacroRuntimeBuilder,
+    macro_name: str,
+    exec_args: dict[str, Any],
+    logger: LoggerPort,
 ) -> RunResult:
     """
     適切なエラー処理でマクロを実行します。
@@ -101,13 +108,18 @@ def execute_macro(
         RuntimeBuildRequest(macro_id=macro_name, entrypoint="cli", exec_args=exec_args)
     )
     if result.status is RunStatus.CANCELLED:
-        log_manager.log("WARNING", "Macro execution was interrupted", component="CLI")
+        logger.user(
+            "WARNING",
+            "Macro execution was interrupted",
+            component="CLI",
+            event="macro.cancelled",
+        )
         return result
     if not result.ok:
         message = result.error.message if result.error is not None else "Macro execution failed"
-        log_manager.log("ERROR", message, component="CLI")
+        logger.user("ERROR", message, component="CLI", event="macro.failed")
         raise RuntimeError(message)
-    log_manager.log("INFO", "Macro execution completed", component="CLI")
+    logger.user("INFO", "Macro execution completed", component="CLI", event="macro.finished")
     return result
 
 
@@ -124,9 +136,11 @@ def cli_main(args: argparse.Namespace) -> int:
     """
     try:
         # ログの設定
-        configure_logging(silence=args.silence, verbose=args.verbose)
+        logging = configure_logging(silence=args.silence, verbose=args.verbose)
+        logger = logging.logger
 
         # シングルトンの初期化
+        capture_manager.set_logger(logger)
         serial_manager.auto_register_devices()
         capture_manager.auto_register_devices()
 
@@ -154,7 +168,7 @@ def cli_main(args: argparse.Namespace) -> int:
         capture_manager.set_active(args.capture)
 
         protocol = create_protocol(args.protocol)
-        runtime_builder = create_runtime_builder(protocol=protocol)
+        runtime_builder = create_runtime_builder(protocol=protocol, logger=logger)
 
         # マクロ実行引数の解析
         exec_args = parse_define_args(args.define)
@@ -164,21 +178,32 @@ def cli_main(args: argparse.Namespace) -> int:
             runtime_builder=runtime_builder,
             macro_name=args.macro_name,
             exec_args=exec_args,
+            logger=logger,
         )
 
         return 0  # 成功時の終了コード
 
     except ValueError as ve:
-        log_manager.log("ERROR", str(ve), component="CLI")
+        if "logger" in locals():
+            logger.user("ERROR", str(ve), component="CLI", event="configuration.invalid")
         print(f"エラー: {ve}")
         return 1  # エラー時の終了コード
 
     except Exception as e:
-        log_manager.log("ERROR", f"Unhandled exception: {e}", component="CLI")
+        if "logger" in locals():
+            logger.technical(
+                "ERROR",
+                "Unhandled exception",
+                component="CLI",
+                event="macro.failed",
+                exc=e,
+            )
         print(f"Unexpected error: {e}")
         return 2  # 重大なエラー時の終了コード
 
     finally:
+        if "logging" in locals():
+            logging.close()
         # デバイスリソースを確実に解放（ゾンビプロセス防止）
         try:
             capture_manager.release_active()

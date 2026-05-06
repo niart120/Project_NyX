@@ -3,15 +3,16 @@ from datetime import UTC, datetime
 import cv2
 import requests
 
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 from .notification_interface import NotificationInterface
 
 
 class BlueskyNotification(NotificationInterface):
-    def __init__(self, identifier: str, password: str):
+    def __init__(self, identifier: str, password: str, logger: LoggerPort | None = None):
         self.identifier = identifier
         self.password = password
+        self.logger = logger or NullLoggerPort()
         self.access_token = None
         self.refresh_token = None
         self.base_url = "https://bsky.social"
@@ -28,8 +29,8 @@ class BlueskyNotification(NotificationInterface):
             data = response.json()
             self.access_token = data.get("accessJwt")
             self.refresh_token = data.get("refreshJwt")
-        except Exception as e:
-            log_manager.log("ERROR", f"Bluesky認証失敗: {e}", component="BlueskyNotification")
+        except Exception as exc:
+            self._log_failure("Bluesky authentication failed", exc)
 
     def _refresh_token(self):
         try:
@@ -42,10 +43,8 @@ class BlueskyNotification(NotificationInterface):
             response.raise_for_status()
             data = response.json()
             self.access_token = data.get("accessJwt")
-        except Exception as e:
-            log_manager.log(
-                "ERROR", f"Blueskyトークン更新失敗: {e}", component="BlueskyNotification"
-            )
+        except Exception as exc:
+            self._log_failure("Bluesky token refresh failed", exc)
 
     # 画像をアップロードしてblob情報を返す
     def _upload_image(self, img: cv2.Mat) -> dict:
@@ -66,26 +65,27 @@ class BlueskyNotification(NotificationInterface):
 
         except requests.exceptions.HTTPError as http_err:
             if http_err.response.status_code == 401:  # トークン期限切れ
-                log_manager.log(
+                self.logger.technical(
                     "DEBUG",
-                    "トークン期限切れ。リフレッシュを試みます",
+                    "Bluesky token expired; refreshing",
                     component="BlueskyNotification",
+                    event="notification.token_expired",
                 )
                 self._refresh_token()
                 return self._upload_image(img)
             else:
-                log_manager.log(
-                    "ERROR", f"画像アップロード失敗: {http_err}", component="BlueskyNotification"
-                )
+                self._log_failure("Bluesky image upload failed", http_err)
                 if hasattr(http_err.response, "text"):
-                    log_manager.log(
+                    self.logger.technical(
                         "ERROR",
-                        f"レスポンス詳細: {http_err.response.text}",
+                        "Bluesky image upload response detail",
                         component="BlueskyNotification",
+                        event="notification.failed",
+                        extra={"response": http_err.response.text},
                     )
                 return None
-        except Exception as e:
-            log_manager.log("ERROR", f"画像アップロード失敗: {e}", component="BlueskyNotification")
+        except Exception as exc:
+            self._log_failure("Bluesky image upload failed", exc)
             return None
 
     def notify(self, text: str, img: cv2.Mat | None = None) -> None:
@@ -129,8 +129,16 @@ class BlueskyNotification(NotificationInterface):
                 self._refresh_token()
                 self.notify(text, img)
             else:
-                log_manager.log(
-                    "ERROR", f"Bluesky通知失敗: {http_err}", component="BlueskyNotification"
-                )
-        except Exception as e:
-            log_manager.log("ERROR", f"Bluesky通知失敗: {e}", component="BlueskyNotification")
+                self._log_failure("Bluesky notification failed", http_err)
+        except Exception as exc:
+            self._log_failure("Bluesky notification failed", exc)
+
+    def _log_failure(self, message: str, exc: Exception) -> None:
+        self.logger.technical(
+            "ERROR",
+            message,
+            component="BlueskyNotification",
+            event="notification.failed",
+            extra={"notifier": "bluesky"},
+            exc=exc,
+        )
