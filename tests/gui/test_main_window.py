@@ -4,21 +4,21 @@ from nyxpy.gui.main_window import MainWindow
 
 
 @pytest.fixture
-def dummy_executor(monkeypatch):
+def dummy_catalog(monkeypatch):
     class DummyMacro:
         description = "dummy desc"
         tags = ["Tag1", "Tag2"]
 
-    class DummyExecutor:
-        def __init__(self):
+    class DummyCatalog:
+        def __init__(self, registry):
             self.macros = {"DummyMacro": DummyMacro()}
 
-    monkeypatch.setattr("nyxpy.gui.main_window.MacroExecutor", DummyExecutor)
+    monkeypatch.setattr("nyxpy.gui.main_window.MacroCatalog", DummyCatalog)
     yield
 
 
 @pytest.fixture
-def window(qtbot, dummy_executor):
+def window(qtbot, dummy_catalog):
     # conftest の _no_real_hardware で initialize_managers は no-op 化済み
     w = MainWindow()
     qtbot.addWidget(w)

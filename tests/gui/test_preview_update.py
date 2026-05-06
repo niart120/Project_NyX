@@ -7,18 +7,18 @@ from nyxpy.gui.main_window import MainWindow
 
 @pytest.fixture
 def tmp_cwd_and_dummy(monkeypatch, tmp_path):
-    # isolate cwd and patch MacroExecutor
+    # isolate cwd and patch macro catalog
     monkeypatch.chdir(tmp_path)
 
     class DummyMacro:
         description = ""
         tags = []
 
-    class DummyExecutor:
-        def __init__(self):
+    class DummyCatalog:
+        def __init__(self, registry):
             self.macros = {"Dummy": DummyMacro()}
 
-    monkeypatch.setattr("nyxpy.gui.main_window.MacroExecutor", DummyExecutor)
+    monkeypatch.setattr("nyxpy.gui.main_window.MacroCatalog", DummyCatalog)
     yield tmp_path
 
 
