@@ -184,12 +184,12 @@ class DeprecationCandidate:
 
 ### 4.3 設定パラメータ
 
-| パラメータ | 型 | デフォルト | 説明 |
-|------------|-----|-----------|------|
-| `runtime.allow_dummy` | `bool` | `False` | 本番 Runtime で dummy Port を許可するか |
-| `runtime.device_detection_timeout_sec` | `float` | `5.0` | 明示デバイス検出の最大待機秒数 |
-| `runtime.frame_ready_timeout_sec` | `float` | `3.0` | 初回フレーム readiness の最大待機秒数 |
-| `migration.require_manifest_for_ambiguous_entrypoint` | `bool` | `True` | convention discovery が曖昧な場合に manifest entrypoint を要求するか |
+| パラメータ | 型 | デフォルト | 所有者 | 説明 |
+|------------|-----|-----------|--------|------|
+| `runtime.allow_dummy` | `bool` | `False` | `RuntimeOptions` | 本番 Runtime で dummy Port を許可するか |
+| `runtime.device_detection_timeout_sec` | `float` | `5.0` | `RuntimeOptions` | 明示デバイス検出の最大待機秒数 |
+| `runtime.frame_ready_timeout_sec` | `float` | `3.0` | `RuntimeOptions` | 初回フレーム readiness の最大待機秒数 |
+| `migration.require_manifest_for_ambiguous_entrypoint` | `bool` | `True` | `MacroRegistry` | convention discovery が曖昧な場合に manifest entrypoint を要求するか |
 
 ### 4.4 エラーハンドリング
 
@@ -207,7 +207,7 @@ Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コン
 
 `singletons.py` の既存 `serial_manager`、`capture_manager`、`global_settings`、`secrets_settings`、`log_manager` は互換のため維持する。ただし新 Runtime 経路では、GUI/CLI/Command がこれらを直接参照せず、`MacroRuntimeBuilder` と Port adapter が必要な lifetime で受け取る。`MacroRuntime`、`MacroRegistry`、`MacroSettingsResolver`、`ResourceStorePort`、`RunHandle` はシングルトンにしない。
 
-`reset_for_testing()` は既存 singleton の再生成に加え、追加した handler、device discovery 状態、Runtime/Port 関連状態を初期化できるようにする。
+`reset_for_testing()` は既存 singleton の再生成に加え、GUI handler snapshot、LogManager sink 登録、device discovery cache、settings snapshot を初期化できるようにする。`MacroRuntime`、`RunHandle`、Port 実体はシングルトンにせず、テスト fixture が実行ごとに生成・破棄する。
 
 ## 5. テスト方針
 

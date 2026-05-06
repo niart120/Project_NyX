@@ -258,7 +258,7 @@ Resource File I/O の `ResourcePathError`、`ResourceReadError`、`ResourceWrite
 
 ### シングルトン管理
 
-既存 `singletons.py` の `global_settings` と `secrets_settings` は互換のため維持する。`SettingsSchema` と `MacroSettingsResolver` はシングルトンにしない。`reset_for_testing()` は `global_settings`、`secrets_settings` の snapshot と lock 状態を初期化できるようにする。
+既存 `singletons.py` の `global_settings` と `secrets_settings` は互換のため維持する。`SettingsSchema` と `MacroSettingsResolver` はシングルトンにしない。`reset_for_testing()` は `global_settings`、`secrets_settings` の snapshot と lock 状態を初期化できるようにする。device discovery cache、LogManager sink、Runtime/Port 実体の扱いは `RUNTIME_AND_IO_PORTS.md` のシングルトン管理表を正とする。
 
 ## 5. テスト方針
 

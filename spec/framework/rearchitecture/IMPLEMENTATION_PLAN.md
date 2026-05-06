@@ -152,12 +152,27 @@
 | Lifecycle gate | 成功、失敗、中断のいずれでも `finalize(cmd)` が可能な限り 1 回呼ばれる |
 | Settings gate | manifest または class metadata settings path を読み、`exec_args` が file settings より優先される。旧 static/cwd fallback は読まない |
 | Builder ownership gate | GUI/CLI は settings と resource を個別解決せず、`MacroRuntimeBuilder.build()` を通して `ExecutionContext` を得る |
-| Migrated macro gate | 移行後の代表マクロ `frlg_id_rng`、`frlg_initial_seed`、`frlg_gorgeous_resort`、`frlg_wild_rng` が manifest あり / なしの新 discovery からロードされる |
+| Migrated macro gate | 移行後の代表マクロ fixture が manifest あり / なしの新 discovery からロードされる。具体的な対象マクロ名は `MACRO_MIGRATION_GUIDE.md` の移行対象一覧を正とする |
 | MacroExecutor removal gate | `test_macro_executor_removed` と `test_gui_cli_do_not_import_macro_executor` で、旧 executor の import 互換 shim と GUI/CLI 参照が残っていないことを検証する |
 | Cancellation gate | 既存 `MacroStopException` は `except MacroStopException` で捕捉でき、新中断も `RunStatus.CANCELLED` に正規化される |
 | Core isolation gate | `nyxpy.framework.*` から `nyxpy.gui`、`nyxpy.cli`、個別マクロへの静的依存を追加しない |
 | Migration guide gate | Resource I/O、settings、entrypoint のマクロ側変更が `MACRO_MIGRATION_GUIDE.md` に記載されている |
 | Deprecation gate | `DEPRECATION_AND_MIGRATION.md` の削除条件、代替 API、互換影響、テストゲート、移行順を満たす |
+
+#### テストゲートと廃止候補の対応
+
+| フェーズ | 必須ゲート | 削除または無効化できる廃止候補 |
+|----------|------------|--------------------------------|
+| 1 ベースライン・互換テスト追加 | Import gate, Signature gate, Lifecycle gate | なし。削除対象をテストで明示するだけに留める |
+| 2 Registry/Factory 導入 | Import gate, Signature gate, Core isolation gate | 恒久的な `sys.path` 変更、曖昧な class 名 alias の後勝ち上書き |
+| 3 Runner/RunResult/Error/Cancellation 導入 | Lifecycle gate, Cancellation gate | `MacroExecutor.execute()` の戻り値 `None` / 例外再送出への内部依存 |
+| 5 Runtime/DefaultCommand 導入 | Builder ownership gate, Cancellation gate | `DefaultCommand` 旧コンストラクタ、GUI/CLI 個別 Command 組み立ての新規追加 |
+| 6 Settings/Resource 分離 | Settings gate, Migration guide gate | settings legacy fallback、`cwd` 固定の project root 解決 |
+| 6A Resource File I/O 再設計 | Migrated macro gate, Migration guide gate | Resource I/O legacy static 互換、`StaticResourceIO` 直接利用 |
+| 7 Logging Framework 再設計 | Core isolation gate, Deprecation gate | loguru 直結の `LogManager` グローバル初期化への Runtime 直接依存 |
+| 9 CLI 移行 | Builder ownership gate, Deprecation gate | CLI 側の旧 `DefaultCommand` 直接構築、CLI notification settings の旧経路 |
+| 10 GUI 移行 | Builder ownership gate, Cancellation gate | GUI スレッドからの `cmd.stop()` 呼び出し、旧 worker の Command 直接構築 |
+| 11 MacroExecutor 削除 | MacroExecutor removal gate, existing macro gate, GUI/CLI integration | `MacroExecutor` 本体と import 互換 shim |
 
 ### 3.4 コミット分割方針
 
@@ -281,7 +296,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 目的 | read-only assets と writable outputs を分離し、`cmd.load_img()` / `cmd.save_img()` のメソッド名互換を保ったまま `MacroResourceScope` と `RunArtifactStore` へ移行する |
 | 対象ファイル | `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\runtime\context.py`, `src\nyxpy\framework\core\runtime\builder.py`, `tests\unit\framework\io\test_resource_file_io.py`, `tests\integration\test_resource_file_io_compat.py` |
 | 完了条件 | `resources\<macro_id>\assets` を読み込み、`runs\<run_id>\outputs` へ保存できる。旧 `static\<macro_name>` 互換を残さず、path traversal 防止、atomic write、overwrite policy がテストで固定される |
-| テスト | `test_resource_path_guard_rejects_parent_escape`, `test_command_load_img_uses_resource_store`, `test_command_save_img_uses_run_artifact_store`, `test_command_save_img_does_not_strip_macro_id_prefix`, `test_save_image_atomic_replace`, `test_migrated_frlg_id_rng_save_img_outputs` |
+| テスト | `test_resource_path_guard_rejects_parent_escape`, `test_command_load_img_uses_resource_store`, `test_command_save_img_uses_run_artifact_store`, `test_command_save_img_does_not_strip_macro_id_prefix`, `test_save_image_atomic_replace`, `test_migrated_representative_macro_save_img_outputs` |
 | リスク | `static` 直下へ保存していたデバッグ画像の場所が変わる、直接 `Path(cfg.output_dir)` を使う既存マクロとの移行差分、OpenCV 書き込みと atomic replace の組み合わせ |
 | ロールバック方針 | `RunArtifactStore` への標準保存は維持し、`Command` 側の呼び出しだけ段階戻しする。旧 static adapter は戻さない。path guard と書き込み失敗検出のテストは残す |
 

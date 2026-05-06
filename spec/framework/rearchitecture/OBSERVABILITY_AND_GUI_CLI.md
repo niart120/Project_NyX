@@ -182,6 +182,13 @@ GUI は起動時に `MacroRuntimeBuilder` を構成し、実行ボタンで `Run
 
 通知 secret は `SecretsSettings` が唯一の入力元である。CLI 引数で通知先を直接受け取る場合でも、その値を一時的な `SecretsSettings` snapshot として扱い、`GlobalSettings` やログ context へ平文を渡さない。Runtime builder が `SecretsSettings` 以外から secret 値を受け取った場合は `ConfigurationError` とする。
 
+| 入力元 | 変換責務 | Runtime へ渡す形 | 禁止事項 |
+|--------|----------|------------------|----------|
+| CLI 引数 | CLI adapter が一時 `SecretsSettings` snapshot を作る | `RuntimeBuildRequest.secrets` | CLI args の値を `GlobalSettings`、ログ context、`exec_args` へ複製しない |
+| GUI 設定画面 | GUI adapter が保存済み `SecretsSettings` または一時 snapshot を渡す | `RuntimeBuildRequest.secrets` | widget の平文値を structured log や status 表示へ渡さない |
+| 既存 secrets file | `SecretsSettings` が読み込み、mask 済み snapshot を logger へ渡す | `SecretsSettings` snapshot | `GlobalSettings` schema に secret field を追加しない |
+| 通知 adapter | Runtime builder が `SecretsSettings` から `NotificationPort` を構築する | `NotificationPort` | Discord / Bluesky credential を Port 生成後の log extra に残さない |
+
 #### ロギング基盤との接続
 
 構造化ログ、GUI 表示イベント、sink 配信、`run_id` / `macro_id` の保持、secret mask は `LOGGING_FRAMEWORK.md` を正とする。CLI は `LoggerPort` を Runtime builder から受け取り、GUI は `src\nyxpy\gui\log_sink.py` の `GuiLogSink` で `UserEvent` を Qt Signal へ変換する adapter に留める。core 層は `GuiLogSink` を import せず、`LogSink` Protocol / ABC だけを知る。

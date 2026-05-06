@@ -662,21 +662,21 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 
 ### 設定パラメータ
 
-| パラメータ | 型 | デフォルト | 説明 |
-|------------|-----|-----------|------|
-| `runtime.allow_dummy` | `bool` | `False` | 本番実行で dummy port を許可するか。テストと明示 dry-run 用 |
-| `runtime.device_detection_timeout_sec` | `float` | `5.0` | CLI/Runtime builder が serial/capture 検出完了を待つ最大秒数 |
-| `runtime.frame_ready_timeout_sec` | `float` | `3.0` | `FrameSourcePort.await_ready()` の最大秒数 |
-| `runtime.release_timeout_sec` | `float` | `2.0` | frame source や controller close の待機秒数 |
-| `runtime.wait_poll_interval_sec` | `float` | `0.05` | `DefaultCommand.wait()` がキャンセル状態を確認する周期。合格条件は中断要求から 100 ms 未満 |
-| `serial_device` | `str` | `""` | GUI/CLI で選択する serial device 名 |
-| `serial_protocol` | `str` | `"CH552"` | `ProtocolFactory` で解決する serial protocol 名 |
-| `serial_baud` | `int | None` | `None` | 明示 baudrate。`None` は protocol 既定値 |
-| `capture_device` | `str` | `""` | GUI/CLI で選択する capture device 名 |
-| `resource.assets_root` | `Path | None` | `project_root / "resources"` | `ResourceStorePort` の assets root。詳細は `RESOURCE_FILE_IO.md` |
-| `resource.runs_root` | `Path | None` | `project_root / "runs"` | `RunArtifactStore` の outputs root。詳細は `RESOURCE_FILE_IO.md` |
-| `notification.discord.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
-| `notification.bluesky.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
+| パラメータ | 型 | デフォルト | 所有者 | 説明 |
+|------------|-----|-----------|--------|------|
+| `runtime.allow_dummy` | `bool` | `False` | `RuntimeOptions` | 本番実行で dummy port を許可するか。テストと明示 dry-run 用 |
+| `runtime.device_detection_timeout_sec` | `float` | `5.0` | `RuntimeOptions` | CLI/Runtime builder が serial/capture 検出完了を待つ最大秒数 |
+| `runtime.frame_ready_timeout_sec` | `float` | `3.0` | `RuntimeOptions` | `FrameSourcePort.await_ready()` の最大秒数 |
+| `runtime.release_timeout_sec` | `float` | `2.0` | `RuntimeOptions` | frame source や controller close の待機秒数 |
+| `runtime.wait_poll_interval_sec` | `float` | `0.05` | `RuntimeOptions` | `DefaultCommand.wait()` がキャンセル状態を確認する周期。合格条件は中断要求から 100 ms 未満 |
+| `serial_device` | `str` | `""` | `GlobalSettings` / 実行要求 | GUI/CLI で選択する serial device 名 |
+| `serial_protocol` | `str` | `"CH552"` | `GlobalSettings` / 実行要求 | `ProtocolFactory` で解決する serial protocol 名 |
+| `serial_baud` | `int | None` | `None` | `GlobalSettings` / 実行要求 | 明示 baudrate。`None` は protocol 既定値 |
+| `capture_device` | `str` | `""` | `GlobalSettings` / 実行要求 | GUI/CLI で選択する capture device 名 |
+| `resource.assets_root` | `Path | None` | `project_root / "resources"` | Resource I/O builder input | `ResourceStorePort` の assets root。詳細は `RESOURCE_FILE_IO.md` |
+| `resource.runs_root` | `Path | None` | `project_root / "runs"` | Resource I/O builder input | `RunArtifactStore` の outputs root。詳細は `RESOURCE_FILE_IO.md` |
+| `notification.discord.enabled` | `bool` | `False` | `SecretsSettings` snapshot | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
+| `notification.bluesky.enabled` | `bool` | `False` | `SecretsSettings` snapshot | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
 
 ### エラーハンドリング
 
@@ -703,6 +703,14 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 Runtime 自体は原則としてシングルトンにしない。GUI と CLI が必要な lifetime で `MacroRuntimeBuilder` と `MacroRuntime` を生成する。
 
 `singletons.py` は当面、既存 `serial_manager`, `capture_manager`, `global_settings`, `secrets_settings` を維持する。追加が必要な場合は `device_discovery_service` のみに限定し、`reset_for_testing()` で Runtime/Port 関連状態を含めて初期化する。
+
+| 対象 | `reset_for_testing()` での扱い |
+|------|-------------------------------|
+| `serial_manager` / `capture_manager` | 既存互換のため再生成し、検出済みデバイス cache を破棄する |
+| `global_settings` / `secrets_settings` | snapshot と lock 状態を初期化する |
+| `log_manager` / GUI sink | `LOGGING_FRAMEWORK.md` に従い sink 登録と handler snapshot を解除する |
+| device discovery cache | 追加する場合は完了・失敗・timeout 状態を破棄する |
+| `MacroRuntime` / `RunHandle` / Port 実体 | シングルトンにしないため再生成対象に含めない。テスト fixture が実行ごとに破棄する |
 
 ### 現行問題への対応詳細
 

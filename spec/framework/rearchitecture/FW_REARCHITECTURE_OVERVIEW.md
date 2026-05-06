@@ -585,13 +585,13 @@ MacroRuntime.start(context)
 
 GUI Adapter
   -> handle.cancel()
-  -> handle.wait(timeout) -> bool
+  -> worker thread で handle.wait(timeout) -> bool
   -> handle.done() -> bool
   -> handle.result() -> RunResult
   -> RunResult を Qt Signal に変換
 ```
 
-`RunHandle.cancel()` は `ExecutionContext.cancellation_token.request_stop()` または `request_cancel()` を呼ぶ。新 GUI adapter は UI スレッドから `cmd.stop()` を呼ばず、`RunHandle.cancel()` を優先する。`result()` は未完了時に `RuntimeError` を送出してよい。
+`RunHandle.cancel()` は `ExecutionContext.cancellation_token.request_stop()` または `request_cancel()` を呼ぶ。新 GUI adapter は UI スレッドから `cmd.stop()` を呼ばず、`RunHandle.cancel()` を優先する。`handle.wait()` は GUI worker thread 内で呼ぶか、UI スレッドでは `done()` の非同期通知と Qt Signal へ変換する。UI スレッドから直接 `wait()` を呼ばない。`result()` は未完了時に `RuntimeError` を送出してよい。
 
 #### 4.2.5 Compatibility Layer
 
