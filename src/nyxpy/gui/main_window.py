@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import create_legacy_runtime_builder
@@ -267,7 +266,6 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _create_runtime_builder(self):
-        resource_io = StaticResourceIO(Path.cwd() / "static")
         protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
         notification_handler = create_notification_handler_from_settings(secrets_settings)
         return create_legacy_runtime_builder(
@@ -275,7 +273,6 @@ class MainWindow(QMainWindow):
             registry=self.registry,
             serial_device=serial_manager.get_active_device(),
             capture_device=capture_manager.get_active_device(),
-            resource_io=resource_io,
             protocol=protocol,
             notification_handler=notification_handler,
             log_manager=log_manager,

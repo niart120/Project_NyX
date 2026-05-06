@@ -72,7 +72,7 @@ def test_exec_args_override_file_settings(tmp_path) -> None:
         controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
         frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
         resource_store_factory=lambda _request, _definition: base_context.resources,
-        artifact_store_factory=lambda _request, _definition: base_context.artifacts,
+        artifact_store_factory=lambda _request, _definition, _run_id: base_context.artifacts,
         notification_factory=lambda _request, _definition: FakeNotificationPort(),
         logger_factory=lambda _request, _definition: FakeLoggerPort(),
     )

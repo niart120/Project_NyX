@@ -16,6 +16,7 @@ from nyxpy.framework.core.utils.helper import (
 )
 
 if TYPE_CHECKING:
+    from nyxpy.framework.core.io.resources import RunArtifactStore
     from nyxpy.framework.core.runtime.context import ExecutionContext
 
 
@@ -180,6 +181,10 @@ class DefaultCommand(Command):
             raise TypeError("DefaultCommand requires context=ExecutionContext")
         self.context = context
         self.ct: CancellationToken = context.cancellation_token
+
+    @property
+    def artifacts(self) -> RunArtifactStore:
+        return self.context.artifacts
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:

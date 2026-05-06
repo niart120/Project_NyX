@@ -8,6 +8,8 @@ from nyxpy.framework.core.io.ports import (
 )
 from nyxpy.framework.core.io.resources import (
     DefaultResourcePathGuard,
+    LocalResourceStore,
+    LocalRunArtifactStore,
     MacroResourceScope,
     OverwritePolicy,
     ResourceAlreadyExistsError,
@@ -28,6 +30,8 @@ __all__ = [
     "ControllerOutputPort",
     "DefaultResourcePathGuard",
     "FrameNotReadyError",
+    "LocalResourceStore",
+    "LocalRunArtifactStore",
     "FrameSourcePort",
     "MacroResourceScope",
     "NotificationPort",
