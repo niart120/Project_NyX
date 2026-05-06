@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from nyxpy.cli.run_cli import (
+    CliPresenter,
+    build_parser,
     cli_main,
     configure_logging,
     create_protocol,
@@ -230,8 +232,25 @@ def test_execute_macro_cancelled(monkeypatch, mock_log_manager):
 def test_execute_macro_failed(monkeypatch, mock_log_manager):
     builder = MagicMock(run=MagicMock(return_value=result(RunStatus.FAILED, "boom")))
 
-    with pytest.raises(RuntimeError, match="boom"):
-        execute_macro(builder, "Sample", {}, mock_log_manager.logger)
+    run_result = execute_macro(builder, "Sample", {}, mock_log_manager.logger)
+
+    assert run_result.status is RunStatus.FAILED
+    assert any(log[1] == "ERROR" for log in mock_log_manager.logger.logs)
+
+
+def test_cli_presenter_exit_codes() -> None:
+    presenter = CliPresenter()
+
+    assert presenter.exit_code(result(RunStatus.SUCCESS)) == 0
+    assert presenter.exit_code(result(RunStatus.CANCELLED)) == 130
+    assert presenter.exit_code(result(RunStatus.FAILED, "boom")) == 2
+
+
+def test_cli_does_not_accept_notification_secret_args() -> None:
+    options = {action.dest for action in build_parser()._actions}
+
+    assert "discord_webhook_url" not in options
+    assert "bluesky_password" not in options
 
 
 def make_args():
@@ -253,7 +272,8 @@ def test_cli_main_success(monkeypatch, mock_serial_manager, mock_capture_manager
     mock_configure = MagicMock(return_value=mock_logging)
     mock_protocol = MagicMock()
     mock_builder = MagicMock()
-    mock_execute = MagicMock()
+    mock_create_builder = MagicMock(return_value=mock_builder)
+    mock_execute = MagicMock(return_value=result(RunStatus.SUCCESS))
 
     monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
     monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
@@ -261,14 +281,20 @@ def test_cli_main_success(monkeypatch, mock_serial_manager, mock_capture_manager
     monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: mock_protocol)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_runtime_builder",
-        lambda protocol, logger: mock_builder,
+        mock_create_builder,
     )
     monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
     monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", mock_execute)
 
     assert cli_main(args) == 0
     mock_configure.assert_called_once()
-    assert mock_serial_manager.active_baudrate == 9600
+    mock_create_builder.assert_called_once_with(
+        protocol=mock_protocol,
+        logger=mock_logging.logger,
+        serial_name="COM1",
+        capture_name="Camera1",
+        baudrate=9600,
+    )
     mock_execute.assert_called_once_with(
         runtime_builder=mock_builder,
         macro_name="Sample",
@@ -289,14 +315,19 @@ def test_cli_main_uses_3ds_default_baudrate(monkeypatch, mock_serial_manager, mo
     )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_runtime_builder",
-        lambda protocol, logger: MagicMock(),
+        MagicMock(return_value=MagicMock()),
     )
     monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
-    monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", MagicMock())
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.execute_macro",
+        MagicMock(return_value=result(RunStatus.SUCCESS)),
+    )
 
     assert cli_main(args) == 0
-    assert mock_serial_manager.active_name == "COM1"
-    assert mock_serial_manager.active_baudrate == 115200
+    create_builder = __import__(
+        "nyxpy.cli.run_cli", fromlist=["create_runtime_builder"]
+    ).create_runtime_builder
+    assert create_builder.call_args.kwargs["baudrate"] == 115200
 
 
 def test_cli_main_baud_override(monkeypatch, mock_serial_manager, mock_capture_manager):
@@ -312,13 +343,19 @@ def test_cli_main_baud_override(monkeypatch, mock_serial_manager, mock_capture_m
     )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_runtime_builder",
-        lambda protocol, logger: MagicMock(),
+        MagicMock(return_value=MagicMock()),
     )
     monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
-    monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", MagicMock())
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.execute_macro",
+        MagicMock(return_value=result(RunStatus.SUCCESS)),
+    )
 
     assert cli_main(args) == 0
-    assert mock_serial_manager.active_baudrate == 9600
+    create_builder = __import__(
+        "nyxpy.cli.run_cli", fromlist=["create_runtime_builder"]
+    ).create_runtime_builder
+    assert create_builder.call_args.kwargs["baudrate"] == 9600
 
 
 def test_cli_main_value_error(
