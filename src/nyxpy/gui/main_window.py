@@ -17,9 +17,11 @@ from nyxpy.framework.core.api.notification_handler import create_notification_ha
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.framework.core.macro.command import Command, DefaultCommand
-from nyxpy.framework.core.macro.exceptions import MacroStopException
-from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.runtime.builder import create_legacy_runtime_builder
+from nyxpy.framework.core.runtime.context import ExecutionContext, RuntimeBuildRequest
+from nyxpy.framework.core.runtime.result import RunStatus
+from nyxpy.framework.core.runtime.runtime import MacroRuntime
 from nyxpy.framework.core.singletons import (
     capture_manager,
     global_settings,
@@ -27,7 +29,6 @@ from nyxpy.framework.core.singletons import (
     secrets_settings,
     serial_manager,
 )
-from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
@@ -43,7 +44,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         initialize_managers()
-        self.executor = MacroExecutor()
+        self.registry = MacroRegistry(project_root=Path.cwd())
+        self.macro_catalog = MacroCatalog(self.registry)
         self._last_settings = {}
         self._last_secrets = {}
         self.setup_ui()
@@ -71,7 +73,7 @@ class MainWindow(QMainWindow):
         # Left container: macro browser, controls, and virtual controller
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
-        self.macro_browser = MacroBrowserPane(self.executor, self)
+        self.macro_browser = MacroBrowserPane(self.macro_catalog, self)
         # Give macro_browser vertical stretch so it fills the pane
         left_layout.addWidget(self.macro_browser, 1)
 
@@ -254,27 +256,34 @@ class MainWindow(QMainWindow):
             exec_args: マクロに渡す引数辞書
         """
         macro_name = self.macro_browser.table.item(self.macro_browser.table.currentRow(), 0).text()
-        resource_io = StaticResourceIO(Path.cwd() / "static")
-        protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
-        ct = CancellationToken()
-        notification_handler = create_notification_handler_from_settings(secrets_settings)
-        cmd = DefaultCommand(
-            serial_device=serial_manager.get_active_device(),
-            capture_device=capture_manager.get_active_device(),
-            resource_io=resource_io,
-            protocol=protocol,
-            ct=ct,
-            notification_handler=notification_handler,
+        builder = self._create_runtime_builder()
+        context = builder.build(
+            RuntimeBuildRequest(macro_id=macro_name, entrypoint="gui", exec_args=exec_args)
         )
-        self.worker = WorkerThread(self.executor, cmd, macro_name, exec_args)
+        self.worker = WorkerThread(builder.runtime, context)
         self.worker.finished.connect(self.on_finished)
         self.control_pane.set_running(True)
         self.status_label.setText("実行中")
         self.worker.start()
 
+    def _create_runtime_builder(self):
+        resource_io = StaticResourceIO(Path.cwd() / "static")
+        protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
+        notification_handler = create_notification_handler_from_settings(secrets_settings)
+        return create_legacy_runtime_builder(
+            project_root=Path.cwd(),
+            registry=self.registry,
+            serial_device=serial_manager.get_active_device(),
+            capture_device=capture_manager.get_active_device(),
+            resource_io=resource_io,
+            protocol=protocol,
+            notification_handler=notification_handler,
+            log_manager=log_manager,
+        )
+
     def cancel_macro(self):
         if hasattr(self, "worker"):
-            self.worker.cmd.stop()
+            self.worker.cancel()
             self.control_pane.set_running(False)  # 状態管理に統一
 
     def closeEvent(self, event):
@@ -283,7 +292,7 @@ class MainWindow(QMainWindow):
 
         # 1. マクロ実行中なら停止を要求し、ワーカースレッドの終了を待つ
         if hasattr(self, "worker") and self.worker.isRunning():
-            self.worker.cmd.stop()
+            self.worker.cancel()
             if not self.worker.wait(5000):  # 最大5秒待機
                 log_manager.log(
                     "WARNING", "ワーカースレッドの終了がタイムアウトしました", "MainWindow"
@@ -328,23 +337,40 @@ class MainWindow(QMainWindow):
                 pass
 
 
+class MacroCatalog:
+    def __init__(self, registry: MacroRegistry) -> None:
+        self.registry = registry
+        self.macros = {}
+        self.reload_macros()
+
+    def reload_macros(self) -> None:
+        self.registry.reload()
+        self.macros = {
+            definition.class_name: definition
+            for definition in self.registry.list(include_failed=False)
+        }
+
+
 class WorkerThread(QThread):
     finished = Signal(str)
 
-    def __init__(self, executor, cmd, macro_name, args):
+    def __init__(self, runtime: MacroRuntime, context: ExecutionContext):
         super().__init__()
-        self.executor: MacroExecutor = executor
-        self.cmd: Command = cmd
+        self.runtime = runtime
+        self.context = context
 
-        self.macro_name = macro_name
-        self.args = args
+    def cancel(self) -> None:
+        self.context.cancellation_token.request_cancel(reason="user cancelled", source="gui_or_cli")
 
     def run(self):
         try:
-            self.executor.set_active_macro(self.macro_name)
-            self.executor.execute(self.cmd, self.args)
-            self.finished.emit("完了")
-        except MacroStopException:
-            self.finished.emit("中断")
+            result = self.runtime.run(self.context)
+            if result.status is RunStatus.SUCCESS:
+                self.finished.emit("完了")
+            elif result.status is RunStatus.CANCELLED:
+                self.finished.emit("中断")
+            else:
+                message = result.error.message if result.error is not None else "不明なエラー"
+                self.finished.emit(f"エラー: {message}")
         except Exception as e:
             self.finished.emit(f"エラー: {e}")

@@ -1,17 +1,11 @@
 import importlib
 from pathlib import Path
 
-import pytest
-
 
 def test_macro_runtime_module_is_available_for_entrypoints() -> None:
     importlib.import_module("nyxpy.framework.core.runtime")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="CLI and GUI stop importing MacroExecutor after runtime adapter migration.",
-)
 def test_gui_cli_entrypoints_do_not_import_macro_executor() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     entrypoint_sources = [

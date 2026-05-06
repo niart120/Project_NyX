@@ -54,7 +54,7 @@ class ThreadRunHandle(RunHandle):
         return self._cancellation_token
 
     def cancel(self) -> None:
-        self._cancellation_token.request_cancel(reason="cancel requested", source="run_handle")
+        self._cancellation_token.request_cancel(reason="user cancelled", source="gui_or_cli")
 
     def done(self) -> bool:
         return self._done_event.is_set()

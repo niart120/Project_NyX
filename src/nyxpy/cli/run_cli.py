@@ -9,12 +9,12 @@ from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.logger.log_manager import log_manager
-from nyxpy.framework.core.macro.command import Command, DefaultCommand
-from nyxpy.framework.core.macro.exceptions import MacroStopException
-from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_legacy_runtime_builder
+from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
+from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.singletons import capture_manager, serial_manager
-from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.utils.helper import parse_define_args
 
 
@@ -52,10 +52,10 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
     return ProtocolFactory.create_protocol(protocol_name)
 
 
-def create_command(
+def create_runtime_builder(
     protocol: SerialProtocolInterface,
     resources_dir: pathlib.Path | None = None,
-) -> Command:
+) -> MacroRuntimeBuilder:
     """
     指定されたコンポーネントでCommandインスタンスを作成します。
 
@@ -64,59 +64,56 @@ def create_command(
         resources_dir: リソースI/O用のディレクトリ（デフォルトは'./static'）
 
     Returns:
-        設定済みのCommandインスタンス
+        設定済みの Runtime builder
     """
     if resources_dir is None:
         resources_dir = pathlib.Path.cwd() / "static"
 
     resource_io = StaticResourceIO(resources_dir)
-    cancellation_token = CancellationToken()
-
+    registry = MacroRegistry(project_root=pathlib.Path.cwd())
+    registry.reload()
     serial_device = serial_manager.get_active_device()
     capture_device = capture_manager.get_active_device()
-
     global_settings = GlobalSettings()
     notification_handler = create_notification_handler_from_settings(global_settings)
-    return DefaultCommand(
+    return create_legacy_runtime_builder(
+        project_root=pathlib.Path.cwd(),
+        registry=registry,
         serial_device=serial_device,
         capture_device=capture_device,
         resource_io=resource_io,
         protocol=protocol,
-        ct=cancellation_token,
         notification_handler=notification_handler,
+        log_manager=log_manager,
     )
 
 
 def execute_macro(
-    executor: MacroExecutor, cmd: Command, macro_name: str, exec_args: dict[str, Any]
-) -> None:
+    runtime_builder: MacroRuntimeBuilder, macro_name: str, exec_args: dict[str, Any]
+) -> RunResult:
     """
     適切なエラー処理でマクロを実行します。
 
     Args:
-        executor: MacroExecutorインスタンス
-        cmd: マクロに渡すCommandインスタンス
+        runtime_builder: 実行用 Runtime builder
         macro_name: 実行するマクロの名前
         exec_args: マクロに渡す引数
 
     Raises:
-        ValueError: マクロが見つからない場合
+        RuntimeError: マクロ実行が失敗した場合
     """
-    try:
-        executor.set_active_macro(macro_name)
-    except ValueError as ve:
-        log_manager.log("ERROR", str(ve), component="MacroExecutor")
-        raise ve
-
-    try:
-        executor.execute(cmd, exec_args)
-    except MacroStopException as mse:
-        cmd.log("Macro execution was interrupted:", mse, level="WARNING")
-    except Exception as e:
-        cmd.log("An unexpected error occurred during macro execution:", e, level="ERROR")
-        raise e
-    finally:
-        cmd.log("Macro execution completed.")
+    result = runtime_builder.run(
+        RuntimeBuildRequest(macro_id=macro_name, entrypoint="cli", exec_args=exec_args)
+    )
+    if result.status is RunStatus.CANCELLED:
+        log_manager.log("WARNING", "Macro execution was interrupted", component="CLI")
+        return result
+    if not result.ok:
+        message = result.error.message if result.error is not None else "Macro execution failed"
+        log_manager.log("ERROR", message, component="CLI")
+        raise RuntimeError(message)
+    log_manager.log("INFO", "Macro execution completed", component="CLI")
+    return result
 
 
 def cli_main(args: argparse.Namespace) -> int:
@@ -162,15 +159,14 @@ def cli_main(args: argparse.Namespace) -> int:
         capture_manager.set_active(args.capture)
 
         protocol = create_protocol(args.protocol)
-        cmd = create_command(protocol=protocol)
+        runtime_builder = create_runtime_builder(protocol=protocol)
 
         # マクロ実行引数の解析
         exec_args = parse_define_args(args.define)
 
         # マクロの実行
         execute_macro(
-            executor=MacroExecutor(),
-            cmd=cmd,
+            runtime_builder=runtime_builder,
             macro_name=args.macro_name,
             exec_args=exec_args,
         )

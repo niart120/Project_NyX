@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import pathlib
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import cv2
 
-from nyxpy.framework.core.api.notification_handler import NotificationHandler
-from nyxpy.framework.core.constants import KeyboardOp, KeyCode, KeyType, SpecialKeyCode
-from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
-from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
-from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
-from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
+from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.io.ports import SleepControlCapability, TouchInputCapability
 from nyxpy.framework.core.macro.decorators import check_interrupt
 from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
 from nyxpy.framework.core.utils.helper import (
     get_caller_class_name,
     validate_keyboard_text,
 )
+
+if TYPE_CHECKING:
+    from nyxpy.framework.core.runtime.context import ExecutionContext
 
 
 class Command(ABC):
@@ -174,51 +175,32 @@ class DefaultCommand(Command):
     外部からログレベルを柔軟に変更できるようにしています。
     """
 
-    def __init__(
-        self,
-        serial_device: SerialCommInterface,
-        capture_device: CaptureDeviceInterface,
-        resource_io: StaticResourceIO,
-        protocol: SerialProtocolInterface,
-        ct: CancellationToken,
-        notification_handler: NotificationHandler,
-    ) -> None:
-        self.serial_device = serial_device
-        self.capture_device = capture_device
-        self.resource_io = resource_io
-        self.protocol = protocol
-        self.ct = ct
-        self.notification_handler = notification_handler
+    def __init__(self, context: ExecutionContext | None = None, **legacy_kwargs: object) -> None:
+        if context is None or legacy_kwargs:
+            raise TypeError("DefaultCommand requires context=ExecutionContext")
+        self.context = context
+        self.ct: CancellationToken = context.cancellation_token
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
         self.log(f"Pressing keys: {keys}", level="DEBUG")
-        press_data = self.protocol.build_press_command(keys)
-        self.serial_device.send(press_data)
-        self.wait(dur)
+        self.context.controller.press(keys)
+        if dur > 0:
+            self.wait(dur)
         self.log(f"Releasing keys: {keys}", level="DEBUG")
-        release_data = self.protocol.build_release_command(keys)
-        self.serial_device.send(release_data)
-        self.wait(wait)
+        self.context.controller.release(keys)
+        if wait > 0:
+            self.wait(wait)
 
     @check_interrupt
     def hold(self, *keys: KeyType) -> None:
         self.log(f"Holding keys: {keys}", level="DEBUG")
-        hold_data = self.protocol.build_hold_command(keys)
-        self.serial_device.send(hold_data)
+        self.context.controller.hold(keys)
 
     @check_interrupt
     def release(self, *keys: KeyType) -> None:
         self.log(f"Releasing keys: {keys}", level="DEBUG")
-        release_data = self.protocol.build_release_command(keys)
-        self.serial_device.send(release_data)
-
-    def _build_protocol_command(self, method_name: str, *args) -> bytes:
-        method = getattr(self.protocol, method_name, None)
-        if method is None:
-            feature = "touch input" if method_name.startswith("build_touch") else "sleep control"
-            raise NotImplementedError(f"Current serial protocol does not support {feature}.")
-        return method(*args)
+        self.context.controller.release(keys)
 
     @check_interrupt
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -230,20 +212,23 @@ class DefaultCommand(Command):
     @check_interrupt
     def touch_down(self, x: int, y: int) -> None:
         self.log(f"Touch down: ({x}, {y})", level="DEBUG")
-        touch_data = self._build_protocol_command("build_touch_down_command", x, y)
-        self.serial_device.send(touch_data)
+        if not isinstance(self.context.controller, TouchInputCapability):
+            raise NotImplementedError("Current serial protocol does not support touch input.")
+        self.context.controller.touch_down(x, y)
 
     @check_interrupt
     def touch_up(self) -> None:
         self.log("Touch up", level="DEBUG")
-        touch_data = self._build_protocol_command("build_touch_up_command")
-        self.serial_device.send(touch_data)
+        if not isinstance(self.context.controller, TouchInputCapability):
+            raise NotImplementedError("Current serial protocol does not support touch input.")
+        self.context.controller.touch_up()
 
     @check_interrupt
     def disable_sleep(self, enabled: bool = True) -> None:
         self.log(f"Disable sleep: {enabled}", level="DEBUG")
-        command_data = self._build_protocol_command("build_disable_sleep_command", enabled)
-        self.serial_device.send(command_data)
+        if not isinstance(self.context.controller, SleepControlCapability):
+            raise NotImplementedError("Current serial protocol does not support sleep control.")
+        self.context.controller.disable_sleep(enabled)
 
     @check_interrupt
     def wait(self, wait: float) -> None:
@@ -258,14 +243,19 @@ class DefaultCommand(Command):
     def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         caller_class = get_caller_class_name()
-        log_manager.log(level, message, component=caller_class)
+        self.context.logger.user(
+            level,
+            message,
+            component=caller_class,
+            event="command.log",
+        )
 
     @check_interrupt
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
     ) -> cv2.typing.MatLike:
         self.log("Capturing screen...", level="DEBUG")
-        capture_data = self.capture_device.get_frame()
+        capture_data = self.context.frame_source.latest_frame()
         if capture_data is None:
             self.log("Capture failed", level="ERROR")
             return None
@@ -284,30 +274,18 @@ class DefaultCommand(Command):
     @check_interrupt
     def save_img(self, filename, image) -> None:
         self.log(f"Saving image to {filename}", level="DEBUG")
-        self.resource_io.save_image(filename, image)
+        self.context.artifacts.save_image(filename, image)
 
     @check_interrupt
     def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
         self.log(f"Loading image from {filename}", level="DEBUG")
-        return self.resource_io.load_image(filename, grayscale=grayscale)
+        return self.context.resources.load_image(filename, grayscale=grayscale)
 
     @check_interrupt
     def keyboard(self, text: str) -> None:
         self.log(f"Sending keyboard text input: {text}", level="DEBUG")
         text = validate_keyboard_text(text)
-        try:
-            kb_data = self.protocol.build_keyboard_command(text)
-            self.serial_device.send(kb_data)
-        except (ValueError, NotImplementedError):
-            for char in text:
-                self.type(KeyCode(char))
-        try:
-            kb_all_release = self.protocol.build_keytype_command(
-                KeyCode(""), KeyboardOp.ALL_RELEASE
-            )
-            self.serial_device.send(kb_all_release)
-        except NotImplementedError:
-            pass
+        self.context.controller.keyboard(text)
 
     @check_interrupt
     def type(self, key: KeyCode | SpecialKeyCode) -> None:
@@ -317,34 +295,21 @@ class DefaultCommand(Command):
 
         self.log(f"Sending keyboard key input: {key}", level="DEBUG")
 
-        # キーの種類に応じて操作を分岐
-        match key:
-            case KeyCode():
-                press_op = KeyboardOp.PRESS
-                release_op = KeyboardOp.RELEASE
-            case SpecialKeyCode():
-                press_op = KeyboardOp.SPECIAL_PRESS
-                release_op = KeyboardOp.SPECIAL_RELEASE
-            case _:
-                raise ValueError(f"Invalid key type: {type(key)}")
-
-        try:
-            # キー押下
-            kb_press = self.protocol.build_keytype_command(key, press_op)
-            self.serial_device.send(kb_press)
-            self.wait(0.02)  # 必要に応じて調整
-
-            # キー解放
-            kb_release = self.protocol.build_keytype_command(key, release_op)
-            self.serial_device.send(kb_release)
-            self.wait(0.01)  # 必要に応じて調整
-        except NotImplementedError as e:
-            self.log(f"Protocol doesn't support key input: {str(e)}", level="WARNING")
+        self.context.controller.type_key(key)
 
     @check_interrupt
     def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
         """
         外部サービスへ通知を送信する
         """
-        if self.notification_handler:
-            self.notification_handler.publish(text, img)
+        try:
+            self.context.notifications.publish(text, img)
+        except Exception as exc:
+            self.context.logger.technical(
+                "WARNING",
+                "Notification failed",
+                component="DefaultCommand",
+                event="notification.failed",
+                extra={"message": str(exc)},
+                exc=exc,
+            )
