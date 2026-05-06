@@ -1,5 +1,4 @@
 import pathlib
-import time
 from abc import ABC, abstractmethod
 
 import cv2
@@ -12,8 +11,7 @@ from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
 from nyxpy.framework.core.logger.log_manager import log_manager  # LogManager 利用
 from nyxpy.framework.core.macro.decorators import check_interrupt
-from nyxpy.framework.core.macro.exceptions import MacroStopException
-from nyxpy.framework.core.utils.cancellation import CancellationToken
+from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
 from nyxpy.framework.core.utils.helper import (
     get_caller_class_name,
     validate_keyboard_text,
@@ -250,12 +248,12 @@ class DefaultCommand(Command):
     @check_interrupt
     def wait(self, wait: float) -> None:
         self.log(f"Waiting for {wait} seconds", level="DEBUG")
-        time.sleep(wait)
+        cancellation_aware_wait(wait, self.ct)
+        self.ct.throw_if_requested()
 
     def stop(self) -> None:
         self.log("Stopping macro execution", level="INFO")
-        self.ct.request_stop()
-        raise MacroStopException("Macro execution interrupted.")
+        self.ct.request_cancel(reason="stop requested", source="macro")
 
     def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")

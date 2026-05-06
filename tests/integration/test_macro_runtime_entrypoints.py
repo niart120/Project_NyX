@@ -4,10 +4,6 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="MacroRuntime is introduced before GUI/CLI migration in later phases.",
-)
 def test_macro_runtime_module_is_available_for_entrypoints() -> None:
     importlib.import_module("nyxpy.framework.core.runtime")
 
