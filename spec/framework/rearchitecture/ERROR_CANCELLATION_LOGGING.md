@@ -346,7 +346,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_MACRO_ARGS_INVALID` | `configuration` | `MacroRunner` / args schema | マクロ引数が schema に一致しない |
 | `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `GlobalSettings`, `SecretsSettings`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
 | `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `GlobalSettings`, `SecretsSettings` | 設定値が schema に一致しない |
-| `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | manifest settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
+| `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | 明示 settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
 | `NYX_DEVICE_SERIAL_FAILED` | `device` | `ControllerOutputPort` | シリアル送信、接続、プロトコル変換に失敗した |
 | `NYX_DEVICE_CAPTURE_FAILED` | `device` | `FrameSourcePort` | フレーム取得、初期化、切断検出に失敗した |
 | `NYX_FRAME_NOT_READY` | `device` | `FrameSourcePort.await_ready` | timeout 内に有効フレームが取得できない |
@@ -422,7 +422,7 @@ class MacroArgsSchema:
     strict: bool = False
 ```
 
-検証順序は manifest settings path から読み込んだ settings と、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。旧 `static/<macro_id>/settings.toml` は探索しない。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
+検証順序は manifest または class metadata settings path から読み込んだ settings と、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。旧 `static/<macro_id>/settings.toml` は探索しない。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
 
 #### GlobalSettings / SecretsSettings schema
 

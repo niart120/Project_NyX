@@ -4,7 +4,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`  
 > **目的**: フレームワーク再設計における互換境界、Runtime 中核、Ports/Adapters、GUI/CLI、ハードウェア/外部 I/O の依存方向を Mermaid 図で固定する。  
 > **関連ドキュメント**: `spec/framework/rearchitecture/FW_REARCHITECTURE_OVERVIEW.md`, `spec/framework/rearchitecture/RUNTIME_AND_IO_PORTS.md`, `spec/framework/rearchitecture/MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec/framework/rearchitecture/RESOURCE_FILE_IO.md`, `spec/framework/rearchitecture/LOGGING_FRAMEWORK.md`, `spec/framework/rearchitecture/OBSERVABILITY_AND_GUI_CLI.md`, `spec/framework/rearchitecture/DEPRECATION_AND_MIGRATION.md`
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、legacy auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象外であり、削除可否は `DEPRECATION_AND_MIGRATION.md` を正とする。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象外であり、削除可否は `DEPRECATION_AND_MIGRATION.md` を正とする。
 
 ## 1. 概要
 
@@ -75,7 +75,7 @@ from nyxpy.framework.core.macro.exceptions import MacroStopException
 
 ### 後方互換性
 
-既存マクロは `MacroRuntime`、`MacroRegistry`、Ports を直接使う必要がない。マクロ作者に対して維持する互換条件は現行と同じ import path、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッドである。settings と Resource I/O は manifest settings path と新リソース配置への移行対象である。
+既存マクロは `MacroRuntime`、`MacroRegistry`、Ports を直接使う必要がない。マクロ作者に対して維持する互換条件は現行と同じ import path、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッドである。settings と Resource I/O は manifest または class metadata の settings source と新リソース配置への移行対象である。
 
 ### レイヤー構成
 
@@ -330,7 +330,7 @@ flowchart TB
         ImportCommand["from ...macro.command import Command / DefaultCommand"]
         ImportConstants["from ...constants import Button / Hat / LStick / RStick / KeyType"]
         ImportStop["from ...macro.exceptions import MacroStopException"]
-        ManifestSettings["macro.toml<br/>[macro].settings"]
+        ManifestSettings["macro.toml / class metadata<br/>settings source"]
     end
 
     subgraph Stable["破壊不可領域"]
@@ -338,7 +338,7 @@ flowchart TB
         CommandContract["Command methods<br/>press / wait / capture / notify / log など"]
         ConstantsContract["constants export"]
         StopContract["MacroStopException"]
-        SettingsResolverContract["MacroSettingsResolver<br/>manifest settings only"]
+        SettingsResolverContract["MacroSettingsResolver<br/>explicit settings only"]
     end
 
     subgraph Replaceable["内部差し替え可能領域"]
@@ -352,7 +352,7 @@ flowchart TB
 
     subgraph Deprecated["削除対象 / 廃止候補領域"]
         Executor["MacroExecutor<br/>旧 GUI/CLI/テスト入口"]
-        LegacyLoader["legacy auto discovery"]
+        LegacyLoader["旧 auto discovery"]
         CwdFallback["cwd fallback"]
         SysPath["恒久的な sys.path 変更"]
         DummyFallback["暗黙 dummy fallback"]
@@ -374,7 +374,7 @@ flowchart TB
     CommandImpl --> Ports
 
     Executor -. "削除前に参照を移行" .-> Runtime
-    LegacyLoader -. "manifest entrypoint へ移行" .-> Registry
+    LegacyLoader -. "manifest / convention discovery へ移行" .-> Registry
     CwdFallback -. "削除" .-> Registry
     SysPath -. "削除候補" .-> LegacyLoader
     DummyFallback -. "allow_dummy=True へ移行" .-> Ports

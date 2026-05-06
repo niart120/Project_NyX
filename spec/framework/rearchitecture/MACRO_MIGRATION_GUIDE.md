@@ -4,25 +4,27 @@
 > **対象モジュール**: `macros\`, `resources\`, `static\`, `macro.toml`, `src\nyxpy\framework\core\macro\`
 > **目的**: Resource I/O、settings lookup、entrypoint、`DefaultCommand` 直接生成の破壊的変更に対して、マクロ側で必要な修正手順を定義する。
 > **関連ドキュメント**: `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RESOURCE_FILE_IO.md`, `CONFIGURATION_AND_RESOURCES.md`, `RUNTIME_AND_IO_PORTS.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。旧 `static` リソース配置、旧 settings fallback、legacy auto discovery、`DefaultCommand` 旧コンストラクタは維持しない。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。旧 `static` リソース配置、旧 settings fallback、旧 auto discovery、`DefaultCommand` 旧コンストラクタは維持しない。
 
 ## 1. 概要
 
 ### 1.1 目的
 
-フレームワーク再設計に伴い、マクロ側で必要になる移行作業を一か所に集約する。互換 shim を長期維持しない項目を明示し、マクロ作者が `macro.toml`、settings、画像リソース、出力先を新仕様へ移せる状態にする。
+フレームワーク再設計に伴い、マクロ側で必要になる移行作業を一か所に集約する。互換 shim を長期維持しない項目を明示し、マクロ作者が任意の `macro.toml`、class metadata、settings、画像リソース、出力先を新仕様へ移せる状態にする。
 
 ### 1.2 用語定義
 
 | 用語 | 定義 |
 |------|------|
-| macro_id | manifest で定義する安定 ID。リソース配置、settings、実行ログの相関に使う |
-| manifest | マクロ定義ファイル `macro.toml`。`[macro].id`、`[macro].entrypoint`、`[macro].settings` を持つ |
-| entrypoint | `module:ClassName` 形式のマクロクラス参照。package 形式と single-file 形式の両方で必須 |
+| macro_id | manifest、class metadata、または convention default で決まる安定 ID。リソース配置、settings、実行ログの相関に使う |
+| manifest | 任意のマクロ定義ファイル `macro.toml`。複数 entrypoint、import 前 metadata、args schema、配布用 metadata を明示したい場合に使う |
+| class metadata | `MacroBase` 派生クラスに置く `macro_id`、`display_name`、`settings_path` などの任意属性 |
+| convention discovery | manifest がない軽量マクロを、ファイル名またはディレクトリ名と 1 件の `MacroBase` 派生クラスから発見する規約 |
+| entrypoint | `module:ClassName` 形式のマクロクラス参照。manifest を使う場合に明示する |
 | standard assets | `resources\<macro_id>\assets` 配下の read-only 画像リソース |
 | macro package assets | `macros\<macro_id>\assets` 配下の read-only 画像リソース |
 | run outputs | `runs\<run_id>\outputs` 配下の実行ごとの出力先 |
-| manifest settings path | `macro.toml` の `[macro].settings` で明示する settings TOML の場所 |
+| explicit settings source | `macro.toml [macro].settings` または class metadata `settings_path` で明示する settings TOML の場所 |
 
 ### 1.3 背景・問題
 
@@ -34,14 +36,14 @@
 
 | 指標 | 現状 | 目標 |
 |------|------|------|
-| settings 探索 | `static\<macro_name>` と `cwd` fallback が混在 | manifest settings path の 1 系統 |
+| settings 探索 | `static\<macro_name>` と `cwd` fallback が混在 | manifest または class metadata の明示 settings source |
 | 画像リソース | 読み込み元と保存先が `static` に混在 | assets と outputs を分離 |
-| マクロ発見 | legacy auto discovery と manifest が混在 | manifest entrypoint の 1 系統 |
+| マクロ発見 | 旧 auto discovery と manifest が混在 | manifest / class metadata / convention discovery |
 | 出力追跡 | 実行単位の出力先が曖昧 | `run_id` ごとの outputs へ保存 |
 
 ### 1.5 着手条件
 
-- `MACRO_COMPATIBILITY_AND_REGISTRY.md` の manifest entrypoint 仕様が確定している。
+- `MACRO_COMPATIBILITY_AND_REGISTRY.md` の manifest 任意採用、class metadata、convention discovery 仕様が確定している。
 - `RESOURCE_FILE_IO.md` の `ResourceRef`、`ResourceKind`、`ResourceSource`、`RunArtifactStore` 仕様が確定している。
 - `CONFIGURATION_AND_RESOURCES.md` の `MacroSettingsResolver` 仕様が確定している。
 - 移行対象マクロの現行 settings と画像リソースの配置を確認済みである。
@@ -51,11 +53,11 @@
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `spec/framework/rearchitecture/MACRO_MIGRATION_GUIDE.md` | 新規 | マクロ側移行手順を定義 |
-| `macros\<macro_id>\macro.toml` | 新規 | manifest entrypoint と settings path を定義 |
+| `macros\<macro_id>\macro.toml` | 新規 | 高度機能が必要な場合だけ manifest entrypoint と settings path を定義 |
 | `macros\<macro_id>\macro.py` | 変更 | 必要に応じて resource path と `DefaultCommand` 直接生成を修正 |
 | `macros\<macro_id>\assets\**` | 新規 | マクロ同梱 assets の移動先 |
 | `resources\<macro_id>\assets\**` | 新規 | プロジェクト標準 assets の移動先 |
-| `resources\<macro_id>\settings.toml` | 新規 | manifest settings path の推奨配置 |
+| `resources\<macro_id>\settings.toml` | 新規 | 明示 settings source の推奨配置 |
 | `static\<macro_name>\**` | 削除 | 旧 settings / assets / outputs 配置。移行後は標準探索しない |
 
 ## 3. 設計方針
@@ -70,15 +72,15 @@
 | lifecycle | `initialize(cmd, args)`, `run(cmd)`, `finalize(cmd)` | 発見時インスタンス保持に依存する処理 |
 | Command API | `cmd.load_img()`, `cmd.save_img()` などのメソッド名 | 旧 `static` 前提の path、ファイル名 prefix 除去前提 |
 | settings | `exec_args` による上書き | `static\<macro_name>\settings.toml` と `Path.cwd()` fallback |
-| entrypoint | package / single-file の実行 | legacy auto discovery |
+| entrypoint | package / single-file の実行 | 曖昧な旧 auto discovery。軽量マクロは convention discovery へ移行 |
 
 ### 3.2 移行単位
 
-移行はマクロごとに完結させる。1 つのマクロで manifest、settings、assets、outputs の期待値を揃えてからテストを通す。旧配置と新配置を同時に標準探索させる中間状態は作らない。
+移行はマクロごとに完結させる。1 つのマクロで発見方式、settings、assets、outputs の期待値を揃えてからテストを通す。旧配置と新配置を同時に標準探索させる中間状態は作らない。
 
 ### 3.3 single-file macro の扱い
 
-single-file macro は許容する。ただし、legacy auto discovery ではなく manifest entrypoint で明示する。
+single-file macro は許容する。`macros\<macro_id>.py` に `MacroBase` 派生クラスが 1 件だけなら manifest は不要である。複数クラスや import 前 metadata が必要な場合は manifest entrypoint で明示する。
 
 ```toml
 [macro]
@@ -98,7 +100,15 @@ Markdown の説明文では Windows 配置例として `\` を使う。`macro.to
 
 ### 4.1 manifest の追加
 
-package 形式のマクロは `macros\<macro_id>\macro.toml` を追加する。
+`macro.toml` は必須ではない。次の条件に該当するマクロだけ `macros\<macro_id>\macro.toml` を追加する。
+
+| 条件 | manifest 要否 |
+|------|---------------|
+| 単一 `MacroBase` クラスだけの軽量マクロ | 不要 |
+| class metadata で `settings_path` を示せる | 不要 |
+| 1 パッケージに複数 entrypoint がある | 必須 |
+| GUI/CLI 一覧に import 前 metadata や args schema を出したい | 必須 |
+| 配布・共有用に ID、説明、tags、resource roots を固定したい | 推奨 |
 
 ```toml
 [macro]
@@ -108,7 +118,16 @@ entrypoint = "macros.frlg_id_rng.macro:FrlgIdRngMacro"
 settings = "project:resources/frlg_id_rng/settings.toml"
 ```
 
-`entrypoint` は `module:ClassName` 形式とする。`id` はディレクトリ名や表示名ではなく、リソース配置とログ相関に使う安定 ID とする。
+`entrypoint` は `module:ClassName` 形式とする。`id` はディレクトリ名や表示名ではなく、リソース配置とログ相関に使う安定 ID とする。manifest がない場合はファイル名またはディレクトリ名を ID とし、必要に応じて class metadata `macro_id` で上書きする。
+
+manifest なしで settings を使う場合は class metadata を使う。
+
+```python
+class FrlgIdRngMacro(MacroBase):
+    macro_id = "frlg_id_rng"
+    display_name = "FRLG ID RNG"
+    settings_path = "project:resources/frlg_id_rng/settings.toml"
+```
 
 ### 4.2 settings の移行
 
@@ -124,14 +143,21 @@ static\frlg_id_rng\settings.toml
 resources\frlg_id_rng\settings.toml
 ```
 
-manifest:
+manifest を使う場合:
 
 ```toml
 [macro]
 settings = "project:resources/frlg_id_rng/settings.toml"
 ```
 
-相対パスを使う場合は manifest のある macro root 相対とする。`project:` prefix を付けた場合は `project_root` 相対とする。`Path.cwd()` からの探索は行わない。
+class metadata を使う場合:
+
+```python
+class FrlgIdRngMacro(MacroBase):
+    settings_path = "project:resources/frlg_id_rng/settings.toml"
+```
+
+相対パスを使う場合は macro root 相対とする。`project:` prefix を付けた場合は `project_root` 相対とする。`Path.cwd()` からの探索は行わない。
 
 ### 4.3 assets の移行
 
@@ -201,16 +227,17 @@ cmd.stop(raise_immediately=True)
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|------------|------|
-| `[macro].id` | `str` | なし | マクロの安定 ID。必須 |
-| `[macro].entrypoint` | `str` | なし | `module:ClassName` 形式。必須 |
-| `[macro].settings` | `str | None` | `None` | settings TOML の path。未指定なら `{}` |
+| `[macro].id` | `str` | convention default | manifest を使う場合のマクロ安定 ID |
+| `[macro].entrypoint` | `str` | convention discovery | `module:ClassName` 形式。複数候補など曖昧な場合は必須 |
+| `[macro].settings` | `str | None` | `None` | settings TOML の path。未指定なら class metadata を見る |
+| `MacroBase.settings_path` | `str | None` | `None` | manifest なし、または manifest に settings がない場合の settings TOML path |
 | `project:` prefix | `str` | なし | `project_root` 相対 path を表す |
 
 ### 4.7 エラーハンドリング
 
 | エラー | 発生条件 |
 |--------|----------|
-| `MacroLoadError` | manifest entrypoint がない、module import に失敗、class が `MacroBase` でない |
+| `MacroLoadError` | module import に失敗、class が `MacroBase` でない、convention discovery が曖昧、manifest entrypoint が不正 |
 | `ConfigurationError` | settings path が root 外参照、絶対パス、空 path、存在しない必須 file |
 | `ResourcePathError` | assets / outputs の root 外参照、未許可拡張子、ディレクトリ指定 |
 | `ResourceWriteError` | `cmd.save_img()` の書き込みまたは atomic replace に失敗 |
@@ -219,25 +246,26 @@ cmd.stop(raise_immediately=True)
 
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
-| ユニット | `test_manifest_entrypoint_required` | manifest entrypoint がないマクロをロードしない |
+| ユニット | `test_registry_loads_convention_single_file_macro` | manifest なしの single-file macro を convention discovery でロードする |
 | ユニット | `test_registry_loads_manifest_single_file_macro` | single-file macro を manifest entrypoint からロードできる |
-| ユニット | `test_macro_settings_resolver_loads_manifest_settings` | manifest settings path から settings を読む |
+| ユニット | `test_registry_requires_manifest_when_convention_is_ambiguous` | 複数候補など曖昧な場合だけ manifest entrypoint を要求する |
+| ユニット | `test_macro_settings_resolver_loads_explicit_settings` | manifest または class metadata settings path から settings を読む |
 | ユニット | `test_macro_settings_resolver_does_not_read_legacy_static_settings` | 旧 `static` settings を暗黙探索しない |
 | ユニット | `test_command_load_img_uses_resource_store` | `cmd.load_img()` が assets root から読む |
 | ユニット | `test_command_save_img_uses_run_artifact_store` | `cmd.save_img()` が run outputs へ保存する |
 | ユニット | `test_default_command_rejects_legacy_constructor_args` | 旧具象引数コンストラクタを受け付けない |
-| 結合 | `test_migrated_repository_macros_load_from_manifest` | 移行後代表マクロが manifest entrypoint からロードされる |
-| 結合 | `test_migrated_macro_settings_load_from_manifest` | 移行後代表マクロの settings が manifest から読み込まれる |
+| 結合 | `test_migrated_repository_macros_load_with_optional_manifest` | 移行後代表マクロが manifest あり / なしの両方でロードされる |
+| 結合 | `test_migrated_macro_settings_load_from_explicit_source` | 移行後代表マクロの settings が manifest または class metadata から読み込まれる |
 
 ## 6. 実装チェックリスト
 
-- [ ] 各マクロに `macro.toml` を追加し、`id` / `entrypoint` / `settings` を定義
-- [ ] `static\<macro_name>\settings.toml` を manifest settings path へ移動
+- [ ] 高度機能が必要なマクロだけ `macro.toml` を追加し、`id` / `entrypoint` / `settings` を定義
+- [ ] `static\<macro_name>\settings.toml` を manifest または class metadata settings path へ移動
 - [ ] 読み込み専用画像を `resources\<macro_id>\assets` または `macros\<macro_id>\assets` へ移動
 - [ ] `cmd.load_img()` に渡す path を assets root 相対へ修正
 - [ ] `cmd.save_img()` の保存先が `runs\<run_id>\outputs` になる前提へ修正
 - [ ] ファイル名先頭の macro ID prefix 除去に依存する処理を削除
 - [ ] `DefaultCommand(serial_device=..., capture_device=..., ...)` の直接生成を削除
-- [ ] single-file macro は manifest entrypoint を追加
+- [ ] single-file macro は convention discovery で一意にロードできることを確認し、曖昧な場合だけ manifest entrypoint を追加
 - [ ] 代表マクロの移行後結合テストを追加
 - [ ] 旧 `static` / `cwd` fallback に依存するテストを削除または新仕様へ更新

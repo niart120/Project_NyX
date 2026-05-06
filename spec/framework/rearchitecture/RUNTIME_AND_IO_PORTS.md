@@ -5,7 +5,7 @@
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。  
 > **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\api\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`  
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、legacy auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、旧 auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -35,7 +35,7 @@
 | ResourceStorePort | Resource File I/O の assets 読み込みを行う Port。詳細は `RESOURCE_FILE_IO.md` を正とし、settings TOML 解決は担当しない |
 | RunArtifactStore | Resource File I/O の writable outputs 保存を行う Port。実行 ID ごとの成果物 root、atomic write、overwrite policy を担当する |
 | MacroResourceScope | 1 つのマクロ ID に紐づく assets root と macro root を表す値 |
-| MacroSettingsResolver | manifest settings path と project root 明示設定を解決する専用コンポーネント |
+| MacroSettingsResolver | manifest または class metadata の settings source と project root 明示設定を解決する専用コンポーネント |
 | NotificationPort | Discord / Bluesky などの外部通知へ発行する Port |
 | LoggerPort | loguru ベースの `LogManager` またはテスト用ロガーへログを出力する Port |
 | Ports/Adapters | Port は Runtime 中核から見た I/O 抽象、Adapter は現行 Serial/Capture/Resource/Notification/Logger 実装へ接続する実装 |
@@ -79,7 +79,7 @@
 
 - 現行 `Command` 抽象メソッドのメソッド名、引数、戻り値互換を維持する。
 - `nyxpy.framework.core.macro.command.DefaultCommand` の import path を維持する。
-- 既存の `MacroBase` ライフサイクル、`Command` / `DefaultCommand`、constants、`MacroStopException` を維持する。旧 settings lookup は維持せず、manifest settings path と `exec_args` merge を新契約として固定する。
+- 既存の `MacroBase` ライフサイクル、`Command` / `DefaultCommand`、constants、`MacroStopException` を維持する。旧 settings lookup は維持せず、manifest / class metadata / settings なしの解決順と `exec_args` merge を新契約として固定する。
 - GUI/CLI の実行組み立ては変更してよいが、GUI/CLI がマクロへ渡す `cmd` は `Command` として振る舞う。
 - 既存テスト (`uv run pytest tests/unit/`) が移行前後でパスすること。
 - 実機依存テストは `@pytest.mark.realdevice` を付け、通常の単体テストから分離する。
@@ -100,7 +100,7 @@
 | `src\nyxpy\framework\core\io\controller.py` | 新規 | `SerialControllerOutputPort`, `DummyControllerOutputPort` を実装 |
 | `src\nyxpy\framework\core\io\frame_source.py` | 新規 | `CaptureFrameSourcePort`, `DummyFrameSourcePort`, frame readiness を実装 |
 | `src\nyxpy\framework\core\io\resources.py` | 新規 | `ResourceStorePort`, `RunArtifactStore`, `ResourceRef`, `MacroResourceScope`, path guard を定義・実装。settings TOML 解決は扱わない |
-| `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` を実装し、manifest settings TOML を解決 |
+| `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` を実装し、manifest / class metadata settings TOML を解決 |
 | `src\nyxpy\framework\core\io\notification.py` | 新規 | `NotificationHandler` の Port adapter を実装 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `DefaultCommand` を `ExecutionContext` と Ports へ接続する実装へ移行 |
 | `src\nyxpy\framework\core\hardware\serial_comm.py` | 変更 | 既存 API は維持し、Runtime 経路では暗黙 dummy fallback を使わない。明示的な検出完了待ち API を追加 |
@@ -611,7 +611,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 #### ResourceStorePort / RunArtifactStore
 
-`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。manifest settings path と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
+`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。manifest または class metadata の settings source と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
 標準配置、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
 
