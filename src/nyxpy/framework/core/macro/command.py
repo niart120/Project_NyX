@@ -137,12 +137,12 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def type(self, key: str) -> None:
+    def type(self, key: KeyCode | SpecialKeyCode) -> None:
         """
         指定されたキーを個別のキーボード入力として送信します。
         これは個々のキーの押下・解放操作を表します。
 
-        :param key: 送信するキー文字
+        :param key: 送信する通常キーまたは特殊キーのキーコード
         """
         pass
 
@@ -257,7 +257,7 @@ class DefaultCommand(Command):
         self.ct.request_stop()
         raise MacroStopException("Macro execution interrupted.")
 
-    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "INFO") -> None:
+    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         caller_class = get_caller_class_name()
         log_manager.log(level, message, component=caller_class)
