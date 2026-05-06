@@ -1,4 +1,5 @@
 import importlib
+import sys
 from pathlib import Path
 
 
@@ -15,3 +16,9 @@ def test_gui_cli_entrypoints_do_not_import_macro_executor() -> None:
 
     for source_path in entrypoint_sources:
         assert "MacroExecutor" not in source_path.read_text(encoding="utf-8")
+
+    sys.modules.pop("nyxpy.framework.core.macro.executor", None)
+    importlib.import_module("nyxpy.cli.run_cli")
+    importlib.import_module("nyxpy.gui.main_window")
+
+    assert "nyxpy.framework.core.macro.executor" not in sys.modules

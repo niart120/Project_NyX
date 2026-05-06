@@ -461,16 +461,16 @@ rg "^## (1\. 概要|2\. 対象ファイル|3\. 設計方針|4\. 実装仕様|5\.
 
 ### 6.2 実装チェックリスト
 
-- [ ] フェーズ 1 の互換テストを実装
-- [ ] フェーズ 2 の Registry/Factory を実装
-- [ ] フェーズ 3 の Runner/RunResult/Error/Cancellation を実装
-- [ ] フェーズ 4 の Port Protocol / fake adapter 最小定義を実装
-- [ ] フェーズ 5 の Runtime/DefaultCommand を実装
-- [ ] フェーズ 6 の Settings/Resource 分離を実装
-- [ ] フェーズ 6.1 の Resource File I/O 再設計を実装
-- [ ] フェーズ 7 の Logging Framework 再設計を実装し、旧 `LogManager` / `log_manager.log()` 呼び出し元と event catalog 更新ゲートを完了
-- [ ] フェーズ 8 の Ports/Adapters を実装
-- [ ] フェーズ 9 の CLI adapter を実装
-- [ ] フェーズ 10 の GUI adapter を実装
-- [ ] フェーズ 11 の `MacroExecutor` 削除を実施
+- [x] フェーズ 1 の互換テストを実装
+- [x] フェーズ 2 の Registry/Factory を実装
+- [x] フェーズ 3 の Runner/RunResult/Error/Cancellation を実装
+- [x] フェーズ 4 の Port Protocol / fake adapter 最小定義を実装
+- [x] フェーズ 5 の Runtime/DefaultCommand を実装
+- [x] フェーズ 6 の Settings/Resource 分離を実装
+- [x] フェーズ 6.1 の Resource File I/O 再設計を実装
+- [x] フェーズ 7 の Logging Framework 再設計を実装し、旧 `LogManager` / `log_manager.log()` 呼び出し元と event catalog 更新ゲートを完了
+- [x] フェーズ 8 の Ports/Adapters を実装
+- [x] フェーズ 9 の CLI adapter を実装
+- [x] フェーズ 10 の GUI adapter を実装
+- [x] フェーズ 11 の `MacroExecutor` 削除を実施
 - [ ] フェーズ 12 のドキュメント・移行ガイドを整理

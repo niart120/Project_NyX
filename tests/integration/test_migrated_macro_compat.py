@@ -7,57 +7,22 @@ from pathlib import Path
 import pytest
 
 from nyxpy.framework.core.macro.base import MacroBase
-from nyxpy.framework.core.macro.command import Command
-from nyxpy.framework.core.macro.executor import MacroExecutor
+from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder
+from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
+from tests.support.fake_execution_context import make_fake_execution_context
+from tests.support.fakes import (
+    FakeControllerOutputPort,
+    FakeFrameSourcePort,
+    FakeLoggerPort,
+    FakeNotificationPort,
+)
 
 
 def _clear_macro_modules() -> None:
     for module_name in list(sys.modules):
         if module_name == "macros" or module_name.startswith("macros."):
             del sys.modules[module_name]
-
-
-class RecordingCommand(Command):
-    def __init__(self) -> None:
-        self.logs: list[str] = []
-
-    def press(self, *keys, dur=0.1, wait=0.1) -> None:
-        self.logs.append(f"press:{keys}:{dur}:{wait}")
-
-    def hold(self, *keys) -> None:
-        self.logs.append(f"hold:{keys}")
-
-    def release(self, *keys) -> None:
-        self.logs.append(f"release:{keys}")
-
-    def wait(self, wait: float) -> None:
-        self.logs.append(f"wait:{wait}")
-
-    def stop(self) -> None:
-        self.logs.append("stop")
-
-    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
-        self.logs.append(sep.join(map(str, values)) + end.rstrip("\n"))
-
-    def capture(self, crop_region=None, grayscale: bool = False):
-        self.logs.append(f"capture:{crop_region}:{grayscale}")
-        return None
-
-    def save_img(self, filename: str | Path, image) -> None:
-        self.logs.append(f"save_img:{filename}:{image}")
-
-    def load_img(self, filename: str | Path, grayscale: bool = False):
-        self.logs.append(f"load_img:{filename}:{grayscale}")
-        return None
-
-    def keyboard(self, text: str) -> None:
-        self.logs.append(f"keyboard:{text}")
-
-    def type(self, key) -> None:
-        self.logs.append(f"type:{key}")
-
-    def notify(self, text: str, img=None) -> None:
-        self.logs.append(f"notify:{text}:{img}")
 
 
 def _write_macro_package(macros_dir: Path, package_name: str, class_name: str) -> None:
@@ -95,10 +60,29 @@ def _write_macro_package(macros_dir: Path, package_name: str, class_name: str) -
 def _prepare_temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     macros_dir = tmp_path / "macros"
     macros_dir.mkdir()
-    monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(tmp_path)
     _clear_macro_modules()
     return macros_dir
+
+
+def _reloaded_registry(project_root: Path) -> MacroRegistry:
+    registry = MacroRegistry(project_root=project_root)
+    registry.reload()
+    return registry
+
+
+def _fake_builder(project_root: Path, registry: MacroRegistry) -> MacroRuntimeBuilder:
+    base_context = make_fake_execution_context(project_root)
+    return MacroRuntimeBuilder(
+        project_root=project_root,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, _definition: base_context.resources,
+        artifact_store_factory=lambda _request, _definition, _run_id: base_context.artifacts,
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+    )
 
 
 def test_convention_package_and_single_file_macros_load_without_manifest(
@@ -127,12 +111,12 @@ def test_convention_package_and_single_file_macros_load_without_manifest(
         encoding="utf-8",
     )
 
-    executor = MacroExecutor()
+    registry = _reloaded_registry(tmp_path)
 
-    assert "ConventionPackageMacro" in executor.macros
-    assert "ConventionSingleFileMacro" in executor.macros
-    assert isinstance(executor.macros["ConventionPackageMacro"], MacroBase)
-    assert isinstance(executor.macros["ConventionSingleFileMacro"], MacroBase)
+    assert registry.resolve("ConventionPackageMacro").id == "convention_package"
+    assert registry.resolve("ConventionSingleFileMacro").id == "convention_single_file"
+    assert isinstance(registry.create("ConventionPackageMacro"), MacroBase)
+    assert isinstance(registry.create("ConventionSingleFileMacro"), MacroBase)
 
 
 def test_optional_manifest_file_does_not_break_package_macro_load(
@@ -153,17 +137,24 @@ def test_optional_manifest_file_does_not_break_package_macro_load(
         encoding="utf-8",
     )
 
-    executor = MacroExecutor()
+    registry = _reloaded_registry(tmp_path)
 
-    assert "ManifestPackageMacro" in executor.macros
-    assert isinstance(executor.macros["ManifestPackageMacro"], MacroBase)
+    definition = registry.resolve("manifest_package")
+    assert definition.class_name == "ManifestPackageMacro"
+    assert isinstance(registry.create("manifest_package"), MacroBase)
 
 
 def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     macros_dir = _prepare_temp_project(tmp_path, monkeypatch)
-    (macros_dir / "settings_probe.py").write_text(
+    package_dir = macros_dir / "settings_probe"
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text(
+        "from .macro import SettingsProbeMacro\n__all__ = ['SettingsProbeMacro']\n",
+        encoding="utf-8",
+    )
+    (package_dir / "macro.py").write_text(
         textwrap.dedent(
             """
             from nyxpy.framework.core.macro.base import MacroBase
@@ -171,7 +162,7 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
 
 
             class SettingsProbeMacro(MacroBase):
-                settings_path = "settings_probe.toml"
+                settings_path = "settings.toml"
 
                 def initialize(self, cmd: Command, args: dict) -> None:
                     self.args = dict(args)
@@ -185,16 +176,18 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
         ),
         encoding="utf-8",
     )
-    (macros_dir / "settings_probe.toml").write_text(
+    (package_dir / "settings.toml").write_text(
         'value = "file"\nkeep = "file"\n',
         encoding="utf-8",
     )
+    registry = _reloaded_registry(tmp_path)
+    builder = _fake_builder(tmp_path, registry)
 
-    executor = MacroExecutor()
-    executor.set_active_macro("SettingsProbeMacro")
-    executor.execute(RecordingCommand(), {"value": "exec", "other": 3})
+    context = builder.build(
+        RuntimeBuildRequest(macro_id="settings_probe", exec_args={"value": "exec", "other": 3})
+    )
 
-    assert executor.macro.args == {"value": "exec", "keep": "file", "other": 3}
+    assert context.exec_args == {"value": "exec", "keep": "file", "other": 3}
 
 
 @pytest.mark.parametrize(

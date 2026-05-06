@@ -32,6 +32,7 @@ from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.gui.events import EventBus, EventType
+from nyxpy.gui.macro_catalog import MacroCatalog
 from nyxpy.gui.panes.control_pane import ControlPane
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
@@ -405,17 +406,3 @@ class MainWindow(QMainWindow):
             elif ret == QMessageBox.Close:
                 # 閉じる場合は何もしない
                 pass
-
-
-class MacroCatalog:
-    def __init__(self, registry: MacroRegistry) -> None:
-        self.registry = registry
-        self.macros = {}
-        self.reload_macros()
-
-    def reload_macros(self) -> None:
-        self.registry.reload()
-        self.macros = {
-            definition.class_name: definition
-            for definition in self.registry.list(include_failed=False)
-        }

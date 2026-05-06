@@ -22,7 +22,7 @@ class MacroBrowserPane(QWidget):
 
     selection_changed = Signal(bool)
 
-    def __init__(self, executor, parent=None):
+    def __init__(self, catalog, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -51,8 +51,8 @@ class MacroBrowserPane(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         layout.addWidget(self.table)
 
-        self.executor = executor
-        self.macros = self.executor.macros
+        self.catalog = catalog
+        self.macros = self.catalog.macros
         self.update_macro_table()
 
         self.search_box.textChanged.connect(self.apply_macro_filter)
@@ -64,11 +64,8 @@ class MacroBrowserPane(QWidget):
 
     def on_reload_button_clicked(self):
         # macrosを再取得し、テーブルを更新
-        if hasattr(self.executor, "reload_macros"):
-            self.executor.reload_macros()
-            self.macros = self.executor.macros
-        else:
-            self.macros = self.executor.macros
+        self.catalog.reload_macros()
+        self.macros = self.catalog.macros
         self.update_macro_table()
 
     def update_macro_table(self):

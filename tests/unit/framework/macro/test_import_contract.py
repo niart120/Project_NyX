@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import sys
 
 import pytest
 
@@ -123,10 +124,7 @@ def test_macro_stop_exception_constructor_and_catch_are_stable() -> None:
         assert str(exc) == "stop requested"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="MacroExecutor is removed in phase 11 after GUI/CLI/runtime migration.",
-)
-def test_macro_executor_module_is_removed_from_final_contract() -> None:
+def test_macro_executor_removed() -> None:
+    sys.modules.pop("nyxpy.framework.core.macro.executor", None)
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("nyxpy.framework.core.macro.executor")
