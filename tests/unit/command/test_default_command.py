@@ -4,6 +4,8 @@ import pytest
 
 from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode, SpecialKeyCode
 from nyxpy.framework.core.macro.command import DefaultCommand
+from nyxpy.framework.core.macro.exceptions import MacroCancelled
+from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 
 # Mock for SerialCommInterface
@@ -86,18 +88,6 @@ class MockProtocolKeyboardNotSupported(MockProtocol):
         )
 
 
-# Mock for CancellationToken
-class MockCancellationToken:
-    def __init__(self):
-        self.stopped = False
-
-    def request_stop(self):
-        self.stopped = True
-
-    def stop_requested(self):
-        return self.stopped
-
-
 @pytest.fixture
 def dummy_command(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda x: None)
@@ -105,7 +95,7 @@ def dummy_command(monkeypatch):
     capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockProtocol()
-    ct = MockCancellationToken()
+    ct = CancellationToken()
     cmd = DefaultCommand(
         serial_device=serial_device,
         capture_device=capture_device,
@@ -124,7 +114,7 @@ def dummy_command_keyboard_not_supported(monkeypatch):
     capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockProtocolKeyboardNotSupported()
-    ct = MockCancellationToken()
+    ct = CancellationToken()
     cmd = DefaultCommand(
         serial_device=serial_device,
         capture_device=capture_device,
@@ -143,7 +133,7 @@ def dummy_command_touch(monkeypatch):
     capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockTouchProtocol()
-    ct = MockCancellationToken()
+    ct = CancellationToken()
     cmd = DefaultCommand(
         serial_device=serial_device,
         capture_device=capture_device,
@@ -224,16 +214,25 @@ def test_touch_not_supported(dummy_command):
 def test_wait(dummy_command):
     cmd, *_ = dummy_command
     start = time.time()
-    cmd.wait(0.5)
+    cmd.wait(0)
     end = time.time()
-    assert end - start < 0.1  # monkeypatchで即時
+    assert end - start < 0.1
 
 
 def test_stop(dummy_command):
     cmd, _, _, _, _, ct = dummy_command
-    with pytest.raises(Exception):
-        cmd.stop()
-    assert ct.stopped
+    cmd.stop()
+    assert ct.stop_requested()
+    assert ct.reason() == "stop requested"
+    assert ct.source() == "macro"
+
+
+def test_wait_raises_macro_cancelled_after_stop(dummy_command):
+    cmd, _, _, _, _, ct = dummy_command
+    ct.request_cancel(reason="test cancel", source="test")
+
+    with pytest.raises(MacroCancelled):
+        cmd.wait(1.0)
 
 
 def test_keyboard_text_mode(dummy_command):
@@ -430,7 +429,7 @@ def test_notify_calls_notification_handler(monkeypatch):
     capture_device = MockCaptureDevice()
     resource_io = MockResourceIO()
     protocol = MockProtocol()
-    ct = MockCancellationToken()
+    ct = CancellationToken()
     mock_notifier = MockNotificationHandler()
     cmd = DefaultCommand(
         serial_device=serial_device,
