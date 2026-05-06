@@ -445,6 +445,7 @@ flowchart LR
 | ドキュメント | `test_architecture_diagrams_has_required_sections` | 本仕様に必須 6 セクションが存在することを確認する。 |
 | ドキュメント | `test_architecture_diagrams_has_mermaid_blocks` | Mermaid コードブロックが 4 つ以上存在することを確認する。 |
 | ドキュメント | `test_architecture_diagrams_keep_import_contract` | `MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、settings lookup が互換境界として記載されていることを確認する。 |
+| ドキュメント | `test_architecture_diagrams_match_canonical_specs` | 各図の参照先仕様と主要ノード名が同期していることを確認する。 |
 | ドキュメント | `git_diff_check` | `git diff --check` で Markdown の空白エラーがないことを確認する。 |
 | ドキュメント | `placeholder_scan` | 対象 2 ファイルに未確定プレースホルダが残っていないことを確認する。 |
 
@@ -458,3 +459,4 @@ flowchart LR
 - [x] GUI/CLI と可観測性の境界図を Mermaid で作成
 - [x] 既存マクロの import contract を破壊不可境界として表示
 - [x] Overview から参照できる構成にする
+- [x] Mermaid 構文と正本仕様との同期確認項目をテスト方針に追加

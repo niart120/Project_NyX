@@ -119,6 +119,8 @@
 
 本書は仕様の追加定義ではなく、既存仕様を壊さずに実装する順序と検証ゲートを定義する。各フェーズは「互換テストを追加し、最小の実装単位を導入し、GUI/CLI/テストを新入口に寄せ、最後に旧実装を削除する」流れで進める。
 
+実装前提とフェーズ 1 の成果物を分ける。実装前提は仕様確定、ベースライン確認、実機不要テストと実機テストの分離、既存マクロを編集しない制約である。フェーズ 1 の成果物は、import / signature / settings / 代表マクロロード / `MacroExecutor` 削除確認のテスト追加であり、フレームワーク本体の挙動は変更しない。
+
 ### 3.2 依存順序
 
 | 順序 | フェーズ | 依存 |
@@ -189,7 +191,7 @@
 | 目的 | 内部再設計前に、既存ユーザーマクロが依存する公開面をテストで固定する |
 | 対象ファイル | `tests\unit\framework\macro\test_legacy_imports.py`, `tests\integration\test_existing_macros_compat.py`, 既存 executor / GUI reload テスト |
 | 完了条件 | import gate、signature gate、settings gate、existing macro gate が自動テストで判定できる |
-| テスト | `uv run pytest tests\unit\framework\macro\test_legacy_imports.py`, `uv run pytest tests\integration\test_existing_macros_compat.py`, `uv run pytest tests\unit\executor\test_executor.py` |
+| テスト | `uv run pytest tests\unit\framework\macro\test_legacy_imports.py`, `uv run pytest tests\integration\test_existing_macros_compat.py`, `uv run pytest tests\integration\test_macro_runtime_entrypoints.py` |
 | リスク | 既存テスト配置と現行 import 形がずれ、実装前から失敗する可能性がある |
 | ロールバック方針 | 本フェーズは実装を変えない。現行仕様と異なるテストだけを修正し、互換契約の弱体化はしない |
 
@@ -209,11 +211,11 @@
 | 項目 | 内容 |
 |------|------|
 | 目的 | マクロ発見、ID、別名、ロード診断、settings 解決、実行ごとのインスタンス生成を `MacroExecutor` から分離する |
-| 対象ファイル | `src\nyxpy\framework\core\macro\registry.py`, `legacy_adapter.py`, `settings_resolver.py`, `executor.py`, `utils\helper.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\runtime\test_macro_factory.py` |
+| 対象ファイル | `src\nyxpy\framework\core\macro\registry.py`, `legacy_adapter.py`, `settings_resolver.py`, `utils\helper.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\runtime\test_macro_factory.py` |
 | 完了条件 | legacy package、legacy single file、manifest opt-in を `MacroDefinition` として登録でき、`MacroFactory.create()` が毎回新しい `MacroBase` インスタンスを返す |
 | テスト | `test_registry_loads_legacy_package_macro`, `test_registry_loads_legacy_single_file_macro`, `test_registry_loads_manifest_macro`, `test_class_name_collision_requires_qualified_id`, `test_load_failure_is_reported_without_stopping_reload`, `test_execute_creates_new_instance_each_time` |
 | リスク | `cwd` / `sys.path` 依存、相対 import、クラス名衝突、ロード失敗時の継続処理が既存挙動とずれる |
-| ロールバック方針 | `MacroExecutor` の公開 API は旧実装に戻し、追加した Registry は未使用状態で残せる形にする。互換テストは残す |
+| ロールバック方針 | Registry 呼び出し側だけを旧探索経路へ戻す。`MacroExecutor` の公開 API 互換 shim は追加せず、互換テストと削除確認テストは残す |
 
 この段階では GUI/CLI が参照する一覧取得と実行対象解決を `MacroRegistry` から行える状態にする。`MacroExecutor.reload_macros()` や `macros` facade は移行対象に含めない。
 
@@ -226,7 +228,7 @@
 | 完了条件 | 成功、失敗、中断で `RunResult` が返り、既存 `MacroStopException` と `finalize(cmd)` 互換が維持される |
 | テスト | `test_runner_calls_lifecycle_in_order`, `test_runner_calls_finalize_on_error`, `test_runner_converts_macro_stop_to_cancelled`, `test_macro_cancelled_is_macro_stop_exception_compatible`, `test_command_wait_returns_immediately_on_cancel`, `test_finalize_cmd_only_remains_supported`, `test_finalize_receives_outcome_when_supported` |
 | リスク | `finalize` 失敗時の優先順位、既存 `except MacroStopException`、GUI cancel の例外送出経路が崩れる |
-| ロールバック方針 | `MacroExecutor.execute()` の旧 lifecycle 実装を維持したまま Runner を未接続に戻す。例外階層は互換 adapter だけ残す |
+| ロールバック方針 | Runner 呼び出し側を旧 lifecycle 実装へ戻す。`MacroExecutor.execute()` の互換契約は復活させず、例外階層は互換 adapter だけ残す |
 
 `MacroBase.finalize(cmd)` を唯一の抽象契約として維持する。`finalize(cmd, outcome)` は opt-in 拡張に限定し、既存マクロへ実装変更を求めない。
 
@@ -235,7 +237,7 @@
 | 項目 | 内容 |
 |------|------|
 | 目的 | `MacroRuntime` を同期・非同期実行の組み立て点にし、`CommandFacade` で既存 `Command` API を維持する |
-| 対象ファイル | `src\nyxpy\framework\core\runtime\runtime.py`, `context.py`, `handle.py`, `builder.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\macro\executor.py`, `tests\unit\framework\runtime\test_execution_context.py`, `test_command_facade.py`, `tests\integration\test_macro_runtime_entrypoints.py` |
+| 対象ファイル | `src\nyxpy\framework\core\runtime\runtime.py`, `context.py`, `handle.py`, `builder.py`, `src\nyxpy\framework\core\macro\command.py`, `tests\unit\framework\runtime\test_execution_context.py`, `test_command_facade.py`, `tests\integration\test_macro_runtime_entrypoints.py` |
 | 完了条件 | `MacroRuntime.run(context)` と `start(context)` が `MacroRunner` に委譲し、GUI/CLI/テストは `MacroExecutor` を経由しない |
 | テスト | `test_execution_context_shallow_copies_args_and_metadata`, `test_run_handle_wait_done_result_contract`, `test_run_handle_cancel_requests_token`, `test_gui_cli_do_not_import_macro_executor`, `test_command_facade_press_delegates_to_controller_port`, `test_command_facade_capture_resizes_crops_and_grayscales` |
 | リスク | `ExecutionContext` が `Command` を保持する、Runtime と Runner が lifecycle を二重実装する、Port close 失敗が本体失敗を上書きする |
@@ -425,5 +427,5 @@ rg "^## (1\. 概要|2\. 対象ファイル|3\. 設計方針|4\. 実装仕様|5\.
 - [ ] フェーズ 7 の Ports/Adapters を実装
 - [ ] フェーズ 8 の CLI adapter を実装
 - [ ] フェーズ 9 の GUI adapter を実装
-- [ ] フェーズ 10 の `MacroExecutor` 縮退判断を実施
+- [ ] フェーズ 10 の `MacroExecutor` 削除を実施
 - [ ] フェーズ 11 のドキュメント・移行ガイドを整理
