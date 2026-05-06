@@ -483,9 +483,9 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | ユニット | `test_command_type_accepts_keycode_special_keycode_only` | `Command.type(key: KeyCode \| SpecialKeyCode)` の呼び出し互換と `str` 非対応を検証する |
 | ユニット | `test_explicit_settings_path_resolution` | manifest / class metadata settings が project-root 相対と macro-root 相対を区別して解決される |
 | ユニット | `test_macro_executor_removed` | `MacroExecutor` を新 API、互換契約、移行 adapter として公開しない |
-| ユニット | `test_constants_import_contract` | `from nyxpy.framework.core.constants import Button, Hat, LStick, RStick, KeyType` が成功する |
+| ユニット | `test_macro_public_import_paths_are_stable` | `from nyxpy.framework.core.constants import Button, Hat, LStick, RStick, KeyType` が成功する |
 | 結合 | `test_migrated_repository_macros_load_with_optional_manifest` | 移行後の代表マクロが manifest あり / なしの両方でロードされる |
-| 結合 | `test_gui_cli_do_not_import_macro_executor` | GUI/CLI が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使う |
+| 結合 | `test_gui_cli_entrypoints_do_not_import_macro_executor` | GUI/CLI が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使う |
 | GUI | `test_macro_reload_add_and_remove_real_env` | 既存 GUI リロードテストの追加・削除挙動を維持する |
 | GUI | `test_macro_reload_shows_load_diagnostics` | 壊れたマクロを追加しても一覧は表示され、診断が確認できる |
 | 性能 | `test_registry_reload_100_macros_perf` | 100 件の dummy macro reload が 1 秒未満を目標に完了する |

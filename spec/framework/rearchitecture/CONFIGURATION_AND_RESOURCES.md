@@ -305,8 +305,8 @@ Resource File I/O の `ResourcePathError`、`ResourceReadError`、`ResourceWrite
 | ユニット | `test_macro_settings_resolver_rejects_broken_toml` | TOML parse 失敗時に既定値 fallback せず `ConfigurationError` にする |
 | ユニット | `test_macro_settings_resolver_rejects_path_escape` | `..` と絶対パスを `ConfigurationError` にする |
 | ユニット | `test_macro_settings_resolver_is_separate_from_resource_store` | settings lookup が Resource Store を参照しない |
-| 結合 | `test_runtime_builder_uses_secrets_snapshot_for_notifications` | 通知 secret が secrets snapshot からのみ adapter へ渡る |
-| 結合 | `test_migrated_macro_settings_load_from_explicit_source` | 移行後マクロの settings が manifest または class metadata settings path から読み込まれる |
+| 結合 | `test_cli_notification_settings_source_is_secrets_store` | 通知 secret が secrets snapshot からのみ adapter へ渡る |
+| 結合 | `test_file_settings_and_exec_args_are_merged_with_exec_args_precedence` | settings と実行引数が Runtime builder で merge され、実行引数が優先される |
 | 性能 | `test_settings_schema_validation_perf` | 100 キー検証が 50 ms 未満で完了する |
 
 Resource File I/O の path guard、画像読み書き、atomic write、`cmd.save_img()` / `load_img()` テストは `RESOURCE_FILE_IO.md` のテスト方針を正とする。

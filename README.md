@@ -13,10 +13,10 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 ### 主な機能
 - PySide6を使用したGUIインターフェース
 - コマンドライン(CLI)インターフェース  
-- マクロの実行・管理
+- Runtime / RunHandle によるマクロの実行・中断・結果管理
 - リアルタイム画面プレビュー
 - スナップショット機能
-- 統合ログ管理システム (LogManager)
+- 構造化ログとGUI表示イベントを分離するログ基盤
 - キャプチャデバイス・シリアルデバイスの設定
 - 外部通知システム (Discord, Bluesky)
 - 設定の永続化 (.nyxpy/)
@@ -38,28 +38,28 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ### 方法1: pip (一般ユーザー向け)
 
-// TBA
+配布パッケージは未公開です。現時点ではリポジトリをクローンし、`uv` で起動してください。
 
 ### 方法2: uv (フレームワーク開発者向け)
 
 1. uvをインストール:
-   ```
+   ```powershell
    pip install uv
    ```
 
 2. リポジトリをクローン:
-   ```
+   ```powershell
    git clone https://github.com/niart120/Project_NyX.git
    cd Project_NyX
    ```
 
 3. 依存関係をインストール:
-   ```
+   ```powershell
    uv sync
    ```
 
 4. GUIアプリケーションを起動:
-   ```
+   ```powershell
    uv run nyx-gui
    ```
 
@@ -68,12 +68,12 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ### GUIアプリケーションの起動
 
-```
+```powershell
 uv run nyx-gui
 ```
 
 または開発環境でない場合:
-```
+```powershell
 nyx-gui
 ```
 
@@ -100,7 +100,7 @@ nyx-gui
 
 コマンドラインからマクロを直接実行することも可能です:
 
-```bash
+```powershell
 uv run nyx-cli sample_macro --serial COM3 --capture 0
 ```
 
@@ -134,7 +134,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ```python
 from nyxpy.framework.core.macro.base import MacroBase
-from nyxpy.framework.core.constants.controller import Button
+from nyxpy.framework.core.constants import Button
 
 class SampleMacro(MacroBase):
     description = "マクロの説明"
@@ -156,6 +156,15 @@ class SampleMacro(MacroBase):
     def finalize(self, cmd):
         # 後処理
         pass
+```
+
+軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macros\<macro_id>\macro.toml` を追加します。
+
+```toml
+[macro]
+id = "sample_macro"
+entrypoint = "macros.sample_macro.macro:SampleMacro"
+settings = "project:resources/sample_macro/settings.toml"
 ```
 
 ### 主なコマンド
@@ -182,7 +191,9 @@ class SampleMacro(MacroBase):
 - `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
 - カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
 
-詳細は `spec/framework/archive/macro_design.md` を参照ください。
+`cmd.load_img()` は `resources\<macro_id>\assets` または `macros\<macro_id>\assets` からの相対パスを読み込みます。`cmd.save_img()` と `cmd.artifacts.open_output()` は `runs\<run_id>\outputs` へ実行ごとの成果物を保存します。旧 `static\<macro_name>` 配置は標準探索されません。
+
+詳細は `spec\framework\rearchitecture\MACRO_MIGRATION_GUIDE.md` と `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md` を参照してください。
 
 ## 5. 設定ファイル
 

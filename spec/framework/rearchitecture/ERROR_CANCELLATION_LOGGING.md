@@ -529,7 +529,7 @@ class MacroArgsSchema:
 | ユニット | `test_runtime_returns_cancelled_for_legacy_macro_stop_exception` | 既存 `MacroStopException` 送出を `status="cancelled"` に正規化する |
 | ユニット | `test_finalize_receives_outcome_when_supported` | `finalize_with_outcome(cmd, outcome)` を実装したマクロへ `RunResult` を渡す |
 | ユニット | `test_finalize_cmd_only_remains_supported` | 既存 `finalize(cmd)` 形式が変更なしで呼ばれる |
-| ユニット | `test_parse_define_args_accepts_list_and_string` | CLI list 入力と GUI string 入力の両方を辞書へ変換する |
+| ユニット | `TestParseDefineArgs::test_multiple_defines` | CLI の複数 `--define` 入力を辞書へ変換する |
 | ユニット | `test_parse_define_args_raises_configuration_error` | 不正 TOML と不正 key を `ConfigurationError` にする |
 | ユニット | `test_settings_store_schema_validation` | settings snapshot の型不一致と既定値を検証する |
 | ユニット | `test_secrets_store_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |

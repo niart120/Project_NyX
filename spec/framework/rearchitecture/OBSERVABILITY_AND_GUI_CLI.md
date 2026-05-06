@@ -102,7 +102,7 @@ GUI は application lifetime で `AppServices` 相当の集約オブジェクト
 
 ### 後方互換性
 
-既存 CLI オプションと GUI 操作は段階移行で維持する。CLI の出力文言は短いユーザー表示へ変更してよいが、成功時 0、失敗時 非 0、中断時 130 の終了コードを明示する。GUI の `WorkerThread` は Runtime adapter へ縮小または置換してよいが、マクロ本体のスレッド実行と GUI スレッド更新の分離は維持する。
+既存 CLI オプションと GUI 操作は段階移行で維持する。CLI の出力文言は短いユーザー表示へ変更してよいが、成功時 0、失敗時 非 0、中断時 130 の終了コードを明示する。GUI は `RunHandle` を `QTimer` で監視し、マクロ本体の Runtime thread と GUI スレッド更新を分離する。
 
 `Command.notify()` は既存呼び出しを維持する。通知先の有効化、webhook URL、Bluesky credentials は secrets snapshot からのみ読み、CLI 引数や通常設定に secret 値を複製しない。
 
@@ -245,24 +245,24 @@ Runtime worker thread
 | ユニット | `test_runtime_builder_passes_logger_port` | Runtime builder が `LOGGING_FRAMEWORK.md` の `LoggerPort` を実行 context へ渡す |
 | ユニット | `test_cli_presenter_exit_codes` | 成功 0、失敗 2、中断 130 の終了コードを返す |
 | ユニット | `test_cli_does_not_accept_notification_secret_args` | CLI 引数で通知 secret を受け取らない |
-| 結合 | `test_cli_uses_macro_runtime_entry` | CLI が `DefaultCommand` 直接構築ではなく Runtime builder を使う |
+| 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `DefaultCommand` 直接構築ではなく Runtime builder を使う |
 | 結合 | `test_cli_notification_settings_source_is_secrets_store` | CLI 通知設定が `SecretsStore` 由来の secrets snapshot に統一される |
-| GUI | `test_main_window_uses_run_handle` | GUI 実行開始で `MacroRuntime.start()` の `RunHandle` を保持する |
+| GUI | `test_main_window_uses_run_handle` | GUI 実行開始で `MacroRuntimeBuilder.start()` の `RunHandle` を保持する |
 | GUI | `test_main_window_cancel_calls_handle_cancel` | GUI cancel が `Command.stop()` ではなく `RunHandle.cancel()` を呼ぶ |
+| GUI | `test_main_window_poll_updates_status_from_run_result` | GUI が `RunResult` を status 表示と実行状態へ反映する |
 | GUI | `test_gui_log_pane_displays_user_event_from_sink` | `LogPane` が `UserEvent` を表示する |
-| GUI | `test_gui_log_sink_emits_qt_signal` | `GuiLogSink` が `UserEvent` を Qt Signal へ変換し、LogPane slot が GUI thread で受け取る |
+| GUI | `test_gui_log_sink_removed_on_close` | `LogPane` close 時に GUI sink が dispatcher から解除される |
 | ハードウェア | `test_realdevice_cli_runtime_logging` | `@pytest.mark.realdevice`。実機 CLI 実行で run_id 付きログが残る |
-| 性能 | `test_gui_user_event_dispatch_perf` | GUI `UserEvent` 受信から Qt Signal emit まで 10 ms 未満 |
-| 性能 | `test_cancel_request_latency_perf` | GUI cancel から token 発火までの `cancel_request_latency` が 100 ms 未満 |
+| 性能 | `test_log_handler_dispatch_thread_safety` | sink dispatch が並行配信で破綻しない |
 
 ## 6. 実装チェックリスト
 
-- [ ] GUI/CLI の `DefaultCommand` 直接構築箇所を Runtime builder へ寄せる
-- [ ] `GuiLogSink` を GUI 層 adapter として実装し、core 層の Qt 依存を禁止
-- [ ] CLI 通知設定ソースを `SecretsStore` 由来の secrets snapshot に統一
-- [ ] `LOGGING_FRAMEWORK.md` の `LoggerPort` / `UserEvent` を GUI/CLI 入口へ接続
-- [ ] ユーザー表示から traceback、secret、内部詳細を除外
-- [ ] CLI 終了コードを `RunResult` から決定
-- [ ] GUI cancel を `RunHandle.cancel()` へ移行
-- [ ] ユニットテスト作成・パス
-- [ ] GUI/CLI integration テスト作成・パス
+- [x] GUI/CLI の `DefaultCommand` 直接構築箇所を Runtime builder へ寄せる
+- [x] `GuiLogSink` を GUI 層 adapter として実装し、core 層の Qt 依存を禁止
+- [x] CLI 通知設定ソースを `SecretsStore` 由来の secrets snapshot に統一
+- [x] `LOGGING_FRAMEWORK.md` の `LoggerPort` / `UserEvent` を GUI/CLI 入口へ接続
+- [x] ユーザー表示から traceback、secret、内部詳細を除外
+- [x] CLI 終了コードを `RunResult` から決定
+- [x] GUI cancel を `RunHandle.cancel()` へ移行
+- [x] ユニットテスト作成・パス
+- [x] GUI/CLI integration テスト作成・パス
