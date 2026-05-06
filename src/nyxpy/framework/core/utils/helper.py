@@ -1,7 +1,14 @@
 import inspect
+from dataclasses import dataclass
 from pathlib import Path
 
 import tomlkit
+
+
+@dataclass(frozen=True)
+class _SettingsDefinition:
+    settings_path: Path | str | None
+    macro_root: Path
 
 
 def get_caller_class_name():
@@ -20,31 +27,19 @@ def get_caller_class_name():
 
 def load_macro_settings(macro_cls) -> dict:
     """
-    指定されたマクロクラスに対応する設定ファイルを読み込み、辞書型のオブジェクトとして返却します。
-    設定ファイルは、<current_working_directory>/static/<macro_name>/settings.toml に存在することを想定します。
+    マクロクラスが明示した settings_path を読み込みます。
 
-    マクロの特定方法:
-    - パッケージマクロ (macros/<pkg>/macro.py): パッケージディレクトリ名を使用
-    - 単一ファイルマクロ (macros/sample.py): ファイル名（拡張子なし）を使用
+    旧 static/<macro_name>/settings.toml fallback は Runtime の settings 契約に含めない。
 
     :param macro_cls: マクロクラス（例: DummyTestMacro）
-    :return: マージされた設定辞書
+    :return: 設定辞書。settings_path が未指定なら空 dict
     """
     macro_file = Path(inspect.getfile(macro_cls))
+    settings_path = getattr(macro_cls, "settings_path", None)
+    definition = _SettingsDefinition(settings_path=settings_path, macro_root=macro_file.parent)
+    from nyxpy.framework.core.macro.settings_resolver import MacroSettingsResolver
 
-    # パッケージマクロ判定: 親ディレクトリに __init__.py があればパッケージ
-    if (macro_file.parent / "__init__.py").exists():
-        macro_name = macro_file.parent.name
-    else:
-        macro_name = macro_file.stem
-
-    settings_file = Path.cwd() / "static" / macro_name / "settings.toml"
-    file_params = {}
-    if settings_file.exists():
-        text = settings_file.read_text(encoding="utf-8")
-        file_params = tomlkit.loads(text)
-
-    return file_params
+    return MacroSettingsResolver(Path.cwd()).load(definition)
 
 
 def parse_define_args(defines: list[str]) -> dict:

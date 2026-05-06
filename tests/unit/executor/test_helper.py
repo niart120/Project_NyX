@@ -21,18 +21,15 @@ from nyxpy.framework.core.utils.helper import (
     validate_keyboard_text,
 )
 
-# ============================================================
-# load_macro_settings テスト
-# ============================================================
-
 
 # --- テスト用ダミーマクロ構造の構築ヘルパー ---
-
-
-def _write_single_file_macro(macros_dir: Path, name: str) -> Path:
+def _write_single_file_macro(macros_dir: Path, name: str, body: str = "") -> Path:
     """macros/<name>.py を作成し、ダミーマクロクラスを定義する。"""
+    body_block = textwrap.indent(textwrap.dedent(body).strip(), "    ")
+    body_section = f"{body_block}\n" if body_block else ""
     src = textwrap.dedent(f"""\
         class {name.title().replace("_", "")}Macro:
+        {body_section}
             pass
     """)
     path = macros_dir / f"{name}.py"
@@ -40,7 +37,7 @@ def _write_single_file_macro(macros_dir: Path, name: str) -> Path:
     return path
 
 
-def _write_package_macro(macros_dir: Path, pkg_name: str) -> Path:
+def _write_package_macro(macros_dir: Path, pkg_name: str, body: str = "") -> Path:
     """macros/<pkg_name>/ パッケージを作成し、macro.py にダミークラスを定義する。"""
     pkg_dir = macros_dir / pkg_name
     pkg_dir.mkdir(parents=True, exist_ok=True)
@@ -48,8 +45,11 @@ def _write_package_macro(macros_dir: Path, pkg_name: str) -> Path:
         f"from .macro import {pkg_name.title().replace('_', '')}Macro\n",
         encoding="utf-8",
     )
+    body_block = textwrap.indent(textwrap.dedent(body).strip(), "    ")
+    body_section = f"{body_block}\n" if body_block else ""
     src = textwrap.dedent(f"""\
         class {pkg_name.title().replace("_", "")}Macro:
+        {body_section}
             pass
     """)
     (pkg_dir / "macro.py").write_text(src, encoding="utf-8")
@@ -82,96 +82,42 @@ def _import_class_from_file(path: Path, class_name: str):
 
 
 class TestLoadMacroSettings:
-    """load_macro_settings のテスト"""
-
-    def test_single_file_macro(self, tmp_path, monkeypatch):
-        """単一ファイルマクロで settings.toml が正しく読み込まれる"""
+    def test_explicit_class_settings_path(self, tmp_path, monkeypatch):
         macros_dir = tmp_path / "macros"
         macros_dir.mkdir()
-        py_path = _write_single_file_macro(macros_dir, "my_sample")
-
-        static_dir = tmp_path / "static"
-        _write_settings_toml(static_dir, "my_sample", 'key1 = "hello"\nkey2 = 42\n')
+        py_path = _write_single_file_macro(
+            macros_dir, "my_sample", 'settings_path = "settings.toml"'
+        )
+        (macros_dir / "settings.toml").write_text('key1 = "hello"\nkey2 = 42\n')
 
         monkeypatch.chdir(tmp_path)
         cls = _import_class_from_file(py_path, "MySampleMacro")
 
-        result = load_macro_settings(cls)
-        assert result["key1"] == "hello"
-        assert result["key2"] == 42
+        assert load_macro_settings(cls) == {"key1": "hello", "key2": 42}
 
-    def test_package_macro(self, tmp_path, monkeypatch):
-        """パッケージマクロで settings.toml が正しく読み込まれる"""
+    def test_project_settings_path(self, tmp_path, monkeypatch):
         macros_dir = tmp_path / "macros"
         macros_dir.mkdir()
-        py_path = _write_package_macro(macros_dir, "my_pkg")
-
-        static_dir = tmp_path / "static"
-        _write_settings_toml(static_dir, "my_pkg", 'name = "test"\nvalue = 100\n')
+        py_path = _write_package_macro(
+            macros_dir, "my_pkg", 'settings_path = "project:project_settings.toml"'
+        )
+        (tmp_path / "project_settings.toml").write_text("value = 100\n")
 
         monkeypatch.chdir(tmp_path)
         cls = _import_class_from_file(py_path, "MyPkgMacro")
 
-        result = load_macro_settings(cls)
-        assert result["name"] == "test"
-        assert result["value"] == 100
+        assert load_macro_settings(cls) == {"value": 100}
 
-    def test_package_macro_does_not_use_file_stem(self, tmp_path, monkeypatch):
-        """パッケージマクロで stem (= 'macro') のパスを参照しないこと"""
+    def test_static_fallback_is_not_supported(self, tmp_path, monkeypatch):
         macros_dir = tmp_path / "macros"
         macros_dir.mkdir()
-        py_path = _write_package_macro(macros_dir, "my_pkg")
-
-        static_dir = tmp_path / "static"
-        # stem 名 'macro' のディレクトリに罠を仕掛ける
-        _write_settings_toml(static_dir, "macro", "wrong = true\n")
-        # 正しいパッケージ名には設定を置かない
+        py_path = _write_single_file_macro(macros_dir, "legacy")
+        _write_settings_toml(tmp_path / "static", "legacy", "wrong = true\n")
 
         monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "MyPkgMacro")
+        cls = _import_class_from_file(py_path, "LegacyMacro")
 
-        result = load_macro_settings(cls)
-        # "macro" の方を読んでいないこと
-        assert "wrong" not in result
-        assert result == {}
-
-    def test_missing_settings_returns_empty(self, tmp_path, monkeypatch):
-        """settings.toml が存在しない場合、空 dict が返る"""
-        macros_dir = tmp_path / "macros"
-        macros_dir.mkdir()
-        py_path = _write_single_file_macro(macros_dir, "no_settings")
-
-        monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "NoSettingsMacro")
-
-        result = load_macro_settings(cls)
-        assert result == {}
-
-    def test_toml_types_preserved(self, tmp_path, monkeypatch):
-        """TOML のデータ型（文字列, 整数, 浮動小数点, 配列, bool）が保持される"""
-        macros_dir = tmp_path / "macros"
-        macros_dir.mkdir()
-        py_path = _write_single_file_macro(macros_dir, "typed")
-
-        static_dir = tmp_path / "static"
-        toml_content = textwrap.dedent("""\
-            str_val = "hello"
-            int_val = 42
-            float_val = 3.14
-            bool_val = true
-            arr_val = [1, 2, 3]
-        """)
-        _write_settings_toml(static_dir, "typed", toml_content)
-
-        monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "TypedMacro")
-
-        result = load_macro_settings(cls)
-        assert result["str_val"] == "hello"
-        assert result["int_val"] == 42
-        assert result["float_val"] == pytest.approx(3.14)
-        assert result["bool_val"] is True
-        assert list(result["arr_val"]) == [1, 2, 3]
+        assert load_macro_settings(cls) == {}
 
 
 # ============================================================

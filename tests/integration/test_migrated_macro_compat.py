@@ -171,6 +171,8 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
 
 
             class SettingsProbeMacro(MacroBase):
+                settings_path = "settings_probe.toml"
+
                 def initialize(self, cmd: Command, args: dict) -> None:
                     self.args = dict(args)
 
@@ -183,9 +185,7 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
         ),
         encoding="utf-8",
     )
-    settings_dir = tmp_path / "static" / "settings_probe"
-    settings_dir.mkdir(parents=True)
-    (settings_dir / "settings.toml").write_text(
+    (macros_dir / "settings_probe.toml").write_text(
         'value = "file"\nkeep = "file"\n',
         encoding="utf-8",
     )

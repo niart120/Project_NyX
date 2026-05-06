@@ -86,6 +86,21 @@ def test_resource_store_raises_for_missing_asset(tmp_path: Path) -> None:
         FakeResourceStore(scope).resolve_asset_path("missing.png")
 
 
+def test_macro_settings_resolver_is_separate_from_resource_store(tmp_path: Path) -> None:
+    settings_dir = tmp_path / "resources" / "sample" / "assets"
+    settings_dir.mkdir(parents=True)
+    (settings_dir / "settings.toml").write_text("value = 'not an image'\n", encoding="utf-8")
+    scope = MacroResourceScope(
+        project_root=tmp_path,
+        macro_id="sample",
+        macro_root=None,
+        assets_roots=(settings_dir,),
+    )
+
+    with pytest.raises(ResourceNotFoundError):
+        FakeResourceStore(scope).resolve_asset_path("missing.png")
+
+
 def test_run_artifact_store_contract(tmp_path: Path) -> None:
     store = FakeRunArtifactStore(
         tmp_path / "runs" / "run-1" / "outputs", macro_id="sample", run_id="run-1"
