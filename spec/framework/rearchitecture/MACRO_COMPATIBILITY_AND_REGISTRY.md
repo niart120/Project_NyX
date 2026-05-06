@@ -270,8 +270,9 @@ class MacroDefinition:
     display_name: str
     class_name: str
     module_name: str
+    macro_root: Path
     source_path: Path
-    settings_path: Path | None
+    settings_path: Path | str | None
     description: str
     tags: tuple[str, ...]
     factory: MacroFactory
@@ -323,6 +324,8 @@ class EntryPointLoader:
 `macro.toml` は任意の入力ファイル形式であり、`MacroManifest` という Python クラスは定義しない。読み込み処理は TOML、class metadata、convention default を検証して `MacroDefinition` を生成する。
 
 `MacroRegistry` は発見、ID 解決、診断、`MacroDefinition` の snapshot 管理だけを担当する。`MacroDefinition` は `factory` を所有し、Runtime は `definition.factory.create()` を呼ぶ。Runtime に別の `MacroFactory` facade は持たせず、生成ポリシーを二重化しない。
+
+`MacroDefinition.macro_root` は settings と package assets の相対解決に使う基準ディレクトリである。manifest ありの場合は `manifest_path.parent`、package convention の場合は package directory、single-file convention の場合は file parent とする。`settings_path` は `Path` なら解決済み path、`str` なら `project:` prefix または portable relative path を含む未解決指定として扱う。未解決指定の実ファイル path 化は `MacroSettingsResolver` だけが行う。
 
 既存 `Command` の公開メソッド名は維持する。
 

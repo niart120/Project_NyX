@@ -292,6 +292,11 @@ class MacroRuntime:
 | `DeviceError` | `FrameworkError` | `device` | シリアル送信、キャプチャ取得、プロトコル変換、デバイス未接続の失敗 |
 | `ResourceError` | `FrameworkError` | `resource` | 画像読み書き、マクロリソース、設定ファイル、ログファイル、通知先 I/O の失敗 |
 | `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、settings/secrets snapshot の schema 検証失敗 |
+| `RuntimeConfigurationError` | `ConfigurationError` | `configuration` | Runtime builder に必要な設定不足、protocol / baudrate 不正 |
+| `RuntimeBusyError` | `ConfigurationError` | `configuration` | 同一 Runtime の二重実行、または実行開始 lock timeout |
+| `RuntimeLockTimeoutError` | `ConfigurationError` | `configuration` | `RunHandle` 状態 lock timeout |
+| `FrameNotReadyError` | `DeviceError` | `device` | 初回フレーム readiness timeout、または ready 前の frame 取得 |
+| `FrameReadError` | `DeviceError` | `device` | frame 読み込み失敗、空 frame、frame lock timeout |
 | `MacroRuntimeError` | `FrameworkError` | `macro` | マクロ実装由来の未分類例外を executor が正規化したもの |
 
 `MacroStopException` は削除しない。`MacroStopException()` と `MacroStopException("stop")` は破壊しない。constructor は `__init__(*args, **kwargs)` で旧呼び出しを受け、`args[0]` がある場合は message として扱う。`kind` 未指定時は `ErrorKind.CANCELLED`、`code` 未指定時は `NYX_MACRO_CANCELLED`、`component` 未指定時は `MacroStopException`、`recoverable` 未指定時は `False` を既定値にする。kwargs に同名キーが渡された場合は kwargs を優先する。新規コードは `MacroCancelled` を送出するが、`MacroCancelled` が `MacroStopException` を継承するため、既存の `except MacroStopException` は中断を捕捉できる。既存マクロが `MacroStopException` を直接送出した場合、`MacroRunner` は `MacroCancelled` 相当の `RunResult(status=RunStatus.CANCELLED)` に正規化する。
@@ -313,6 +318,8 @@ class MacroRuntime:
 | `details` | JSON 化できる詳細情報。パスやキー名はよいが secret 値は入れない |
 | `traceback` | DEBUG ログ用。GUI 表示には出さない |
 
+`MacroRunner` は失敗正規化時に `ErrorInfo.traceback` を保持してよい。`LoggerPort` / `LogBackend` は `logging.include_traceback` を参照して `TechnicalLog` への永続化有無を決める。`UserEvent` と GUI/CLI 表示には、設定値に関係なく traceback を含めない。
+
 #### Error code catalog
 
 error code の体系と発生元は本表を正とする。設定仕様、Runtime 仕様、GUI/CLI 仕様は本表の code を参照し、別名を定義しない。
@@ -327,6 +334,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `SettingsStore`, `SecretsStore`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
 | `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `SettingsStore`, `SecretsStore` | 設定値が schema に一致しない |
 | `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | 明示 settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
+| `NYX_RUNTIME_CONFIGURATION_INVALID` | `configuration` | `MacroRuntimeBuilder` | Runtime builder に必要な設定が不足、または protocol / baudrate が不正 |
 | `NYX_DEVICE_SERIAL_FAILED` | `device` | `ControllerOutputPort` | シリアル送信、接続、プロトコル変換に失敗した |
 | `NYX_DEVICE_CAPTURE_FAILED` | `device` | `FrameSourcePort` | フレーム取得、初期化、切断検出に失敗した |
 | `NYX_FRAME_NOT_READY` | `device` | `FrameSourcePort.await_ready` | timeout 内に有効フレームが取得できない |
@@ -337,7 +345,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_RESOURCE_PATH_INVALID` | `resource` | `ResourceStorePort`, `RunArtifactStore` | path guard で root 外参照または不正 path を検出した |
 | `NYX_RESOURCE_READ_FAILED` | `resource` | `ResourceStorePort` | assets 読み込みに失敗した |
 | `NYX_RESOURCE_WRITE_FAILED` | `resource` | `RunArtifactStore` | outputs 書き込みまたは atomic replace に失敗した |
-| `NYX_NOTIFICATION_FAILED` | `resource` | `NotificationPort` | Discord / Bluesky 等の通知送信に失敗した |
+| `NYX_NOTIFICATION_FAILED` | `resource` | `NotificationPort` | Discord / Bluesky 等の通知送信に失敗し、警告ログとして記録した |
 | `NYX_MACRO_FAILED` | `macro` | `MacroRunner` | マクロの `initialize` / `run` / `finalize` が未分類例外を送出した |
 
 ### CancellationToken と協調キャンセル
@@ -350,7 +358,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 
 1. `seconds < 0` は `ConfigurationError(code="NYX_INVALID_WAIT_SECONDS")` とする。
 2. 待機前に `ct.throw_if_requested()` を呼ぶ。
-3. `ct.wait(seconds)` を呼び、中断要求が来たら 100 ms 未満で `MacroCancelled` を送出する。
+3. `ct.wait(seconds)` を呼ぶ。`CancellationToken.wait()` は `threading.Event.wait()` 相当であり、中断要求で即時復帰する。polling interval は持たない。
 4. 待機後に再度 `ct.throw_if_requested()` を呼ぶ。
 
 キャンセル API は 3 層に分ける。
@@ -507,7 +515,7 @@ class MacroArgsSchema:
 | ユニット | `test_error_events_use_logger_port` | 異常・中断 event が `LOGGING_FRAMEWORK.md` の `LoggerPort` へ渡る |
 | ユニット | `test_cli_notification_settings_source_is_secrets_snapshot` | CLI 通知設定が secrets snapshot に統一されていることを検証する |
 | 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `RunResult(cancelled)` を確認する |
-| 結合 | `test_cli_uses_run_result_exit_code` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
+| 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
 | ハードウェア | `test_device_error_on_serial_disconnect` | `@pytest.mark.realdevice`。シリアル切断時に `DeviceError` へ正規化する |
 | ハードウェア | `test_device_error_on_capture_disconnect` | `@pytest.mark.realdevice`。キャプチャ取得失敗時に `DeviceError` へ正規化する |

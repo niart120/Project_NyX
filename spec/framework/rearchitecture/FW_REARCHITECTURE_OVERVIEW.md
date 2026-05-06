@@ -108,7 +108,7 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 
 ### 1.7 パス表記規則
 
-Markdown リンクとリポジトリ内の参照 path は `/` を使う。Windows 配置例や PowerShell コマンド例では `\` を使う。`macro.toml`、class metadata、settings などファイル内に永続化する path 文字列は portable path として `/` を使い、実ファイルパスへの変換は resolver が担当する。
+Markdown リンクとリポジトリ内の参照 path は `/` を使う。Windows 配置例や PowerShell コマンド例では `\` を使う。`macro.toml`、class metadata、settings などファイル内に永続化する path 文字列は portable path として `/` を使い、実ファイルパスへの変換は resolver が担当する。`Command.load_img()` / `save_img()` など実行時 Resource File I/O の path 引数は Windows path を許容し、path guard で root 外参照、drive 指定、UNC、予約名を拒否する。
 
 ## 2. 対象ファイル
 
@@ -212,7 +212,7 @@ flowchart TB
 
 | 区分 | 対象 | 方針 |
 |------|------|------|
-| 永久維持 | `MacroBase` / `Command` / `DefaultCommand` import path、constants import、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッド、`MacroStopException()` / `MacroStopException("stop")` | Runtime 再設計後も維持する。 |
+| 永久維持 | `MacroBase` / `Command` / `DefaultCommand` import path、constants import、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッド、`MacroStopException()` / `MacroStopException("stop")` | Runtime 再設計後も維持する。ただし `Command.stop()` はメソッド名と呼び出し可能性だけを維持し、即時例外送出の意味論は維持しない。 |
 | 削除対象 | `MacroExecutor` | 既存マクロ互換 API ではない。GUI/CLI/テストを `MacroRuntime` / `RunHandle` / `MacroRegistry` へ移行した時点で削除し、import 互換 shim は作らない。 |
 | 破壊的変更 | Resource I/O の `static` 互換、settings lookup の `static` / `cwd` fallback、`DefaultCommand` 旧コンストラクタ、legacy loader 自動探索 | マクロ移行ガイドに従ってマクロ側を修正する。 |
 | 削除対象 | 暗黙 dummy fallback、恒久的な `sys.path` 変更、`cwd` 起点だけに依存する探索、settings path の曖昧解決 | 新 Runtime 経路では残さない。 |
@@ -461,7 +461,6 @@ class RuntimeOptions:
     allow_dummy: bool = False
     frame_ready_timeout_sec: float = 3.0
     release_timeout_sec: float = 2.0
-    wait_poll_interval_sec: float = 0.05
 
 
 @dataclass(frozen=True)

@@ -242,7 +242,7 @@ Runtime worker thread
 | 結合 | `test_cli_notification_settings_source_is_secrets_snapshot` | CLI 通知設定が secrets snapshot に統一される |
 | GUI | `test_main_window_uses_run_handle` | GUI 実行開始で `MacroRuntime.start()` の `RunHandle` を保持する |
 | GUI | `test_main_window_cancel_calls_handle_cancel` | GUI cancel が `Command.stop()` ではなく `RunHandle.cancel()` を呼ぶ |
-| GUI | `test_log_pane_receives_user_event` | `LogPane` が `UserEvent` を表示する |
+| GUI | `test_gui_log_pane_displays_user_event_from_sink` | `LogPane` が `UserEvent` を表示する |
 | GUI | `test_gui_log_sink_emits_qt_signal` | `GuiLogSink` が `UserEvent` を Qt Signal へ変換し、LogPane slot が GUI thread で受け取る |
 | ハードウェア | `test_realdevice_cli_runtime_logging` | `@pytest.mark.realdevice`。実機 CLI 実行で run_id 付きログが残る |
 | 性能 | `test_gui_user_event_dispatch_perf` | GUI `UserEvent` 受信から Qt Signal emit まで 10 ms 未満 |

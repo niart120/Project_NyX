@@ -19,7 +19,6 @@
 | Compatibility Contract | 既存マクロが依存している import path、ライフサイクル、Command API、例外捕捉を維持する契約 |
 | MacroBase | ユーザー定義マクロの抽象基底クラス。`initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)` を維持する |
 | Command | マクロから見える操作 API。`press`、`wait`、`capture`、`save_img`、`notify` などの既存メソッドを維持する |
-| DefaultCommand | 既存 import path を維持する `Command` 実装。生成は `DefaultCommand(context=...)` に統一し、旧具象引数コンストラクタは残さない |
 | MacroExecutor | 既存 GUI/CLI とテストの旧入口。再設計後の公開 API・互換契約・移行 adapter には含めず削除する |
 | MacroRegistry | マクロの発見、安定 ID、別名、診断、設定解決を管理し、実行インスタンスを保持しないコンポーネント |
 | MacroFactory | `MacroDefinition` が所有する生成責務。実行ごとに新しい `MacroBase` インスタンスを返す |
@@ -29,7 +28,7 @@
 | RunHandle | 非同期実行の中断要求、完了待ち、結果取得を提供するハンドル |
 | ExecutionContext | 1 回の実行に必要な `run_id`、`macro_id`、`macro_name`、Ports、設定、実行引数、`CancellationToken` を束ねる値。`Command` は保持しない |
 | Ports/Adapters | Runtime 中核からハードウェア、設定、通知、ログ、GUI/CLI 依存を隔離する境界 |
-| DefaultCommand | 既存 `Command` API を維持し、`ExecutionContext` 経由で Ports へ委譲する実装。追加の別 `Command` 実装クラスは置かない |
+| DefaultCommand | 既存 import path と `Command` API を維持する実装。生成は `DefaultCommand(context=...)` に統一し、`ExecutionContext` 経由で Ports へ委譲する。旧具象引数コンストラクタは残さない |
 | MacroSettingsResolver | manifest / class metadata settings を解決するコンポーネント。Resource File I/O から分離し、旧 static/cwd fallback を持たない |
 | Resource File I/O | read-only assets と writable outputs の配置、path guard、atomic write、overwrite policy を扱う境界 |
 | MacroResourceScope | 1 つのマクロ ID に紐づく assets root を表す値 |
@@ -312,7 +311,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 目的 | `LOGGING_FRAMEWORK.md` に従い、`LoggerPort`、`LogEvent`、`LogSinkDispatcher`、`LogBackend`、`LogSanitizer`、`UserEvent` / `TechnicalLog` 分離、実行単位 context、test sink、ログファイル運用を実装する |
 | 対象ファイル | `src\nyxpy\framework\core\logger\events.py`, `ports.py`, `dispatcher.py`, `backend.py`, `sanitizer.py`, `sinks.py`, `log_manager.py`, `src\nyxpy\framework\core\runtime\context.py`, `builder.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\gui\panes\log_pane.py`, `tests\unit\framework\logger\test_logging_framework.py`, `tests\gui\test_log_pane_user_event.py`, `tests\perf\test_logging_framework_perf.py` |
 | 完了条件 | import 時の global handler 削除をなくし、Runtime 実行ログへ `run_id` / `macro_id` を付与し、GUI は `UserEvent` を表示する。`LogManager` と旧 `log_manager.log()` 互換 adapter は残さない |
-| テスト | `test_logger_import_has_no_backend_side_effect`, `test_logger_port_binds_run_context`, `test_sink_exception_is_logged_and_ignored`, `test_log_pane_receives_user_event`, `test_logging_sink_dispatch_perf`, `test_legacy_log_manager_removed` |
+| テスト | `test_logger_import_has_no_backend_side_effect`, `test_logger_port_binds_run_context`, `test_sink_exception_is_logged_and_ignored`, `test_gui_log_pane_displays_user_event_from_sink`, `test_log_handler_dispatch_thread_safety`, `test_legacy_log_manager_removed` |
 | リスク | 旧 `log_manager.log()` / `add_handler()` 利用箇所、ログファイル path 変更、sink 例外の再帰記録、GUI close 時の解除漏れ |
 | ロールバック方針 | `LoggerPort` と test sink は残し、backend 構成だけを差し戻す。旧文字列 handler adapter と `log_manager.log()` 互換は戻さない |
 
@@ -338,7 +337,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 目的 | CLI を `MacroRuntimeBuilder` と `RunResult` ベースへ移行し、デバイス検出、通知設定、終了コードを統一する |
 | 対象ファイル | `src\nyxpy\cli\run_cli.py`, `src\nyxpy\framework\core\runtime\builder.py`, `src\nyxpy\framework\core\utils\helper.py`, `tests\integration\test_cli_runtime_adapter.py` |
 | 完了条件 | CLI は `DefaultCommand` を直接構築せず、Runtime 経由で実行し、成功 0、中断 130、失敗 非 0 の終了コードを `RunResult` から決める |
-| テスト | `test_cli_uses_macro_runtime_builder`, `test_cli_adapter_runs_macro_with_define_args`, `test_cli_device_detection_waits_until_complete`, `test_cli_notification_settings_come_from_secrets_snapshot`, `test_cli_uses_run_result_exit_code`, `test_parse_define_args_accepts_list_and_string` |
+| テスト | `test_cli_uses_runtime_and_run_result`, `test_cli_adapter_runs_macro_with_define_args`, `test_cli_device_detection_waits_until_complete`, `test_cli_notification_settings_come_from_secrets_snapshot`, `test_parse_define_args_accepts_list_and_string` |
 | リスク | CLI 引数互換、`-D` 解析、通知設定ソース、デバイス検出待ち、既存コマンド出力が変わる |
 | ロールバック方針 | CLI adapter の呼び出しだけ旧経路へ戻す。旧 `create_command()` と `execute_macro()` の長期互換関数は残さない |
 
@@ -351,7 +350,7 @@ CLI は `serial_manager.get_active_device()` と `capture_manager.get_active_dev
 | 目的 | GUI の実行制御を `RunHandle` / `RunResult` へ移行し、GUI スレッドから `cmd.stop()` による例外送出をなくす |
 | 対象ファイル | `src\nyxpy\gui\main_window.py`, GUI log pane 関連ファイル, `src\nyxpy\framework\core\logger\dispatcher.py`, `src\nyxpy\framework\core\runtime\builder.py`, `tests\gui\test_main_window_runtime_adapter.py` |
 | 完了条件 | Run button は `runtime.start(context)` を呼び、Cancel button は `handle.cancel()` を呼び、完了時に `RunResult` を UI 状態へ反映する |
-| テスト | `test_main_window_starts_runtime_and_updates_status`, `test_main_window_cancel_requests_run_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, `test_main_window_runtime_adapter_updates_running_state`, `test_gui_event_is_separate_from_file_log`, `test_gui_log_sink_exception_is_logged_and_ignored` |
+| テスト | `test_gui_start_uses_runtime_handle`, `test_gui_cancel_response`, `test_gui_log_pane_displays_user_event_from_sink`, `test_gui_event_is_separate_from_file_log`, `test_gui_log_sink_exception_is_logged_and_ignored` |
 | リスク | Qt thread と Runtime thread の責務混在、GUI log handler の deadlock、preview capture と runtime frame source の所有権競合、終了時 cancel 待ち |
 | ロールバック方針 | 既存 `WorkerThread` を Qt signal adapter として残し、Runtime 実行呼び出しだけ旧 executor 経路へ戻す |
 

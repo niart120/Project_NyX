@@ -438,10 +438,10 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 | ユニット | `test_log_serialization_falls_back_to_repr` | JSON 化不能な `extra` を安全に縮退する |
 | 結合 | `test_command_log_emits_macro_message_with_context` | 既存 `Command.log()` が `macro.message` と実行 context を付与する |
 | 結合 | `test_notification_failure_is_technical_log_only` | 通知失敗は secret mask 済み技術ログに残り、原則 GUI 表示しない |
-| GUI | `test_log_pane_receives_user_event` | `LogPane` が `UserEvent` を Qt Signal で表示する |
+| GUI | `test_gui_log_pane_displays_user_event_from_sink` | `LogPane` が `UserEvent` を Qt Signal で表示する |
 | GUI | `test_gui_log_sink_emits_qt_signal_without_core_qt_dependency` | `GuiLogSink` が GUI 層で `UserEvent` を Qt Signal へ変換し、core 層が Qt 型を import しない |
 | GUI | `test_log_pane_level_filter_uses_gui_sink` | DEBUG 表示切替が GUI sink の level に反映される |
-| 性能 | `test_logging_sink_dispatch_perf` | sink 3 件への配信が 1 件 5 ms 未満 |
+| 性能 | `test_log_handler_dispatch_thread_safety` | sink 登録解除と配信で deadlock しない |
 | 性能 | `test_gui_user_event_dispatch_perf` | GUI sink 10 件への配信が 1 件 10 ms 未満 |
 
 ## 6. 実装チェックリスト
