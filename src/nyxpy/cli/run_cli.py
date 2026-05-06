@@ -7,7 +7,6 @@ from nyxpy.framework.core.api.notification_handler import (
 )
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.logger.log_manager import log_manager
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_legacy_runtime_builder
@@ -61,27 +60,23 @@ def create_runtime_builder(
 
     Args:
         protocol: 使用するプロトコル実装
-        resources_dir: リソースI/O用のディレクトリ（デフォルトは'./static'）
+        resources_dir: 旧互換引数。指定時はプロジェクトルートとして扱います。
 
     Returns:
         設定済みの Runtime builder
     """
-    if resources_dir is None:
-        resources_dir = pathlib.Path.cwd() / "static"
-
-    resource_io = StaticResourceIO(resources_dir)
-    registry = MacroRegistry(project_root=pathlib.Path.cwd())
+    project_root = pathlib.Path.cwd() if resources_dir is None else resources_dir
+    registry = MacroRegistry(project_root=project_root)
     registry.reload()
     serial_device = serial_manager.get_active_device()
     capture_device = capture_manager.get_active_device()
     global_settings = GlobalSettings()
     notification_handler = create_notification_handler_from_settings(global_settings)
     return create_legacy_runtime_builder(
-        project_root=pathlib.Path.cwd(),
+        project_root=project_root,
         registry=registry,
         serial_device=serial_device,
         capture_device=capture_device,
-        resource_io=resource_io,
         protocol=protocol,
         notification_handler=notification_handler,
         log_manager=log_manager,

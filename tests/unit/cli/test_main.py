@@ -152,12 +152,10 @@ def test_create_protocol_unknown():
 
 
 def test_create_runtime_builder_uses_active_devices(monkeypatch, tmp_path):
-    mock_resource_io = MagicMock()
     mock_registry = MagicMock()
     registry = MagicMock()
     mock_registry.return_value = registry
     mock_builder = MagicMock()
-    monkeypatch.setattr("nyxpy.cli.run_cli.StaticResourceIO", lambda path: mock_resource_io)
     monkeypatch.setattr("nyxpy.cli.run_cli.MacroRegistry", mock_registry)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.serial_manager",
@@ -175,7 +173,7 @@ def test_create_runtime_builder_uses_active_devices(monkeypatch, tmp_path):
 
     create_runtime_builder(MagicMock(), resources_dir=tmp_path)
 
-    mock_registry.assert_called_once()
+    mock_registry.assert_called_once_with(project_root=tmp_path)
     registry.reload.assert_called_once()
     mock_builder.assert_called_once()
 

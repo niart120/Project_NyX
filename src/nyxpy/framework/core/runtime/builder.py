@@ -4,14 +4,12 @@ import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import BinaryIO
 from uuid import uuid4
 
 import cv2
 
 from nyxpy.framework.core.constants import KeyboardOp, KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
-from nyxpy.framework.core.hardware.resource import StaticResourceIO
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
     FrameNotReadyError,
@@ -19,12 +17,9 @@ from nyxpy.framework.core.io.ports import (
     NotificationPort,
 )
 from nyxpy.framework.core.io.resources import (
-    DefaultResourcePathGuard,
-    OverwritePolicy,
-    ResourceKind,
-    ResourceNotFoundError,
-    ResourceRef,
-    ResourceSource,
+    LocalResourceStore,
+    LocalRunArtifactStore,
+    MacroResourceScope,
     ResourceStorePort,
     RunArtifactStore,
 )
@@ -47,6 +42,7 @@ from nyxpy.framework.core.utils.cancellation import CancellationToken
 from nyxpy.framework.core.utils.helper import validate_keyboard_text
 
 type PortFactory[T] = Callable[[RuntimeBuildRequest, MacroDefinition], T]
+type ArtifactStoreFactory = Callable[[RuntimeBuildRequest, MacroDefinition, str], RunArtifactStore]
 
 
 class MacroRuntimeBuilder:
@@ -60,7 +56,7 @@ class MacroRuntimeBuilder:
         controller_factory: PortFactory[ControllerOutputPort],
         frame_source_factory: PortFactory[FrameSourcePort],
         resource_store_factory: PortFactory[ResourceStorePort],
-        artifact_store_factory: PortFactory[RunArtifactStore],
+        artifact_store_factory: ArtifactStoreFactory,
         notification_factory: PortFactory[NotificationPort],
         logger_factory: PortFactory[LoggerPort],
     ) -> None:
@@ -101,7 +97,7 @@ class MacroRuntimeBuilder:
             controller=self._controller_factory(request, definition),
             frame_source=self._frame_source_factory(request, definition),
             resources=self._resource_store_factory(request, definition),
-            artifacts=self._artifact_store_factory(request, definition),
+            artifacts=self._artifact_store_factory(request, definition, run_id),
             notifications=self._notification_factory(request, definition),
             logger=logger,
             options=RuntimeOptions(allow_dummy=self._allow_dummy(request)),
@@ -125,7 +121,6 @@ def create_legacy_runtime_builder(
     registry: MacroRegistry,
     serial_device,
     capture_device,
-    resource_io: StaticResourceIO,
     protocol: SerialProtocolInterface,
     notification_handler,
     log_manager,
@@ -139,11 +134,13 @@ def create_legacy_runtime_builder(
             serial_device, protocol
         ),
         frame_source_factory=lambda _request, _definition: _LegacyFrameSourcePort(capture_device),
-        resource_store_factory=lambda _request, definition: _LegacyResourceStore(
-            resource_io, definition
+        resource_store_factory=lambda _request, definition: LocalResourceStore(
+            MacroResourceScope.from_definition(definition, project_root)
         ),
-        artifact_store_factory=lambda _request, definition: _LegacyRunArtifactStore(
-            resource_io, definition
+        artifact_store_factory=lambda _request, definition, run_id: LocalRunArtifactStore(
+            Path(project_root) / "runs" / run_id / "outputs",
+            macro_id=definition.id,
+            run_id=run_id,
         ),
         notification_factory=lambda _request, _definition: _LegacyNotificationPort(
             notification_handler
@@ -225,67 +222,6 @@ class _LegacyFrameSourcePort(FrameSourcePort):
 
     def close(self) -> None:
         pass
-
-
-class _LegacyResourceStore(ResourceStorePort):
-    def __init__(self, resource_io: StaticResourceIO, definition: MacroDefinition) -> None:
-        self.resource_io = resource_io
-        self.definition = definition
-
-    def resolve_asset_path(self, name: str | Path) -> ResourceRef:
-        path = Path(self.resource_io.root_dir_path) / name
-        if not path.exists():
-            raise ResourceNotFoundError(f"resource not found: {name}")
-        return ResourceRef(
-            kind=ResourceKind.ASSET,
-            source=ResourceSource.STANDARD_ASSETS,
-            path=path,
-            relative_path=Path(name),
-            macro_id=self.definition.id,
-        )
-
-    def load_image(self, name: str | Path, grayscale: bool = False) -> cv2.typing.MatLike:
-        return self.resource_io.load_image(name, grayscale=grayscale)
-
-
-class _LegacyRunArtifactStore(RunArtifactStore):
-    def __init__(self, resource_io: StaticResourceIO, definition: MacroDefinition) -> None:
-        self.resource_io = resource_io
-        self.definition = definition
-        self.guard = DefaultResourcePathGuard()
-
-    def resolve_output_path(self, name: str | Path) -> ResourceRef:
-        path = self.guard.resolve_under_root(Path(self.resource_io.root_dir_path), name)
-        return ResourceRef(
-            kind=ResourceKind.OUTPUT,
-            source=ResourceSource.RUN_OUTPUTS,
-            path=path,
-            relative_path=Path(name),
-            macro_id=self.definition.id,
-        )
-
-    def save_image(
-        self,
-        name: str | Path,
-        image: cv2.typing.MatLike,
-        *,
-        overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
-        atomic: bool = True,
-    ) -> ResourceRef:
-        self.resource_io.save_image(name, image)
-        return self.resolve_output_path(name)
-
-    def open_output(
-        self,
-        name: str | Path,
-        mode: str = "xb",
-        *,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
-        atomic: bool = True,
-    ) -> BinaryIO:
-        ref = self.resolve_output_path(name)
-        ref.path.parent.mkdir(parents=True, exist_ok=True)
-        return ref.path.open(mode)
 
 
 class _LegacyNotificationPort(NotificationPort):
