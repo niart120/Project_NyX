@@ -3,7 +3,7 @@ import inspect
 import sys
 from pathlib import Path
 
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.macro.exceptions import MacroStopException
@@ -20,7 +20,8 @@ class MacroExecutor:
     ・execute() によって選択されたマクロのライフサイクル関数（initialize -> run -> finalize）を呼び出します。
     """
 
-    def __init__(self):
+    def __init__(self, logger: LoggerPort | None = None):
+        self.logger = logger or NullLoggerPort()
         self.macros: dict[str, MacroBase] = {}
         self.macro: MacroBase = None
         # カレントディレクトリをsys.pathに追加する
@@ -67,10 +68,12 @@ class MacroExecutor:
                         instance = obj()
                         self.macros[obj.__name__] = instance
             except Exception as e:
-                log_manager.log(
+                self.logger.technical(
                     "ERROR",
-                    f"Error loading macro:{display_name}, {e}",
+                    f"Error loading macro:{display_name}",
                     component="MacroExecutor",
+                    event="macro.load_failed",
+                    exc=e,
                 )
                 pass
 

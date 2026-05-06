@@ -1,63 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import StrEnum
+from abc import ABC
 from typing import Protocol
 
-from nyxpy.framework.core.macro.exceptions import FrameworkValue
-
-type LogExtraValue = FrameworkValue
-
-
-class LogLevel(StrEnum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-
-@dataclass(frozen=True)
-class RunLogContext:
-    run_id: str
-    macro_id: str
-    macro_name: str = ""
-    entrypoint: str = "runtime"
-    started_at: datetime | None = None
-
-
-@dataclass(frozen=True)
-class LogEvent:
-    timestamp: datetime
-    level: LogLevel
-    component: str
-    event: str
-    message: str
-    run_id: str | None = None
-    macro_id: str | None = None
-    extra: dict[str, LogExtraValue] = field(default_factory=dict)
-    exception_type: str | None = None
-    traceback: str | None = None
-
-
-@dataclass(frozen=True)
-class TechnicalLog:
-    event: LogEvent
-    include_traceback: bool = True
-
-
-@dataclass(frozen=True)
-class UserEvent:
-    timestamp: datetime
-    level: LogLevel
-    component: str
-    event: str
-    message: str
-    run_id: str | None = None
-    macro_id: str | None = None
-    code: str | None = None
-    extra: dict[str, LogExtraValue] = field(default_factory=dict)
+from nyxpy.framework.core.logger.events import (
+    LogEvent,
+    LogExtraValue,
+    LogLevel,
+    RunLogContext,
+    TechnicalLog,
+    UserEvent,
+)
 
 
 class LoggerPort(Protocol):
@@ -84,3 +37,38 @@ class LoggerPort(Protocol):
         code: str | None = None,
         extra: dict[str, LogExtraValue] | None = None,
     ) -> None: ...
+
+
+class LogSink(ABC):
+    def emit_technical(self, event: TechnicalLog) -> None:
+        pass
+
+    def emit_user(self, event: UserEvent) -> None:
+        pass
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+class LogBackend(Protocol):
+    def emit_technical(self, event: TechnicalLog) -> None: ...
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+__all__ = [
+    "LogBackend",
+    "LogEvent",
+    "LogExtraValue",
+    "LoggerPort",
+    "LogLevel",
+    "LogSink",
+    "RunLogContext",
+    "TechnicalLog",
+    "UserEvent",
+]

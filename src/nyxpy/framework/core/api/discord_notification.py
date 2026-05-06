@@ -3,14 +3,15 @@ import io
 import cv2
 import requests
 
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 from .notification_interface import NotificationInterface
 
 
 class DiscordNotification(NotificationInterface):
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url: str, logger: LoggerPort | None = None):
         self.webhook_url = webhook_url
+        self.logger = logger or NullLoggerPort()
 
     def notify(self, text: str, img: cv2.Mat | None = None) -> None:
         try:
@@ -27,5 +28,12 @@ class DiscordNotification(NotificationInterface):
             else:
                 data = {"content": text}
                 requests.post(self.webhook_url, data=data, timeout=5)
-        except Exception as e:
-            log_manager.log("ERROR", f"Discord通知失敗: {e}", component="DiscordNotification")
+        except Exception as exc:
+            self.logger.technical(
+                "ERROR",
+                "Discord notification failed",
+                component="DiscordNotification",
+                event="notification.failed",
+                extra={"notifier": "discord"},
+                exc=exc,
+            )

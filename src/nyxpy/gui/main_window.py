@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.logger.log_manager import log_manager
+from nyxpy.framework.core.logger import create_default_logging
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import create_legacy_runtime_builder
 from nyxpy.framework.core.runtime.context import ExecutionContext, RuntimeBuildRequest
@@ -42,6 +42,9 @@ from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.logging = create_default_logging(base_dir=Path.cwd() / "logs", console_enabled=False)
+        self.logger = self.logging.logger
+        capture_manager.set_logger(self.logger)
         initialize_managers()
         self.registry = MacroRegistry(project_root=Path.cwd())
         self.macro_catalog = MacroCatalog(self.registry)
@@ -77,7 +80,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.macro_browser, 1)
 
         # 仮想コントローラーペインを作成
-        self.virtual_controller = VirtualControllerPane(self)
+        self.virtual_controller = VirtualControllerPane(self.logger, self)
 
         # Control pane and Virtual Controller in lower section
         lower_section = QVBoxLayout()
@@ -106,7 +109,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.preview_pane, stretch=1)
 
         # Log pane
-        self.log_pane = LogPane(self)
+        self.log_pane = LogPane(self.logging.dispatcher, self)
         right_layout.addWidget(self.log_pane, stretch=1)
 
         # Set stretch for log pane to fill remaining space
@@ -163,13 +166,20 @@ class MainWindow(QMainWindow):
                         "device": serial_manager.get_active_device(),
                     },
                 )
-                log_manager.log(
+                self.logger.user(
                     "INFO",
                     f"シリアルデバイスを切り替えました: {cur_global.get('serial_device')} ({cur_global.get('serial_baud', 9600)} bps)",
-                    "MainWindow",
+                    component="MainWindow",
+                    event="configuration.changed",
                 )
             except Exception as e:
-                log_manager.log("ERROR", f"シリアルデバイス切り替えエラー: {e}", "MainWindow")
+                self.logger.technical(
+                    "ERROR",
+                    "シリアルデバイス切り替えエラー",
+                    component="MainWindow",
+                    event="configuration.invalid",
+                    exc=e,
+                )
         if "capture_device" in diff_keys:
             try:
                 capture_manager.set_active(cur_global.get("capture_device"))
@@ -180,13 +190,20 @@ class MainWindow(QMainWindow):
                         "device": capture_manager.get_active_device(),
                     },
                 )
-                log_manager.log(
+                self.logger.user(
                     "INFO",
                     f"キャプチャデバイスを切り替えました: {cur_global.get('capture_device')}",
-                    "MainWindow",
+                    component="MainWindow",
+                    event="configuration.changed",
                 )
             except Exception as e:
-                log_manager.log("ERROR", f"キャプチャデバイス切り替えエラー: {e}", "MainWindow")
+                self.logger.technical(
+                    "ERROR",
+                    "キャプチャデバイス切り替えエラー",
+                    component="MainWindow",
+                    event="configuration.invalid",
+                    exc=e,
+                )
         if "serial_protocol" in diff_keys:
             try:
                 protocol = ProtocolFactory.create_protocol(
@@ -194,13 +211,20 @@ class MainWindow(QMainWindow):
                 )
                 EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
                 protocol_name = cur_global.get("serial_protocol", "CH552")
-                log_manager.log(
+                self.logger.user(
                     "INFO",
                     f"コントローラープロトコルを切り替えました: {protocol_name}",
-                    "MainWindow",
+                    component="MainWindow",
+                    event="configuration.changed",
                 )
             except Exception as e:
-                log_manager.log("ERROR", f"プロトコル切り替えエラー: {e}", "MainWindow")
+                self.logger.technical(
+                    "ERROR",
+                    "プロトコル切り替えエラー",
+                    component="MainWindow",
+                    event="configuration.invalid",
+                    exc=e,
+                )
         if "preview_fps" in diff_keys:
             self.preview_pane.preview_fps = cur_global.get("preview_fps", 30)
             self.preview_pane.apply_fps()
@@ -217,14 +241,18 @@ class MainWindow(QMainWindow):
                 enabled_services.append("Bluesky")
 
             if enabled_services:
-                log_manager.log(
+                self.logger.user(
                     "INFO",
                     f"通知設定が変更されました。有効なサービス: {', '.join(enabled_services)}",
-                    "MainWindow",
+                    component="MainWindow",
+                    event="configuration.changed",
                 )
             else:
-                log_manager.log(
-                    "INFO", "通知設定が変更されました。全てのサービスが無効です。", "MainWindow"
+                self.logger.user(
+                    "INFO",
+                    "通知設定が変更されました。全てのサービスが無効です。",
+                    component="MainWindow",
+                    event="configuration.changed",
                 )
 
         # ...他の設定も必要に応じて追加...
@@ -267,7 +295,10 @@ class MainWindow(QMainWindow):
 
     def _create_runtime_builder(self):
         protocol = ProtocolFactory.create_protocol(global_settings.get("serial_protocol", "CH552"))
-        notification_handler = create_notification_handler_from_settings(secrets_settings)
+        notification_handler = create_notification_handler_from_settings(
+            secrets_settings,
+            logger=self.logger,
+        )
         return create_legacy_runtime_builder(
             project_root=Path.cwd(),
             registry=self.registry,
@@ -275,7 +306,7 @@ class MainWindow(QMainWindow):
             capture_device=capture_manager.get_active_device(),
             protocol=protocol,
             notification_handler=notification_handler,
-            log_manager=log_manager,
+            logger=self.logger,
         )
 
     def cancel_macro(self):
@@ -285,14 +316,22 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """ウィンドウ終了時にリソースを確実に解放する。"""
-        log_manager.log("INFO", "アプリケーションを終了します...", "MainWindow")
+        self.logger.user(
+            "INFO",
+            "アプリケーションを終了します...",
+            component="MainWindow",
+            event="application.closing",
+        )
 
         # 1. マクロ実行中なら停止を要求し、ワーカースレッドの終了を待つ
         if hasattr(self, "worker") and self.worker.isRunning():
             self.worker.cancel()
             if not self.worker.wait(5000):  # 最大5秒待機
-                log_manager.log(
-                    "WARNING", "ワーカースレッドの終了がタイムアウトしました", "MainWindow"
+                self.logger.technical(
+                    "WARNING",
+                    "ワーカースレッドの終了がタイムアウトしました",
+                    component="MainWindow",
+                    event="macro.cancelled",
                 )
                 self.worker.terminate()
                 self.worker.wait(2000)
@@ -304,14 +343,27 @@ class MainWindow(QMainWindow):
         try:
             capture_manager.release_active()
         except Exception as e:
-            log_manager.log("WARNING", f"キャプチャデバイス解放エラー: {e}", "MainWindow")
+            self.logger.technical(
+                "WARNING",
+                "キャプチャデバイス解放エラー",
+                component="MainWindow",
+                event="capture.release_failed",
+                exc=e,
+            )
 
         # 4. シリアルデバイスを解放
         try:
             serial_manager.close_active()
         except Exception as e:
-            log_manager.log("WARNING", f"シリアルデバイス解放エラー: {e}", "MainWindow")
+            self.logger.technical(
+                "WARNING",
+                "シリアルデバイス解放エラー",
+                component="MainWindow",
+                event="serial.close_failed",
+                exc=e,
+            )
 
+        self.logging.close()
         super().closeEvent(event)
 
     def on_finished(self, status: str):

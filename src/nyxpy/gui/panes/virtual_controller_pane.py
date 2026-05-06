@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 from nyxpy.framework.core.constants import Button
+from nyxpy.framework.core.logger import LoggerPort
 from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
 from nyxpy.gui.widgets.controller.analog_stick import AnalogStick
 from nyxpy.gui.widgets.controller.button import ControllerButton
@@ -11,9 +12,9 @@ from nyxpy.gui.widgets.controller.dpad import DPad
 class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, logger: LoggerPort, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.model = VirtualControllerModel()
+        self.model = VirtualControllerModel(logger=logger)
         self.initUI()
 
     def initUI(self) -> None:
