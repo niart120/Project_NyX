@@ -4,7 +4,7 @@
 > **目的**: 現行 `LogManager` を、実行単位コンテキスト、ユーザー表示イベント、技術ログ、差し替え可能な sink を持つロギング基盤へ再設計する。  
 > **関連ドキュメント**: `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `IMPLEMENTATION_PLAN.md`, `..\archive\logging_design.md`  
 > **既存ソース**: `src\nyxpy\framework\core\logger\log_manager.py`, `src\nyxpy\gui\panes\log_pane.py`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。既存 `log_manager.log(level, message, component="")` と GUI のログ表示概念は互換 adapter で維持する。ただし GUI/CLI 内部のログ接続、singleton 直接利用、旧 handler 構成は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: 既存 `log_manager.log(level, message, component="")` と GUI のログ表示概念は互換 adapter で維持する。ただし GUI/CLI 内部のログ接続、singleton 直接利用、旧 handler 構成は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -70,7 +70,7 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 | `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、test sink の標準実装を定義。GUI sink は置かない |
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | Runtime から使う `LoggerPort` を io port 群へ re-export するか参照境界を整理 |
 | `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` を `ExecutionContext.run_log_context` に含める |
-| `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI/Legacy 用の logger 構成と `LoggerPort` 注入を担当 |
+| `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI 用の logger 構成と `LoggerPort` 注入を担当 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` / `technical()` へ接続 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
 | `src\nyxpy\gui\log_sink.py` | 新規 | `GuiLogSink` を定義し、`UserEvent` を Qt Signal へ変換する GUI 層 adapter |
@@ -174,7 +174,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Protocol
+
+
+type LogExtraValue = str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
 
 
 class LogLevel(StrEnum):
@@ -203,7 +206,7 @@ class LogEvent:
     message: str
     run_id: str | None = None
     macro_id: str | None = None
-    extra: Mapping[str, Any] = field(default_factory=dict)
+    extra: Mapping[str, LogExtraValue] = field(default_factory=dict)
     exception_type: str | None = None
     traceback: str | None = None
 
@@ -224,7 +227,7 @@ class UserEvent:
     run_id: str | None = None
     macro_id: str | None = None
     code: str | None = None
-    extra: Mapping[str, Any] = field(default_factory=dict)
+    extra: Mapping[str, LogExtraValue] = field(default_factory=dict)
 
 
 class LoggerPort(Protocol):
@@ -237,7 +240,7 @@ class LoggerPort(Protocol):
         *,
         component: str,
         event: str = "log.message",
-        extra: Mapping[str, Any] | None = None,
+        extra: Mapping[str, LogExtraValue] | None = None,
         exc: BaseException | None = None,
     ) -> None: ...
 
@@ -249,7 +252,7 @@ class LoggerPort(Protocol):
         component: str,
         event: str,
         code: str | None = None,
-        extra: Mapping[str, Any] | None = None,
+        extra: Mapping[str, LogExtraValue] | None = None,
     ) -> None: ...
 
 

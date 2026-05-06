@@ -1,17 +1,17 @@
 # マクロ互換性とレジストリ再設計 仕様書
 
-> **文書種別**: 仕様書。既存マクロ互換契約、`MacroRegistry`、`MacroDefinition`、manifest ファイル形式、settings lookup の正本である。
+> **文書種別**: 仕様書。既存マクロ import / lifecycle 互換契約、`MacroRegistry`、`MacroDefinition`、manifest ファイル形式、settings lookup の正本である。
 > **対象モジュール**: `src/nyxpy/framework/core/macro/`  
-> **目的**: 既存マクロ互換を最優先し、ロード・識別・実行基盤をレジストリ中心へ再設計する  
+> **目的**: 既存マクロの import / lifecycle 互換を維持しつつ、ロード・識別・実行基盤をレジストリ中心へ再設計する
 > **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
 > **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: Resource I/O、settings lookup、legacy auto discovery、`DefaultCommand` 旧コンストラクタはマクロ側移行を前提に破壊的変更を許容する。`MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。
 
 ## 1. 概要
 
 ### 1.1 目的
 
-現行マクロ資産を変更せずに動かし続けることを最優先し、マクロの発見・識別・生成・実行を `MacroRegistry` 中心の構成へ置き換える。既存の import path、ライフサイクル、Command API、定数 import、`static/<macro_name>/settings.toml` 参照は互換契約として固定し、内部実装と実行基盤は差し替え可能にする。
+既存マクロの import path、ライフサイクル、Command API、定数 import を維持しつつ、マクロの発見・識別・生成・実行を `MacroRegistry` 中心の構成へ置き換える。`static/<macro_name>/settings.toml` 参照、legacy auto discovery、`cwd` fallback は互換契約として固定せず、マクロ移行ガイドで新方式へ移行する。
 
 ### 1.2 用語定義
 
@@ -29,10 +29,10 @@
 | RunResult | 1 回のマクロ実行の成功・中断・失敗、例外、開始終了時刻を保持する結果値 |
 | ExecutionContext | `run_id`、`macro_name`、Ports、中断トークン、options、`exec_args`、`metadata` を束ねる実行単位の値オブジェクト。`Command` は保持しない |
 | Ports/Adapters | Runtime 中核がハードウェア・通知・ログ・GUI/CLI に直接依存しないための抽象境界と接続実装 |
-| Legacy Compatibility Layer | 既存マクロが import する公開面を壊さない互換層。`MacroExecutor` は含めない |
+| Compatibility Layer | 既存マクロが import する公開面を壊さない互換層。`MacroExecutor` は含めない |
 | MacroManifest | `macro.toml` の永続化フォーマット名。Python クラスとしては定義せず、読み込み結果は `MacroDefinition` へ正規化する |
-| MacroSettingsResolver | manifest settings path と `static/<macro_name>/settings.toml` 互換を解決する専用コンポーネント。画像リソース保存先は扱わない |
-| LegacyMacroAdapter | 既存の `macros/<name>/macro.py`、`macros/<name>/__init__.py`、`macros/<name>.py` を変更なしで扱うアダプタ |
+| MacroSettingsResolver | manifest settings path を解決する専用コンポーネント。画像リソース保存先は扱わない |
+| Manifest entrypoint | `macro.toml [macro].entrypoint` で明示された `module:ClassName`。package / single-file のどちらもこの形式で扱う |
 | Compatibility Contract | 既存マクロが依存している公開面を維持する契約。本仕様では破壊不可の要件として扱う |
 | Qualified Macro ID | クラス名衝突を避けるための完全修飾 ID。例: `frlg_id_rng:FrlgIdRngMacro` |
 
@@ -46,19 +46,19 @@
 
 | 指標 | 現状 | 目標 |
 |------|------|------|
-| 既存マクロの変更必要数 | 0 件であるべきだが、実装変更時の契約が明文化されていない | 0 件を互換契約として固定 |
+| 既存マクロの変更必要数 | 0 件であるべきだが、実装変更時の契約が明文化されていない | Resource/settings/entrypoint は移行ガイドに従って変更 |
 | import path 互換 | 暗黙維持 | `MacroBase` / `Command` / `constants` の path を絶対維持 |
 | クラス名衝突 | 後勝ちで上書きされる | 衝突を診断し、`Qualified Macro ID` で両方選択可能 |
 | ロード失敗診断 | ログ文字列のみ | `MacroLoadDiagnostic` と GUI / CLI 表示用メッセージを保持 |
 | 実行ごとの状態分離 | reload 後に作ったインスタンスを再利用 | `MacroFactory.create()` で実行ごとに新規生成 |
-| `cwd` 依存 | `Path.cwd()` 固定 | 明示 `project_root` を主経路にし、`cwd` は段階互換の fallback |
+| `cwd` 依存 | `Path.cwd()` 固定 | 明示 `project_root` を必須経路にし、`cwd` fallback を削除 |
 
 ### 1.5 着手条件
 
 - 既存テスト `uv run pytest tests/unit/executor/test_executor.py` が現状把握として確認されていること。
 - GUI リロード挙動を検証する `tests/gui/test_macro_reload.py` が存在する場合は互換対象に含めること。
-- 代表マクロ `macros/frlg_id_rng/macro.py`, `macros/frlg_initial_seed/macro.py`, `macros/frlg_gorgeous_resort/macro.py`, `macros/frlg_wild_rng/macro.py` の import、設定取得、ライフサイクルを維持対象として扱うこと。
-- 本仕様の実装では、既存マクロのソース変更を要求しないこと。
+- 代表マクロ `macros/frlg_id_rng/macro.py`, `macros/frlg_initial_seed/macro.py`, `macros/frlg_gorgeous_resort/macro.py`, `macros/frlg_wild_rng/macro.py` の import とライフサイクルを維持対象として扱うこと。
+- Resource I/O、settings、entrypoint については既存マクロのソース変更を要求してよい。変更内容は `MACRO_MIGRATION_GUIDE.md` に集約すること。
 
 ## 2. 対象ファイル
 
@@ -70,12 +70,12 @@
 | `src/nyxpy/framework/core/macro/executor.py` | 削除 | GUI/CLI/テストの参照を `MacroRuntime` / `MacroRegistry` / `MacroFactory` へ移行した後に削除する |
 | `src/nyxpy/framework/core/macro/registry.py` | 新規 | `MacroRegistry`, `MacroDefinition`, `MacroFactory`, `MacroLoadDiagnostic` を定義する正配置 |
 | `src/nyxpy/framework/core/macro/settings_resolver.py` | 新規 | `MacroSettingsResolver` を定義し、settings TOML 解決を `ResourceStorePort` から分離 |
-| `src/nyxpy/framework/core/macro/legacy_adapter.py` | 新規 | 旧方式マクロ探索・互換名生成を担当。settings 解決は `MacroSettingsResolver` へ委譲 |
-| `src/nyxpy/framework/core/utils/helper.py` | 変更 | `load_macro_settings()` の既存挙動を維持し、新しい `MacroDefinition` ベース解決へ委譲可能にする |
+| `src/nyxpy/framework/core/macro/entrypoint_loader.py` | 新規 | manifest entrypoint から package / single-file macro を解決する |
+| `src/nyxpy/framework/core/utils/helper.py` | 変更 | `load_macro_settings()` の旧 fallback を削除し、必要なら `MacroSettingsResolver` へ委譲 |
 | `tests/unit/executor/test_executor.py` | 変更 | 既存テストを維持し、衝突・失敗診断・実行ごとの新規インスタンス生成のテストを追加 |
 | `tests/gui/test_macro_reload.py` | 変更 | 存在する場合、追加・削除リロード互換とロード失敗表示を検証 |
-| `tests/unit/macro/test_registry.py` | 新規 | レジストリ、マニフェスト、Legacy adapter の純粋ロジックを検証 |
-| `tests/integration/test_macro_registry_compat.py` | 新規 | 実際の `macros/` と `static/` 配置に近い構成で互換ロードを検証 |
+| `tests/unit/macro/test_registry.py` | 新規 | レジストリ、マニフェスト、entrypoint loader の純粋ロジックを検証 |
+| `tests/integration/test_macro_registry_migration.py` | 新規 | 移行後 `macros/` と manifest 構成でロードを検証 |
 
 ## 3. 設計方針
 
@@ -89,7 +89,7 @@
 nyxpy.gui / nyxpy.cli
   -> nyxpy.framework.core.runtime
   -> nyxpy.framework.core.macro.registry
-  -> nyxpy.framework.core.macro.legacy_adapter
+  -> nyxpy.framework.core.macro.entrypoint_loader
   -> nyxpy.framework.core.macro.base / command / utils
 
 macros/<name> -> nyxpy.framework.*       OK
@@ -118,27 +118,24 @@ nyxpy.framework.* -> macros/<name>       NG
 | lifecycle signature | `finalize(self, cmd: Command) -> None` | 例外・中断時も可能な限り呼ばれる |
 | Command method names | `press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `save_img`, `load_img`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` | 既存名を削除・改名しない |
 | Command argument compatibility | `press(*keys, dur=0.1, wait=0.1)` など現行キーワード | 既存呼び出しが TypeError にならない |
-| settings lookup | `static/<macro_name>/settings.toml` | 旧配置の TOML が読み込まれる |
 | exec args merge | file settings より `exec_args` が優先 | 現行 `args = {**file_args, **exec_args}` と同じ |
 | macro metadata | `description: str`, `tags: list[str]` | GUI 一覧・タグ抽出で利用できる |
 
-`static settings lookup` は `MacroSettingsResolver` が担当する。画像保存・読み込み用の `ResourceStorePort` は settings TOML を探索しない。優先順は次の通りである。
+`MacroSettingsResolver` は manifest settings path だけを担当する。画像保存・読み込み用の `ResourceStorePort` は settings TOML を探索しない。解決順は次の通りである。
 
-1. `macro.toml [macro].settings` に明示されたパス。`static/...` のような通常パスは `project_root` 相対、`./settings.toml` のように `./` で始まるパスは manifest を置いた macro root 相対として解決する。絶対パスと `..` による root 外参照は拒否する。
-2. legacy package 名から `project_root/static/<package_name>/settings.toml`。
-3. legacy single-file 名から `project_root/static/<module_stem>/settings.toml`。
-4. `cwd` 起点の legacy fallback。非推奨警告を出すが、非推奨期間中は読み込む。
+1. `macro.toml [macro].settings` に明示されたパス。`project:` prefix は `project_root` 相対、通常の相対パスは manifest を置いた macro root 相対として解決する。
+2. manifest 指定がない場合は settings file を読み込まず、`MacroSettingsResolver.resolve()` は `None` を返す。
 
-旧方式は非推奨にするが、即削除しない。少なくとも 2 minor release または 6 か月の長い方を非推奨期間とし、その間は `warnings.warn(..., DeprecationWarning)` とログで移行先を案内する。既存マクロは変更不要である。新方式は `macro.toml` を置いたマクロだけが opt-in する。
+`static/<macro_name>/settings.toml`、legacy package / single-file 名からの settings 推測、`cwd` 起点 fallback は残さない。必要な settings は manifest に明示し、マクロ移行ガイドで移動手順を示す。
 
 #### 互換ポリシー表
 
 | 区分 | 対象 | 方針 |
 |------|------|------|
-| 永久維持 | `MacroBase` / `Command` / `DefaultCommand` / constants import、`MacroBase` lifecycle、`Command` method names、`MacroStopException` constructor 互換、static settings lookup | 既存マクロ変更不要のため破壊不可。 |
+| 永久維持 | `MacroBase` / `Command` / `DefaultCommand` / constants import、`MacroBase` lifecycle、`Command` method names、`MacroStopException` constructor 互換 | Runtime 再設計後も破壊しない。 |
 | 削除対象 | `MacroExecutor` | 既存ユーザーマクロ互換契約には含めない。GUI/CLI/テストを新 API へ移行した後に削除し、シグネチャ保証、adapter 契約、import shim は提供しない。 |
-| 一時互換 | legacy loader, `cwd` fallback | 既存マクロのロード互換に必要な範囲だけ警告付きで残す。 |
-| 非推奨後削除候補 | 恒久的な `sys.path` 変更、曖昧な class 名選択、暗黙 dummy fallback、`cwd` のみに依存する探索 | 移行期間後、別仕様で削除可否を判断する。 |
+| 破壊的変更 | static settings lookup、legacy auto discovery、`cwd` fallback、`DefaultCommand` 旧コンストラクタ | マクロ移行ガイドに従って修正する。 |
+| 削除対象 | 恒久的な `sys.path` 変更、曖昧な class 名選択、暗黙 dummy fallback、`cwd` のみに依存する探索 | 新 Runtime 経路では残さない。 |
 
 ### レイヤー構成
 
@@ -149,25 +146,25 @@ nyxpy.framework.* -> macros/<name>       NG
 | レジストリレイヤー | マクロ一覧、ID、診断、ファクトリを管理 | `MacroRegistry`, `MacroDefinition` |
 | 生成レイヤー | 実行ごとの新規インスタンス生成 | `MacroFactory` |
 | 宣言レイヤー | 新方式の `macro.toml` 読み込み。読み込み結果は `MacroDefinition` へ正規化する | `macro.toml` |
-| 旧方式アダプタ | 既存ファイル構造・表示名を解決 | `LegacyMacroAdapter` |
-| 設定解決 | manifest settings と legacy static settings を解決 | `MacroSettingsResolver` |
+| entrypoint 解決 | manifest の entrypoint から package / single-file を解決 | `MacroDefinition.entrypoint` |
+| 設定解決 | manifest settings を解決 | `MacroSettingsResolver` |
 
 ### クラス名衝突方針
 
 現行は `self.macros[obj.__name__] = instance` のため、同じクラス名が複数あると後勝ちで上書きされる。新方式では `MacroDefinition.id` を主キーにする。
 
 - manifest あり: `id = manifest.id`。
-- legacy package: `id = "<package_name>:<class_name>"`。
-- legacy single-file: `id = "<module_stem>:<class_name>"`。
+- manifest なしの legacy auto discovery は行わない。
+- single-file macro は manifest に明示された entrypoint として扱い、`id = manifest.id` に正規化する。
 - `class_name` が一意な場合だけ、互換 alias として `class_name` でも選択可能。
 - `class_name` が衝突した場合、`set_active_macro("ClassName")` は `AmbiguousMacroError` を送出し、候補 ID をメッセージに含める。
 - GUI/CLI は `MacroRegistry.resolve()` の `AmbiguousMacroError` を表示用エラーへ変換する。`MacroExecutor.set_active_macro()` の旧互換は保証しない。
 
 ### cwd / sys.path 依存の扱い
 
-`MacroRegistry(project_root: Path)` を主経路にする。`project_root` 未指定時だけ `Path.cwd()` を fallback とする。legacy import のために探索対象 root を一時的に `sys.path` へ追加する場合は context manager で囲み、ロード後に元へ戻す。恒久的な `sys.path.append(str(Path.cwd()))` は廃止する。
+`MacroRegistry(project_root: Path)` を主経路にし、`Path.cwd()` fallback は使わない。manifest entrypoint を import する際に探索対象 root を一時的に `sys.path` へ追加する必要がある場合は context manager で囲み、ロード後に元へ戻す。恒久的な `sys.path.append(str(Path.cwd()))` は廃止する。
 
-相対 import を使う package 型マクロは、現在と同じく `macros/<package>/__init__.py` または manifest entrypoint から import できる必要がある。`macros/shared/*` への依存は許可する。
+相対 import を使う package 型マクロは、manifest entrypoint から import できる必要がある。single-file macro も manifest entrypoint が明示されていれば許可する。`macros/shared/*` への依存は許可する。
 
 ### ロード失敗診断
 
@@ -198,7 +195,7 @@ nyxpy.framework.* -> macros/<name>       NG
 |---------|------|----------|--------|---------|------------------|------------------------|----------|
 | `registry_reload_lock` | `threading.RLock` | `definitions`、`diagnostics`、alias map の snapshot 交換 | 全体 1 番目。`run_start_lock` より先 | 2 秒 | `RegistryLockTimeoutError` | module import、ユーザー macro class 生成、settings TOML parse、GUI 通知、ログ sink emit | `test_registry_reload_swaps_snapshot_atomically` |
 
-`LegacyMacroAdapter.discover()` と `load_definition()` はローカル変数へ候補を集め、`MacroRegistry.reload()` の最後に `registry_reload_lock` を取得して snapshot を一括交換する。`resolve()`、`list()`、`definitions`、`diagnostics` は lock 内で immutable snapshot への参照または浅い copy を取得し、呼び出し元へ返す前に lock を解放する。
+`EntryPointLoader.load_definition()` は manifest entrypoint を解決し、ローカル変数へ候補を集める。`MacroRegistry.reload()` は最後に `registry_reload_lock` を取得して snapshot を一括交換する。`resolve()`、`list()`、`definitions`、`diagnostics` は lock 内で immutable snapshot への参照または浅い copy を取得し、呼び出し元へ返す前に lock を解放する。
 
 `MacroRuntimeBuilder.build()` は `MacroRegistry.resolve()` で `MacroDefinition` の snapshot を取得した後、`registry_reload_lock` を保持しないまま settings 解決、resource scope 生成、Port 構築を行う。reload が実行中に完了しても、開始済みまたは開始準備済みの実行は取得済み `MacroDefinition` で完結する。
 
@@ -220,6 +217,9 @@ from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.runtime import MacroRuntime, RunResult
 
 
+type SettingValue = str | int | float | bool | list[SettingValue] | dict[str, SettingValue] | None
+
+
 class MacroLoadError(Exception):
     """マクロロードに失敗したことを表す例外。"""
 
@@ -238,6 +238,12 @@ class MacroLoadDiagnostic:
     exception_type: str
     message: str
     traceback: str
+
+
+@dataclass(frozen=True)
+class MacroSettingsSource:
+    path: Path
+    source: str
 
 
 class MacroFactory(Protocol):
@@ -265,15 +271,15 @@ class MacroDefinition:
     tags: tuple[str, ...]
     factory: MacroFactory
     manifest_path: Path | None = None
-    legacy: bool = False
+    entrypoint_kind: str = "manifest"
 
 
 class MacroSettingsResolver:
     def __init__(self, project_root: Path) -> None: ...
 
-    def resolve(self, definition: "MacroDefinition") -> Path | None: ...
+    def resolve(self, definition: "MacroDefinition") -> MacroSettingsSource | None: ...
 
-    def load(self, definition: "MacroDefinition") -> dict: ...
+    def load(self, definition: "MacroDefinition") -> dict[str, SettingValue]: ...
 
 
 class MacroRegistry:
@@ -301,14 +307,10 @@ class MacroRegistry:
     def get_settings(self, definition: MacroDefinition) -> dict: ...  # MacroSettingsResolver へ委譲
 
 
-class LegacyMacroAdapter:
+class EntryPointLoader:
     def __init__(self, project_root: Path, macros_dir: Path) -> None: ...
 
-    def discover(self) -> Sequence[Path]: ...
-
-    def load_definition(self, path: Path) -> MacroDefinition: ...
-
-    def resolve_settings_path(self, macro_cls: type[MacroBase]) -> Path | None: ...
+    def load_definition(self, manifest_path: Path) -> MacroDefinition: ...
 ```
 
 `macro.toml` は入力ファイル形式であり、`MacroManifest` という Python クラスは定義しない。読み込み処理は TOML を検証して `MacroDefinition` を生成する。
@@ -350,7 +352,7 @@ GUI/CLI
 
 ### Manifest 仕様
 
-新方式は `macros/<macro_name>/macro.toml` を置いた場合のみ opt-in する。manifest が存在しないマクロは `LegacyMacroAdapter` で従来通り扱う。
+`macros/<macro_name>/macro.toml` を必須とする。manifest が存在しないマクロは自動探索しない。single-file macro は manifest entrypoint に明示されている場合だけロードする。
 
 ```toml
 [macro]
@@ -360,7 +362,7 @@ display_name = "FRLG TID乱数調整マクロ"
 description = "FRLG TID乱数調整マクロ (Switch 720p)"
 tags = ["pokemon", "frlg", "rng", "tid"]
 version = "1.0.0"
-settings = "static/frlg_id_rng/settings.toml"
+settings = "settings.toml"
 ```
 
 manifest の `entrypoint` は `module:ClassName` 形式である。`class_name` は原則不要だが、将来の拡張で複数 entrypoint を扱う場合に備えて予約する。
@@ -369,24 +371,23 @@ manifest の `entrypoint` は `module:ClassName` 形式である。`class_name` 
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `project_root` | `Path | None` | `None` | `MacroRegistry` の探索起点。`None` の場合は `Path.cwd()` を段階互換 fallback とする |
+| `project_root` | `Path` | なし | `MacroRegistry` の探索起点。省略不可 |
 | `macros_dir` | `Path | None` | `None` | 探索対象ディレクトリ。`None` の場合は `<project_root>/macros` |
 | `macro.toml [macro].id` | `str` | なし | 新方式の安定 ID。省略不可 |
 | `macro.toml [macro].entrypoint` | `str` | なし | `module:ClassName` 形式の entrypoint。省略不可 |
 | `macro.toml [macro].display_name` | `str | None` | class 名 | GUI / CLI 表示名 |
 | `macro.toml [macro].description` | `str | None` | class 属性 `description` | マクロ説明文 |
 | `macro.toml [macro].tags` | `list[str]` | `[]` | GUI タグフィルタ用 |
-| `macro.toml [macro].settings` | `str | None` | legacy lookup | TOML 設定ファイルの相対パス。`static/...` は project-root 相対、`./...` は macro-root 相対 |
+| `macro.toml [macro].settings` | `str | None` | `None` | TOML 設定ファイルの相対パス。通常の相対パスは macro-root 相対、`project:` prefix は project-root 相対 |
+### Entrypoint loader 仕様
 
-### Legacy loader 仕様
+`EntryPointLoader` は manifest に明示された `entrypoint` だけを解決する。
 
-`LegacyMacroAdapter.discover()` は次を探索する。
-
-| 形式 | 例 | module_name | legacy macro_name |
-|------|----|-------------|-------------------|
-| package `__init__.py` | `macros/frlg_id_rng/__init__.py` | `macros.frlg_id_rng` | `frlg_id_rng` |
-| package `macro.py` | `macros/frlg_id_rng/macro.py` | `macros.frlg_id_rng.macro` | `frlg_id_rng` |
-| single file | `macros/sample.py` | `macros.sample` | `sample` |
+| 形式 | 例 | entrypoint |
+|------|----|------------|
+| package `macro.py` | `macros/frlg_id_rng/macro.py` | `macros.frlg_id_rng.macro:FrlgIdRngMacro` |
+| package `__init__.py` | `macros/frlg_id_rng/__init__.py` | `macros.frlg_id_rng:FrlgIdRngMacro` |
+| single file | `macros/sample.py` | `macros.sample:SampleMacro` |
 
 package に `macro.toml` がある場合は manifest を優先する。manifest がない場合、従来の `__init__.py` import と `macro.py` import の両方を許容する。ただし同一 package から同じ class が二重登録される場合は 1 件に統合し、診断に重複を記録する。
 
@@ -420,23 +421,23 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
-| ユニット | `test_registry_loads_legacy_package_macro` | `macros/pkg/macro.py` の `MacroBase` サブクラスを `MacroDefinition` として登録する |
-| ユニット | `test_registry_loads_legacy_single_file_macro` | `macros/sample.py` を `sample:ClassName` で登録する |
+| ユニット | `test_registry_loads_manifest_package_macro` | manifest entrypoint の package macro を `MacroDefinition` として登録する |
+| ユニット | `test_registry_loads_manifest_single_file_macro` | manifest entrypoint の single-file macro を `MacroDefinition` として登録する |
 | ユニット | `test_registry_loads_manifest_macro` | `macro.toml` の `entrypoint` と `settings` を優先する |
 | ユニット | `test_class_name_alias_is_available_when_unique` | class 名が一意なら `set_active_macro("ClassName")` が通る |
 | ユニット | `test_class_name_collision_requires_qualified_id` | 同名 class が複数ある場合に `AmbiguousMacroError` と候補 ID を返す |
 | ユニット | `test_load_failure_is_reported_without_stopping_reload` | 1 件 import 失敗しても他マクロが登録され、diagnostics に失敗理由が残る |
 | ユニット | `test_registry_reload_swaps_snapshot_atomically` | reload 中に `definitions` と `diagnostics` の中途半端な snapshot が見えない |
 | ユニット | `test_execute_creates_new_instance_each_time` | 2 回 execute して `MacroFactory.create()` が 2 回呼ばれ、状態が共有されない |
-| ユニット | `test_settings_legacy_package_lookup` | `static/<package>/settings.toml` が読み込まれる |
-| ユニット | `test_settings_legacy_single_file_lookup` | `static/<module_stem>/settings.toml` が読み込まれる |
+| ユニット | `test_settings_without_manifest_path_returns_empty_dict` | manifest settings path がない場合は settings file を暗黙探索しない |
+| ユニット | `test_settings_static_lookup_is_not_supported` | `static/<macro_name>/settings.toml` を互換 settings として読み込まない |
 | ユニット | `test_exec_args_override_file_settings` | file settings より `exec_args` が優先される |
 | ユニット | `test_command_method_names_are_compatible` | `Command` が互換契約のメソッド名を持つ |
 | ユニット | `test_command_type_accepts_str_keycode_special_keycode` | `Command.type(key: str | KeyCode | SpecialKeyCode)` の呼び出し互換を検証する |
 | ユニット | `test_manifest_settings_path_resolution` | manifest settings が project-root 相対と macro-root 相対を区別して解決される |
 | ユニット | `test_macro_executor_removed` | `MacroExecutor` を新 API、互換契約、移行 adapter として公開しない |
 | ユニット | `test_constants_import_contract` | `from nyxpy.framework.core.constants import Button, Hat, LStick, RStick, KeyType` が成功する |
-| 結合 | `test_existing_repository_macros_load_without_changes` | 代表マクロ 4 件が変更なしでロードされる |
+| 結合 | `test_migrated_repository_macros_load_from_manifest` | 移行後の代表マクロが manifest entrypoint からロードされる |
 | 結合 | `test_gui_cli_do_not_import_macro_executor` | GUI/CLI が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使う |
 | GUI | `test_macro_reload_add_and_remove_real_env` | 既存 GUI リロードテストの追加・削除挙動を維持する |
 | GUI | `test_macro_reload_shows_load_diagnostics` | 壊れたマクロを追加しても一覧は表示され、診断が確認できる |
@@ -460,13 +461,13 @@ uv run ruff check .
 - [x] lifecycle signature の互換契約を明記
 - [x] Command method names の互換契約を明記
 - [x] constants import の互換契約を明記
-- [x] static settings lookup の段階互換を明記
-- [x] `MacroRegistry`, `MacroDefinition`, `MacroFactory`, `macro.toml`, `LegacyMacroAdapter` の責務を定義
+- [x] static settings lookup を互換対象から外す方針を明記
+- [x] `MacroRegistry`, `MacroDefinition`, `MacroFactory`, `macro.toml`, `EntryPointLoader` の責務を定義
 - [x] クラス名衝突時の ID / alias 方針を定義
 - [x] `cwd` / `sys.path` 依存の解消方針を定義
 - [x] ロード失敗診断の保持方針を定義
 - [x] 実行ごとのマクロインスタンス生成を定義
-- [x] 既存マクロ変更不要、新方式 opt-in、旧方式非推奨期間の方針を定義
+- [x] Resource/settings/entrypoint のマクロ側移行を要求する方針を定義
 - [x] 対象ファイル表を作成
 - [x] 公開 API シグネチャを作成
 - [x] 設定例 TOML を作成

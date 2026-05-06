@@ -1,11 +1,11 @@
 # 異常系・中断・ログ再設計 仕様書
 
-> **文書種別**: 仕様書。例外分類、キャンセル正規化、`RunResult` への失敗情報変換、error code catalog の正本である。
+> **文書種別**: 仕様書。例外分類、キャンセル正規化、`RunResult.error` への失敗情報変換、error code catalog の正本である。`RunResult` 本体の正本は `RUNTIME_AND_IO_PORTS.md` とする。
 > **対象モジュール**: `src/nyxpy/framework/core/macro/`, `src/nyxpy/framework/core/utils/`, `src/nyxpy/framework/core/logger/`, `src/nyxpy/framework/core/settings/`  
 > **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果を再設計し、ログ出力は `LOGGING_FRAMEWORK.md` の基盤へ接続する。  
 > **関連ドキュメント**: `LOGGING_FRAMEWORK.md`, `spec/framework/archive/logging_design.md`  
 > **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、`DefaultCommand` 旧コンストラクタ、legacy loader はマクロ側移行を前提に破壊的変更を許容する。
 
 ## 1. 概要
 
@@ -103,13 +103,13 @@
 
 ### 公開 API 方針
 
-既存ユーザーマクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と主要メソッド名、settings lookup は維持する。`MacroExecutor.execute()` は公開互換契約から外し、戻り値 `None` と失敗時の例外再送出は保証しない。`RunResult` は `MacroRuntime` / `MacroRunner` の新方式 API が返す。既存 `Command.log()` は呼び出し形式を維持し、`LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続する。
+既存ユーザーマクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と主要メソッド名は維持する。settings lookup は新方式へ移行し、旧 `static` / `cwd` fallback は維持しない。`MacroExecutor.execute()` は公開互換契約から外し、戻り値 `None` と失敗時の例外再送出は保証しない。`RunResult` は `MacroRuntime` / `MacroRunner` の新方式 API が返す。既存 `Command.log()` は呼び出し形式を維持し、`LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続する。
 
 `Command.stop()` はマクロ内から呼ばれる既存用途を考慮し、既定では中断要求の登録だけを行う。GUI/CLI の外部操作は `RunHandle.cancel()` のみを呼び、`Command` の cancel API や `CancellationToken` を直接操作しない。
 
 ### 後方互換性
 
-破壊的変更は行わない。`MacroStopException` は削除せず、`MacroCancelled` との adapter 関係を定義する。推奨 API は `MacroCancelled` だが、既存の `except MacroStopException` は `MacroCancelled` を捕捉できる。
+例外・中断契約に対する破壊的変更は行わない。`MacroStopException` は削除せず、`MacroCancelled` との adapter 関係を定義する。推奨 API は `MacroCancelled` だが、既存の `except MacroStopException` は `MacroCancelled` を捕捉できる。
 
 `MacroBase.finalize(self, cmd)` の抽象シグネチャは変更しない。これは唯一の抽象契約である。新方式で outcome を受け取りたいマクロだけが `SupportsFinalizeOutcome` Protocol 相当の opt-in 拡張として `finalize(self, cmd, outcome)` または `finalize(self, cmd, **kwargs)` を実装できる。Runner が `inspect.signature()` で `outcome` 引数または `**kwargs` の有無を判定し、受け取れるマクロにだけ `outcome` を渡す。
 
@@ -151,10 +151,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Mapping, Protocol
+from typing import Mapping, Protocol
 
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
+
+
+type ErrorDetailValue = str | int | float | bool | list[ErrorDetailValue] | dict[str, ErrorDetailValue] | None
+type MacroArgValue = str | int | float | bool | list[MacroArgValue] | dict[str, MacroArgValue] | None
+type LogExtraValue = str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
 
 
 class ErrorKind(StrEnum):
@@ -176,7 +181,7 @@ class FrameworkError(Exception):
         code: str,
         component: str,
         recoverable: bool = False,
-        details: Mapping[str, Any] | None = None,
+        details: Mapping[str, ErrorDetailValue] | None = None,
         cause: BaseException | None = None,
     ) -> None: ...
 
@@ -205,7 +210,7 @@ class ErrorInfo:
     component: str
     exception_type: str
     recoverable: bool
-    details: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, ErrorDetailValue] = field(default_factory=dict)
     traceback: str | None = None
 
 
@@ -219,6 +224,7 @@ class RunStatus(StrEnum):
 class RunResult:
     run_id: str
     macro_id: str
+    macro_name: str
     status: RunStatus
     started_at: datetime
     finished_at: datetime
@@ -266,7 +272,7 @@ class CancellableCommand(Command):
         end: str = "\n",
         level: str = "INFO",
         event: str = "macro.message",
-        extra: Mapping[str, Any] | None = None,
+        extra: Mapping[str, LogExtraValue] | None = None,
         gui: bool = True,
     ) -> None: ...
 ```
@@ -285,7 +291,7 @@ class MacroRunner:
         self,
         macro: MacroBase,
         cmd: Command,
-        exec_args: Mapping[str, Any],
+        exec_args: Mapping[str, MacroArgValue],
         run_context: RunContext,
     ) -> RunResult: ...
 
@@ -399,8 +405,8 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 class ArgSpec:
     type: type | tuple[type, ...]
     required: bool = False
-    default: object = None
-    choices: tuple[object, ...] | None = None
+    default: MacroArgValue = None
+    choices: tuple[MacroArgValue, ...] | None = None
     description: str = ""
 
 

@@ -5,7 +5,7 @@
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。  
 > **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\api\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、legacy auto discovery、`DefaultCommand` 旧コンストラクタ、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -18,29 +18,29 @@
 | 用語 | 定義 |
 |------|------|
 | Command | マクロがコントローラー操作、待機、キャプチャ、画像入出力、通知、ログを行うための高レベル API |
-| DefaultCommand | 既存 import path を維持する `Command` 実装。移行後は `CommandFacade` の互換ラッパーとして Ports を利用する |
+| DefaultCommand | 既存 import path を維持する `Command` 実装。移行後は `CommandFacade` の薄い別名または互換 subclass とし、旧コンストラクタ引数は受け付けない |
 | CommandFacade | `Command` API を Ports へ委譲する実装。プロトコル変換やデバイス具象実装を直接持たない |
 | MacroBase | ユーザ定義マクロの抽象基底クラス。`initialize` / `run` / `finalize` ライフサイクルを持つ |
 | MacroExecutor | 旧 GUI/CLI/テスト入口で使われる既存クラス。再設計後の公開 API、既存マクロ互換契約、移行 adapter のいずれにも含めず削除する |
-| MacroRuntime | 実行要求、`ExecutionContext` 構築、`Command` 生成、`MacroRegistry` / `MacroFactory` / `MacroRunner` 呼び出し、`RunResult` 確定、リソース解放を統括するフレームワーク層の実行基盤 |
-| MacroRuntimeBuilder | GUI/CLI/Legacy 入口から受け取った実行要求を、`MacroDefinition`、settings、`MacroResourceScope`、Ports、`ExecutionContext` へ組み立てる adapter。本書が API と責務の正本である |
+| MacroRuntime | 完成済み `ExecutionContext` を受け取り、`Command` 生成、`MacroFactory` / `MacroRunner` 呼び出し、`RunResult` 確定、リソース解放を統括するフレームワーク層の実行基盤 |
+| MacroRuntimeBuilder | GUI/CLI 入口から受け取った実行要求を、`MacroDefinition`、settings、`MacroResourceScope`、Ports、`ExecutionContext` へ組み立てる adapter。本書が API と責務の正本である |
 | MacroRegistry | 利用可能マクロを発見し、安定 ID とメタデータを保持するレジストリ。実行インスタンスは保持しない |
 | MacroFactory | `MacroRegistry` の定義情報から実行ごとに新しい `MacroBase` インスタンスを生成するファクトリ |
 | MacroRunner | `initialize -> run -> finalize` のライフサイクルを実行し、例外・中断・結果を `RunResult` に変換するコンポーネント |
-| ExecutionContext | 1 回のマクロ実行に必要な引数、CancellationToken、Ports、設定値、実行 ID を束ねる不変データ |
+| ExecutionContext | 1 回のマクロ実行に必要な `macro_id`、`macro_name`、引数、CancellationToken、Ports、設定値、実行 ID を束ねる不変データ |
 | RunLogContext | 1 回の実行に紐づくログ相関情報。型定義は `LOGGING_FRAMEWORK.md` を正とし、所有は `ExecutionContext.run_log_context` とする |
 | RunHandle | 非同期実行中のマクロに対するキャンセル、完了待ち、結果取得のハンドル |
-| RunResult | マクロ実行の終了状態、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を表す値オブジェクト |
+| RunResult | `macro_id`、`macro_name`、マクロ実行の終了状態、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を表す値オブジェクト |
 | ControllerOutputPort | ボタン、スティック、キーボード入力をコントローラー出力へ送る基本 Port。touch と sleep は optional capability に分離する |
 | FrameSourcePort | キャプチャデバイスまたはテスト用フレームソースから最新フレームを取得する Port |
 | ResourceStorePort | Resource File I/O の assets 読み込みを行う Port。詳細は `RESOURCE_FILE_IO.md` を正とし、settings TOML 解決は担当しない |
 | RunArtifactStore | Resource File I/O の writable outputs 保存を行う Port。実行 ID ごとの成果物 root、atomic write、overwrite policy を担当する |
-| MacroResourceScope | 1 つのマクロ ID に紐づく assets root、macro root、legacy static root を表す値 |
-| MacroSettingsResolver | `static/<macro_name>/settings.toml` 互換と manifest settings path を解決する専用コンポーネント |
+| MacroResourceScope | 1 つのマクロ ID に紐づく assets root と macro root を表す値 |
+| MacroSettingsResolver | manifest settings path と project root 明示設定を解決する専用コンポーネント |
 | NotificationPort | Discord / Bluesky などの外部通知へ発行する Port |
 | LoggerPort | loguru ベースの `LogManager` またはテスト用ロガーへログを出力する Port |
 | Ports/Adapters | Port は Runtime 中核から見た I/O 抽象、Adapter は現行 Serial/Capture/Resource/Notification/Logger 実装へ接続する実装 |
-| Legacy Compatibility Layer | 既存ユーザーマクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と settings lookup を維持する互換層。`MacroExecutor` は含めない |
+| Compatibility Layer | 既存ユーザーマクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` を維持する互換層。旧コンストラクタ、旧 settings lookup、`MacroExecutor` は含めない |
 | CancellationToken | スレッドセーフなマクロ中断メカニズム |
 | dummy fallback | 実デバイス未選択時に暗黙でダミーデバイスを有効化する現行挙動 |
 | frame readiness | `AsyncCaptureDevice` 初期化後、最初の有効フレームが取得可能になった状態 |
@@ -101,7 +101,7 @@
 | `src\nyxpy\framework\core\io\controller.py` | 新規 | `SerialControllerOutputPort`, `DummyControllerOutputPort` を実装 |
 | `src\nyxpy\framework\core\io\frame_source.py` | 新規 | `CaptureFrameSourcePort`, `DummyFrameSourcePort`, frame readiness を実装 |
 | `src\nyxpy\framework\core\io\resource_store.py` | 新規 | 安全な static root 解決と画像 I/O を実装。settings TOML 解決は扱わない |
-| `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` を実装し、manifest / legacy settings TOML を解決 |
+| `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` を実装し、manifest settings TOML を解決 |
 | `src\nyxpy\framework\core\io\notification.py` | 新規 | `NotificationHandler` の Port adapter を実装 |
 | `src\nyxpy\framework\core\io\logger.py` | 新規 | `LogManager` の Port adapter を実装 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `CommandFacade` を追加し、`DefaultCommand` を互換ラッパーとして Ports 利用へ移行 |
@@ -152,7 +152,7 @@ GUI/CLI
   -> MacroSettingsResolver.load(definition)
   -> MacroResourceScope.from_definition(definition, project_root)
   -> ResourceStorePort / RunArtifactStore / ControllerOutputPort / FrameSourcePort / NotificationPort / LoggerPort を生成
-  -> MacroRuntime.create_context(...)
+  -> ExecutionContext を生成
   -> MacroRuntime.run(context) または MacroRuntime.start(context)
 ```
 
@@ -162,23 +162,22 @@ GUI/CLI
 
 - `nyxpy.framework.core.runtime` は `nyxpy.gui` と `nyxpy.cli` に依存しない。
 - `nyxpy.framework.core.io` は GUI イベントや Qt 型に依存しない。
-- `nyxpy.framework.core.macro.command` は Port インターフェースに依存してよいが、Port 具象実装への依存は互換コンストラクタ内の adapter 生成に限定する。
+- `nyxpy.framework.core.macro.command` は Port インターフェースに依存してよいが、Port 具象実装へ依存しない。
 - `macros\` 配下は引き続き `nyxpy.framework.*` にだけ依存する。
 
 ### 公開 API 方針
 
-新規公開 API は `nyxpy.framework.core.runtime` と `nyxpy.framework.core.io` に集約する。既存 `Command` API は維持し、`DefaultCommand` の import path と主要コンストラクタ引数も移行期間中は維持する。
+新規公開 API は `nyxpy.framework.core.runtime` と `nyxpy.framework.core.io` に集約する。既存 `Command` API と `DefaultCommand` の import path は維持するが、`DefaultCommand` の旧コンストラクタ引数は公開互換契約から外す。
 
-`CommandFacade` は新規実装の正とする。`DefaultCommand` は次のどちらの形式でも生成できる。
+`CommandFacade` は新規実装の正とする。`DefaultCommand` は次の形式だけで生成できる。
 
 1. 新形式: `DefaultCommand(context=execution_context)`
-2. 旧形式: `DefaultCommand(serial_device=..., capture_device=..., resource_io=..., protocol=..., ct=..., notification_handler=...)`
 
-旧形式は内部で標準 Port adapter を生成する。旧形式を即時廃止せず、移行後 1 minor 以上の期間は `DeprecationWarning` なしで維持する。GUI/CLI の内部利用だけを先に新形式へ移す。
+既存マクロは GUI/CLI 経路から生成された `Command` を受け取り、`DefaultCommand` を直接生成しない前提である。旧形式 `DefaultCommand(serial_device=..., capture_device=..., resource_io=..., protocol=..., ct=..., notification_handler=...)` は互換 shim を作らず削除する。GUI/CLI とテストは同じ移行単位で `MacroRuntimeBuilder` 経由へ移す。
 
 ### 後方互換性
 
-破壊的変更は行わない。次の互換条件を受け入れ基準とする。
+既存マクロの import path と lifecycle には破壊的変更を行わない。Resource I/O、settings lookup、`DefaultCommand` 旧コンストラクタなど、マクロ側の移行で吸収する項目は破壊的変更を許容する。次の互換条件を受け入れ基準とする。
 
 | 互換対象 | 方針 |
 |----------|------|
@@ -247,14 +246,18 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
-from typing import Any, BinaryIO, Protocol
+from typing import BinaryIO, Protocol, runtime_checkable
 
 import cv2
 
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
+from nyxpy.framework.core.io.resources import OverwritePolicy, ResourceRef
 from nyxpy.framework.core.utils.cancellation import CancellationToken
+
+
+type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, RuntimeValue] | None
 
 
 class RunStatus(StrEnum):
@@ -275,10 +278,11 @@ class RuntimeOptions:
 @dataclass(frozen=True)
 class ExecutionContext:
     run_id: str
+    macro_id: str
     macro_name: str
     run_log_context: RunLogContext
-    exec_args: Mapping[str, Any]
-    metadata: Mapping[str, Any]
+    exec_args: Mapping[str, RuntimeValue]
+    metadata: Mapping[str, RuntimeValue]
     cancellation_token: CancellationToken
     controller: ControllerOutputPort
     frame_source: FrameSourcePort
@@ -292,6 +296,7 @@ class ExecutionContext:
 @dataclass(frozen=True)
 class RunContext:
     run_id: str
+    macro_id: str
     macro_name: str
     started_at: datetime
     cancellation_token: CancellationToken
@@ -306,13 +311,14 @@ class ErrorInfo:
     component: str
     exception_type: str
     recoverable: bool = False
-    details: Mapping[str, Any] = field(default_factory=dict)
+    details: Mapping[str, RuntimeValue] = field(default_factory=dict)
     traceback: str | None = None
 
 
 @dataclass(frozen=True)
 class RunResult:
     run_id: str
+    macro_id: str
     macro_name: str
     status: RunStatus
     started_at: datetime
@@ -321,7 +327,10 @@ class RunResult:
     cleanup_warnings: tuple[str, ...] = ()
 
     @property
-    def duration_sec(self) -> float: ...
+    def ok(self) -> bool: ...
+
+    @property
+    def duration_seconds(self) -> float: ...
 
 
 class RunHandle(ABC):
@@ -354,21 +363,6 @@ class MacroRuntime:
         runner: MacroRunner | None = None,
     ) -> None: ...
 
-    def create_context(
-        self,
-        *,
-        macro_name: str,
-        exec_args: Mapping[str, Any] | None,
-        controller: ControllerOutputPort,
-        frame_source: FrameSourcePort,
-        resources: ResourceStorePort,
-        artifacts: RunArtifactStore,
-        notifications: NotificationPort,
-        logger: LoggerPort,
-        options: RuntimeOptions | None = None,
-        metadata: Mapping[str, Any] | None = None,
-    ) -> ExecutionContext: ...
-
     def run(self, context: ExecutionContext) -> RunResult: ...
 
     def start(self, context: ExecutionContext) -> RunHandle: ...
@@ -380,9 +374,9 @@ class MacroRuntime:
 class RuntimeBuildRequest:
     macro_id: str
     entrypoint: str
-    exec_args: Mapping[str, Any] = field(default_factory=dict)
+    exec_args: Mapping[str, RuntimeValue] = field(default_factory=dict)
     allow_dummy: bool | None = None
-    metadata: Mapping[str, Any] = field(default_factory=dict)
+    metadata: Mapping[str, RuntimeValue] = field(default_factory=dict)
 
 
 class MacroRuntimeBuilder:
@@ -408,12 +402,14 @@ class MacroRunner(ABC):
         self,
         macro: MacroBase,
         cmd: Command,
-        exec_args: Mapping[str, Any],
+        exec_args: Mapping[str, RuntimeValue],
         run_context: RunContext,
     ) -> RunResult: ...
 ```
 
 `ExecutionContext` の完全なフィールド一覧は本節を正とする。`RunLogContext` は `ExecutionContext.run_log_context` として保持し、Runtime builder が `run_id`、`macro_id`、`macro_name`、entrypoint、開始時刻から生成する。`LoggerPort.bind_context(context.run_log_context)` は context 付き `LoggerPort` を返すだけで、`RunLogContext` の別所有者にはならない。
+
+`MacroRuntimeBuilder.build()` が `ExecutionContext` の唯一の組み立て入口である。`MacroRuntime` は context を生成せず、完成済み context を `run()` / `start()` で受け取る。
 
 ```python
 class ControllerOutputPort(ABC):
@@ -436,16 +432,15 @@ class ControllerOutputPort(ABC):
     def close(self) -> None: ...
 
 
-class TouchInputCapability(ABC):
-    @abstractmethod
+@runtime_checkable
+class TouchInputCapability(Protocol):
     def touch_down(self, x: int, y: int) -> None: ...
 
-    @abstractmethod
     def touch_up(self) -> None: ...
 
 
-class SleepControlCapability(ABC):
-    @abstractmethod
+@runtime_checkable
+class SleepControlCapability(Protocol):
     def disable_sleep(self, enabled: bool = True) -> None: ...
 
 
@@ -465,7 +460,7 @@ class FrameSourcePort(ABC):
 
 class ResourceStorePort(ABC):
     @abstractmethod
-    def resolve_asset_path(self, filename: str | Path) -> Path: ...
+    def resolve_asset_path(self, filename: str | Path) -> ResourceRef: ...
 
     @abstractmethod
     def load_image(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
@@ -475,10 +470,27 @@ class ResourceStorePort(ABC):
 
 class RunArtifactStore(ABC):
     @abstractmethod
-    def save_image(self, filename: str | Path, image: cv2.typing.MatLike) -> Path: ...
+    def resolve_output_path(self, filename: str | Path) -> ResourceRef: ...
 
     @abstractmethod
-    def open_output(self, filename: str | Path, mode: str = "xb") -> BinaryIO: ...
+    def save_image(
+        self,
+        filename: str | Path,
+        image: cv2.typing.MatLike,
+        *,
+        overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
+        atomic: bool = True,
+    ) -> ResourceRef: ...
+
+    @abstractmethod
+    def open_output(
+        self,
+        filename: str | Path,
+        mode: str = "xb",
+        *,
+        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
+        atomic: bool = True,
+    ) -> BinaryIO: ...
 
     def close(self) -> None: ...
 
@@ -520,19 +532,7 @@ class CommandFacade(Command):
 
 
 class DefaultCommand(CommandFacade):
-    def __init__(
-        self,
-        *,
-        context: ExecutionContext | None = None,
-        serial_device: SerialCommInterface | None = None,
-        capture_device: CaptureDeviceInterface | None = None,
-        resource_io: StaticResourceIO | ResourceStorePort | None = None,
-        artifact_store: RunArtifactStore | None = None,
-        protocol: SerialProtocolInterface | None = None,
-        ct: CancellationToken | None = None,
-        notification_handler: NotificationHandler | NotificationPort | None = None,
-        logger: LoggerPort | None = None,
-    ) -> None: ...
+    def __init__(self, *, context: ExecutionContext) -> None: ...
 ```
 
 ### 内部設計
@@ -545,7 +545,7 @@ MacroRuntime.run(context)
   ├─ context.frame_source.initialize()
   ├─ context.frame_source.await_ready(context.options.frame_ready_timeout_sec)
   │    └─ False の場合 FrameNotReadyError
-  ├─ definition = registry.resolve(context.macro_name)
+  ├─ definition = registry.resolve(context.macro_id)
   ├─ macro = factory.create(definition)
   ├─ cmd = CommandFacade(context)
   ├─ result = runner.run(macro, cmd, context.exec_args, run_context)
@@ -557,11 +557,11 @@ MacroRuntime.run(context)
        └─ close 失敗だけ RunResult.cleanup_warnings に追記
 ```
 
-`MacroRuntime` は registry 解決、factory 呼び出し、Ports 準備、`CommandFacade(context)` 生成、Port close だけを担当する。`MacroRunner` は現行実行順序を引き継ぎ、`finalize()` を `finally` で呼び、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` 正規化、`RunResult` 生成を担当する。GUI/CLI/テストは `MacroExecutor.execute()` を経由しない。
+`MacroRuntime` は registry 解決、factory 呼び出し、`CommandFacade(context)` 生成、Port close だけを担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` が担当する。`MacroRunner` は現行実行順序を引き継ぎ、`finalize()` を `finally` で呼び、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` 正規化、`RunResult` 生成を担当する。GUI/CLI/テストは `MacroExecutor.execute()` を経由しない。
 
 `RunResult` は常に `MacroRunner` が生成する。`MacroRuntime` は Runner が返した `RunResult.status`、`error`、`started_at`、`finished_at` を変更しない。Port close 失敗だけを `cleanup_warnings: tuple[str, ...]` に追記し、複数 close 失敗は発生順に全件保持する。close 失敗だけで `RunResult.status` を変更しない。
 
-`ExecutionContext` は `Command` を保持しない。`MacroRuntime.create_context()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, Any]` として扱う。
+`ExecutionContext` は `Command` を保持しない。`MacroRuntimeBuilder.build()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, RuntimeValue]` として扱う。
 
 #### RunHandle 非同期実行シーケンス
 
@@ -596,11 +596,11 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 `CommandFacade.press()` は `controller.press(keys)`、`CommandFacade.wait(dur)`、`controller.release(keys)`、`CommandFacade.wait(wait)` の順に実行する。`dur <= 0` の場合は押下直後に release し、`wait <= 0` の場合は後続 wait を省略する。2 回の wait はどちらも `CancellationToken` aware wait を使うため、長い `dur` / `wait` 中でも cancellation safe point になる。
 
-`DefaultCommand(context=..., serial_device=...)` のように新形式 `context` と旧形式の具象引数を同時に指定した場合は `RuntimeConfigurationError(code="runtime.default_command.ambiguous_arguments")` を送出する。旧引数を黙って無視しない。`context` が `None` の場合だけ旧形式を受け入れ、内部で標準 Port adapter と一時 `ExecutionContext` を組み立てる。
+`DefaultCommand` は `context` だけを受け取る。`serial_device`、`capture_device`、`resource_io`、`protocol`、`ct`、`notification_handler`、`logger` など旧形式の具象引数を受け取った場合は `TypeError` とし、互換 shim は作らない。GUI/CLI は `MacroRuntimeBuilder` から得た context を渡す。
 
 #### ControllerOutputPort
 
-`ControllerOutputPort` の基本契約は `press`、`hold`、`release`、`keyboard`、`type_key`、`close` に限定する。touch 操作は `TouchInputCapability`、スリープ制御は `SleepControlCapability` を実装した Port だけが提供する。`CommandFacade.touch*()` と `disable_sleep()` は capability の有無を検査し、未対応なら既存どおり `NotImplementedError` を送出する。
+`ControllerOutputPort` の基本契約は `press`、`hold`、`release`、`keyboard`、`type_key`、`close` に限定する。touch 操作は `TouchInputCapability`、スリープ制御は `SleepControlCapability` を実装した Port だけが提供する。`CommandFacade.touch*()` と `disable_sleep()` は `isinstance(port, TouchInputCapability)` / `isinstance(port, SleepControlCapability)` で capability の有無を検査し、未対応なら既存どおり `NotImplementedError` を送出する。
 
 `SerialControllerOutputPort` は `SerialCommInterface` と `SerialProtocolInterface` を受け取り、既存 `DefaultCommand` 内の protocol build 処理を移管する。`VirtualControllerModel` も同じ Port を使うことで、マクロ実行と手動操作の送信経路を統一する。
 
@@ -618,9 +618,9 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 #### ResourceStorePort / RunArtifactStore
 
-`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。`static/<macro_name>/settings.toml` 互換と manifest settings path は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
+`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。manifest settings path と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
-標準配置、legacy static 互換、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`CommandFacade.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
+標準配置、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`CommandFacade.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
 
 Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `cleanup_warnings` へ `"<port_name>: <ExceptionType>: <message>"` 形式で追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
 
@@ -693,7 +693,6 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | `capture_device` | `str` | `""` | GUI/CLI で選択する capture device 名 |
 | `resource.assets_root` | `Path | None` | `project_root / "resources"` | `ResourceStorePort` の assets root。詳細は `RESOURCE_FILE_IO.md` |
 | `resource.runs_root` | `Path | None` | `project_root / "runs"` | `RunArtifactStore` の outputs root。詳細は `RESOURCE_FILE_IO.md` |
-| `resource.legacy_static_root` | `Path | None` | `project_root / "static"` | legacy static 互換 root。settings lookup には使わない |
 | `notification.discord.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
 | `notification.bluesky.enabled` | `bool` | `False` | `SecretsSettings` の値。CLI/GUI/Runtime builder の唯一の通知設定ソース |
 
@@ -742,7 +741,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | ユニット | `test_command_facade_press_delegates_to_controller_port` | `press()` が press、待機、release の順で `ControllerOutputPort` を呼ぶ |
 | ユニット | `test_command_facade_wait_observes_cancellation_token` | 長い wait 中に cancellation が要求されたら 50 ms 周期で `MacroStopException` へ進む |
 | ユニット | `test_command_facade_capture_resizes_crops_and_grayscales` | 既存 `DefaultCommand.capture()` と同じ 1280x720 resize、crop 範囲検証、grayscale 変換を行う |
-| ユニット | `test_default_command_legacy_constructor_builds_ports` | 旧形式の `DefaultCommand(serial_device=..., ...)` が import path と挙動互換を保つ |
+| ユニット | `test_default_command_rejects_legacy_constructor_args` | 旧形式の `DefaultCommand(serial_device=..., ...)` を受け付けず、Builder 経由の context を要求する |
 | ユニット | `test_runtime_success_calls_finalize_and_closes_ports` | 正常終了時に `finalize()` と各 Port の close が一度だけ呼ばれ `RunStatus.SUCCESS` になる |
 | ユニット | `test_runtime_failed_preserves_error_info` | マクロ例外が `RunResult.error` に `ErrorInfo` として保持され `RunStatus.FAILED` になる |
 | ユニット | `test_runtime_cancelled_result` | `RunHandle.cancel()` 後、`RunStatus.CANCELLED` になる |
@@ -774,7 +773,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 - [ ] `MacroRuntime` の同期実行 `run()` 実装
 - [ ] `MacroRuntime` の非同期実行 `start()` と `RunHandle` 実装
 - [ ] `CommandFacade` 実装
-- [ ] `DefaultCommand` の import path 維持と旧コンストラクタ互換
+- [ ] `DefaultCommand` の import path 維持と旧コンストラクタ削除
 - [ ] `SerialControllerOutputPort` 実装
 - [ ] `CaptureFrameSourcePort` と frame readiness 実装
 - [ ] Resource File I/O の path traversal 防止を `RESOURCE_FILE_IO.md` に従って実装

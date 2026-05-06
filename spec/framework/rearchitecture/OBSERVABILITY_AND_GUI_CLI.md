@@ -3,7 +3,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\settings\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
 > **目的**: GUI/CLI の実行入口を `MacroRuntime` へ寄せ、表示、終了コード、通知設定ソースを一貫させる。ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` を正とする。  
 > **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。既存マクロの `Command.log()` 呼び出しは維持する。ただし GUI/CLI 内部入口、Worker / command 組み立て、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
+> **破壊的変更**: 既存マクロの `Command.log()` 呼び出しと import / lifecycle 互換は維持する。GUI/CLI 内部入口、Worker / command 組み立て、singleton 直接利用、暗黙 fallback、`DefaultCommand` 旧コンストラクタは互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -33,7 +33,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 
 既存仕様では Runtime と I/O Ports の分離、異常系、構造化ログの方向性が定義されている。ただし、GUI/CLI をどの段階で `MacroRuntime` 入口へ寄せるか、CLI 通知設定ソースを `SecretsSettings` に統一する問題、ユーザー表示と技術ログの境界は独立した観点として明文化が不足していた。sink 例外・ロック方針は `LOGGING_FRAMEWORK.md` を正とする。
 
-現行 GUI/CLI がそれぞれ `DefaultCommand` を組み立てると、通知設定、キャンセル、logger 注入、デバイス検出完了待ちが入口ごとにずれる。再設計では既存マクロを変更せず、入口側の組み立てを `MacroRuntimeBuilder` へ集約する。
+現行 GUI/CLI がそれぞれ `DefaultCommand` を組み立てると、通知設定、キャンセル、logger 注入、デバイス検出完了待ちが入口ごとにずれる。再設計ではマクロ実行契約を維持し、入口側の組み立てを `MacroRuntimeBuilder` へ集約する。
 
 ### 1.4 期待効果
 
