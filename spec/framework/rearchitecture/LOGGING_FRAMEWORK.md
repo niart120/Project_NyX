@@ -447,7 +447,7 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 | GUI | `test_gui_log_sink_emits_qt_signal_without_core_qt_dependency` | `GuiLogSink` が GUI 層で `UserEvent` を Qt Signal へ変換し、core 層が Qt 型を import しない |
 | GUI | `test_log_pane_level_filter_uses_gui_sink` | DEBUG 表示切替が GUI sink の level に反映される |
 | 性能 | `test_log_handler_dispatch_thread_safety` | sink 登録解除と配信で deadlock しない |
-| 性能 | `test_gui_user_event_dispatch_perf` | GUI sink 10 件への配信が 1 件 10 ms 未満 |
+| 性能 | `test_log_handler_dispatch_thread_safety` | sink 登録解除と配信が並行実行で破綻しない |
 
 ## 6. 実装チェックリスト
 

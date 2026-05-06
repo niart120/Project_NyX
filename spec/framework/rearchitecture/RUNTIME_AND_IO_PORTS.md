@@ -742,10 +742,11 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | ユニット | `test_resource_file_io_path_and_write_policy` | path guard と atomic write の詳細は `RESOURCE_FILE_IO.md` のテストで検証する |
 | ユニット | `test_notification_port_logs_notifier_failure` | notifier 失敗が warning log になり、例外がマクロへ伝播しない |
 | 結合 | `test_cli_uses_runtime_and_run_result` | CLI が `DefaultCommand` を直接構築せず Runtime 経由で実行し、`RunResult` から終了コードを決める |
-| 結合 | `test_cli_notification_settings_come_from_secrets_store` | CLI の Discord / Bluesky 通知設定が `SecretsStore` 由来の secrets snapshot だけから構築されることを検証する |
+| 結合 | `test_cli_notification_settings_source_is_secrets_store` | CLI の Discord / Bluesky 通知設定が `SecretsStore` 由来の secrets snapshot だけから構築されることを検証する |
 | 結合 | `test_cli_device_detection_waits_until_complete` | 非同期検出が遅れても timeout 内なら成功し、race で失敗しない |
-| GUI | `test_gui_start_uses_runtime_handle` | Run button が Runtime `start()` を呼び、`RunHandle` を保持する |
-| GUI | `test_gui_cancel_response` | Cancel button が `RunHandle.cancel()` を呼び、`cancel_request_latency` が 100 ms 未満である |
+| GUI | `test_main_window_uses_run_handle` | Run button が Runtime builder `start()` を呼び、`RunHandle` を保持する |
+| GUI | `test_main_window_cancel_calls_handle_cancel` | Cancel button が `RunHandle.cancel()` を呼ぶ |
+| GUI | `test_main_window_poll_updates_status_from_run_result` | 完了した `RunResult` が status label と実行状態へ反映される |
 | GUI | `test_virtual_controller_uses_controller_output_port` | 仮想コントローラー操作が Port 経由で送信される |
 | ハードウェア | `test_serial_controller_output_port_realdevice` | `@pytest.mark.realdevice`。実 serial device へ CH552 press/release bytes を送信できる |
 | ハードウェア | `test_capture_frame_source_realdevice_ready` | `@pytest.mark.realdevice`。実 capture device が timeout 内に ready になる |

@@ -304,9 +304,9 @@ cmd.wait(0)
 
 | macro_id | 採用理由 | 必要な移行項目 | 必須テスト |
 |----------|----------|----------------|------------|
-| `frlg_id_rng` | settings、画像リソース、output 保存を含む代表例 | 明示 settings source、assets root 相対 path、run outputs 保存 | `test_migrated_frlg_id_rng_save_img_outputs`, `test_migrated_macro_settings_load_from_explicit_source` |
+| `frlg_id_rng` | settings、画像リソース、output 保存を含む代表例 | 明示 settings source、assets root 相対 path、run outputs 保存 | `test_sample_turbo_macro_saves_capture_to_run_outputs_without_prefix_stripping`, `test_file_settings_and_exec_args_are_merged_with_exec_args_precedence` |
 | `sample_turbo_a_macro` | single-file convention discovery の最小例 | manifest なし discovery、公開 import 契約 | `test_registry_loads_convention_single_file_macro` |
-| `frlg_initial_seed` | package 型 macro の代表例 | package entrypoint、class metadata、settings 未指定時の `{}` | `test_migrated_repository_macros_load_with_optional_manifest` |
+| `frlg_initial_seed` | package 型 macro の代表例 | package entrypoint、class metadata、settings 未指定時の `{}` | `test_repository_representative_macros_keep_lifecycle_contract` |
 
 ## 5. テスト方針
 
@@ -320,18 +320,20 @@ cmd.wait(0)
 | ユニット | `test_command_load_img_uses_resource_store` | `cmd.load_img()` が assets root から読む |
 | ユニット | `test_command_save_img_uses_run_artifact_store` | `cmd.save_img()` が run outputs へ保存する |
 | ユニット | `test_default_command_rejects_legacy_constructor_args` | 旧具象引数コンストラクタを受け付けない |
-| 結合 | `test_migrated_repository_macros_load_with_optional_manifest` | 移行後代表マクロが manifest あり / なしの両方でロードされる |
-| 結合 | `test_migrated_macro_settings_load_from_explicit_source` | 移行後代表マクロの settings が manifest または class metadata から読み込まれる |
+| 結合 | `test_convention_package_and_single_file_macros_load_without_manifest` | 移行後代表マクロが manifest なしでもロードされる |
+| 結合 | `test_optional_manifest_file_does_not_break_package_macro_load` | manifest ありの package macro をロードできる |
+| 結合 | `test_file_settings_and_exec_args_are_merged_with_exec_args_precedence` | settings と実行引数が Runtime builder で merge され、実行引数が優先される |
+| 結合 | `test_repository_representative_macros_keep_lifecycle_contract` | リポジトリ代表マクロが lifecycle signature を維持する |
 
 ## 6. 実装チェックリスト
 
-- [ ] 高度機能が必要なマクロだけ `macro.toml` を追加し、`id` / `entrypoint` / `settings` を定義
-- [ ] `static\<macro_name>\settings.toml` を manifest または class metadata settings path へ移動
-- [ ] 読み込み専用画像を `resources\<macro_id>\assets` または `macros\<macro_id>\assets` へ移動
-- [ ] `cmd.load_img()` に渡す path を assets root 相対へ修正
-- [ ] `cmd.save_img()` の保存先が `runs\<run_id>\outputs` になる前提へ修正
-- [ ] ファイル名先頭の macro ID prefix 除去に依存する処理を削除
-- [ ] `DefaultCommand(serial_device=..., capture_device=..., ...)` の直接生成を削除
-- [ ] single-file macro は convention discovery で一意にロードできることを確認し、曖昧な場合だけ manifest entrypoint を追加
-- [ ] 代表マクロの移行後結合テストを追加
-- [ ] 旧 `static` / `cwd` fallback に依存するテストを削除または新仕様へ更新
+- [x] 高度機能が必要なマクロだけ `macro.toml` を追加し、`id` / `entrypoint` / `settings` を定義
+- [x] `static\<macro_name>\settings.toml` を manifest または class metadata settings path へ移動
+- [x] 読み込み専用画像を `resources\<macro_id>\assets` または `macros\<macro_id>\assets` へ移動
+- [x] `cmd.load_img()` に渡す path を assets root 相対へ修正
+- [x] `cmd.save_img()` の保存先が `runs\<run_id>\outputs` になる前提へ修正
+- [x] ファイル名先頭の macro ID prefix 除去に依存する処理を削除
+- [x] `DefaultCommand(serial_device=..., capture_device=..., ...)` の直接生成を削除
+- [x] single-file macro は convention discovery で一意にロードできることを確認し、曖昧な場合だけ manifest entrypoint を追加
+- [x] 代表マクロの移行後結合テストを追加
+- [x] 旧 `static` / `cwd` fallback に依存するテストを削除または新仕様へ更新
