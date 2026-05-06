@@ -22,7 +22,7 @@
 | TechnicalLog | ファイル保存、障害調査、集計に使う技術ログ。traceback、例外型、詳細辞書を持てるが secret 値は含めない |
 | UserEvent | GUI/CLI へ表示する短いイベント。traceback、secret 値、内部絶対パス、通知 payload を含めない |
 | LogSink | `LogEvent`、`TechnicalLog`、`UserEvent` のいずれかを受け取る出力先。ファイル、コンソール、GUI、テスト用 memory sink を含む |
-| RunLogContext | 1 回の実行に紐づく `run_id`、`macro_id`、`macro_name`、入口種別、開始時刻を保持する immutable な値 |
+| RunLogContext | 1 回の実行に紐づく `run_id`、`macro_id`、`macro_name`、入口種別、開始時刻を保持する immutable な値。型定義は本書、所有場所は `RUNTIME_AND_IO_PORTS.md` の `ExecutionContext.run_log_context` を正とする |
 | backend | 実際のログ出力を担う実装。候補は loguru、Python logging、structlog、独自 JSON writer である |
 | Structured Log | JSON Lines など機械処理しやすい形式の技術ログ。検索、集計、障害解析の入力にする |
 | GuiLogSink | GUI へ `UserEvent` を配信する sink。Qt 型を core 層へ持ち込まず、GUI adapter が Qt Signal へ変換する |
@@ -54,7 +54,7 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 ### 1.5 着手条件
 
 - `ERROR_CANCELLATION_LOGGING.md` の `RunResult`、`ErrorInfo`、`MacroCancelled` 方針が確定している。
-- `RUNTIME_AND_IO_PORTS.md` または Runtime 実装側で `ExecutionContext` / `RunLogContext` の保持場所が決まっている。
+- `RUNTIME_AND_IO_PORTS.md` で `ExecutionContext.run_log_context` が `RunLogContext` の保持場所として確定している。
 - 既存 `log_manager.log(level, message, component="")` 呼び出しを壊さない adapter を先に用意する。
 - core 層から `nyxpy.gui`、Qt 型、CLI 表示実装へ依存しない。
 - 実装前に `uv run pytest tests\unit\` のベースラインを確認する。
@@ -69,7 +69,7 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 | `src\nyxpy\framework\core\logger\log_manager.py` | 変更 | 既存 API 互換 adapter、sink 管理、context bind、backend 初期化、secret mask を実装 |
 | `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、GUI、test sink の標準実装を定義 |
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | Runtime から使う `LoggerPort` を io port 群へ re-export するか参照境界を整理 |
-| `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` または同等情報を `ExecutionContext` に含める |
+| `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` を `ExecutionContext.run_log_context` に含める |
 | `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI/Legacy 用の logger 構成と `LoggerPort` 注入を担当 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` / `technical()` へ接続 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
@@ -270,6 +270,8 @@ class LogManager(LoggerPort):
     def log(self, level: str, message: str, component: str = "") -> None: ...
 ```
 
+`LoggerPort.bind_context()` は `RunLogContext` を保持した context 付き `LoggerPort` を返す self-like interface である。`RunLogContext` の所有者は `ExecutionContext` であり、`LoggerPort` は出力時に参照する束縛ビューだけを返す。戻り値を close する責務はなく、sink の close は `LogManager` または Runtime の Port close で扱う。
+
 ### 内部設計
 
 #### 初期化
@@ -303,7 +305,24 @@ LoggerPort.technical() / user()
 
 #### 実行単位コンテキスト
 
-Runtime は実行開始時に `RunLogContext(run_id, macro_id, macro_name, entrypoint)` を作成する。`ExecutionContext` は `LoggerPort.bind_context(run_log_context)` の戻り値を保持し、`Command`、`NotificationPort`、`MacroRunner` に渡す。実行終了時は `macro.finished`、中断時は `macro.cancelled`、失敗時は `macro.failed` を同じ context で記録する。
+Runtime builder は `RunLogContext(run_id, macro_id, macro_name, entrypoint)` を作成して `ExecutionContext.run_log_context` に保持する。`ExecutionContext.logger` は `LoggerPort.bind_context(run_log_context)` の戻り値であり、`Command`、`NotificationPort`、`MacroRunner` に渡す。実行終了時は `macro.finished`、中断時は `macro.cancelled`、失敗時は `macro.failed` を同じ context で記録する。
+
+#### Event catalog
+
+ログ event 名、UserEvent の表示方針、TechnicalLog の保持項目は本表を正とする。他仕様は event の発行タイミングだけを定義し、event 名を追加する場合は本表を更新する。
+
+| event | 発生元 | TechnicalLog | UserEvent |
+|-------|--------|--------------|-----------|
+| `macro.started` | `MacroRuntime` | `run_id`, `macro_id`, entrypoint | `マクロを開始しました` |
+| `macro.finished` | `MacroRunner` | `RunResult`, duration | `マクロが完了しました` |
+| `macro.cancel_requested` | `RunHandle.cancel()` / `Command.stop()` | `source`, `reason`, `run_id`, `macro_id` | `中断を要求しました` |
+| `macro.cancelled` | `MacroRunner` | `RunResult`, cancelled_reason | `マクロを中断しました` |
+| `macro.failed` | `MacroRunner` | `ErrorInfo`, exception_type, traceback | `マクロ実行中にエラーが発生しました` |
+| `macro.finalize_failed` | `MacroRunner` | finalize 例外詳細、元 outcome | `終了処理でエラーが発生しました` |
+| `configuration.invalid` | settings / args 検証 | key 名、期待型、mask 済み詳細、error code | `設定に誤りがあります` |
+| `notification.failed` | `NotificationPort` | 通知先種別、mask 済み詳細 | 原則表示しない。必要時のみ warning 表示 |
+| `log.retention_cleanup_failed` | `LogManager` | 対象 path、例外型、message | 原則表示しない |
+| `sink.emit_failed` | `LogManager` | sink_id、event、例外型、message | 原則表示しない |
 
 #### テスト用 sink
 

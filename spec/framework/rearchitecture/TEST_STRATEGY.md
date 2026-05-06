@@ -1,9 +1,10 @@
 # フレームワーク再設計テスト戦略 仕様書
 
+> **文書種別**: 仕様書。再設計全体のテスト分類、配置、性能測定、互換ゲートの正本である。
 > **対象モジュール**: `tests\unit\`, `tests\integration\`, `tests\gui\`, `tests\hardware\`, `tests\perf\`, `src\nyxpy\framework\core\`  
 > **目的**: フレームワーク再設計を既存マクロ変更なしで進めるため、互換、Runtime 分割、Port adapter、GUI/CLI、実機、性能、スレッド安全性、キャンセル応答の検証方針を定義する。  
 > **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`, `spec\framework\rearchitecture\CONFIGURATION_AND_RESOURCES.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`  
-> **破壊的変更**: なし。既存マクロ fixture と import/signature 互換テストを最初に固定する。
+> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、削除確認テストで検証する。
 
 ## 1. 概要
 
@@ -16,9 +17,9 @@
 | 用語 | 定義 |
 |------|------|
 | import 互換テスト | 既存マクロが利用する import path が削除・移動されていないことを検証するテスト |
-| signature 互換テスト | `MacroBase` lifecycle、`Command` API の呼び出しシグネチャを検証するテスト。`MacroExecutor` は既存マクロ互換 API ではなく、残す場合だけ legacy adapter gate で検証する |
+| signature 互換テスト | `MacroBase` lifecycle、`Command` API の呼び出しシグネチャを検証するテスト。`MacroExecutor` は既存マクロ互換 API ではなく、削除確認テストで不在を検証する |
 | 既存マクロ fixture | リポジトリ内の代表マクロ、または同等構造を `tmp_path` に複製した互換検証用 fixture |
-| MacroRegistry | マクロ発見、識別、ロード診断、descriptor 一覧を担当するコンポーネント |
+| MacroRegistry | マクロ発見、識別、ロード診断、`MacroDefinition` 一覧を担当するコンポーネント |
 | MacroFactory | 実行ごとに新しい `MacroBase` インスタンスを生成するコンポーネント |
 | MacroRunner | `initialize -> run -> finalize` と例外・中断・結果変換を担当するコンポーネント |
 | MacroRuntime | Registry / Factory / Runner / Ports を統合して同期・非同期実行を提供する中核 |
@@ -97,8 +98,9 @@ import/signature 互換テストは最初の保護線である。次の import p
 | `nyxpy.framework.core.macro.base.MacroBase` | import でき、`initialize(self, cmd, args)`, `run(self, cmd)`, `finalize(self, cmd)` を持つ |
 | `nyxpy.framework.core.macro.command.Command` | 既存 `press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `save_img`, `load_img`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` を持つ |
 | `nyxpy.framework.core.macro.command.DefaultCommand` | import path を維持し、既存コンストラクタ互換を持つ |
-| `nyxpy.framework.core.macro.executor.MacroExecutor` | 既存マクロ互換 API ではない。旧 GUI/CLI/テスト入口として残す場合だけ `reload_macros()`, `set_active_macro()`, `execute(cmd, exec_args={})`, `macros`, `macro` を一時 adapter gate で検証 |
 | `nyxpy.framework.core.constants` | `Button`, `Hat`, `LStick`, `RStick`, `KeyType` を import できる |
+
+`MacroExecutor` は公開互換契約から明示的に除外する。テストは成功時 `None`、失敗時例外再送出、`macros` / `macro` 属性を保証せず、`test_macro_executor_removed` と `test_gui_cli_do_not_import_macro_executor` で削除状態を確認する。
 
 ### 後方互換性
 
@@ -210,7 +212,7 @@ class FakeLoggerPort:
 
 #### 既存マクロ fixture による互換検証
 
-fixture は package 形式、single file 形式、manifest opt-in、壊れた macro、settings あり、settings なしを含める。repository macro 互換テストは代表マクロをロードし、マクロ本体を編集せずに descriptor 生成、settings 解決、`initialize -> run -> finalize` の最小 dry-run を検証する。
+fixture は package 形式、single file 形式、manifest opt-in、壊れた macro、settings あり、settings なしを含める。repository macro 互換テストは代表マクロをロードし、マクロ本体を編集せずに `MacroDefinition` 生成、settings 解決、`initialize -> run -> finalize` の最小 dry-run を検証する。
 
 #### Registry / Factory / Runner / Runtime
 
@@ -252,7 +254,7 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | ユニット | `test_command_import_and_method_contract` | `Command` と `DefaultCommand` の import、既存メソッド、主要引数を検証する |
 | ユニット | `test_macro_executor_signature_contract` | `MacroExecutor` の既存 API と `exec_args={}` 互換を検証する |
 | ユニット | `test_constants_import_contract` | `Button`, `Hat`, `LStick`, `RStick`, `KeyType` を import できる |
-| ユニット | `test_registry_loads_fixture_macros` | package / single file fixture を descriptor 化する |
+| ユニット | `test_registry_loads_fixture_macros` | package / single file fixture を `MacroDefinition` 化する |
 | ユニット | `test_registry_collects_load_diagnostics` | 壊れた fixture が reload 全体を止めず診断に残る |
 | ユニット | `test_factory_creates_new_instance_each_run` | 実行ごとに `MacroBase` インスタンスが共有されない |
 | ユニット | `test_runner_lifecycle_success_order` | `initialize -> run -> finalize` の順序を検証する |

@@ -132,10 +132,10 @@ project_root
 | macro | `Command` API を呼ぶ | `nyxpy.framework.*`, `macros.shared` |
 | command facade | 既存 API と新 Port の橋渡し | runtime context, Resource Store, Frame Source |
 | resource file io | assets 解決、outputs 保存、path guard、atomic write | 標準ライブラリ、OpenCV、フレームワーク例外 |
-| settings resolver | settings TOML 解決と辞書化 | macro descriptor, TOML reader |
+| settings resolver | settings TOML 解決と辞書化 | `MacroDefinition`, TOML reader |
 | runtime builder | macro ID と run ID から scope と store を構築 | registry, settings, resource file io |
 
-フレームワーク層から `macros\<macro_id>` へ静的 import しない。macro root は `MacroDescriptor` の値として渡し、path 解決だけに使う。
+フレームワーク層から `macros\<macro_id>` へ静的 import しない。macro root は `MacroDefinition` の値として渡し、path 解決だけに使う。
 
 ### 3.6 性能要件
 
@@ -269,7 +269,7 @@ resolve_under_root(root, name)
 
 | 優先度 | 条件 | 解決先 |
 |--------|------|--------|
-| 1 | manifest / descriptor が assets root を持つ | `resources\<macro_id>\assets` または macro root assets |
+| 1 | manifest / `MacroDefinition` が assets root を持つ | `resources\<macro_id>\assets` または macro root assets |
 | 2 | legacy static root に存在 | `static\<macro_name>` |
 | 3 | package resource 対応が有効 | `importlib.resources` から読み取り、必要なら同一 run cache へ展開 |
 

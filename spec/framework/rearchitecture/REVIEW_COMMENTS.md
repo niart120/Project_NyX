@@ -11,103 +11,6 @@
 
 ## 2. 全体指摘
 
-### RC-001: 文書種別とテンプレート準拠状態が混在している
-
-- **重要度**: Critical
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `ARCHITECTURE_DIAGRAMS.md`, `IMPLEMENTATION_PLAN.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`
-- **位置**:
-  - `ARCHITECTURE_DIAGRAMS.md` 全体
-  - `IMPLEMENTATION_PLAN.md` 全体
-  - `MACRO_COMPATIBILITY_AND_REGISTRY.md` `### Compatibility Contract`
-- **指摘**: フレームワーク仕様書テンプレートは「概要 / 対象ファイル / 設計方針 / 実装仕様 / テスト方針 / 実装チェックリスト」を必須としているが、再設計ディレクトリには仕様書、実装計画、図解補助文書が混在している。`MACRO_COMPATIBILITY_AND_REGISTRY.md` では `### 後方互換性` が独立せず `### Compatibility Contract` に寄っており、レビュー観点上の検索性が落ちる。
-- **修正案**: 各ファイルの冒頭に「仕様書」「補助資料」「実装計画」の文書種別を明記する。仕様書として扱うファイルは必須 6 セクションへ揃え、補助資料である場合は「本書は `FW_REARCHITECTURE_OVERVIEW.md` の補助資料であり、実装仕様の正は参照先」と明記する。
-
-### RC-002: 正とする文書の所有権が不足している
-
-- **重要度**: Critical
-- **対象**: 全体
-- **位置**: 各ファイルの関連ドキュメント、用語定義、実装仕様
-- **指摘**: `RunResult`, `ExecutionContext`, `RunLogContext`, `ConfigurationError`, logging event 名、`MacroExecutor`, `MacroManifest`, `MacroDescriptor`, `MacroDefinition`, `MacroSettingsResolver` が複数文書で説明されている。相互参照は多いが、型定義・責務・テスト期待値の正本がどれか不明である。
-- **修正案**: `FW_REARCHITECTURE_OVERVIEW.md` に「仕様依存関係」表を追加する。各概念について「所有文書」「参照元」「変更時に同期すべき文書」を定義する。
-
-例:
-
-| 概念 | 正とする文書 | 参照元 |
-|---|---|---|
-| `MacroRegistry` / マクロメタデータ型 | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | Overview, Implementation Plan, Test Strategy |
-| `ExecutionContext` / `RunResult` / `RunHandle` | `RUNTIME_AND_IO_PORTS.md` または `ERROR_CANCELLATION_LOGGING.md` のどちらかに統一 | Logging, Observability, Test Strategy |
-| logging event 名 / sink 契約 | `LOGGING_FRAMEWORK.md` | Error/Cancellation, Observability |
-| settings lookup | `CONFIGURATION_AND_RESOURCES.md` | Resource File I/O, Runtime |
-
-### RC-003: `MacroExecutor` は削除方針へ統一する
-
-- **重要度**: Critical
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `IMPLEMENTATION_PLAN.md`, `TEST_STRATEGY.md`
-- **位置**:
-  - `FW_REARCHITECTURE_OVERVIEW.md` `MacroExecutor は既存マクロ互換 API ではない`
-  - `RUNTIME_AND_IO_PORTS.md` `MacroExecutor.execute(cmd, exec_args)`
-  - `ERROR_CANCELLATION_LOGGING.md` `旧 MacroExecutor.execute() を残す場合は戻り値 None を維持`
-  - `IMPLEMENTATION_PLAN.md` `フェーズ 10: MacroExecutor 廃止判断または adapter 縮退`
-- **指摘**: `MacroExecutor` は既存マクロ互換 API ではないと書かれている一方で、「残す場合」「一時 adapter」「戻り値 `None` と例外再送出を維持」「非推奨期間」など、存続を前提に読める表現が複数残っている。これにより、実装者が `MacroExecutor` の互換維持や縮退 adapter 実装に工数を使う余地が生まれる。
-- **修正案**: `MacroExecutor` は削除方針へ統一し、互換維持・一定期間存続・adapter 縮退・非推奨期間の文言を削除する。最低限、以下を明記する。
-  - `MacroExecutor` は再設計後の公開 API・既存マクロ互換契約・移行 adapter のいずれにも含めない。
-  - GUI/CLI/テストは `MacroRuntime` / `RunHandle` / `MacroRegistry` を直接使う構成へ移行する。
-  - `MacroExecutor.execute()` の戻り値 `None`、例外再送出、`macros` / `macro` 属性などの旧契約は保証しない。
-  - `DEPRECATION_AND_MIGRATION.md` では `MacroExecutor` を「廃止候補」ではなく「削除対象」とし、削除後に残す import 互換 shim も作らない方針を明記する。
-  - テスト方針から `legacy executor gate` を削除し、代わりに `test_macro_executor_removed` や `test_gui_cli_do_not_import_macro_executor` のような削除確認テストを置く。
-
-### RC-004: `MacroDescriptor` / `MacroDefinition` / `MacroManifest` は統合・廃止を検討する
-
-- **重要度**: Major
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `IMPLEMENTATION_PLAN.md`
-- **位置**:
-  - `FW_REARCHITECTURE_OVERVIEW.md` `MacroDescriptor` / `MacroDefinition`
-  - `MACRO_COMPATIBILITY_AND_REGISTRY.md` `### Manifest 仕様`
-  - `IMPLEMENTATION_PLAN.md` `MacroFactory | MacroDescriptor または MacroDefinition`
-- **指摘**: `MacroManifest`, `MacroDescriptor`, `MacroDefinition` はいずれもマクロの識別子、表示名、entrypoint、settings path など近い情報を扱う。責務差分が小さいまま複数型を導入すると、変換処理、同期漏れ、テスト対象が増える。`MacroFactory` が `MacroDescriptor` と `MacroDefinition` のどちらを受け取るかも文書により揺れている。
-- **修正案**: まず「本当に複数型が必要か」を検討し、不要なら 1 つの `MacroDefinition` に統合する。分離する場合でも、各型の存在理由と廃止できない理由を明記する。
-  - 推奨案: `MacroDefinition` を唯一のマクロメタデータ型にし、manifest ファイルは `MacroDefinition` を生成する入力形式として扱う。`MacroManifest` は永続化フォーマット名に留め、Python クラスとしての独立定義を避ける。
-  - 代替案: 内部専用の `MacroDescriptor` と公開用 `MacroDefinition` を分ける場合、変換方向を `MacroDescriptor -> MacroDefinition` の一方向に限定し、`MacroFactory` は内部型だけを受け取る。
-  - どちらの案でも、`MacroFactory.create()` が受け取る型を 1 つに固定し、`MacroManifest` / `MacroDescriptor` / `MacroDefinition` の三者が同じデータを重複保持しないようにする。
-
-### RC-005: `ExecutionContext`, `RunLogContext`, `RunResult` の所有責務が重複している
-
-- **重要度**: Critical
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `LOGGING_FRAMEWORK.md`, `OBSERVABILITY_AND_GUI_CLI.md`
-- **位置**:
-  - `FW_REARCHITECTURE_OVERVIEW.md` `ExecutionContext は Command を保持しない`
-  - `RUNTIME_AND_IO_PORTS.md` `RunResult`
-  - `ERROR_CANCELLATION_LOGGING.md` `RunResult と失敗情報`
-  - `LOGGING_FRAMEWORK.md` `ExecutionContext は LoggerPort.bind_context(...) の戻り値を保持`
-- **指摘**: `ExecutionContext` が何を保持するか、`RunLogContext` を誰が生成・保持するか、`RunResult` を Runner と Runtime のどちらが所有するかが文書間で分散している。特に close 失敗時の `cleanup_warnings` 追記責務は実装上の分岐点になる。
-- **修正案**: 1 文書に `ExecutionContext` の完全なフィールド一覧を置く。`RunResult` は `MacroRunner` が生成し、`MacroRuntime` は Port close 失敗だけを `cleanup_warnings` へ追記する、というルールを正本に記載する。`RunLogContext` は `ExecutionContext.run_log_context` として保持するのか、`LoggerPort.bind_context()` の戻り値だけを保持するのかを選ぶ。
-
-### RC-006: キャンセル API が外部操作とマクロ内部操作で混ざっている
-
-- **重要度**: Critical
-- **対象**: `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `RUNTIME_AND_IO_PORTS.md`, `TEST_STRATEGY.md`
-- **位置**:
-  - `ERROR_CANCELLATION_LOGGING.md` `GUI cancel は Command.request_cancel(...)`
-  - `OBSERVABILITY_AND_GUI_CLI.md` `GUI cancel は RunHandle.cancel() のみ`
-  - `RUNTIME_AND_IO_PORTS.md` `RunHandle.cancel() から RunResult.cancelled`
-- **指摘**: GUI/CLI の外部キャンセルを `RunHandle.cancel()` で表す箇所と、`Command.request_cancel()` で表す箇所がある。加えて、`Command.stop()` が例外送出を維持する前提で書かれているが、停止要求が `CancellationToken` / `RunHandle` 経由で伝播するなら、`stop()` 自体が例外を投げる必要があるかは再検討が必要である。
-- **修正案**: API を 3 層に分けて定義する。
-  - 外部操作: GUI/CLI は `RunHandle.cancel()` のみを呼ぶ。
-  - Runtime 内部: `RunHandle.cancel()` が `CancellationToken.request_cancel()` を呼ぶ。
-  - マクロ内部: `Command.stop()` は停止要求を登録する API とし、例外送出は必須契約にしない。即時脱出が必要な箇所は `CancellationToken.check_cancelled()` や `Command.wait()` などの中断チェック点で扱う。
-  - 既存実装が `Command.stop()` の例外に依存しているかを調査し、依存が小さい場合は例外送出を廃止する。依存が残る場合でも、例外送出は `stop(raise_immediately=True)` のような明示 opt-in に限定する。
-
-### RC-007: logging event 名と error code が一元管理されていない
-
-- **重要度**: Critical
-- **対象**: `ERROR_CANCELLATION_LOGGING.md`, `LOGGING_FRAMEWORK.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `CONFIGURATION_AND_RESOURCES.md`
-- **位置**:
-  - `ERROR_CANCELLATION_LOGGING.md` `macro.finalize_failed`
-  - `LOGGING_FRAMEWORK.md` `macro.finished`, `macro.cancelled`, `macro.failed`
-  - `OBSERVABILITY_AND_GUI_CLI.md` `ConfigurationError`
-- **指摘**: `macro.finalize_failed` は Error/Cancellation 側で定義され、`macro.finished` などは Logging 側で定義されている。`ConfigurationError` も複数文書に現れるが、error code の体系と発生元が統一されていない。
-- **修正案**: `LOGGING_FRAMEWORK.md` に event catalog を置き、`ERROR_CANCELLATION_LOGGING.md` は発行タイミングだけを書く。error code は `ERROR_CANCELLATION_LOGGING.md` か `CONFIGURATION_AND_RESOURCES.md` のどちらかに表を置き、全仕様から参照する。
-
 ### RC-008: GUI と core の境界で `GuiLogSink` の配置が曖昧である
 
 - **重要度**: Major
@@ -284,12 +187,6 @@ GUI/CLI
 
 | 優先 | 修正内容 | 主な対象 |
 |---|---|---|
-| 1 | 正とする文書の所有権表を追加する | Overview |
-| 2 | `MacroExecutor` を削除方針へ統一し、互換維持・adapter・非推奨期間の文言を削除する | Deprecation, Implementation Plan, Test Strategy |
-| 3 | `MacroManifest` / `MacroDescriptor` / `MacroDefinition` の統合または廃止を決める | Macro Compatibility, Overview |
-| 4 | `ExecutionContext` / `RunResult` / `RunLogContext` の単一定義を決める | Runtime, Error/Cancellation, Logging |
-| 5 | GUI/CLI cancel API を `RunHandle.cancel()` に統一し、`Command.stop()` の例外送出要否を再検討する | Error/Cancellation, Observability, Runtime |
-| 6 | logging event catalog と error code catalog を作る | Logging, Error/Cancellation |
 | 7 | settings / resource / runtime builder の責務境界をフロー図にする | Configuration, Resource, Runtime |
 | 8 | Port 契約の未定義部分を型・戻り値・例外で固定する | Runtime |
 | 9 | テスト分類と性能測定方法を `TEST_STRATEGY.md` に集約する | Test Strategy |

@@ -1,16 +1,17 @@
 # フレームワーク再設計仕様書
 
+> **文書種別**: 仕様書。再設計全体の方針と仕様依存関係を定義し、詳細 API の正本は下記の所有文書へ委譲する。
 > **対象モジュール**: `src\nyxpy\framework\core\macro\` および将来追加する `src\nyxpy\framework\core\runtime\`  
 > **目的**: 既存マクロ資産の import 互換を維持しながら、マクロ発見・生成・実行・中断・結果取得を `MacroRuntime` 中心に再整理する。  
 > **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `spec\framework\archive\architecture.md`, `ARCHITECTURE_DIAGRAMS.md`, `DEPRECATION_AND_MIGRATION.md`,   `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `RUNTIME_AND_IO_PORTS.md`, `OBSERVABILITY_AND_GUI_CLI.md`  
 > **既存ソース**: `src\nyxpy\framework\core\macro\base.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\macro\executor.py`, `src\nyxpy\framework\core\singletons.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`  
-> **破壊的変更**: なし。特に `nyxpy.framework.core.macro.base.MacroBase` と `nyxpy.framework.core.macro.command.Command` の import は維持する。
+> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
 ### 1.1 目的
 
-NyX フレームワークのマクロ実行基盤を、既存マクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と settings lookup の互換を保ったまま `MacroRuntime` 中心の構成へ段階移行する。`MacroExecutor` は既存 GUI/CLI/テスト移行のための一時 adapter または削除候補であり、既存ユーザーマクロが直接依存していない限り公開互換契約には含めない。
+NyX フレームワークのマクロ実行基盤を、既存マクロが import する `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` と settings lookup の互換を保ったまま `MacroRuntime` 中心の構成へ段階移行する。`MacroExecutor` は既存ユーザーマクロの公開互換契約、新 Runtime API、移行 adapter のいずれにも含めず、GUI/CLI/テストの参照をなくしたうえで削除する。
 
 ### 1.2 用語定義
 
@@ -19,20 +20,21 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 | MacroBase | ユーザー定義マクロの抽象基底クラス。現行 import `nyxpy.framework.core.macro.base.MacroBase` と `initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)` のシグネチャを維持する。 |
 | Command | マクロがコントローラー操作・画面キャプチャ・画像入出力・ログ・通知・中断を行うための高レベル API。現行 import `nyxpy.framework.core.macro.command.Command` を維持する。 |
 | DefaultCommand | 現行 `Command` の標準実装。シリアル通信、キャプチャ、リソース I/O、プロトコル、通知、中断トークンを受け取って実操作を行う。 |
-| MacroExecutor | 現行のマクロ発見・選択・実行クラス。再設計後に残す場合は、旧入口から `MacroRuntime` へ委譲するだけの一時 adapter とする。既存ユーザーマクロが直接依存していない限り、実装段階で置換・廃止できる。 |
+| MacroExecutor | 現行のマクロ発見・選択・実行クラス。再設計では公開 API・既存マクロ互換契約・移行 adapter に含めず、GUI/CLI/テストの参照を解消して削除する。 |
 | MacroRuntime | マクロ発見、実行コンテキスト生成、同期実行、非同期実行、結果取得を統括する新しい実行中核。GUI・CLI が将来参照する主要 API である。 |
 | MacroRegistry | `macros` ディレクトリから `MacroBase` 継承クラスを発見し、マクロ定義情報を保持するコンポーネント。マクロの実行インスタンスは保持しない。 |
-| MacroDescriptor | `MacroRegistry` 内部で扱う詳細メタデータ。Runtime 公開 API では同じ安定 ID・module/class・表示情報を `MacroDefinition` として受け渡す。 |
+| MacroDefinition | 1 件のマクロを表す唯一の Python メタデータ型。安定 ID、module/class、表示名、説明、タグ、settings path、factory を保持する。 |
 | MacroFactory | `MacroRegistry` の定義情報から、実行ごとに新しい `MacroBase` インスタンスを生成するコンポーネント。 |
 | MacroRunner | `initialize -> run -> finalize` のライフサイクルを実行し、例外・中断・結果を `RunResult` に変換するコンポーネント。 |
 | RunHandle | 非同期実行中のマクロに対する操作ハンドル。中断要求、完了待ち、結果取得、状態確認を提供する。 |
-| RunResult | マクロ実行の結果値。`RunStatus(StrEnum)`、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を保持する。 |
+| RunResult | マクロ実行の結果値。`RunStatus(StrEnum)`、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を保持する。正本は `RUNTIME_AND_IO_PORTS.md` であり、生成責務は `MacroRunner` が持つ。 |
 | ErrorInfo | 失敗・中断理由を GUI/CLI へ渡すための構造化エラー情報。秘密情報と traceback の表示先を分離する。 |
-| ExecutionContext | 1 回のマクロ実行に必要な `run_id`、`macro_name`、Ports、`CancellationToken`、`RuntimeOptions`、`exec_args`、`metadata` をまとめる値オブジェクト。`Command` は保持しない。 |
+| ExecutionContext | 1 回のマクロ実行に必要な `run_id`、`macro_name`、`RunLogContext`、Ports、`CancellationToken`、`RuntimeOptions`、`exec_args`、`metadata` をまとめる値オブジェクト。`Command` は保持しない。 |
 | RunContext | `MacroRunner` が `RunResult` を組み立てるための実行時刻、run_id、macro_name、token、logger を保持する内部値。 |
+| RunLogContext | ログ相関情報。型定義は `LOGGING_FRAMEWORK.md`、所有場所は `RUNTIME_AND_IO_PORTS.md` の `ExecutionContext.run_log_context` を正とする。 |
 | MacroSettingsResolver | `static/<macro_name>/settings.toml` と manifest settings path を解決する専用コンポーネント。画像保存用の `ResourceStorePort` とは分離する。 |
 | Ports/Adapters | フレームワーク中核がハードウェア、設定、通知、時刻、スレッド、GUI/CLI に直接依存しないための境界。Port は抽象、Adapter は現行実装への接続である。 |
-| Legacy Compatibility Layer | 既存マクロが import する公開面を壊さないための互換層。`MacroExecutor` は既存 GUI/CLI/テスト移行で必要な場合だけここに置き、内部実装は新 runtime に委譲する。 |
+| Legacy Compatibility Layer | 既存マクロが import する公開面を壊さないための互換層。対象は `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` / settings lookup に限定し、`MacroExecutor` は含めない。 |
 | CancellationToken | `Command` の中断判定に使うスレッドセーフな中断メカニズム。現行では `DefaultCommand.stop()` が停止要求後に `MacroStopException` を送出する。 |
 | MacroStopException | マクロ中断を表す既存例外。再設計後も既存マクロと既存 GUI/CLI の catch 対象として維持する。 |
 
@@ -76,6 +78,23 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 - 実装着手時は `uv run pytest tests\unit\` が既存ベースラインとして通ることを確認する。
 - GUI/CLI の置換は `MacroRuntime` の同期実行・非同期実行・中断・結果取得が単体テストで固定された後に行う。
 
+### 1.6 仕様依存関係
+
+詳細な型定義、責務、テスト期待値は次の所有文書を正とする。Overview は判断の入口であり、表内の概念を重複定義しない。
+
+| 概念 | 正とする文書 | 参照元 | 変更時に同期すべき文書 |
+|------|--------------|--------|------------------------|
+| 既存マクロ互換契約 | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | Overview, Implementation Plan, Test Strategy | Deprecation, Runtime |
+| `MacroRegistry` / `MacroDefinition` / manifest ファイル形式 | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | Overview, Runtime, Implementation Plan, Test Strategy | Configuration, Deprecation |
+| `MacroRuntime` / `MacroRuntimeBuilder` / Ports / `ExecutionContext` / `RunResult` / `RunHandle` | `RUNTIME_AND_IO_PORTS.md` | Overview, Error/Cancellation, Observability, Test Strategy | Implementation Plan, Logging |
+| `RunLogContext` / logging event 名 / sink 契約 | `LOGGING_FRAMEWORK.md` | Error/Cancellation, Observability, Runtime | Test Strategy |
+| error code / 例外から `RunResult` への正規化 | `ERROR_CANCELLATION_LOGGING.md` | Runtime, Logging, Observability | Configuration, Test Strategy |
+| settings lookup / `MacroSettingsResolver` | `CONFIGURATION_AND_RESOURCES.md` | Macro Compatibility, Runtime, Resource File I/O | Implementation Plan |
+| Resource File I/O / `MacroResourceScope` / artifact store | `RESOURCE_FILE_IO.md` | Runtime, Configuration, Test Strategy | Implementation Plan |
+| GUI/CLI adapter / 終了コード / Qt 境界 | `OBSERVABILITY_AND_GUI_CLI.md` | Overview, Runtime, Logging | Implementation Plan, Test Strategy |
+| 廃止・削除対象 | `DEPRECATION_AND_MIGRATION.md` | Overview, Implementation Plan, Test Strategy | Macro Compatibility |
+| テスト分類と性能測定 | `TEST_STRATEGY.md` | 全仕様 | Implementation Plan |
+
 ## 2. 対象ファイル
 
 現時点の作業対象は本仕様書のみである。以下の表は、本仕様が想定する段階移行の実装対象を含む。
@@ -89,20 +108,20 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 | `src\nyxpy\framework\core\runtime\handle.py` | 新規 | `RunHandle` とスレッド実装を定義する。 |
 | `src\nyxpy\framework\core\runtime\runner.py` | 新規 | `MacroBase` と `Command` を受け、ライフサイクル実行と `RunResult` 生成だけを担当する。 |
 | `src\nyxpy\framework\core\runtime\runtime.py` | 新規 | registry 解決、factory 呼び出し、Ports 準備、`CommandFacade` 生成、Port close を担当する。 |
-| `src\nyxpy\framework\core\macro\registry.py` | 新規 | `MacroRegistry`, `MacroDescriptor`, `MacroFactory`, `MacroManifest` を定義する正配置。 |
+| `src\nyxpy\framework\core\macro\registry.py` | 新規 | `MacroRegistry`, `MacroDefinition`, `MacroFactory` を定義する正配置。`macro.toml` は入力フォーマットとして扱う。 |
 | `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` を定義し、設定 TOML 解決を画像リソース I/O から分離する。 |
 | `src\nyxpy\framework\core\macro\base.py` | 変更 | import パスと `MacroBase` シグネチャを維持する。初期段階では定義を移動しない。移動する場合も re-export と互換テストを先に置く。 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `Command` / `DefaultCommand` の import パスと公開メソッドを維持する。内部依存だけを Ports/Adapters に寄せる。 |
-| `src\nyxpy\framework\core\macro\executor.py` | 変更または削除 | `MacroExecutor` を残す場合は旧入口から `MacroRuntime` へ委譲するだけの一時 adapter とする。GUI/CLI を直接 Runtime へ移行できるなら削除候補にする。 |
+| `src\nyxpy\framework\core\macro\executor.py` | 削除 | GUI/CLI/テストの参照を `MacroRuntime` / `MacroRegistry` へ移行した後に削除する。import 互換 shim は作らない。 |
 | `src\nyxpy\framework\core\singletons.py` | 変更 | 既存 singleton を維持しつつ、runtime adapter が参照する既定依存の生成・リセット点を整理する。 |
-| `src\nyxpy\cli\run_cli.py` | 変更 | 将来的に `MacroRuntime` を使う CLI adapter へ移行する。既存 `create_command()`、`execute_macro()` は互換関数として残す。 |
-| `src\nyxpy\gui\main_window.py` | 変更 | 将来的に `MacroRuntime.start()` と `RunHandle` を使う GUI adapter へ移行する。既存 import は段階移行中も残す。 |
+| `src\nyxpy\cli\run_cli.py` | 変更 | `MacroRuntime` を使う CLI adapter へ移行し、`MacroExecutor` 参照を削除する。 |
+| `src\nyxpy\gui\main_window.py` | 変更 | `MacroRuntime.start()` と `RunHandle` を使う GUI adapter へ移行し、`MacroExecutor` 参照を削除する。 |
 | `tests\unit\framework\macro\test_legacy_imports.py` | 新規 | `MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException` の import 互換と主要シグネチャを検証する。 |
 | `tests\unit\framework\runtime\test_macro_registry.py` | 新規 | マクロ探索、reload、パッケージ型マクロ、import キャッシュ削除を検証する。 |
 | `tests\unit\framework\runtime\test_macro_factory.py` | 新規 | 実行ごとに新規 `MacroBase` インスタンスが生成されることを検証する。 |
 | `tests\unit\framework\runtime\test_macro_runner.py` | 新規 | 正常終了、中断、例外、`finalize()` 呼び出し保証、`RunResult` を検証する。 |
 | `tests\unit\framework\runtime\test_execution_context.py` | 新規 | `ExecutionContext` と adapter が `Command`、設定、通知、中断トークンを正しく束ねることを検証する。 |
-| `tests\integration\test_macro_runtime_legacy_executor.py` | 新規 | `MacroExecutor` を残す場合、旧入口から `MacroRuntime` へ委譲され、ライフサイクルを二重実装しないことを検証する。 |
+| `tests\integration\test_macro_runtime_entrypoints.py` | 新規 | GUI/CLI/テスト入口が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使うことを検証する。 |
 | `tests\integration\test_cli_runtime_adapter.py` | 新規 | CLI adapter が既存引数から `ExecutionContext` を作り、runtime 実行へ接続できることを検証する。 |
 | `tests\gui\test_main_window_runtime_adapter.py` | 新規 | GUI adapter が `RunHandle` の完了・中断・失敗を既存 UI 状態へ反映することを検証する。 |
 | `tests\hardware\test_macro_runtime_realdevice.py` | 新規 | 実機接続時の runtime 実行、シリアル送信、キャプチャ取得を `@pytest.mark.realdevice` で検証する。 |
@@ -132,7 +151,7 @@ Legacy Compatibility Layer
   -> nyxpy.framework.core.macro.base.MacroBase
   -> nyxpy.framework.core.macro.command.Command
   -> nyxpy.framework.core.macro.command.DefaultCommand
-  -> nyxpy.framework.core.macro.executor.MacroExecutor  # 残す場合のみ
+  -> nyxpy.framework.core.macro.exceptions.MacroStopException
 ```
 
 詳細な図は [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) を参照する。最重要の依存方向は、GUI/CLI と既存マクロが上位利用者であり、Runtime 中核が Ports/Adapters を介してハードウェア/外部 I/O へ到達することである。
@@ -167,7 +186,7 @@ flowchart TB
 | `from nyxpy.framework.core.macro.base import MacroBase` | 必ず維持する。シグネチャも維持する。 |
 | `from nyxpy.framework.core.macro.command import Command` | 必ず維持する。既存マクロが呼ぶ公開メソッドを削除しない。 |
 | `from nyxpy.framework.core.macro.command import DefaultCommand` | 維持する。CLI/GUI と既存テストの移行を妨げない。 |
-| `from nyxpy.framework.core.macro.executor import MacroExecutor` | 既存ユーザーマクロが直接依存していない限り公開互換契約から外す。既存 GUI/CLI/テスト移行のために残す場合は、`reload_macros()` / `set_active_macro()` / `execute()` から `MacroRuntime` へ委譲するだけの薄い adapter とする。 |
+| `from nyxpy.framework.core.macro.executor import MacroExecutor` | 公開互換契約から外す。`reload_macros()` / `set_active_macro()` / `execute()` / `macros` / `macro` は保証せず、GUI/CLI/テスト移行後に削除する。 |
 | `from nyxpy.framework.core.macro.exceptions import MacroStopException` | 維持する。中断の catch 対象を変えない。 |
 
 #### 新規 API
@@ -179,7 +198,8 @@ flowchart TB
 | 区分 | 対象 | 方針 |
 |------|------|------|
 | 永久維持 | `MacroBase` / `Command` / `DefaultCommand` import path、constants import、`MacroBase.initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)`、`Command` 公開メソッド、`MacroStopException()` / `MacroStopException("stop")`、`static/<macro_name>/settings.toml` lookup | 既存マクロ変更不要の前提で維持する。 |
-| 一時 adapter / 廃止候補 | `MacroExecutor`, legacy loader, `cwd` fallback | 既存 GUI/CLI/テスト移行に必要な場合だけ残す。残す場合の責務は Runtime / Ports / Registry への委譲に限定し、既存ユーザーマクロが直接依存していないなら廃止できる。 |
+| 削除対象 | `MacroExecutor` | 既存マクロ互換 API ではない。GUI/CLI/テストを `MacroRuntime` / `RunHandle` / `MacroRegistry` へ移行した時点で削除し、import 互換 shim は作らない。 |
+| 一時互換 | legacy loader, `cwd` fallback | 既存マクロのロード互換に必要な範囲だけ警告付きで残す。 |
 | 非推奨後削除候補 | 暗黙 dummy fallback、恒久的な `sys.path` 変更、`cwd` 起点だけに依存する探索、settings path の曖昧解決 | 非推奨警告と移行期間を置き、削除可否は別仕様で判断する。 |
 
 廃止候補の削除条件、代替 API、互換影響、テストゲート、移行順は `DEPRECATION_AND_MIGRATION.md` を正とする。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、`static\<macro_name>\settings.toml` lookup は廃止候補に含めない。
@@ -191,15 +211,15 @@ flowchart TB
 | 段階 | 内容 | 互換性の扱い |
 |------|------|--------------|
 | Phase 0 | import/signature 互換テストを追加する。 | 実装変更前に `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` / settings lookup の契約を固定する。 |
-| Phase 1 | `core.macro.registry` の `MacroRegistry` / `MacroFactory` / `MacroSettingsResolver` を導入する。 | `MacroExecutor` を残す場合も旧ロード互換だけを担わせ、ライフサイクル実行は Runtime / Runner へ寄せる。 |
+| Phase 1 | `core.macro.registry` の `MacroRegistry` / `MacroFactory` / `MacroSettingsResolver` を導入する。 | `MacroExecutor` を使わず、GUI/CLI/テストから `MacroRegistry` を直接参照できる入口を用意する。 |
 | Phase 2 | `MacroRunner` を導入し、`initialize -> run -> finalize`、`RunResult`、`MacroStopException` 正規化を固定する。 | `MacroBase.finalize(cmd)` を唯一の抽象契約として維持し、outcome は opt-in にする。 |
-| Phase 3 | `RunResult` / cancellation / finalize outcome opt-in を GUI/CLI へ渡せる形にする。 | 旧 `execute()` は `None` 戻り値と例外再送出を維持する。 |
-| Phase 4 | 必要な場合だけ `MacroExecutor` を Runtime 委譲へ変更する。 | 旧入口を残す場合は薄い adapter とし、不要なら GUI/CLI を Runtime へ直接移行して削除する。 |
+| Phase 3 | `RunResult` / cancellation / finalize outcome opt-in を GUI/CLI へ渡せる形にする。 | `MacroRunner` が `RunResult` を生成し、GUI/CLI は例外再送出や `None` 戻り値へ依存しない。 |
+| Phase 4 | GUI/CLI/テストの `MacroExecutor` 参照を `MacroRuntime` / `RunHandle` / `MacroRegistry` へ置換する。 | 置換完了後に `MacroExecutor` を削除する。 |
 | Phase 5 | Ports / `CommandFacade` を導入し、`DefaultCommand` 内部を移行する。 | `Command.type(key: str | KeyCode | SpecialKeyCode)` を含む既存呼び出しを維持する。 |
 | Phase 6 | CLI を Runtime adapter へ移行する。 | 通知設定ソースは `SecretsSettings` に統一し、終了コードは `RunResult` から決める。 |
 | Phase 7 | GUI を Runtime adapter へ移行する。 | `RunHandle` と GUI log event を Qt 層で変換し、core 層に Qt 依存を入れない。 |
 
-非推奨化が必要になった場合でも即削除しない。`warnings.warn(..., DeprecationWarning, stacklevel=2)` を使い、削除時期は別仕様で決める。
+既存ユーザーマクロ互換 API を非推奨化する場合は即削除しない。`MacroExecutor` は互換 API ではないため、非推奨期間や import shim を設けず、参照解消後に削除する。
 
 ### 3.4 レイヤー構成
 
@@ -258,7 +278,7 @@ nyxpy.framework.*     -> macros\{macro_name}\           禁止。ただし impor
 
 ### 4.1 公開インターフェース
 
-#### 4.1.1 既存マクロ互換 API と移行 adapter
+#### 4.1.1 既存マクロ互換 API
 
 ```python
 from abc import ABC, abstractmethod
@@ -350,24 +370,9 @@ class Command(ABC):
     def disable_sleep(self, enabled: bool = True) -> None:
         raise NotImplementedError("Current serial protocol does not support sleep control.")
 
-
-# MacroExecutor は既存マクロ互換 API ではない。
-# 残す場合だけ旧 GUI/CLI/テスト入口から Runtime へ委譲する一時 adapter とする。
-class MacroExecutor:
-    macros: dict[str, MacroBase]
-    macro: MacroBase | None
-
-    def reload_macros(self) -> None:
-        ...
-
-    def set_active_macro(self, macro_name: str) -> None:
-        ...
-
-    def execute(self, cmd: Command, exec_args: dict = {}) -> None:
-        ...
 ```
 
-`MacroExecutor` は公開互換契約ではない。既存 GUI/CLI/テスト移行のために残す場合だけ上記シグネチャを保ち、内部実装では即座に `dict(exec_args)` を作成して可変デフォルト値の副作用を避ける。
+`MacroExecutor` は上記の既存マクロ互換 API に含めない。`MacroExecutor.execute()` の成功時 `None`、失敗時例外再送出、`macros` / `macro` 属性は再設計後の保証対象外である。
 
 #### 4.1.2 新 runtime API
 
@@ -424,6 +429,7 @@ class RuntimeOptions:
 class ExecutionContext:
     run_id: str
     macro_name: str
+    run_log_context: object
     controller: object
     frame_source: object
     resources: object
@@ -500,7 +506,7 @@ class MacroRuntime:
     def start(self, context: ExecutionContext) -> RunHandle: ...
 ```
 
-`ExecutionContext` は `Command` を保持しない。`MacroRuntime.create_context()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, Any]` として扱う。`MacroRuntime.run()` は `CommandFacade(context)` を生成し、`MacroRunner.run(macro, cmd, context.exec_args, run_context)` へ渡す。`RunResult` は `datetime` と `RunStatus(StrEnum)` を使い、失敗情報は `ErrorInfo | None`、解放失敗は `cleanup_warnings` に集約する。
+`ExecutionContext` は `Command` を保持しない。`MacroRuntime.create_context()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, Any]` として扱う。`RunLogContext` は `ExecutionContext.run_log_context` として保持し、`LoggerPort.bind_context()` は context 付き logger view を返す。`MacroRuntime.run()` は `CommandFacade(context)` を生成し、`MacroRunner.run(macro, cmd, context.exec_args, run_context)` へ渡す。`RunResult` は `MacroRunner` が生成し、Runtime は Port close 失敗だけを `cleanup_warnings` に追記する。
 
 ### 4.2 内部設計
 
@@ -524,8 +530,8 @@ class MacroRuntime:
 
 ```text
 MacroRuntime.run(context)
-  -> descriptor = MacroRegistry.get(context.macro_name)
-  -> macro = MacroFactory.create(descriptor)
+  -> definition = MacroRegistry.get(context.macro_name)
+  -> macro = MacroFactory.create(definition)
   -> Ports の readiness を確認
   -> cmd = CommandFacade(context)
   -> run_context = RunContext(...)
@@ -558,18 +564,15 @@ GUI Adapter
 
 #### 4.2.5 Legacy Compatibility Layer
 
-`MacroExecutor` を残す場合、以下の互換だけを維持する薄い adapter である。残さず GUI/CLI を `MacroRuntime` へ直接移行する選択も許容する。
+Legacy Compatibility Layer は、既存ユーザーマクロが import する公開面だけを維持する。対象は `MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、legacy settings lookup である。
 
-- `reload_macros()` は `MacroRuntime.reload()` / `MacroRegistry.reload()` へ委譲し、`macros` 互換 facade を更新する。
-- `set_active_macro(macro_name)` は Runtime/Registry の解決結果を保持し、見つからない場合に現行どおり `ValueError` を送出する。
-- `execute(cmd, exec_args)` は `RunResult` を返さず `None` を維持する。内部 `RunResult` が失敗の場合は現行どおり例外を再送出する。
-- ライフサイクル実行、`RunResult` 生成、`MacroStopException` 正規化を `MacroExecutor` に二重実装しない。
+`MacroExecutor` は Legacy Compatibility Layer に含めない。`MacroExecutor.execute()` の成功時 `None`、失敗時例外再送出、`macros` / `macro` 属性は保証せず、GUI/CLI/テストが `MacroRuntime` / `RunHandle` / `MacroRegistry` を使う状態になった時点で削除する。
 
 ### 4.3 設定パラメータ
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `macros_dir` | `Path` | `Path.cwd() / "macros"` | マクロ探索ディレクトリ。現行 `MacroExecutor` と同じ既定値にする。 |
+| `macros_dir` | `Path` | `Path.cwd() / "macros"` | マクロ探索ディレクトリ。初期互換の既定値として扱う。 |
 | `resources_dir` | `Path` | `Path.cwd() / "static"` | 画像保存・読み込み用 `ResourceStorePort` の root。settings TOML 解決には使わない。 |
 | `macro_settings_root` | `Path` | `project_root` | `MacroSettingsResolver` が `static/<macro_name>/settings.toml` 互換と manifest settings path を解決する起点。 |
 | `compatibility_mode` | `bool` | `True` | Legacy adapter の挙動を優先するかを示す。初期段階では常に `True` とする。 |
@@ -579,12 +582,12 @@ GUI Adapter
 
 ### 4.4 エラーハンドリング
 
-| 例外クラス | 発生条件 | Legacy adapter での扱い |
-|------------|----------|--------------------------|
-| `MacroNotFoundError` | 指定名のマクロ定義が registry に存在しない。 | `ValueError` に変換し、現行メッセージ形式に合わせる。 |
-| `MacroLoadError` | import、class 解決、インスタンス生成に失敗した。 | `log_manager.log("ERROR", ...)` へ記録し、必要に応じて `ValueError` または元例外を再送出する。 |
-| `MacroExecutionError` | `initialize()`、`run()`、`finalize()` のいずれかで予期しない例外が発生した。 | 現行どおり `cmd.log()` 後に元例外を再送出する。 |
-| `MacroStopException` | 既存 `cmd.stop()` または `check_interrupt` による中断。 | 中断結果 `RunStatus.CANCELLED` に変換し、Legacy adapter では既存の中断ログに合わせる。 |
+| 例外クラス | 発生条件 | 扱い |
+|------------|----------|------|
+| `MacroNotFoundError` | 指定名のマクロ定義が registry に存在しない。 | `RunResult.error` または GUI/CLI の入力エラーへ正規化する。 |
+| `MacroLoadError` | import、class 解決、インスタンス生成に失敗した。 | 構造化ログへ記録し、`RunResult.error` へ正規化する。 |
+| `MacroExecutionError` | `initialize()`、`run()`、`finalize()` のいずれかで予期しない例外が発生した。 | `RunStatus.FAILED` と `ErrorInfo` へ正規化する。 |
+| `MacroStopException` | 既存 `cmd.stop()` または `check_interrupt` による中断。 | `RunStatus.CANCELLED` へ正規化する。 |
 | `TimeoutError` | `RunHandle.result(timeout=...)` の待機時間を超えた。 | GUI/CLI adapter 側で表示・終了コードへ変換する。 |
 
 新規例外は runtime 内部で使う。既存マクロに新規例外の catch を要求しない。
@@ -611,7 +614,8 @@ GUI Adapter
 | ユニット | `test_command_type_accepts_str_keycode_special_keycode` | `Command.type(key: str | KeyCode | SpecialKeyCode)` の互換を検証する。 |
 | ユニット | `test_run_handle_cancel_requests_token` | `RunHandle.cancel()` が `CancellationToken` に停止要求を出し、実行中マクロが中断できることを検証する。 |
 | ユニット | `test_execution_context_builds_default_command_from_adapters` | adapter が既定 manager、protocol、resource、notification、token から `DefaultCommand` を構築できることを検証する。 |
-| 結合 | `test_macro_executor_delegates_to_runtime_if_kept` | `MacroExecutor` を残す場合、`reload_macros()`、`set_active_macro()`、`execute()` が runtime へ委譲され、ライフサイクルを二重実装しないことを検証する。 |
+| 結合 | `test_gui_cli_do_not_import_macro_executor` | GUI/CLI/テスト入口が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使うことを検証する。 |
+| 結合 | `test_macro_executor_removed` | `MacroExecutor` の import 互換 shim を作らず、削除対象として扱うことを検証する。 |
 | 結合 | `test_cli_adapter_runs_macro_with_define_args` | CLI 引数から実行引数を作り、runtime 経由でマクロを実行できることを検証する。 |
 | GUI | `test_main_window_runtime_adapter_updates_running_state` | GUI adapter が実行開始、完了、中断、失敗を `ControlPane` と status label に反映することを検証する。 |
 | ハードウェア | `test_macro_runtime_realdevice_press_and_capture` | 実機接続時に `DefaultCommand` 経由の press と capture が runtime 実行でも動作することを `@pytest.mark.realdevice` で検証する。 |
@@ -623,7 +627,7 @@ GUI Adapter
 
 - [x] 現行 `MacroBase` の import パスと抽象メソッドを確認
 - [x] 現行 `Command` / `DefaultCommand` の import パスと公開メソッドを確認
-- [x] 現行 `MacroExecutor` の探索・選択・実行フローを確認
+- [x] 現行 `MacroExecutor` の探索・選択・実行フローを確認し、削除対象として明記
 - [x] 現行 `singletons.py` の manager/settings 管理を確認
 - [x] 現行 CLI の `DefaultCommand` 構築と `MacroExecutor` 実行を確認
 - [x] 現行 GUI の `WorkerThread`、中断、完了通知を確認
@@ -639,7 +643,7 @@ GUI Adapter
 - [x] テスト方針をテスト種別別に記載
 - [ ] Phase 1 実装前に import 互換テストを追加
 - [ ] `MacroRuntime` 系クラスを実装
-- [ ] `MacroExecutor` を残す場合は runtime 委譲へ移行し、不要なら削除
+- [ ] GUI/CLI/テストの `MacroExecutor` 参照を削除し、`test_macro_executor_removed` と `test_gui_cli_do_not_import_macro_executor` を追加
 - [ ] CLI adapter を runtime 経由へ移行
 - [ ] GUI adapter を runtime 経由へ移行
 - [ ] 既存マクロを変更せずに主要テストが通ることを確認
