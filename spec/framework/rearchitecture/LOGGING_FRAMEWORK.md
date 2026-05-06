@@ -431,8 +431,13 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 
 ## 6. 実装チェックリスト
 
+### 6.1 仕様確定
+
 - [ ] `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext` のシグネチャ確定
 - [ ] `LoggerPort`、`LogSink`、`LogBackend` の抽象定義
+
+### 6.2 実装
+
 - [ ] `LogManager.__init__()` から backend handler 初期化と global `logger.remove()` を排除
 - [ ] `configure()` による明示初期化を実装
 - [ ] 旧 `LogManager.log()` と handler API の呼び出し元を新 API へ置換
@@ -444,6 +449,9 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 - [ ] ログファイル配置、rotation、保持期間、cleanup を実装
 - [ ] `LogPane` を `UserEvent` 購読へ移行
 - [ ] 通知失敗と Runtime 失敗を技術ログへ記録
+
+### 6.3 検証
+
 - [ ] ユニットテスト作成・パス
 - [ ] GUI テスト作成・パス
 - [ ] パフォーマンステスト作成・パス

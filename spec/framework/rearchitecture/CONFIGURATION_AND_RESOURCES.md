@@ -272,6 +272,7 @@ Resource File I/O の `ResourcePathError`、`ResourceReadError`、`ResourceWrite
 | ユニット | `test_macro_settings_resolver_uses_manifest_project_path` | manifest の `project:` settings を `project_root` 相対で解決する |
 | ユニット | `test_macro_settings_resolver_uses_macro_root_relative_path` | manifest の相対 settings を macro root 相対で解決する |
 | ユニット | `test_macro_settings_resolver_uses_class_metadata_path` | manifest がない場合に class metadata `settings_path` を解決する |
+| ユニット | `test_macro_settings_resolver_rejects_backslash_in_portable_path` | TOML / class metadata の path に `\` が含まれる場合は診断して拒否する |
 | ユニット | `test_macro_settings_resolver_does_not_read_legacy_static_settings` | `static\<macro_name>\settings.toml` を暗黙探索しない |
 | ユニット | `test_macro_settings_resolver_returns_none_when_absent` | settings 候補が存在しない場合に `resolve()` が `None`、`load()` が `{}` を返す |
 | ユニット | `test_macro_settings_resolver_rejects_broken_toml` | TOML parse 失敗時に既定値 fallback せず `ConfigurationError` にする |

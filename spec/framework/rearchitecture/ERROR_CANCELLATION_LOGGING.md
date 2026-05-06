@@ -294,7 +294,7 @@ class MacroRuntime:
 | `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の schema 検証失敗 |
 | `MacroRuntimeError` | `FrameworkError` | `macro` | マクロ実装由来の未分類例外を executor が正規化したもの |
 
-`MacroStopException` は削除しない。`MacroStopException()` と `MacroStopException("stop")` は破壊しない。constructor は `__init__(*args, **kwargs)` で旧呼び出しを受け、`kind` 未指定時は `ErrorKind.CANCELLED`、`code` 未指定時は `NYX_MACRO_CANCELLED`、`component` 未指定時は `MacroStopException` を既定値にする。新規コードは `MacroCancelled` を送出するが、`MacroCancelled` が `MacroStopException` を継承するため、既存の `except MacroStopException` は中断を捕捉できる。既存マクロが `MacroStopException` を直接送出した場合、`MacroRunner` は `MacroCancelled` 相当の `RunResult(status=RunStatus.CANCELLED)` に正規化する。
+`MacroStopException` は削除しない。`MacroStopException()` と `MacroStopException("stop")` は破壊しない。constructor は `__init__(*args, **kwargs)` で旧呼び出しを受け、`args[0]` がある場合は message として扱う。`kind` 未指定時は `ErrorKind.CANCELLED`、`code` 未指定時は `NYX_MACRO_CANCELLED`、`component` 未指定時は `MacroStopException`、`recoverable` 未指定時は `False` を既定値にする。kwargs に同名キーが渡された場合は kwargs を優先する。新規コードは `MacroCancelled` を送出するが、`MacroCancelled` が `MacroStopException` を継承するため、既存の `except MacroStopException` は中断を捕捉できる。既存マクロが `MacroStopException` を直接送出した場合、`MacroRunner` は `MacroCancelled` 相当の `RunResult(status=RunStatus.CANCELLED)` に正規化する。
 
 ### RunResult と失敗情報
 
@@ -375,6 +375,8 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `finalize(self, cmd, outcome)` | `finalize(cmd, outcome)` |
 | `finalize(self, cmd, *, outcome=None)` | `finalize(cmd, outcome=result)` |
 | `finalize(self, cmd, **kwargs)` | `finalize(cmd, outcome=result)` |
+
+`finalize` の signature inspection は Registry reload または `MacroDefinition` 生成時に 1 回だけ行い、`MacroDefinition.finalize_accepts_outcome: bool` として保持する。`MacroRunner` は実行ごとに `inspect.signature()` を呼ばず、保持済みフラグに従って呼び出し形式を選ぶ。
 
 `finalize` 自体が例外を送出した場合、元の `run` 失敗情報を失わせない。実行本体が成功していた場合は `finalize` 失敗を `RunStatus.FAILED` とする。実行本体がすでに失敗または中断していた場合は、`RunResult.error.details["finalize_error"]` に要約を追加し、構造化ログへ `event="macro.finalize_failed"` を出す。
 

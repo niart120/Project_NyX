@@ -104,6 +104,8 @@ project_root
 - `RunArtifactStore.output_root` は書き込み専用の標準先である。`save_img()` の保存先は常にここへ集約する。
 - `MacroSettingsResolver` は settings TOML だけを扱う。Resource Store は settings ファイルを探索しない。
 
+`Command.save_img()`、`RunArtifactStore.save_image()`、`RunArtifactStore.open_output()` は、読み込み元 assets root へ同名ファイルを書き戻さない。標準 assets と macro package 同梱 assets のどちらから読み込んだ場合でも、保存先は `runs\<run_id>\outputs` 配下だけである。assets を更新したい場合はマクロ実行の成果物として保存し、移行作業またはユーザー操作で assets へ反映する。
+
 `MacroResourceScope.assets_roots` が複数 root を持つ理由は、標準 assets と macro package 同梱 assets を同時に検索するためである。例えば `frlg_id_rng` は次の順で検索する。
 
 ```text

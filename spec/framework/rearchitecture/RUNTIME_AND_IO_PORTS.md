@@ -758,8 +758,13 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 
 ## 6. 実装チェックリスト
 
+### 6.1 仕様確定
+
 - [ ] `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` のシグネチャ確定
 - [ ] `ExecutionContext`, `RunHandle`, `RunResult`, `RuntimeOptions` のシグネチャ確定
+
+### 6.2 実装
+
 - [ ] `MacroRuntime` の同期実行 `run()` 実装
 - [ ] `MacroRuntime` の非同期実行 `start()` と `RunHandle` 実装
 - [ ] `DefaultCommand(context=...)` の Port 委譲実装
@@ -776,6 +781,9 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 - [ ] CLI の `DefaultCommand` 直接構築を Runtime 利用へ移行
 - [ ] `VirtualControllerModel` を `ControllerOutputPort` 利用へ移行
 - [ ] `singletons.py` の `reset_for_testing()` が Runtime/Port 関連状態を初期化
+
+### 6.3 検証
+
 - [ ] ユニットテスト作成・パス
 - [ ] 結合テスト作成・パス
 - [ ] GUI テスト作成・パス

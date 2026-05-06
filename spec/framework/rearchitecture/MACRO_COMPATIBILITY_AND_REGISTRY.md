@@ -129,6 +129,8 @@ nyxpy.framework.* -> macros/<name>       NG
 2. class metadata `settings_path` に明示されたパス。`project:` prefix は `project_root` 相対、通常の相対パスは macro root 相対として解決する。
 3. どちらも指定がない場合は settings file を読み込まず、`MacroSettingsResolver.resolve()` は `None` を返す。
 
+`macro.toml` と class metadata に永続化する path 文字列は portable path として `/` のみを使う。Windows 実行環境でも `project:resources/frlg_id_rng/settings.toml` のように記述し、`\` は入力エラーとして診断する。実ファイルパスへの変換は resolver が行う。
+
 `static/<macro_name>/settings.toml`、package / single-file 名からの settings 推測、`cwd` 起点 fallback は残さない。必要な settings は manifest または class metadata に明示し、マクロ移行ガイドで移動手順を示す。
 
 #### 互換ポリシー表
@@ -490,6 +492,8 @@ uv run ruff check .
 ```
 
 ## 6. 実装チェックリスト
+
+本チェックリストは仕様確定項目である。実装タスクと検証タスクは `IMPLEMENTATION_PLAN.md` のフェーズ別チェックリストを正とする。
 
 - [x] 既存 import path の互換契約を明記
 - [x] lifecycle signature の互換契約を明記

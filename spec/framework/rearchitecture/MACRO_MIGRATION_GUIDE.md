@@ -183,6 +183,16 @@ macros\frlg_id_rng\assets\templates\title.png
 
 `cmd.load_img("templates/title.png")` は assets root からの相対パスとして解決される。`static\frlg_id_rng` や絶対パスを直接渡す前提は移行対象である。
 
+```python
+# 移行前: static 配置を呼び出し側に含めている
+template = cmd.load_img("frlg_id_rng/templates/title.png")
+```
+
+```python
+# 移行後: assets root からの相対パスだけを渡す
+template = cmd.load_img("templates/title.png")
+```
+
 ### 4.4 outputs の移行
 
 `cmd.save_img("result.png", image)` の保存先は次に固定する。
@@ -192,6 +202,18 @@ runs\<run_id>\outputs\result.png
 ```
 
 旧 `static\<macro_name>` への保存、`legacy_static_write=True`、`resource.write_mode = "legacy_static"` は定義しない。ファイル名先頭の macro ID prefix は除去しない。
+
+```python
+# 移行前: static 配下へ直接保存する
+output_path = Path("static/frlg_initial_seed/result.csv")
+output_path.write_text(csv_text, encoding="utf-8")
+```
+
+```python
+# 移行後: run outputs へ成果物として保存する
+with cmd.artifacts.open_output("result.csv", mode="w", encoding="utf-8") as fp:
+    fp.write(csv_text)
+```
 
 ### 4.5 `DefaultCommand` 直接生成の修正
 
@@ -207,6 +229,12 @@ cmd = DefaultCommand(serial_device=serial, capture_device=capture)
 ```python
 # 移行後: テスト用に context を明示する
 cmd = DefaultCommand(context=context)
+```
+
+```python
+# 移行後: Command 不要なロジックは純粋関数としてテストする
+def decide_next_button(state: dict[str, int]) -> Button:
+    return Button.A if state["ready"] else Button.B
 ```
 
 ### 4.5A `Command.stop()` の移行

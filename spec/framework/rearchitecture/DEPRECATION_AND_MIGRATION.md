@@ -243,6 +243,12 @@ uv run ruff check .
 
 本書作成時の文書検証は次を使う。
 
+| コマンド | 検証内容 |
+|----------|----------|
+| `git diff --check` | 行末空白、混在インデント、patch として不正な空白を検出する |
+| `rg "T[O]D[O]|T[B]D|x{3}|\[T[O]D[O]\]" spec\framework\rearchitecture` | 未解決 placeholder と仮テキストを検出する。一致なしを合格とする |
+| `rg "^## ..."` | 必須 6 セクションが存在することを確認する。6 行が出ることを合格とする |
+
 ```powershell
 git diff --check
 rg "T[O]D[O]|T[B]D|x{3}|\[T[O]D[O]\]" spec\framework\rearchitecture
