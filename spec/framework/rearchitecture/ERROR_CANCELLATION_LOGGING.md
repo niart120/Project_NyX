@@ -1,9 +1,9 @@
 # 異常系・中断・ログ再設計 仕様書
 
-> **対象モジュール**: `src/nyxpy/framework/core/macro/`, `src/nyxpy/framework/core/utils/`, `src/nyxpy/framework/core/logger/`, `src/nyxpy/framework/core/settings/`
-> **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果を再設計し、ログ出力は `LOGGING_FRAMEWORK.md` の基盤へ接続する。
-> **関連ドキュメント**: `LOGGING_FRAMEWORK.md`, `spec/framework/archive/logging_design.md`
-> **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`
+> **対象モジュール**: `src/nyxpy/framework/core/macro/`, `src/nyxpy/framework/core/utils/`, `src/nyxpy/framework/core/logger/`, `src/nyxpy/framework/core/settings/`  
+> **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果を再設計し、ログ出力は `LOGGING_FRAMEWORK.md` の基盤へ接続する。  
+> **関連ドキュメント**: `LOGGING_FRAMEWORK.md`, `spec/framework/archive/logging_design.md`  
+> **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`  
 > **破壊的変更**: なし。既存マクロの import 互換と `finalize(cmd)` 互換を維持する。
 
 ## 1. 概要

@@ -1,8 +1,8 @@
 # 廃止候補と移行方針 仕様書
 
 > **対象モジュール**: `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\hardware\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`
-> **目的**: フレームワーク再設計仕様の分割粒度を確認し、既存マクロ互換の外側で削除・廃止できる実装責務と移行順を定義する。
-> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `TEST_STRATEGY.md`, `IMPLEMENTATION_PLAN.md`
+> **目的**: フレームワーク再設計仕様の分割粒度を確認し、既存マクロ互換の外側で削除・廃止できる実装責務と移行順を定義する。  
+> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `TEST_STRATEGY.md`, `IMPLEMENTATION_PLAN.md`  
 > **破壊的変更**: 既存マクロ向けにはなし。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、`static\<macro_name>\settings.toml` 互換は削除対象に含めない。
 
 ## 1. 概要
@@ -17,10 +17,10 @@
 |------|------|
 | Compatibility Contract | 既存マクロが依存する import path、ライフサイクル、Command API、settings lookup、例外互換を維持する契約 |
 | 廃止候補 | 互換契約の外側にあり、代替 API とテストゲートが成立した後に削除または非推奨化できる実装・挙動 |
-| 削除条件 | 対象を削除しても既存マクロ互換と GUI/CLI 移行後の受け入れ条件を壊さないための必須条件 |
+| 削除条件 | 対象を削除しても既存マクロ互換を壊さず、新 GUI/CLI 入口の受け入れ条件を満たすための必須条件 |
 | 代替 API | 廃止候補の呼び出し元が移行する先の API、Port、Adapter、Builder、設定項目 |
 | テストゲート | 削除判断前後に必ず通す自動テストまたは検証コマンド |
-| 移行順 | 互換テスト追加から adapter 縮退、非推奨警告、削除判断までの実施順 |
+| 移行順 | 互換テスト追加、代替 API 実装、呼び出し元置換、旧経路削除までの実施順 |
 | MacroExecutor | 旧 GUI/CLI/テスト入口。残す場合は `MacroRuntime` へ委譲する一時 adapter とし、既存マクロ互換契約には含めない |
 | MacroRuntimeBuilder | GUI/CLI/Legacy 入口から Runtime、Ports、設定 snapshot、通知、ログを組み立てる adapter |
 | Ports/Adapters | Runtime 中核からハードウェア、リソース、通知、ログ、GUI/CLI 依存を分離する抽象境界と接続実装 |
@@ -32,6 +32,8 @@
 
 既存マクロ互換を維持するため、廃止対象を公開互換契約から明確に外し、代替経路とテストゲートを先に固定する必要がある。特に `MacroExecutor` や `singletons.py` は「ファイルや import path を即削除する対象」ではなく、「新 Runtime 経路で直接責務を持たせない対象」として扱う。
 
+GUI / CLI は既存マクロ互換契約の外側にあるため、破壊的変更を許容する。旧 GUI / CLI 入口、旧 helper、旧 adapter を温存して二重実装を増やすより、新 Runtime 入口へ直接移行し、受け入れテストで同等のユーザー操作が成立した時点で旧経路を削除する。
+
 ### 1.4 期待効果
 
 | 指標 | 現状 | 目標 |
@@ -39,7 +41,7 @@
 | 廃止判断の所在 | Overview、個別仕様、実装計画に分散 | 本書で候補、条件、代替、順序を一元化 |
 | 仕様分割レビュー | 個別仕様の責務はあるが横断レビューがない | 妥当、分割、統合、境界曖昧を表で確認可能 |
 | 既存マクロ破壊 | 廃止候補と互換契約の境界が曖昧 | 既存マクロ変更 0 件を削除条件に含める |
-| GUI/CLI 重複廃止 | 入口ごとの `DefaultCommand` 構築が残る | `MacroRuntimeBuilder` 経由へ移行後に旧構築を削除 |
+| GUI/CLI 重複廃止 | 入口ごとの `DefaultCommand` 構築が残る | 新 Runtime 入口へ直接移行し、旧構築 helper と中間 adapter を残さない |
 | 暗黙挙動の削除 | dummy fallback、非同期検出、`cwd` fallback が残る | 明示設定と非推奨警告を経由して削除判断 |
 
 ### 1.5 着手条件
@@ -66,7 +68,7 @@
 | `src\nyxpy\gui\main_window.py` | 変更 | `RunHandle` / `RunResult` 経由の実行制御へ移行 |
 | `tests\unit\framework\macro\test_legacy_imports.py` | 新規 | import / signature 互換ゲート |
 | `tests\integration\test_existing_macros_compat.py` | 新規 | 既存マクロ変更なしの互換ゲート |
-| `tests\integration\test_macro_runtime_legacy_executor.py` | 新規 | `MacroExecutor` adapter 縮退ゲート |
+| `tests\integration\test_macro_runtime_entrypoints.py` | 新規 | GUI/CLI が `MacroExecutor` を経由せず `MacroRuntime` を使うことを検証 |
 
 ## 3. 設計方針
 
@@ -92,15 +94,17 @@
 
 ### 3.2 廃止判断の原則
 
-廃止候補は、既存マクロ互換契約の内側と外側を分けて扱う。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、`static\<macro_name>\settings.toml` lookup は削除対象にしない。旧入口や暗黙挙動を削除する場合も、先に代替 API を実装し、互換ゲートを通し、必要な期間は adapter と `DeprecationWarning` を残す。
+廃止候補は、既存マクロ互換契約の内側と外側を分けて扱う。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException`、`static\<macro_name>\settings.toml` lookup は削除対象にしない。GUI / CLI、内部 helper、旧 executor、旧 singleton 参照、暗黙挙動は互換契約の外側であるため、代替 Runtime 経路と受け入れテストが成立した時点で破壊的に置換してよい。
+
+中途半端な互換資材は作らない。旧 API を残すのは、既存マクロが直接 import する場合、または同一リリース内の段階実装で一時的に必要な場合に限定する。GUI / CLI 向けには長期 adapter、互換 wrapper、旧新二重実装を残さず、移行 commit 内で呼び出し元を新 API へ寄せる。
 
 ### 3.3 レイヤー構成
 
 | レイヤー | 維持するもの | 廃止候補にできるもの |
 |----------|--------------|----------------------|
 | 既存マクロ互換 | `MacroBase`, `Command`, `DefaultCommand`, constants, `MacroStopException`, legacy settings lookup | なし |
-| Legacy adapter | 必要な期間の `MacroExecutor` import と旧戻り値互換 | lifecycle 二重実装、発見時インスタンス保持、`Path.cwd()` 固定探索 |
-| Runtime / Ports | `MacroRuntime`, `MacroRunner`, `RunHandle`, `RunResult`, `ExecutionContext`, Port interfaces | GUI/CLI の個別 `DefaultCommand` 組み立て |
+| Legacy adapter | 既存マクロが直接 import する API のみ。`MacroExecutor` は同一リリース内の一時移行に限る | `MacroExecutor` 恒久残置、lifecycle 二重実装、発見時インスタンス保持、`Path.cwd()` 固定探索 |
+| Runtime / Ports | `MacroRuntime`, `MacroRunner`, `RunHandle`, `RunResult`, `ExecutionContext`, Port interfaces | GUI/CLI の個別 `DefaultCommand` 組み立て、旧 `create_command()` helper |
 | Device adapter | 明示検出、ready 待ち、`allow_dummy` | `auto_register_devices()` 直後の暗黙参照、dummy 本番既定 |
 | Settings / Resources | `MacroSettingsResolver`, `ResourceStorePort`, `SecretsSettings` | `StaticResourceIO` の settings 解決、hardware 配下への恒久配置 |
 | Logger | `LoggerPort`, 構造化ログ、GUI 表示イベント | loguru 直結のグローバル初期化依存 |
@@ -110,9 +114,10 @@
 削除前に次を満たす。
 
 - 既存マクロの import path、Command API、lifecycle、settings lookup を変更しない。
-- CLI/GUI は `MacroRuntimeBuilder` と `RunResult` へ移行済みであり、`DefaultCommand` を個別に組み立てない。
-- `MacroExecutor` を削除する場合は、外部利用の移行期間と `DeprecationWarning` 期間を完了している。
-- `Path.cwd()` fallback、暗黙 dummy fallback、legacy loader は削除前に警告と移行先を表示する。
+- CLI/GUI は `MacroRuntimeBuilder` と `RunResult` へ直接移行済みであり、`DefaultCommand` を個別に組み立てない。
+- `MacroExecutor` を削除する場合、既存マクロ互換テストが通り、GUI/CLI/テストコードが `MacroExecutor` を参照しない。
+- GUI/CLI 内部 API、旧 helper、旧 worker、旧 settings 適用経路には長期の `DeprecationWarning` 期間を設けない。
+- `Path.cwd()` fallback、暗黙 dummy fallback、legacy loader は、既存マクロ互換に必要な範囲だけ警告付きで残し、GUI/CLI 入口からは削除する。
 - 実機なしの通常テストは fake Port で通り、実機テストは `@pytest.mark.realdevice` へ分離されている。
 
 ### 3.5 並行性・スレッド安全性
@@ -152,18 +157,18 @@ class DeprecationCandidate:
 
 | 候補 | 削除条件 | 代替 API | 互換影響 | テストゲート | 移行順 |
 |------|----------|----------|----------|--------------|--------|
-| `MacroExecutor` | CLI/GUI が `MacroRuntime` へ移行し、`MacroExecutor` が lifecycle、`RunResult`、Ports 準備を二重実装していない。外部利用へ非推奨期間を提供済み | `MacroRuntime`, `MacroRegistry`, `MacroFactory`, `MacroRunner`, `RunHandle` | 既存マクロへの影響なし。旧 GUI/CLI/外部コードが `macros` / `macro` 属性へ依存する場合だけ影響 | `test_macro_executor_delegates_to_runtime`, `test_macro_executor_execute_keeps_legacy_none_return`, import gate, existing macro gate | 互換テスト追加 → Runtime adapter 化 → GUI/CLI 直接 Runtime 化 → `DeprecationWarning` → 削除判断 |
-| `singletons.py` のグローバル manager 直接利用 | Runtime builder と Port adapter が manager を受け取り、GUI/CLI/Command が `serial_manager` / `capture_manager` を直接参照しない | `MacroRuntimeBuilder`, `ControllerOutputPort`, `FrameSourcePort`, `create_default_runtime()` | singleton ファイル自体は維持。直接利用箇所だけ移行対象 | `test_cli_uses_macro_runtime_builder`, `test_main_window_starts_runtime_and_updates_status`, `reset_for_testing` 関連テスト | 直接参照箇所を洗い出し → builder 経由へ置換 → adapter 内だけに限定 → 新規直接利用を禁止 |
-| `auto_register_devices()` の暗黙非同期検出 API | serial/capture 検出が `detect(timeout_sec)` または `DeviceDiscoveryResult` で完了、失敗、タイムアウトを返す | `SerialManager.detect(timeout_sec)`, `CaptureManager.detect(timeout_sec)`, `MacroRuntimeBuilder.detect_devices()` | CLI/GUI の検出表示は変更されるが、既存マクロには影響なし | `test_cli_device_detection_waits_until_complete`, `test_frame_source_await_ready_success_after_first_frame`, hardware detection test | 明示検出 API 追加 → CLI/GUI builder へ移行 → 旧 API に警告 → 暗黙参照を削除 |
+| `MacroExecutor` | CLI/GUI/テストコードが `MacroRuntime` へ移行し、既存マクロ互換テストが通る。`MacroExecutor` が lifecycle、`RunResult`、Ports 準備を二重実装していない | `MacroRuntime`, `MacroRegistry`, `MacroFactory`, `MacroRunner`, `RunHandle` | 既存マクロへの影響なし。旧 GUI/CLI/内部テストの破壊的変更は許容する | import gate, existing macro gate, `test_cli_uses_macro_runtime`, `test_gui_uses_run_handle` | 互換テスト追加 → GUI/CLI を Runtime へ直接移行 → 内部テスト更新 → `MacroExecutor` 削除またはテスト専用 fixture 化 |
+| `singletons.py` のグローバル manager 直接利用 | Runtime builder と Port adapter が manager を受け取り、GUI/CLI/Command が `serial_manager` / `capture_manager` を直接参照しない | `MacroRuntimeBuilder`, `ControllerOutputPort`, `FrameSourcePort`, `create_default_runtime()` | 既存マクロへの影響なし。GUI/CLI の設定適用経路は破壊的変更を許容する | `test_cli_uses_macro_runtime_builder`, `test_main_window_starts_runtime_and_updates_status`, `reset_for_testing` 関連テスト | 直接参照箇所を洗い出し → builder 経由へ置換 → 旧 GUI/CLI 参照を削除 → 新規直接利用を禁止 |
+| `auto_register_devices()` の暗黙非同期検出 API | serial/capture 検出が `detect(timeout_sec)` または `DeviceDiscoveryResult` で完了、失敗、タイムアウトを返す | `SerialManager.detect(timeout_sec)`, `CaptureManager.detect(timeout_sec)`, `MacroRuntimeBuilder.detect_devices()` | CLI/GUI の検出表示は変更されるが、既存マクロには影響なし | `test_cli_device_detection_waits_until_complete`, `test_frame_source_await_ready_success_after_first_frame`, hardware detection test | 明示検出 API 追加 → CLI/GUI builder へ移行 → 旧 GUI/CLI 参照を同時削除 |
 | dummy fallback の本番既定挙動 | `runtime.allow_dummy=False` が既定になり、テストと明示 dry-run だけが dummy Port を選べる | `RuntimeOptions.allow_dummy`, `DummyControllerOutputPort`, `DummyFrameSourcePort` | 実機未接続を成功扱いしていた CLI/GUI 操作は失敗表示に変わる。既存マクロのコード変更は不要 | `test_runtime_builder_disallows_dummy_by_default`, `test_runtime_allows_dummy_when_explicit`, hardware smoke test | 設定項目追加 → builder で明示判定 → GUI/CLI 表示更新 → 暗黙 fallback を新 Runtime 経路から削除 |
 | `StaticResourceIO` の hardware 配下配置 | `StaticResourceStorePort` が path guard、画像書き込み検証、画像読み込み検証を提供し、`StaticResourceIO` が adapter だけになる | `ResourceStorePort`, `StaticResourceStorePort`, `ResourcePathGuard` | `Command.save_img()` / `load_img()` は維持。`StaticResourceIO` 直接 import 利用者だけ警告対象 | `test_resource_store_rejects_path_escape`, `test_resource_store_raises_when_imwrite_returns_false`, `test_command_save_and_load_image_use_resource_store` | Port 実装追加 → `Command` を Port 経由へ移行 → `StaticResourceIO` を adapter 化 → 配置変更または re-export 判断 |
-| GUI/CLI 個別 Command 組み立て | CLI と GUI が `DefaultCommand` を直接構築せず、Runtime builder から context を作る | `MacroRuntimeBuilder.from_cli_args()`, `MacroRuntimeBuilder.from_settings()`, `CommandFacade` | 既存マクロへの影響なし。CLI/GUI の内部構築だけ変更 | `test_cli_uses_macro_runtime_builder`, `test_main_window_uses_run_handle`, `test_cli_uses_run_result_exit_code` | Runtime builder 実装 → CLI 移行 → GUI 移行 → 旧 `create_command()` を互換関数へ縮退 → 不要なら削除 |
+| GUI/CLI 個別 Command 組み立て | CLI と GUI が `DefaultCommand` を直接構築せず、Runtime builder から context を作る | `MacroRuntimeBuilder.from_cli_args()`, `MacroRuntimeBuilder.from_settings()`, `CommandFacade` | 既存マクロへの影響なし。CLI/GUI の内部構築とテストは破壊的変更を許容する | `test_cli_uses_macro_runtime_builder`, `test_main_window_uses_run_handle`, `test_cli_uses_run_result_exit_code` | Runtime builder 実装 → CLI 移行 commit で旧 `create_command()` を削除 → GUI 移行 commit で旧 worker/command 構築を削除 |
 | loguru 直結の `LogManager` グローバル初期化 | `LoggerPort` と `LogManager` factory があり、Runtime は `log_manager` グローバルへ直接依存しない | `LoggerPort`, `LogManagerPort`, `create_log_manager()`, `LogManager.add_gui_handler()` | `Command.log()` は維持。保存ログ形式と GUI 表示イベントは変わる | `test_log_manager_emits_structured_log_with_run_context`, `test_gui_handler_exception_is_logged_and_ignored`, `test_technical_log_masks_secrets` | 構造化ログ API 追加 → Port adapter 追加 → GUI handler 分離 → 直接 global 初期化を adapter 内へ限定 |
 | `Path.cwd()` 固定の project root 解決 | `project_root` が Runtime builder / Registry / SettingsResolver へ明示され、`cwd` は非推奨 fallback だけになる | `MacroRegistry(project_root=...)`, `MacroSettingsResolver(project_root)`, `MacroRuntimeBuilder(project_root=...)` | `cwd` 前提の外部起動方法は警告対象。既存マクロの settings lookup は維持 | `test_registry_uses_explicit_project_root`, `test_macro_settings_resolver_legacy_static_settings`, existing macro gate | 明示 root 引数追加 → GUI/CLI 起点で渡す → fallback に警告 → 固定 `Path.cwd()` を削除 |
 | 恒久的な `sys.path` 変更 | legacy import が context manager で一時追加され、load 後に復元される | `LegacyMacroAdapter` の scoped import path 管理 | 相対 import を使う legacy macro は維持。グローバルな import 汚染だけ削減 | `test_registry_reload_restores_sys_path`, `test_existing_repository_macros_load_without_changes` | scoped loader 実装 → reload テスト追加 → 恒久 append を削除 |
 | 曖昧な class 名 alias 選択 | 衝突時に `AmbiguousMacroError` と候補 ID を返し、後勝ち上書きを行わない | `Qualified Macro ID`, `MacroDescriptor.id`, `MacroRegistry.resolve()` | class 名だけで選んでいた外部コードは修正が必要。既存マクロ本体は変更不要 | `test_class_name_collision_requires_qualified_id`, `test_class_name_alias_is_available_when_unique` | ID 生成追加 → 一意 alias 維持 → 衝突時診断追加 → 後勝ち上書きを削除 |
 | `ResourceStorePort` による settings TOML 探索 | `MacroSettingsResolver` が settings を解決し、ResourceStore は画像 I/O だけを扱う | `MacroSettingsResolver.resolve()`, `MacroSettingsResolver.load()` | `static\<macro_name>\settings.toml` 互換は維持。責務混在だけ削除 | `test_macro_settings_resolver_is_separate_from_resource_store`, `test_existing_macro_settings_compat` | settings resolver 実装 → helper 委譲 → ResourceStore から settings 探索を排除 |
-| GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, cancel latency test | RunHandle 導入 → GUI cancel 移行 → 旧経路を adapter 化 → GUI からの直接 `cmd.stop()` を削除 |
+| GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, cancel latency test | RunHandle 導入 → GUI cancel 移行 → GUI からの直接 `cmd.stop()` を削除 |
 
 ### 4.3 設定パラメータ
 
@@ -173,21 +178,19 @@ class DeprecationCandidate:
 | `runtime.device_detection_timeout_sec` | `float` | `5.0` | 明示デバイス検出の最大待機秒数 |
 | `runtime.frame_ready_timeout_sec` | `float` | `3.0` | 初回フレーム readiness の最大待機秒数 |
 | `compatibility.cwd_fallback_enabled` | `bool` | `True` | 非推奨期間中に `Path.cwd()` fallback を許可するか |
-| `compatibility.warn_deprecated_legacy_entry` | `bool` | `True` | legacy entry / 旧 API 利用時に非推奨警告を出すか |
-| `compatibility.deprecation_min_minor_releases` | `int` | `2` | legacy 方式を削除判断するまでに維持する最小 minor release 数 |
-| `compatibility.deprecation_min_months` | `int` | `6` | legacy 方式を削除判断するまでに維持する最小月数 |
+| `compatibility.warn_deprecated_legacy_entry` | `bool` | `True` | 既存マクロ互換に必要な legacy entry / 旧 API 利用時だけ非推奨警告を出すか |
 
 ### 4.4 エラーハンドリング
 
 | 例外クラス | 発生条件 |
 |------------|----------|
-| `DeprecationWarning` | 旧 API、`cwd` fallback、暗黙互換経路、`StaticResourceIO` 直接利用など、移行先がある非推奨経路を利用した |
+| `DeprecationWarning` | 既存マクロ互換のため一時維持する旧 API、`cwd` fallback、legacy loader、`StaticResourceIO` 直接利用など、移行先がある非推奨経路を利用した |
 | `ConfigurationError` | `allow_dummy=False` で dummy を選択、明示 project root 不正、通知 secret の入力元違反 |
 | `DeviceDetectionTimeoutError` | 明示検出 API が timeout 内に完了しない |
 | `AmbiguousMacroError` | class 名 alias が複数 descriptor に一致した |
 | `ResourcePathError` | `ResourceStorePort` が static root 外参照を拒否した |
 
-非推奨警告は既存マクロ実行を止めない。削除条件を満たさない候補は `DeprecationWarning` 付き adapter として維持し、Runtime / Ports / Builder の正 API へ移行を促す。
+非推奨警告は既存マクロ実行を止めない。`DeprecationWarning` 付き adapter として維持する対象は、既存マクロ互換または外部マクロ作者が直接 import し得る API に限定する。GUI / CLI 内部経路、旧 worker、旧 helper、旧 settings 適用処理は警告期間を置かず、新 Runtime 入口へ置換した commit 内で削除する。
 
 ### 4.5 シングルトン管理
 
@@ -200,7 +203,7 @@ class DeprecationCandidate:
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
 | ユニット | `test_deprecation_candidates_do_not_include_compat_contract` | 廃止候補が `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` を削除対象にしていない |
-| ユニット | `test_macro_executor_delegates_to_runtime` | `MacroExecutor` が lifecycle を二重実装せず Runtime へ委譲する |
+| ユニット | `test_no_gui_cli_reference_to_macro_executor` | GUI/CLI が `MacroExecutor` を経由せず Runtime を直接利用する |
 | ユニット | `test_runtime_builder_disallows_dummy_by_default` | 本番既定で dummy Port が選択されない |
 | ユニット | `test_runtime_allows_dummy_when_explicit` | `allow_dummy=True` の明示時だけ dummy Port を使える |
 | ユニット | `test_cli_device_detection_waits_until_complete` | CLI が非同期検出直後の不完全な一覧を参照しない |

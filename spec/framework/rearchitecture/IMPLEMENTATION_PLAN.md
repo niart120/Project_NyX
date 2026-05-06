@@ -1,8 +1,8 @@
 # フレームワーク再設計 実装計画書
 
-> **対象モジュール**: `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`
-> **目的**: 既存ユーザーマクロのソース変更を不要にしたまま、実行中核を `MacroRuntime` / `MacroRunner` / `MacroRegistry` / `MacroFactory` へ段階移行する。
-> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `ARCHITECTURE_DIAGRAMS.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`
+> **対象モジュール**: `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
+> **目的**: 既存ユーザーマクロのソース変更を不要にしたまま、実行中核を `MacroRuntime` / `MacroRunner` / `MacroRegistry` / `MacroFactory` へ段階移行する。  
+> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `ARCHITECTURE_DIAGRAMS.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`  
 > **破壊的変更**: なし。`MacroBase`、`Command`、`DefaultCommand`、`MacroStopException` の import path と主要シグネチャを維持する。
 
 ## 1. 概要

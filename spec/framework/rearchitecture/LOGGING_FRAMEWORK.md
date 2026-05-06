@@ -1,9 +1,9 @@
 # ロギングフレームワーク再設計 仕様書
 
-> **対象モジュール**: `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\gui\panes\`
-> **目的**: 現行 `LogManager` を、実行単位コンテキスト、ユーザー表示イベント、技術ログ、差し替え可能な sink を持つロギング基盤へ再設計する。
-> **関連ドキュメント**: `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `IMPLEMENTATION_PLAN.md`, `..\archive\logging_design.md`
-> **既存ソース**: `src\nyxpy\framework\core\logger\log_manager.py`, `src\nyxpy\gui\panes\log_pane.py`
+> **対象モジュール**: `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\gui\panes\`  
+> **目的**: 現行 `LogManager` を、実行単位コンテキスト、ユーザー表示イベント、技術ログ、差し替え可能な sink を持つロギング基盤へ再設計する。  
+> **関連ドキュメント**: `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `IMPLEMENTATION_PLAN.md`, `..\archive\logging_design.md`  
+> **既存ソース**: `src\nyxpy\framework\core\logger\log_manager.py`, `src\nyxpy\gui\panes\log_pane.py`  
 > **破壊的変更**: なし。既存 `log_manager.log(level, message, component="")` と GUI のログ表示概念は互換 adapter で維持する。
 
 ## 1. 概要

@@ -1,8 +1,8 @@
 # フレームワーク再設計テスト戦略 仕様書
 
-> **対象モジュール**: `tests\unit\`, `tests\integration\`, `tests\gui\`, `tests\hardware\`, `tests\perf\`, `src\nyxpy\framework\core\`
-> **目的**: フレームワーク再設計を既存マクロ変更なしで進めるため、互換、Runtime 分割、Port adapter、GUI/CLI、実機、性能、スレッド安全性、キャンセル応答の検証方針を定義する。
-> **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`, `spec\framework\rearchitecture\CONFIGURATION_AND_RESOURCES.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`
+> **対象モジュール**: `tests\unit\`, `tests\integration\`, `tests\gui\`, `tests\hardware\`, `tests\perf\`, `src\nyxpy\framework\core\`  
+> **目的**: フレームワーク再設計を既存マクロ変更なしで進めるため、互換、Runtime 分割、Port adapter、GUI/CLI、実機、性能、スレッド安全性、キャンセル応答の検証方針を定義する。  
+> **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`, `spec\framework\rearchitecture\CONFIGURATION_AND_RESOURCES.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`  
 > **破壊的変更**: なし。既存マクロ fixture と import/signature 互換テストを最初に固定する。
 
 ## 1. 概要

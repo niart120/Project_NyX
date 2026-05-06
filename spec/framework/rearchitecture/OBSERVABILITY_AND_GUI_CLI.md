@@ -1,8 +1,8 @@
 # 可観測性と GUI/CLI 入口再設計 仕様書
 
-> **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\settings\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`
-> **目的**: GUI/CLI の実行入口を `MacroRuntime` へ寄せ、表示、終了コード、通知設定ソースを一貫させる。ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` を正とする。
-> **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`
+> **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\settings\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
+> **目的**: GUI/CLI の実行入口を `MacroRuntime` へ寄せ、表示、終了コード、通知設定ソースを一貫させる。ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` を正とする。  
+> **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`  
 > **破壊的変更**: なし。既存 GUI/CLI の操作概念と既存マクロの `Command.log()` 呼び出しを維持する。
 
 ## 1. 概要

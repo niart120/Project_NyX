@@ -1,9 +1,9 @@
 # マクロ互換性とレジストリ再設計 仕様書
 
-> **対象モジュール**: `src/nyxpy/framework/core/macro/`
-> **目的**: 既存マクロ互換を最優先し、ロード・識別・実行基盤をレジストリ中心へ再設計する
-> **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`
-> **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`
+> **対象モジュール**: `src/nyxpy/framework/core/macro/`  
+> **目的**: 既存マクロ互換を最優先し、ロード・識別・実行基盤をレジストリ中心へ再設計する  
+> **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
+> **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`  
 > **破壊的変更**: なし
 
 ## 1. 概要

@@ -1,8 +1,8 @@
 # 設定とリソース境界再設計 仕様書
 
-> **対象モジュール**: `src\nyxpy\framework\core\settings\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`
-> **目的**: 通常設定、秘密設定、マクロ設定 lookup の境界を分離し、画像・ファイル I/O の詳細を Resource File I/O 仕様へ独立させる。
-> **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\RESOURCE_FILE_IO.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`
+> **対象モジュール**: `src\nyxpy\framework\core\settings\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`  
+> **目的**: 通常設定、秘密設定、マクロ設定 lookup の境界を分離し、画像・ファイル I/O の詳細を Resource File I/O 仕様へ独立させる。  
+> **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\RESOURCE_FILE_IO.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`  
 > **破壊的変更**: なし。`static\<macro_name>\settings.toml` と既存 `Command.save_img()` / `Command.load_img()` 呼び出しを維持する。
 
 ## 1. 概要

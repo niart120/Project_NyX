@@ -1,9 +1,9 @@
 # Resource File I/O 再設計仕様書
 
-> **対象モジュール**: `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\hardware\`, `src\nyxpy\framework\core\macro\`
-> **目的**: マクロが参照する read-only assets と実行中に生成する writable outputs の配置、解決、読み書きを Runtime Port と互換 Command API へ分離する。
-> **関連ドキュメント**: `CONFIGURATION_AND_RESOURCES.md`, `RUNTIME_AND_IO_PORTS.md`, `IMPLEMENTATION_PLAN.md`
-> **既存ソース**: `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\utils\helper.py`, `src\nyxpy\framework\core\macro\command.py`
+> **対象モジュール**: `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\hardware\`, `src\nyxpy\framework\core\macro\`  
+> **目的**: マクロが参照する read-only assets と実行中に生成する writable outputs の配置、解決、読み書きを Runtime Port と互換 Command API へ分離する。  
+> **関連ドキュメント**: `CONFIGURATION_AND_RESOURCES.md`, `RUNTIME_AND_IO_PORTS.md`, `IMPLEMENTATION_PLAN.md`  
+> **既存ソース**: `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\utils\helper.py`, `src\nyxpy\framework\core\macro\command.py`  
 > **破壊的変更**: なし。既存 `cmd.load_img()` / `cmd.save_img()` と `static\<macro_name>\...` 参照は互換層で維持する。
 
 ## 1. 概要
