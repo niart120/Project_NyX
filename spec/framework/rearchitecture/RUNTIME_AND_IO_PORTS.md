@@ -415,6 +415,18 @@ class MacroRunner(ABC):
 
 `MacroRuntimeBuilder.build()` が `ExecutionContext` の唯一の組み立て入口である。`MacroRuntime` は context を生成せず、完成済み context を `run()` / `start()` で受け取る。
 
+`MacroRuntime` は reload と一覧取得 API を持たない。GUI/CLI の composition root は `MacroRegistry.reload()`、`MacroRegistry.list()`、`MacroRegistry.diagnostics` を直接使って一覧表示とロード診断を行い、実行時だけ `MacroRuntimeBuilder` が `MacroRegistry.resolve(request.macro_id)` の snapshot を取得する。
+
+`allow_dummy` は次の優先順位で決定する。上位で明示値がある場合、下位の設定値は上書きしない。
+
+| 優先 | 入力元 | 値 | 用途 |
+|------|--------|----|------|
+| 1 | テスト fixture / fake builder | 任意 | 単体テストと結合テストで dummy Port を明示する |
+| 2 | CLI `--dummy-devices` | `True` | 開発・dry-run の明示実行。通常 CLI 実行では指定しない |
+| 3 | GUI debug 設定 | `True` | GUI からの明示 dummy 実行。通常 GUI 実行では無効 |
+| 4 | `RuntimeBuildRequest.allow_dummy` | `True` / `False` / `None` | 入口 adapter が実行単位で指定する。`None` は settings snapshot に委譲 |
+| 5 | `settings["runtime.allow_dummy"]` | `False` 既定 | 明示がない場合の既定値。本番実行では `False` を維持する |
+
 ```python
 class ControllerOutputPort(ABC):
     @abstractmethod
@@ -517,13 +529,13 @@ MacroRuntime.run(context)
   ├─ result = runner.run(macro, cmd, context.exec_args, run_context)
   │    ├─ macro.initialize(cmd, args)
   │    ├─ macro.run(cmd)
-  │    ├─ macro.finalize(cmd)
+  │    ├─ macro.finalize(cmd) または macro.finalize_with_outcome(cmd, outcome)
   │    └─ RunResult を生成
   └─ controller.close(), frame_source.close(), resources.close(), artifacts.close() を finally で試行
        └─ close 失敗だけ RunResult.cleanup_warnings に追記
 ```
 
-`MacroRuntime` は registry 解決、`definition.factory.create()` によるマクロ生成、`DefaultCommand(context=...)` 生成、Port close だけを担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` が担当する。`MacroRunner` は現行実行順序を引き継ぎ、`finalize()` を `finally` で呼び、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` 正規化、`RunResult` 生成を担当する。GUI/CLI/テストは `MacroExecutor.execute()` を経由しない。
+`MacroRuntime` は registry 解決、`definition.factory.create()` によるマクロ生成、`DefaultCommand(context=...)` 生成、Port close だけを担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` が担当する。`MacroRunner` は現行実行順序を引き継ぎ、`finalize(cmd)` または opt-in の `finalize_with_outcome(cmd, outcome)` を `finally` で 1 回だけ呼び、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` 正規化、`RunResult` 生成を担当する。GUI/CLI/テストは `MacroExecutor.execute()` を経由しない。
 
 `RunResult` は常に `MacroRunner` が生成する。`MacroRuntime` は Runner が返した `RunResult.status`、`error`、`started_at`、`finished_at` を変更しない。Port close 失敗だけを `cleanup_warnings: tuple[CleanupWarning, ...]` に追記し、複数 close 失敗は発生順に全件保持する。close 失敗だけで `RunResult.status` を変更しない。
 

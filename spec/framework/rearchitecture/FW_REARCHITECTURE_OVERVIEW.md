@@ -50,6 +50,10 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 | `MacroRegistry` / `MacroDefinition` / `MacroFactory` | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | Runtime は `MacroDefinition.factory` を実行ごとに使う |
 | 破壊的変更 / 削除条件 / 代替 API / テストゲート | `DEPRECATION_AND_MIGRATION.md` | 他仕様では詳細を再定義せず、設計上必要な制約だけを記述する |
 
+#### 1.2.2 path 表記方針
+
+本文中のリポジトリ内ファイル参照は、読みやすさのため `spec/framework/...` と `src\nyxpy\...` のどちらも使う。PowerShell コマンド例と Windows 実行時 path は `\` を使う。`macro.toml`、class metadata、settings TOML に保存する portable path は `/` を使い、実装では `Path` で正規化して Windows path へ変換する。
+
 ### 1.3 背景・問題
 
 #### 現行コードから確認した事実
@@ -411,109 +415,30 @@ class Command(ABC):
 
 #### 4.1.2 新 runtime API
 
-本節のコードは主要クラスの関係を示す抜粋である。`MacroDefinition` は `MACRO_COMPATIBILITY_AND_REGISTRY.md`、`ExecutionContext` / `RuntimeOptions` / `RunResult` / `RunHandle` は `RUNTIME_AND_IO_PORTS.md` を正とする。`MacroManifest` と `MacroDescriptor` は Python 型として導入しない。
+本節のコードは主要クラスの関係を示す非正本の抜粋である。`MacroDefinition` / `MacroRegistry` / `MacroFactory` は `MACRO_COMPATIBILITY_AND_REGISTRY.md`、`ExecutionContext` / `RuntimeOptions` / `RunResult` / `RunHandle` / `MacroRuntime` は `RUNTIME_AND_IO_PORTS.md`、`ErrorInfo` / `ErrorKind` / error code は `ERROR_CANCELLATION_LOGGING.md` を正とする。`MacroManifest` と `MacroDescriptor` は Python 型として導入しない。
 
 ```python
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import StrEnum
 from pathlib import Path
 
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
-from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 
 type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, RuntimeValue] | None
 
 
-class RunStatus(StrEnum):
-    SUCCESS = "success"
-    CANCELLED = "cancelled"
-    FAILED = "failed"
-
-
-@dataclass(frozen=True)
-class ErrorInfo:
-    kind: str
-    code: str
-    message: str
-    component: str
-    exception_type: str
-    recoverable: bool = False
-    details: Mapping[str, RuntimeValue] = field(default_factory=dict)
-    traceback: str | None = None
-
-
-@dataclass(frozen=True)
-class MacroDefinition:
-    id: str
-    module_name: str
-    class_name: str
-    display_name: str
-    factory: MacroFactory
-    description: str = ""
-    tags: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class RuntimeOptions:
-    allow_dummy: bool = False
-    frame_ready_timeout_sec: float = 3.0
-    release_timeout_sec: float = 2.0
-
-
-@dataclass(frozen=True)
-class ExecutionContext:
-    run_id: str
-    macro_id: str
-    macro_name: str
-    run_log_context: RunLogContext
-    controller: ControllerOutputPort
-    frame_source: FrameSourcePort
-    resources: ResourceStorePort
-    artifacts: RunArtifactStore
-    notifications: NotificationPort
-    logger: LoggerPort
-    cancellation_token: CancellationToken
-    options: RuntimeOptions = field(default_factory=RuntimeOptions)
-    exec_args: Mapping[str, RuntimeValue] = field(default_factory=dict)
-    metadata: Mapping[str, RuntimeValue] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class RunContext:
-    run_id: str
-    macro_id: str
-    macro_name: str
-    started_at: datetime
-    cancellation_token: CancellationToken
-    logger: LoggerPort
-
-
-@dataclass(frozen=True)
-class RunResult:
-    run_id: str
-    macro_id: str
-    macro_name: str
-    status: RunStatus
-    started_at: datetime
-    finished_at: datetime
-    error: ErrorInfo | None = None
-    cleanup_warnings: tuple[CleanupWarning, ...] = ()
-
-    @property
-    def ok(self) -> bool: ...
-
-    @property
-    def duration_seconds(self) -> float: ...
+class MacroDefinition: ...
+class ExecutionContext: ...
+class RunContext: ...
+class RunResult: ...
+class RunHandle: ...
 
 
 class MacroRegistry:
     def reload(self) -> None: ...
-    def list(self) -> Mapping[str, MacroDefinition]: ...
-    def get(self, macro_name: str) -> MacroDefinition: ...
+    def resolve(self, name_or_id: str) -> MacroDefinition: ...
+    def list(self, include_failed: bool = False) -> Sequence[MacroDefinition]: ...
 
 
 class MacroFactory:
@@ -530,27 +455,21 @@ class MacroRunner:
     ) -> RunResult: ...
 
 
-class RunHandle:
-    def cancel(self) -> None: ...
-    def wait(self, timeout: float | None = None) -> bool: ...
-    def done(self) -> bool: ...
-    def result(self) -> RunResult: ...
-
-
 class MacroRuntime:
-    def reload(self) -> None: ...
-    def list_macros(self) -> Mapping[str, MacroDefinition]: ...
     def run(self, context: ExecutionContext) -> RunResult: ...
     def start(self, context: ExecutionContext) -> RunHandle: ...
+    def shutdown(self) -> None: ...
 ```
 
 `ExecutionContext` は `Command` を保持しない。`MacroRuntimeBuilder.build()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, RuntimeValue]` として扱う。`RunLogContext` は `ExecutionContext.run_log_context` として保持し、`LoggerPort.bind_context()` は context 付き logger view を返す。`MacroRuntime.run()` は `DefaultCommand(context=...)` を生成し、`MacroRunner.run(macro, cmd, context.exec_args, run_context)` へ渡す。`RunResult` は `MacroRunner` が生成し、Runtime は Port close 失敗だけを `cleanup_warnings` に追記する。
+
+`MacroRuntime` は実行専用の中核であり、reload と一覧取得 API を持たない。GUI/CLI の reload、一覧表示、ロード診断表示は composition root が所有する `MacroRegistry.reload()` / `MacroRegistry.list()` / `MacroRegistry.diagnostics` を直接呼び、実行時だけ `MacroRuntimeBuilder` が `MacroRegistry.resolve()` の snapshot を使って `ExecutionContext` を組み立てる。
 
 ### 4.2 内部設計
 
 #### 4.2.1 マクロ発見
 
-1. `MacroRuntime.reload()` が `MacroRegistry.reload()` を呼ぶ。
+1. GUI/CLI の composition root が `MacroRegistry.reload()` を呼ぶ。
 2. `MacroRegistry` は `macros_dir` を走査する。既定値は `Path.cwd() / "macros"` で現行挙動を維持する。
 3. 単一ファイル型 `macros\sample.py` とパッケージ型 `macros\sample\__init__.py` を対象にする。
 4. 現行 `MacroExecutor` と同様に、対象 module とそのサブモジュールを `sys.modules` から削除してから import する。
@@ -560,7 +479,7 @@ class MacroRuntime:
 
 #### 4.2.2 マクロ生成
 
-1. `MacroRuntime.run(context)` または `MacroRuntime.start(context)` が `MacroRegistry.get(context.macro_name)` を呼ぶ。
+1. `MacroRuntime.run(context)` または `MacroRuntime.start(context)` が `MacroRegistry.resolve(context.macro_id)` を呼ぶ。
 2. `definition.factory.create()` が module/class を解決し、新しい `MacroBase` インスタンスを生成する。
 3. 生成失敗は `MacroLoadError` として扱い、Legacy adapter では現行の `ValueError` または既存ログ出力に変換する。
 
@@ -568,7 +487,7 @@ class MacroRuntime:
 
 ```text
 MacroRuntime.run(context)
-  -> definition = MacroRegistry.get(context.macro_name)
+  -> definition = MacroRegistry.resolve(context.macro_id)
   -> macro = definition.factory.create()
   -> Ports の readiness を確認
   -> cmd = DefaultCommand(context=...)
@@ -581,7 +500,7 @@ MacroRuntime.run(context)
 
 `MacroRunner` は `initialize -> run -> finalize`、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` への正規化、`RunResult` 生成を担当する。`MacroRuntime` は Runner の結果を上書きしない。Runtime が追加できるのは Port close 失敗に由来する `cleanup_warnings` だけである。
 
-`finalize()` は成功・中断・失敗のすべてで 1 回だけ呼ぶ。`MacroBase.finalize(cmd)` を唯一の抽象契約として維持し、outcome 受け取りは `SupportsFinalizeOutcome` などの opt-in 拡張契約に限定する。
+`finalize()` は成功・中断・失敗のすべてで 1 回だけ呼ぶ。`MacroBase.finalize(cmd)` を唯一の抽象契約として維持し、outcome 受け取りは `SupportsFinalizeOutcome.finalize_with_outcome(cmd, outcome)` の opt-in 拡張契約に限定する。`finalize_with_outcome` を実装したマクロでは `MacroRunner` が `finalize(cmd)` の代わりに outcome 付きメソッドを 1 回だけ呼ぶ。
 
 #### 4.2.4 非同期実行
 

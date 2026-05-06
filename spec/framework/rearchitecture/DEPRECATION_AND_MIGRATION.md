@@ -169,6 +169,19 @@ class DeprecationCandidate:
 
 Resource I/O legacy static 互換と settings legacy fallback の代表マクロは `MACRO_MIGRATION_GUIDE.md` の「移行対象代表マクロ」表を正とする。本書では代表マクロ名を重複管理せず、削除条件とテストゲートだけを扱う。
 
+#### 4.2.1 移行期間 shim と最終削除 API
+
+移行期間に一時 shim を置く場合でも、最終状態で残してよい API と残してはいけない API を分ける。shim は次の削除条件を満たすまでの短期措置であり、新 Runtime 経路から参照してはならない。
+
+| 対象 | 移行期間の扱い | 最終状態 | 削除条件 |
+|------|----------------|----------|----------|
+| `MacroExecutor` / `nyxpy.framework.core.macro.executor` | shim 不可。新 API、互換契約、移行 adapter に含めない | module import は `ModuleNotFoundError` | `test_macro_executor_removed`, `test_gui_cli_do_not_import_macro_executor` が green |
+| `LogManager` クラス / `log_manager` module global | 旧呼び出し元置換中だけ内部 shim を許可。ただし Runtime / Command / GUI/CLI 新経路から参照しない | 削除。互換 shim も残さない | `test_legacy_log_manager_removed`, `test_log_manager_call_sites_removed` が green |
+| `singletons.py` の `serial_manager` / `capture_manager` / settings globals | 旧 GUI/CLI 経路が残る間だけ互換 shim として保持可 | 新 Runtime 経路から直接参照しない。必要ならテスト用 reset だけを残す | `test_new_runtime_does_not_import_singletons` と GUI/CLI 移行テストが green |
+| `reset_for_testing()` | shim が残る間は既存 singleton 状態の初期化に使う | Runtime / Port 実体は fixture lifetime で破棄し、`reset_for_testing()` は旧 shim 初期化だけに限定 | 旧 singleton shim 削除時に対象を空にするか、関数自体の削除を別途判断 |
+| `StaticResourceIO` 直接利用 | 旧呼び出し元置換中だけ内部 adapter の参照元として許可 | 公開互換 shim は残さない | Resource I/O 移行テストと `test_command_save_and_load_image_use_resource_store` が green |
+| `load_macro_settings()` 旧 fallback | shim 不可。`MacroSettingsResolver` へ接続する場合も `static` / `cwd` fallback は復活させない | 旧 fallback 削除 | `test_macro_settings_resolver_does_not_read_legacy_static_settings` が green |
+
 ### 4.3 廃止候補一覧
 
 | 候補 | 削除条件 | 代替 API | 互換影響 | テストゲート | 移行順 |
@@ -184,6 +197,8 @@ Resource I/O legacy static 互換と settings legacy fallback の代表マクロ
 | 曖昧な class 名 alias 選択 | 衝突時に `AmbiguousMacroError` と候補 ID を返し、後勝ち上書きを行わない | `Qualified Macro ID`, `MacroDefinition.id`, `MacroRegistry.resolve()` | class 名だけで選んでいた外部コードは修正が必要。既存マクロ本体は変更不要 | `test_class_name_collision_requires_qualified_id`, `test_class_name_alias_is_available_when_unique` | ID 生成追加 → 一意 alias 維持 → 衝突時診断追加 → 後勝ち上書きを削除 |
 | `ResourceStorePort` による settings TOML 探索 | `MacroSettingsResolver` が settings を解決し、ResourceStore は画像 I/O だけを扱う | `MacroSettingsResolver.resolve()`, `MacroSettingsResolver.load()` | `static\<macro_name>\settings.toml` 互換は削除 | `test_macro_settings_resolver_is_separate_from_resource_store`, `test_migrated_macro_settings_load_from_explicit_source` | settings resolver 実装 → ResourceStore から settings 探索を排除 |
 | GUI スレッドからの `cmd.stop()` 呼び出し | GUI cancel が `RunHandle.cancel()` または `request_cancel()` だけを呼び、GUI スレッドで例外を送出しない | `RunHandle.cancel()`, `CancellationToken.request_cancel()` | GUI 内部挙動の変更。既存マクロの `Command.stop()` は維持 | `test_main_window_cancel_calls_handle_cancel`, `test_main_window_cancel_does_not_raise_in_gui_thread`, `test_cancel_request_latency_perf` | RunHandle 導入 → GUI cancel 移行 → GUI からの直接 `cmd.stop()` を削除 |
+
+`runtime.allow_dummy` の優先順位と明示経路は `RUNTIME_AND_IO_PORTS.md` の `allow_dummy` 決定表を正とする。本書では暗黙 fallback の削除条件だけを扱う。
 
 ### 4.4 設定パラメータ
 

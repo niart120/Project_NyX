@@ -112,7 +112,7 @@
 
 例外・中断契約に対する破壊的変更は行わない。`MacroStopException` は削除せず、`MacroCancelled` との adapter 関係を定義する。推奨 API は `MacroCancelled` だが、既存の `except MacroStopException` は `MacroCancelled` を捕捉できる。
 
-`MacroBase.finalize(self, cmd)` の抽象シグネチャは変更しない。これは唯一の抽象契約である。新方式で outcome を受け取りたいマクロだけが `SupportsFinalizeOutcome` Protocol 相当の opt-in 拡張として `finalize(self, cmd, outcome)` または `finalize(self, cmd, **kwargs)` を実装できる。Runner が `inspect.signature()` で `outcome` 引数または `**kwargs` の有無を判定し、受け取れるマクロにだけ `outcome` を渡す。
+`MacroBase.finalize(self, cmd)` の抽象シグネチャは変更しない。これは唯一の抽象契約である。新方式で outcome を受け取りたいマクロだけが `SupportsFinalizeOutcome.finalize_with_outcome(self, cmd, outcome)` を実装する。Runner は `isinstance(macro, SupportsFinalizeOutcome)` で opt-in を判定し、既存 `finalize(cmd)` の signature inspection は行わない。
 
 ### レイヤー構成
 
@@ -152,7 +152,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Mapping, Protocol
+from typing import Mapping, Protocol, runtime_checkable
 
 from nyxpy.framework.core.runtime import RunResult, RunStatus
 from nyxpy.framework.core.macro.base import MacroBase
@@ -263,8 +263,9 @@ class RunContext: ...
 class ExecutionContext: ...
 
 
+@runtime_checkable
 class SupportsFinalizeOutcome(Protocol):
-    def finalize(self, cmd: Command, outcome: RunResult) -> None: ...
+    def finalize_with_outcome(self, cmd: Command, outcome: RunResult) -> None: ...
 
 
 class MacroRunner:
@@ -281,6 +282,8 @@ class MacroRuntime:
 ```
 
 ロギング公開インターフェースは `LOGGING_FRAMEWORK.md` の `LoggerPort`、`LogEvent`、`TechnicalLog`、`UserEvent`、`LogSink` を正とする。本書の Runtime / Runner は、失敗・中断・終了処理失敗を `LoggerPort` へ渡す event 名だけを保証する。
+
+`SupportsFinalizeOutcome` は既存の `MacroBase.finalize(cmd)` と衝突しない opt-in 拡張である。`MacroRunner` は `isinstance(macro, SupportsFinalizeOutcome)` が真の場合、finalize 直前に確定した `RunResult` を `finalize_with_outcome(cmd, outcome)` へ渡し、`finalize(cmd)` は呼ばない。Protocol は別メソッド名のため、既存マクロが `finalize(cmd)` だけを持つ場合に誤って opt-in 扱いされない。
 
 ### 例外階層
 
@@ -393,18 +396,16 @@ def cancellation_aware_wait(seconds: float, token: CancellationToken) -> bool:
 
 ### finalize への outcome 伝達
 
-`MacroBase.finalize(cmd)` を唯一の抽象契約として維持する。outcome 伝達は `SupportsFinalizeOutcome` Protocol または signature inspection による opt-in 拡張であり、既存マクロへ `finalize(cmd, outcome)` 実装を要求しない。
+`MacroBase.finalize(cmd)` を唯一の抽象契約として維持する。outcome 伝達は `SupportsFinalizeOutcome.finalize_with_outcome(cmd, outcome)` による opt-in 拡張であり、既存マクロへ `finalize(cmd, outcome)` 実装を要求しない。
 
-`MacroRunner` は `initialize`、`run`、例外正規化、暫定 `RunResult` 生成の後に必ず `finalize` を呼ぶ。`finalize` の呼び出しは以下の互換ルールに従う。
+`MacroRunner` は `initialize`、`run`、例外正規化、暫定 `RunResult` 生成の後に必ず finalize 処理を 1 回だけ呼ぶ。呼び出しは以下の互換ルールに従う。
 
-| マクロ側シグネチャ | Runner の呼び出し |
-|--------------------|------------------|
-| `finalize(self, cmd)` | `finalize(cmd)` |
-| `finalize(self, cmd, outcome)` | `finalize(cmd, outcome)` |
-| `finalize(self, cmd, *, outcome=None)` | `finalize(cmd, outcome=result)` |
-| `finalize(self, cmd, **kwargs)` | `finalize(cmd, outcome=result)` |
+| マクロ側実装 | Runner の呼び出し |
+|--------------|------------------|
+| `finalize(self, cmd)` のみ | `finalize(cmd)` |
+| `finalize(self, cmd)` と `finalize_with_outcome(self, cmd, outcome)` | `finalize_with_outcome(cmd, outcome=result)` |
 
-`finalize` の signature inspection は Registry reload または `MacroDefinition` 生成時に 1 回だけ行い、`MacroDefinition.finalize_accepts_outcome: bool` として保持する。`MacroRunner` は実行ごとに `inspect.signature()` を呼ばず、保持済みフラグに従って呼び出し形式を選ぶ。
+`SupportsFinalizeOutcome` は `@runtime_checkable` Protocol であり、`MacroRunner` は `isinstance(macro, SupportsFinalizeOutcome)` が真の場合だけ outcome 付き finalize を選ぶ。別メソッド名にすることで、既存マクロが `finalize(cmd)` だけを持つ場合に誤検出しない。outcome 付き finalize を選んだ場合、`finalize(cmd)` は呼ばず、終了処理は 1 回だけ実行する。
 
 `finalize` 自体が例外を送出した場合、元の `run` 失敗情報を失わせない。実行本体が成功していた場合は `finalize` 失敗を `RunStatus.FAILED` とする。実行本体がすでに失敗または中断していた場合は、`RunResult.error.details["finalize_error"]` に要約を追加し、構造化ログへ `event="macro.finalize_failed"` を出す。
 
@@ -526,7 +527,7 @@ class MacroArgsSchema:
 | ユニット | `test_macro_executor_removed` | `MacroExecutor.execute()` の `None` 戻り値や例外再送出を互換契約として保証しない |
 | ユニット | `test_runtime_returns_run_result_on_framework_error` | `ConfigurationError` 等を `RunResult.error` に格納する |
 | ユニット | `test_runtime_returns_cancelled_for_legacy_macro_stop_exception` | 既存 `MacroStopException` 送出を `status="cancelled"` に正規化する |
-| ユニット | `test_finalize_receives_outcome_when_supported` | `finalize(cmd, outcome)` 形式のマクロへ `RunResult` を渡す |
+| ユニット | `test_finalize_receives_outcome_when_supported` | `finalize_with_outcome(cmd, outcome)` を実装したマクロへ `RunResult` を渡す |
 | ユニット | `test_finalize_cmd_only_remains_supported` | 既存 `finalize(cmd)` 形式が変更なしで呼ばれる |
 | ユニット | `test_parse_define_args_accepts_list_and_string` | CLI list 入力と GUI string 入力の両方を辞書へ変換する |
 | ユニット | `test_parse_define_args_raises_configuration_error` | 不正 TOML と不正 key を `ConfigurationError` にする |

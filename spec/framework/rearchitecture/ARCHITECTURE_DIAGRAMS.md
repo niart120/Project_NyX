@@ -143,6 +143,7 @@ flowchart TB
         ControllerPort["ControllerOutputPort"]
         FramePort["FrameSourcePort"]
         ResourcePort["ResourceStorePort"]
+        ArtifactPort["RunArtifactStore"]
         NotificationPortNode["NotificationPort"]
         LoggerPortNode["LoggerPort"]
     end
@@ -150,7 +151,8 @@ flowchart TB
     subgraph Adapters["Adapters"]
         SerialAdapter["SerialControllerOutputPort"]
         CaptureAdapter["CaptureFrameSourcePort"]
-        ResourceAdapter["StaticResourceStorePort"]
+        ResourceStoreAdapter["ResourceStore adapter"]
+        ArtifactAdapter["RunArtifactStore adapter"]
         NotificationAdapter["NotificationHandlerAdapter"]
         LoggerAdapter["LoggerPortAdapter"]
     end
@@ -158,7 +160,8 @@ flowchart TB
     subgraph IO["Hardware / external I/O"]
         SerialIO["SerialComm + CH552 protocol"]
         CaptureIO["AsyncCaptureDevice / capture card"]
-        StaticIO["resources/&lt;macro_id&gt;/assets<br/>runs/&lt;run_id&gt;/outputs"]
+        AssetIO["resources/&lt;macro_id&gt;/assets"]
+        OutputIO["runs/&lt;run_id&gt;/outputs"]
         ExternalIO["Discord / Bluesky"]
         LogIO["logs / GUI log event"]
     end
@@ -166,7 +169,6 @@ flowchart TB
     GUI --> Builder
     CLI --> Builder
     Builder --> Runtime
-    ExecutorNode -. "旧入口は委譲" .-> Runtime
 
     MacroCode -->|imports| MacroBaseNode
     MacroCode -->|imports| CommandNode
@@ -190,12 +192,14 @@ flowchart TB
     DefaultCommandImpl --> ControllerPort
     DefaultCommandImpl --> FramePort
     DefaultCommandImpl --> ResourcePort
+    DefaultCommandImpl --> ArtifactPort
     DefaultCommandImpl --> NotificationPortNode
     DefaultCommandImpl --> LoggerPortNode
 
     ControllerPort --> SerialAdapter --> SerialIO
     FramePort --> CaptureAdapter --> CaptureIO
-    ResourcePort --> ResourceAdapter --> StaticIO
+    ResourcePort --> ResourceStoreAdapter --> AssetIO
+    ArtifactPort --> ArtifactAdapter --> OutputIO
     NotificationPortNode --> NotificationAdapter --> ExternalIO
     LoggerPortNode --> LoggerAdapter --> LogIO
 
@@ -212,22 +216,32 @@ flowchart TB
 
     class MacroBaseNode,CommandNode,ConstantsNode,StopNode,SettingsNode stable;
     class Runtime,Registry,Factory,Context,Runner,Result,DefaultCommandImpl runtime;
-    class ControllerPort,FramePort,ResourcePort,NotificationPortNode,LoggerPortNode port;
-    class SerialAdapter,CaptureAdapter,ResourceAdapter,NotificationAdapter,LoggerAdapter adapter;
-    class SerialIO,CaptureIO,StaticIO,ExternalIO,LogIO io;
+    class ControllerPort,FramePort,ResourcePort,ArtifactPort,NotificationPortNode,LoggerPortNode port;
+    class SerialAdapter,CaptureAdapter,ResourceStoreAdapter,ArtifactAdapter,NotificationAdapter,LoggerAdapter adapter;
+    class SerialIO,CaptureIO,AssetIO,OutputIO,ExternalIO,LogIO io;
     class ExecutorNode legacy;
     class Guard guard;
 ```
+
+| 分類 | 意味 |
+|------|------|
+| stable | 既存ユーザーマクロが import する破壊不可領域 |
+| runtime | 再設計後の実行中核 |
+| port | Runtime から見た I/O 抽象境界 |
+| adapter | 現行実装や外部 I/O への接続実装 |
+| io | ハードウェア、ファイル、外部サービスなどの具体 I/O |
+| legacy | 最終構成では削除する旧実装 |
+| guard | 静的依存禁止の境界 |
 
 参照: [FW_REARCHITECTURE_OVERVIEW.md](FW_REARCHITECTURE_OVERVIEW.md)、[RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[RESOURCE_FILE_IO.md](RESOURCE_FILE_IO.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)。
 
 ### 4.2 MacroRuntime 実行フロー
 
-実行要求が registry、`definition.factory.create()`、context、runner、result へ流れる順序を示す。`MacroExecutor` が残る場合も、同じ Runtime 経路へ委譲する。
+実行要求が registry、`definition.factory.create()`、context、runner、result へ流れる順序を示す。`MacroExecutor` は最終構成に含めず、GUI/CLI は Runtime 入口を直接使う。
 
 ```mermaid
 flowchart LR
-    Request["request<br/>GUI / CLI / legacy adapter"]
+    Request["request<br/>GUI / CLI"]
     RegistryStep["registry<br/>MacroRegistry.resolve"]
     FactoryStep["factory<br/>definition.factory.create"]
     ContextStep["context<br/>ExecutionContext + Ports + token"]
@@ -261,7 +275,7 @@ flowchart LR
 
 ### 4.3 I/O Port 図
 
-`DefaultCommand` から controller、capture、resource、notification、logger の各 Port へ分岐し、Adapter が現行実装または外部 I/O へ接続する。
+`DefaultCommand` から controller、capture、resource、artifact、notification、logger の各 Port へ分岐し、Adapter が現行実装または外部 I/O へ接続する。
 
 ```mermaid
 flowchart TB
@@ -270,7 +284,8 @@ flowchart TB
     subgraph PortLayer["Port layer"]
         Controller["ControllerOutputPort<br/>press / hold / release / keyboard / type_key"]
         Capture["FrameSourcePort<br/>initialize / await_ready / latest_frame"]
-        Resource["ResourceStorePort<br/>resolve / save_image / load_image"]
+        Resource["ResourceStorePort<br/>resolve_asset_path / load_image"]
+        Artifact["RunArtifactStore<br/>resolve_output_path / save_image / open_output"]
         Notify["NotificationPort<br/>publish"]
         Logger["LoggerPort<br/>log"]
         Touch["TouchInputCapability<br/>任意 capability"]
@@ -282,7 +297,8 @@ flowchart TB
         DummyController["DummyControllerOutputPort<br/>allow_dummy=True only"]
         CapturePort["CaptureFrameSourcePort"]
         DummyFrame["DummyFrameSourcePort<br/>テスト・明示実行"]
-        StaticStore["StaticResourceStorePort"]
+        ResourceStore["ResourceStore adapter"]
+        ArtifactStore["RunArtifactStore adapter"]
         NotificationHandlerAdapter["NotificationHandlerAdapter / NoopNotificationAdapter"]
         LoggerPortAdapter["LoggerPortAdapter"]
     end
@@ -291,7 +307,8 @@ flowchart TB
         SerialComm["SerialCommInterface"]
         Protocol["SerialProtocolInterface / CH552"]
         CaptureDevice["AsyncCaptureDevice / CaptureDeviceInterface"]
-        StaticRoot["resources / runs root<br/>画像リソース"]
+        AssetsRoot["resources/&lt;macro_id&gt;/assets<br/>read-only assets"]
+        OutputsRoot["runs/&lt;run_id&gt;/outputs<br/>writable artifacts"]
         SettingsResolver["MacroSettingsResolver<br/>settings TOML 解決"]
         Discord["Discord"]
         Bluesky["Bluesky"]
@@ -301,6 +318,7 @@ flowchart TB
     DefaultCommandImpl --> Controller
     DefaultCommandImpl --> Capture
     DefaultCommandImpl --> Resource
+    DefaultCommandImpl --> Artifact
     DefaultCommandImpl --> Notify
     DefaultCommandImpl --> Logger
     DefaultCommandImpl -. "touch*" .-> Touch
@@ -312,8 +330,9 @@ flowchart TB
     Sleep -.-> SerialPort
     Capture --> CapturePort --> CaptureDevice
     Capture --> DummyFrame
-    Resource --> StaticStore --> StaticRoot
-    StaticStore -. "settings は扱わない" .-> SettingsResolver
+    Resource --> ResourceStore --> AssetsRoot
+    Artifact --> ArtifactStore --> OutputsRoot
+    ResourceStore -. "settings は扱わない" .-> SettingsResolver
     Notify --> NotificationHandlerAdapter --> Discord
     NotificationHandlerAdapter --> Bluesky
     Logger --> LoggerPortAdapter --> LoggerComponents
@@ -324,10 +343,17 @@ flowchart TB
     classDef commandimpl fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
 
     class DefaultCommandImpl commandimpl;
-    class Controller,Capture,Resource,Notify,Logger,Touch,Sleep port;
-    class SerialPort,DummyController,CapturePort,DummyFrame,StaticStore,NotificationHandlerAdapter,LoggerPortAdapter adapter;
-    class SerialComm,Protocol,CaptureDevice,StaticRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
+    class Controller,Capture,Resource,Artifact,Notify,Logger,Touch,Sleep port;
+    class SerialPort,DummyController,CapturePort,DummyFrame,ResourceStore,ArtifactStore,NotificationHandlerAdapter,LoggerPortAdapter adapter;
+    class SerialComm,Protocol,CaptureDevice,AssetsRoot,OutputsRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
 ```
+
+| 分類 | 意味 |
+|------|------|
+| commandimpl | 既存 `Command` API を実装する `DefaultCommand` |
+| port | `DefaultCommand` が依存する抽象境界 |
+| adapter | Port を現行実装またはファイル配置へ接続する実装 |
+| io | 実ファイル、デバイス、外部サービスなどの具体 I/O |
 
 参照: [RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[RESOURCE_FILE_IO.md](RESOURCE_FILE_IO.md)、[CONFIGURATION_AND_RESOURCES.md](CONFIGURATION_AND_RESOURCES.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)。
 

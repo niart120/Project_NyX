@@ -263,7 +263,31 @@ class DefaultCommand(Command):
     def artifacts(self) -> RunArtifactStore: ...
 ```
 
+`DefaultCommand` から Resource File I/O への委譲は次の通りである。`ResourceStorePort` は読み込み専用、`RunArtifactStore` は書き込み専用であり、互いの責務を混ぜない。
+
+| `Command` API | 委譲先 | 期待する root | 戻り値 |
+|---------------|--------|---------------|--------|
+| `load_img(filename, grayscale=False)` | `ResourceStorePort.load_image()` | `resources\<macro_id>\assets` または macro package assets | `cv2.typing.MatLike` |
+| `save_img(filename, image)` | `RunArtifactStore.save_image()` | `runs\<run_id>\outputs` | 既存互換のため `None`。保存先 `ResourceRef` は debug ログへ記録 |
+| `artifacts` property | `ExecutionContext.artifacts` | `runs\<run_id>\outputs` | `RunArtifactStore` |
+
 ### 内部設計
+
+#### `MacroResourceScope.from_definition()` 変換規則
+
+`MacroResourceScope.from_definition(definition, project_root)` は `MacroDefinition` の snapshot から読み込み候補だけを作る。settings path は `MacroSettingsResolver` の責務であり、本変換には含めない。
+
+| 入力 | 変換先 | 規則 |
+|------|--------|------|
+| `definition.id` | `macro_id` | Resource path 用の安定 ID としてそのまま使う。`/`、`\`、drive、空文字は `ResourcePathError` |
+| `project_root` | `project_root` | 呼び出し元が明示した root を保持し、標準 assets root と runs root の起点にする |
+| `definition.macro_root` | `macro_root` | package / single-file macro の配置 root。`None` の場合は標準 assets root だけを候補にする |
+| `project_root\resources\<macro_id>\assets` | `assets_roots[0]` | 標準 assets root。存在しない場合も候補として保持し、読み込み時に未存在を診断する |
+| `definition.macro_root\assets` | `assets_roots[1]` | macro package 同梱 assets。`macro_root` が `None` の場合は追加しない |
+| `definition.settings_path` | 変換対象外 | settings TOML は `MacroSettingsResolver` が解決する |
+| `definition.manifest_path` | 変換対象外 | manifest の settings / entrypoint は Registry / SettingsResolver が解釈済みであり、Resource Store は参照しない |
+
+`candidate_asset_paths(name)` は `assets_roots` の順序を保って `ResourcePathGuard.resolve_under_root(root, name)` を適用し、root 外参照が 1 件でもあれば `ResourcePathError` とする。root 配下だが未存在の候補は、探索候補として保持し、全候補が未存在の場合にまとめて `ResourceReadError` へ含める。
 
 #### Resource path 正規化
 

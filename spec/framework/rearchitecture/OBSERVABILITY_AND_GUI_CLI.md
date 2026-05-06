@@ -215,6 +215,13 @@ Runtime worker thread
 
 `ErrorInfo.message` はユーザー表示可能な短文に限定する。traceback、内部絶対パス、secret 値、通知 payload は `LOGGING_FRAMEWORK.md` の `TechnicalLog` へ分離する。CLI は `CliPresenter.render_result()` で `RunResult` を `UserMessage` に変換し、GUI は同じ `UserMessage` 相当を status 表示へ渡す。
 
+| シナリオ | ユーザー表示 OK | ユーザー表示 NG | 技術ログに残す情報 |
+|----------|----------------|----------------|------------------|
+| デバイス未接続 | `デバイスが接続されていません` | `SerialManager.get_active_device() returned None` | device name、protocol、検出結果、`NYX_DEVICE_SERIAL_FAILED` |
+| settings parse 失敗 | `設定ファイルを読み込めません` | `tomllib.TOMLDecodeError at C:\Users\...\settings.toml` | project root 相対 path、line / column、`NYX_SETTINGS_PARSE_FAILED` |
+| 通知失敗 | 原則表示しない。必要時は `通知の送信に失敗しました` | webhook URL、payload、password を含む本文 | notifier 種別、retryable、mask 済み要約、`NYX_NOTIFICATION_FAILED` |
+| マクロ例外 | `マクロ実行中にエラーが発生しました` | traceback 全文、内部絶対 path、secret 値 | exception type、traceback、component、mask 済み `ErrorInfo.details` |
+
 ### エラーハンドリング
 
 | 例外クラス | 発生条件 |
@@ -228,7 +235,7 @@ Runtime worker thread
 
 ### シングルトン管理
 
-`log_manager` シングルトンと `LogManager` クラスは維持しない。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult`、`LoggerPort`、`LogSinkDispatcher`、`LogBackend` は必要な lifetime で生成するオブジェクトであり、シングルトンにしない。
+最終状態では `log_manager` シングルトンと `LogManager` クラスを維持しない。移行期間に許可する shim と最終削除 API は `DEPRECATION_AND_MIGRATION.md` の「移行期間 shim と最終削除 API」を正とする。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult`、`LoggerPort`、`LogSinkDispatcher`、`LogBackend` は必要な lifetime で生成するオブジェクトであり、シングルトンにしない。
 
 ## 5. テスト方針
 
