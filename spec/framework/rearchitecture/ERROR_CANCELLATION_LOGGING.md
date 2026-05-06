@@ -5,7 +5,7 @@
 > **目的**: マクロ実行基盤の異常系、入力検証、協調キャンセル、実行結果を再設計し、ログ出力は `LOGGING_FRAMEWORK.md` の基盤へ接続する。  
 > **関連ドキュメント**: `LOGGING_FRAMEWORK.md`, `spec/framework/archive/logging_design.md`  
 > **既存ソース**: `decorators.py`, `exceptions.py`, `cancellation.py`, `executor.py`, `command.py`, `log_manager.py`, `global_settings.py`, `secrets_settings.py`, `notification_handler.py`, `log_pane.py`  
-> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、`DefaultCommand` 旧コンストラクタ、legacy loader はマクロ側移行を前提に破壊的変更を許容する。
+> **破壊的変更**: `MacroBase` / `Command` / `DefaultCommand` / constants / `MacroStopException` の import と lifecycle は維持する。Resource I/O、settings lookup、`DefaultCommand` 旧コンストラクタ、legacy loader、`Command.stop()` の即時例外送出依存はマクロ側移行を前提に破壊的変更を許容する。
 
 ## 1. 概要
 
@@ -22,7 +22,7 @@
 | MacroExecutor | 旧 GUI/CLI/テスト入口で使われる既存クラス。再設計後の公開 API、既存マクロ互換契約、移行 adapter のいずれにも含めず削除する |
 | MacroRuntime | 新方式の実行中核。例外正規化、キャンセル、`RunResult` 生成は Runtime / Runner 側で扱う |
 | MacroRegistry | 利用可能マクロを発見し、安定 ID とメタデータを保持するレジストリ |
-| MacroFactory | 実行ごとに新しい `MacroBase` インスタンスを生成するファクトリ |
+| MacroFactory | `MacroDefinition` が所有する生成責務。実行ごとに新しい `MacroBase` インスタンスを返す |
 | MacroRunner | `initialize -> run -> finalize` を実行し、例外・中断を `RunResult` に変換するコンポーネント |
 | RunHandle | 非同期実行中のマクロに対する中断要求、完了待ち、結果取得を提供するハンドル |
 | ExecutionContext | 1 回のマクロ実行に必要な `run_id`、`macro_id`、`RunLogContext`、Ports、中断トークン、options、`exec_args`、`metadata` を束ねる値オブジェクト。`Command` は保持しない。完全なフィールド一覧は `RUNTIME_AND_IO_PORTS.md` を正とする |
@@ -57,7 +57,7 @@
 | 既存 `MacroStopException` import | `exceptions.py` に単独定義 | import パスと `except MacroStopException` の捕捉互換を維持 |
 | マクロ実行結果 | `execute()` は `None`、失敗情報はログ文字列のみ | `RunResult` に `status`, `error`, `cancelled_reason`, `run_id`, `macro_id` を保持 |
 | GUI cancel の例外 | GUI スレッドから `cmd.stop()` を呼ぶと例外が出る | GUI は中断要求のみを行い、例外送出はマクロ実行スレッドに限定 |
-| `Command.wait()` 中断反映 | 待機秒数が終わるまで反映されない | `CancellationToken` 発火後 100 ms 以内に `MacroCancelled` を送出 |
+| `Command.wait()` 中断反映 | 待機秒数が終わるまで反映されない | `CancellationToken` 発火後 100 ms 未満で `MacroCancelled` を送出 |
 | ログ相関 | `component` 文字列のみ | 構造化ログに `run_id`, `macro_id`, `component` を常時付与 |
 | GUI 表示 | loguru の文字列を直接表示 | 永続ログと GUI 表示イベントを分離し、表示用文言を短く保つ |
 | 設定・引数検証 | TOML パース後の型検証なし | schema に基づき実行前に `ConfigurationError` として検出 |
@@ -68,6 +68,7 @@
 - 既存マクロの `from nyxpy.framework.core.macro.exceptions import MacroStopException` を変更不要にする。
 - 既存マクロの `finalize(self, cmd)` を変更不要にする。
 - `Command.log(*values, sep=" ", end="\n", level="...")` の既存呼び出しを変更不要にする。
+- `Command.stop()` は協調キャンセル優先へ変更するため、即時例外送出に依存するマクロは `Command.stop(raise_immediately=True)` へ移行する。
 - GUI からの cancel は例外を直接送出せず、マクロ実行スレッド側の協調キャンセルで処理する。
 - 実装前に `uv run pytest tests/unit/` のベースラインを確認する。
 
@@ -345,9 +346,14 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_MACRO_ARGS_INVALID` | `configuration` | `MacroRunner` / args schema | マクロ引数が schema に一致しない |
 | `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `GlobalSettings`, `SecretsSettings`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
 | `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `GlobalSettings`, `SecretsSettings` | 設定値が schema に一致しない |
+| `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | manifest settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
 | `NYX_DEVICE_SERIAL_FAILED` | `device` | `ControllerOutputPort` | シリアル送信、接続、プロトコル変換に失敗した |
 | `NYX_DEVICE_CAPTURE_FAILED` | `device` | `FrameSourcePort` | フレーム取得、初期化、切断検出に失敗した |
 | `NYX_FRAME_NOT_READY` | `device` | `FrameSourcePort.await_ready` | timeout 内に有効フレームが取得できない |
+| `NYX_DEVICE_DETECTION_TIMEOUT` | `device` | `MacroRuntimeBuilder` | serial/capture 検出が timeout 内に完了しない |
+| `NYX_DEVICE_NOT_FOUND` | `device` | `MacroRuntimeBuilder` | 指定された serial/capture device が検出結果に存在しない |
+| `NYX_DUMMY_DEVICE_NOT_ALLOWED` | `configuration` | `MacroRuntimeBuilder` | `allow_dummy=False` で dummy device を選択しようとした |
+| `NYX_RUNTIME_BUSY` | `configuration` | `MacroRuntime`, `RunHandle` | 同一 Runtime の二重実行、または実行状態 lock の timeout |
 | `NYX_RESOURCE_PATH_INVALID` | `resource` | `ResourceStorePort`, `RunArtifactStore` | path guard で root 外参照または不正 path を検出した |
 | `NYX_RESOURCE_READ_FAILED` | `resource` | `ResourceStorePort` | assets 読み込みに失敗した |
 | `NYX_RESOURCE_WRITE_FAILED` | `resource` | `RunArtifactStore` | outputs 書き込みまたは atomic replace に失敗した |
@@ -364,7 +370,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 
 1. `seconds < 0` は `ConfigurationError(code="NYX_INVALID_WAIT_SECONDS")` とする。
 2. 待機前に `ct.throw_if_requested()` を呼ぶ。
-3. `ct.wait(seconds)` を呼び、中断要求が来たら即座に `MacroCancelled` を送出する。
+3. `ct.wait(seconds)` を呼び、中断要求が来たら 100 ms 未満で `MacroCancelled` を送出する。
 4. 待機後に再度 `ct.throw_if_requested()` を呼ぶ。
 
 キャンセル API は 3 層に分ける。
@@ -375,7 +381,7 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | Runtime 内部 | `RunHandle` / Runtime | `CancellationToken.request_cancel(reason, source)` | 送出しない |
 | マクロ内部 | マクロコード | `Command.stop(raise_immediately=False)` | 既定では送出しない。即時脱出が必要な場合だけ `raise_immediately=True` を指定する |
 
-`Command.stop()` はマクロ内部から停止要求を登録する API とし、既定では `cancellation_token.request_cancel(reason="stop requested", source="macro")` のみを行う。実際の脱出は `Command.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point で `MacroCancelled` を送出して行う。既存マクロが `stop()` の即時例外に依存している場合だけ、段階互換として `Command.stop(raise_immediately=True)` を使う。
+`Command.stop()` はマクロ内部から停止要求を登録する API とし、既定では `cancellation_token.request_cancel(reason="stop requested", source="macro")` のみを行う。実際の脱出は `Command.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point で `MacroCancelled` を送出して行う。現行 `DefaultCommand.stop()` の即時例外送出とは意味論が変わるため、即時脱出に依存するマクロは `Command.stop(raise_immediately=True)` へ移行する。
 
 ### finalize への outcome 伝達
 
@@ -416,7 +422,7 @@ class MacroArgsSchema:
     strict: bool = False
 ```
 
-検証順序は `static/<macro_id>/settings.toml`、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
+検証順序は manifest settings path から読み込んだ settings と、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。旧 `static/<macro_id>/settings.toml` は探索しない。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
 
 #### GlobalSettings / SecretsSettings schema
 

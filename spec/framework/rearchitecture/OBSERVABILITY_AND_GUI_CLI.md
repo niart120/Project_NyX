@@ -45,7 +45,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 | GUI 表示と保存ログ | 同一 handler に依存しやすい | `LOGGING_FRAMEWORK.md` の `UserEvent` と `TechnicalLog` を利用 |
 | sink 例外 | 方針未定義 | `LOGGING_FRAMEWORK.md` の sink 例外隔離に従う |
 | ユーザー表示 | traceback や内部詳細が混入し得る | 短い表示文言と技術ログを分離 |
-| 既存マクロ変更数 | 変更不可 | 0 件 |
+| 維持対象 import / lifecycle に起因するマクロ本体変更 | 変更不可 | 0 件 |
 
 ### 1.5 着手条件
 
@@ -59,7 +59,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md` | 新規 | 本仕様書 |
+| `spec/framework/rearchitecture/OBSERVABILITY_AND_GUI_CLI.md` | 新規 | 本仕様書 |
 | `src\nyxpy\framework\core\runtime\builder.py` | 新規 | GUI/CLI/Legacy 入口から Runtime と Ports を組み立てる |
 | `src\nyxpy\framework\core\runtime\result.py` | 新規 | `RunResult`, `RunStatus`, `ErrorInfo` を GUI/CLI 表示へ利用可能にする |
 | `src\nyxpy\framework\core\logger\log_manager.py` | 変更 | `LOGGING_FRAMEWORK.md` の `LoggerPort` / sink 基盤を Runtime builder から利用 |
@@ -218,7 +218,7 @@ Runtime worker thread
 
 ### シングルトン管理
 
-既存 `log_manager` シングルトンは維持する。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult` は実行単位のオブジェクトであり、シングルトンにしない。
+`log_manager` シングルトンは維持しない。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult`、`LogManager` は必要な lifetime で生成するオブジェクトであり、シングルトンにしない。
 
 ## 5. テスト方針
 

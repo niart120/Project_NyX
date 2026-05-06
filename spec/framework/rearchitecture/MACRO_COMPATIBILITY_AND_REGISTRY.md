@@ -23,7 +23,7 @@
 | MacroRuntime | マクロ発見・生成・実行・結果取得を統括する新しい実行中核 |
 | MacroRegistry | 利用可能マクロを発見し、安定 ID とメタデータで管理する新しいレジストリ |
 | MacroDefinition | 1 件のマクロを表す唯一の Python メタデータ型。ID、表示名、クラス、設定ファイル候補、ロード診断、factory を持つ |
-| MacroFactory | 実行ごとに新しい `MacroBase` インスタンスを生成するファクトリ |
+| MacroFactory | `MacroDefinition` が所有する生成責務。実行ごとに新しい `MacroBase` インスタンスを返す |
 | MacroRunner | `initialize -> run -> finalize` を実行し、例外・中断・結果を `RunResult` に変換するコンポーネント |
 | RunHandle | 非同期実行中のマクロに対する中断要求、完了待ち、結果取得を提供するハンドル |
 | RunResult | 1 回のマクロ実行の成功・中断・失敗、例外、開始終了時刻を保持する結果値 |
@@ -50,7 +50,7 @@
 | import path 互換 | 暗黙維持 | `MacroBase` / `Command` / `constants` の path を絶対維持 |
 | クラス名衝突 | 後勝ちで上書きされる | 衝突を診断し、`Qualified Macro ID` で両方選択可能 |
 | ロード失敗診断 | ログ文字列のみ | `MacroLoadDiagnostic` と GUI / CLI 表示用メッセージを保持 |
-| 実行ごとの状態分離 | reload 後に作ったインスタンスを再利用 | `MacroFactory.create()` で実行ごとに新規生成 |
+| 実行ごとの状態分離 | reload 後に作ったインスタンスを再利用 | `definition.factory.create()` で実行ごとに新規生成 |
 | `cwd` 依存 | `Path.cwd()` 固定 | 明示 `project_root` を必須経路にし、`cwd` fallback を削除 |
 
 ### 1.5 着手条件
@@ -74,7 +74,7 @@
 | `src/nyxpy/framework/core/utils/helper.py` | 変更 | `load_macro_settings()` の旧 fallback を削除し、必要なら `MacroSettingsResolver` へ委譲 |
 | `tests/unit/executor/test_executor.py` | 変更 | 既存テストを維持し、衝突・失敗診断・実行ごとの新規インスタンス生成のテストを追加 |
 | `tests/gui/test_macro_reload.py` | 変更 | 存在する場合、追加・削除リロード互換とロード失敗表示を検証 |
-| `tests/unit/macro/test_registry.py` | 新規 | レジストリ、マニフェスト、entrypoint loader の純粋ロジックを検証 |
+| `tests/unit/framework/macro/test_registry.py` | 新規 | レジストリ、マニフェスト、entrypoint loader の純粋ロジックを検証 |
 | `tests/integration/test_macro_registry_migration.py` | 新規 | 移行後 `macros/` と manifest 構成でロードを検証 |
 
 ## 3. 設計方針
@@ -315,6 +315,8 @@ class EntryPointLoader:
 
 `macro.toml` は入力ファイル形式であり、`MacroManifest` という Python クラスは定義しない。読み込み処理は TOML を検証して `MacroDefinition` を生成する。
 
+`MacroRegistry` は発見、ID 解決、診断、`MacroDefinition` の snapshot 管理だけを担当する。`MacroDefinition` は `factory` を所有し、Runtime は `definition.factory.create()` を呼ぶ。Runtime に別の `MacroFactory` facade は持たせず、生成ポリシーを二重化しない。
+
 既存 `Command` の公開メソッド名は維持する。
 
 ```python
@@ -348,7 +350,7 @@ GUI/CLI
   -> result = runtime.run(context)
 ```
 
-`MacroRuntime` が registry 解決結果、factory 呼び出し、Ports 準備、Port close を担当し、`MacroRunner` がライフサイクル実行、`MacroStopException` 正規化、`RunResult` 生成を担当する。
+`MacroRuntime` が registry 解決結果、`definition.factory.create()`、Ports の利用、Port close を担当し、`MacroRunner` がライフサイクル実行、`MacroStopException` 正規化、`RunResult` 生成を担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` の責務である。
 
 ### Manifest 仕様
 
@@ -428,7 +430,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | ユニット | `test_class_name_collision_requires_qualified_id` | 同名 class が複数ある場合に `AmbiguousMacroError` と候補 ID を返す |
 | ユニット | `test_load_failure_is_reported_without_stopping_reload` | 1 件 import 失敗しても他マクロが登録され、diagnostics に失敗理由が残る |
 | ユニット | `test_registry_reload_swaps_snapshot_atomically` | reload 中に `definitions` と `diagnostics` の中途半端な snapshot が見えない |
-| ユニット | `test_execute_creates_new_instance_each_time` | 2 回 execute して `MacroFactory.create()` が 2 回呼ばれ、状態が共有されない |
+| ユニット | `test_execute_creates_new_instance_each_time` | 2 回 execute して `definition.factory.create()` が 2 回呼ばれ、状態が共有されない |
 | ユニット | `test_settings_without_manifest_path_returns_empty_dict` | manifest settings path がない場合は settings file を暗黙探索しない |
 | ユニット | `test_settings_static_lookup_is_not_supported` | `static/<macro_name>/settings.toml` を互換 settings として読み込まない |
 | ユニット | `test_exec_args_override_file_settings` | file settings より `exec_args` が優先される |
@@ -450,7 +452,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 
 ```powershell
 uv run pytest tests/unit/executor/test_executor.py
-uv run pytest tests/unit/macro/test_registry.py
+uv run pytest tests/unit/framework/macro/test_registry.py
 uv run pytest tests/gui/test_macro_reload.py
 uv run ruff check .
 ```

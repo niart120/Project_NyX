@@ -50,7 +50,7 @@
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `spec\framework\rearchitecture\MACRO_MIGRATION_GUIDE.md` | 新規 | マクロ側移行手順を定義 |
+| `spec/framework/rearchitecture/MACRO_MIGRATION_GUIDE.md` | 新規 | マクロ側移行手順を定義 |
 | `macros\<macro_id>\macro.toml` | 新規 | manifest entrypoint と settings path を定義 |
 | `macros\<macro_id>\macro.py` | 変更 | 必要に応じて resource path と `DefaultCommand` 直接生成を修正 |
 | `macros\<macro_id>\assets\**` | 新規 | マクロ同梱 assets の移動先 |
@@ -92,6 +92,8 @@ settings = "project:resources/sample_single_file/settings.toml"
 
 `cmd.load_img()` は assets を読み込む API、`cmd.save_img()` は run outputs へ書き込む API として扱う。settings は `MacroSettingsResolver` が解決し、Resource Store は settings TOML を探索しない。
 
+Markdown の説明文では Windows 配置例として `\` を使う。`macro.toml` の `entrypoint` と `settings` など、ファイル内に永続化する path 文字列は portable path として `/` を使う。
+
 ## 4. 実装仕様
 
 ### 4.1 manifest の追加
@@ -110,13 +112,13 @@ settings = "project:resources/frlg_id_rng/settings.toml"
 
 ### 4.2 settings の移行
 
-旧配置:
+旧配置（Windows 表記例）:
 
 ```text
 static\frlg_id_rng\settings.toml
 ```
 
-新配置:
+新配置（Windows 表記例）:
 
 ```text
 resources\frlg_id_rng\settings.toml
@@ -133,14 +135,14 @@ settings = "project:resources/frlg_id_rng/settings.toml"
 
 ### 4.3 assets の移行
 
-旧配置:
+旧配置（Windows 表記例）:
 
 ```text
 static\frlg_id_rng\button_a.png
 static\frlg_id_rng\templates\title.png
 ```
 
-新配置の例:
+新配置の例（Windows 表記例）:
 
 ```text
 resources\frlg_id_rng\assets\button_a.png
@@ -179,6 +181,20 @@ cmd = DefaultCommand(serial_device=serial, capture_device=capture)
 ```python
 # 移行後: テスト用に context を明示する
 cmd = DefaultCommand(context=context)
+```
+
+### 4.5A `Command.stop()` の移行
+
+現行 `DefaultCommand.stop()` は停止要求後に即時 `MacroStopException` を送出していた。再設計後の `Command.stop()` は協調キャンセル優先とし、既定では停止要求だけを登録する。長い処理から即時脱出したい場合は `raise_immediately=True` を明示する。
+
+```python
+# 移行前: stop() 呼び出し直後の例外送出に依存
+cmd.stop()
+```
+
+```python
+# 移行後: 即時脱出が必要な場合だけ明示
+cmd.stop(raise_immediately=True)
 ```
 
 ### 4.6 設定パラメータ
