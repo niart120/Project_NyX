@@ -1,3 +1,8 @@
+from nyxpy.framework.core.io.adapters import (
+    CaptureFrameSourcePort,
+    NotificationHandlerPort,
+    SerialControllerOutputPort,
+)
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
     FrameNotReadyError,
@@ -28,6 +33,7 @@ from nyxpy.framework.core.io.resources import (
 
 __all__ = [
     "ControllerOutputPort",
+    "CaptureFrameSourcePort",
     "DefaultResourcePathGuard",
     "FrameNotReadyError",
     "LocalResourceStore",
@@ -35,6 +41,7 @@ __all__ = [
     "FrameSourcePort",
     "MacroResourceScope",
     "NotificationPort",
+    "NotificationHandlerPort",
     "OverwritePolicy",
     "ResourceAlreadyExistsError",
     "ResourceConfigurationError",
@@ -48,6 +55,7 @@ __all__ = [
     "ResourceStorePort",
     "ResourceWriteError",
     "RunArtifactStore",
+    "SerialControllerOutputPort",
     "SleepControlCapability",
     "TouchInputCapability",
 ]
