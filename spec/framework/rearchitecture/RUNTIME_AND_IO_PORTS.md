@@ -3,7 +3,7 @@
 > **文書種別**: 仕様書。`MacroRuntime`、`MacroRuntimeBuilder`、Ports、`ExecutionContext`、`RunResult`、`RunHandle` の正本である。
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\hardware\`  
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。  
-> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `RESOURCE_FILE_IO.md`  
+> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\api\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`  
 > **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
@@ -23,6 +23,7 @@
 | MacroBase | ユーザ定義マクロの抽象基底クラス。`initialize` / `run` / `finalize` ライフサイクルを持つ |
 | MacroExecutor | 旧 GUI/CLI/テスト入口で使われる既存クラス。再設計後の公開 API、既存マクロ互換契約、移行 adapter のいずれにも含めず削除する |
 | MacroRuntime | 実行要求、`ExecutionContext` 構築、`Command` 生成、`MacroRegistry` / `MacroFactory` / `MacroRunner` 呼び出し、`RunResult` 確定、リソース解放を統括するフレームワーク層の実行基盤 |
+| MacroRuntimeBuilder | GUI/CLI/Legacy 入口から受け取った実行要求を、`MacroDefinition`、settings、`MacroResourceScope`、Ports、`ExecutionContext` へ組み立てる adapter。本書が API と責務の正本である |
 | MacroRegistry | 利用可能マクロを発見し、安定 ID とメタデータを保持するレジストリ。実行インスタンスは保持しない |
 | MacroFactory | `MacroRegistry` の定義情報から実行ごとに新しい `MacroBase` インスタンスを生成するファクトリ |
 | MacroRunner | `initialize -> run -> finalize` のライフサイクルを実行し、例外・中断・結果を `RunResult` に変換するコンポーネント |
@@ -94,7 +95,7 @@
 | `src\nyxpy\framework\core\runtime\result.py` | 新規 | `RunStatus`, `RunResult` を定義 |
 | `src\nyxpy\framework\core\runtime\handle.py` | 新規 | `RunHandle` とスレッド実装を定義 |
 | `src\nyxpy\framework\core\runtime\runtime.py` | 新規 | `MacroRuntime` の同期・非同期実行を実装 |
-| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | GUI/CLI 設定から Runtime と Ports を組み立てる。通知設定は `SecretsSettings` から読む |
+| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | `MacroRuntimeBuilder` の正本。GUI/CLI 実行要求から Runtime、Ports、settings、resource scope を組み立てる |
 | `src\nyxpy\framework\core\io\__init__.py` | 新規 | Port インターフェースと標準実装の再 export |
 | `src\nyxpy\framework\core\io\ports.py` | 新規 | `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` を定義 |
 | `src\nyxpy\framework\core\io\controller.py` | 新規 | `SerialControllerOutputPort`, `DummyControllerOutputPort` を実装 |
@@ -139,6 +140,23 @@ ControllerOutputPort / FrameSourcePort / ResourceStorePort / RunArtifactStore / 
     ↓
 SerialComm / AsyncCaptureDevice / static resources / NotificationHandler / LogManager
 ```
+
+`MacroRuntimeBuilder` の所有権は本書に置く。`CONFIGURATION_AND_RESOURCES.md` は `GlobalSettings` / `SecretsSettings` / `MacroSettingsResolver` の読み込み結果だけを定義し、`RESOURCE_FILE_IO.md` は `MacroResourceScope`、`ResourceStorePort`、`RunArtifactStore`、path guard だけを定義する。GUI/CLI は settings と resource を個別に問い合わせず、実行時は `MacroRuntimeBuilder.build()` を入口にする。
+
+GUI/CLI の実行組み立てフローは次の順で固定する。
+
+```text
+GUI/CLI
+  -> MacroRuntimeBuilder.build(request)
+  -> MacroRegistry.resolve(macro_id)
+  -> MacroSettingsResolver.load(definition)
+  -> MacroResourceScope.from_definition(definition, project_root)
+  -> ResourceStorePort / RunArtifactStore / ControllerOutputPort / FrameSourcePort / NotificationPort / LoggerPort を生成
+  -> MacroRuntime.create_context(...)
+  -> MacroRuntime.run(context) または MacroRuntime.start(context)
+```
+
+`MacroSettingsResolver.load()` が返す settings は `ExecutionContext.exec_args` の初期値であり、GUI/CLI から渡された実行引数が同一 key を上書きする。`MacroRuntimeBuilder` は設定ファイル探索規則や resource path guard を再実装せず、各仕様の公開 API だけを呼ぶ。
 
 依存方向は次の制約を守る。
 
@@ -348,6 +366,32 @@ class MacroRuntime:
     def shutdown(self) -> None: ...
 
 
+@dataclass(frozen=True)
+class RuntimeBuildRequest:
+    macro_id: str
+    entrypoint: str
+    exec_args: Mapping[str, Any] = field(default_factory=dict)
+    allow_dummy: bool | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+class MacroRuntimeBuilder:
+    def __init__(
+        self,
+        *,
+        project_root: Path,
+        registry: MacroRegistry,
+        settings_resolver: MacroSettingsResolver,
+        global_settings: GlobalSettings,
+        secrets_settings: SecretsSettings,
+        runtime: MacroRuntime | None = None,
+    ) -> None: ...
+
+    def build(self, request: RuntimeBuildRequest) -> ExecutionContext: ...
+    def run(self, request: RuntimeBuildRequest) -> RunResult: ...
+    def start(self, request: RuntimeBuildRequest) -> RunHandle: ...
+
+
 class MacroRunner(ABC):
     @abstractmethod
     def run(
@@ -499,7 +543,7 @@ MacroRuntime.run(context)
   │    ├─ macro.run(cmd)
   │    ├─ macro.finalize(cmd)
   │    └─ RunResult を生成
-  └─ controller.close(), frame_source.close(), resources.close() を finally で試行
+  └─ controller.close(), frame_source.close(), resources.close(), artifacts.close() を finally で試行
        └─ close 失敗だけ RunResult.cleanup_warnings に追記
 ```
 
@@ -540,6 +584,10 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `log()` | `logger.log()` | component は既存同様 caller class 名を既定にする |
 | `touch*()` / `disable_sleep()` | `controller` | 未対応 protocol は `NotImplementedError` |
 
+`CommandFacade.press()` は `controller.press(keys)`、`CommandFacade.wait(dur)`、`controller.release(keys)`、`CommandFacade.wait(wait)` の順に実行する。`dur <= 0` の場合は押下直後に release し、`wait <= 0` の場合は後続 wait を省略する。2 回の wait はどちらも `CancellationToken` aware wait を使うため、長い `dur` / `wait` 中でも cancellation safe point になる。
+
+`DefaultCommand(context=..., serial_device=...)` のように新形式 `context` と旧形式の具象引数を同時に指定した場合は `RuntimeConfigurationError(code="runtime.default_command.ambiguous_arguments")` を送出する。旧引数を黙って無視しない。`context` が `None` の場合だけ旧形式を受け入れ、内部で標準 Port adapter と一時 `ExecutionContext` を組み立てる。
+
 #### ControllerOutputPort
 
 `ControllerOutputPort` の基本契約は `press`、`hold`、`release`、`keyboard`、`type_key`、`close` に限定する。touch 操作は `TouchInputCapability`、スリープ制御は `SleepControlCapability` を実装した Port だけが提供する。`CommandFacade.touch*()` と `disable_sleep()` は capability の有無を検査し、未対応なら既存どおり `NotImplementedError` を送出する。
@@ -552,6 +600,10 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 `CaptureFrameSourcePort` は現行 `AsyncCaptureDevice` または `CaptureDeviceInterface` を包む。`initialize()` 後に capture loop が最初の frame を取得した時点で internal `Event` を set し、`await_ready()` はこの Event を待つ。`latest_frame()` は readiness 未達なら `FrameNotReadyError` を送出する。
 
+`FrameSourcePort.await_ready(timeout)` は timeout 到達時に `False` を返し、例外を送出しない。`timeout=None` は無期限待機、`timeout < 0` は `ValueError` とする。Runtime は `False` を `FrameNotReadyError(code="runtime.frame.not_ready")` に変換して `RunResult.failed` にする。
+
+`FrameSourcePort.latest_frame()` は adapter が受け取った最新 frame の copy を返す。返却値は BGR、`uint8`、shape `(height, width, 3)` とし、サイズは capture device の native size のままにする。既存 `Command.capture()` 互換の 1280x720 resize、crop、grayscale 変換は `CommandFacade.capture()` が担当する。
+
 `DummyFrameSourcePort` はテストと明示 dummy 実行用であり、黒画面または指定 frame を即時 ready とする。
 
 #### ResourceStorePort / RunArtifactStore
@@ -559,6 +611,8 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 `ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。`static/<macro_name>/settings.toml` 互換と manifest settings path は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
 標準配置、legacy static 互換、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`CommandFacade.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
+
+Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `cleanup_warnings` へ `"<port_name>: <ExceptionType>: <message>"` 形式で追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
 
 #### NotificationPort
 
@@ -576,31 +630,28 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 main()
   ├─ argparse で引数解析
   ├─ configure_logging()
-  ├─ builder = MacroRuntimeBuilder.from_cli_args(args)
-  ├─ detection = builder.detect_devices(timeout=5.0)
-  │    ├─ serial/capture が未検出なら exit code 1
-  │    └─ timeout なら検出途中の候補と timeout を表示して exit code 1
-  ├─ context = builder.create_context(macro_name=args.macro_name, exec_args=parse_define_args(args.define))
-  ├─ result = builder.runtime.run(context)
+  ├─ builder = MacroRuntimeBuilder(project_root=..., registry=..., settings_resolver=..., global_settings=..., secrets_settings=...)
+  ├─ request = RuntimeBuildRequest(macro_id=args.macro_name, entrypoint="cli", exec_args=parse_define_args(args.define))
+  ├─ result = builder.run(request)
   ├─ result.status == SUCCESS なら exit code 0
   ├─ result.status == CANCELLED なら exit code 130
   └─ result.status == FAILED なら exit code 2
 ```
 
-CLI から `serial_manager.get_active_device()` と `capture_manager.get_active_device()` を直接呼ばない。検出完了待ちと dummy 許可は `MacroRuntimeBuilder` に集約する。Discord / Bluesky 通知設定は `SecretsSettings` を唯一の入力元とし、CLI 独自の通知設定解釈を持たない。
+CLI から `serial_manager.get_active_device()` と `capture_manager.get_active_device()` を直接呼ばない。検出完了待ち、timeout、dummy 許可は `MacroRuntimeBuilder.run()` の build 手順に集約し、失敗時は `RunResult.failed` と `ErrorInfo` に変換する。Discord / Bluesky 通知設定は `SecretsSettings` を唯一の入力元とし、CLI 独自の通知設定解釈を持たない。
 
 #### GUI
 
 ```text
 MainWindow.__init__()
-  ├─ builder = MacroRuntimeBuilder.from_settings(global_settings, secrets_settings)
-  ├─ builder.start_device_detection(background=True)
+  ├─ builder = MacroRuntimeBuilder(project_root=..., registry=..., settings_resolver=..., global_settings=..., secrets_settings=...)
+  ├─ GUI adapter がデバイス検出を background 起動し、結果 snapshot を builder 入力へ渡す
   ├─ PreviewPane は builder.frame_source_for_preview() を購読
   └─ VirtualControllerModel は builder.controller_output_for_manual_input() を保持
 
 Run button
-  ├─ context = builder.create_context(macro_name, exec_args)
-  ├─ handle = runtime.start(context)
+  ├─ request = RuntimeBuildRequest(macro_id=macro_id, entrypoint="gui", exec_args=exec_args)
+  ├─ handle = builder.start(request)
   ├─ control_pane.set_running(True)
   └─ QTimer で handle.done() を監視し、完了時 result を UI に反映
 
@@ -644,7 +695,7 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | `DeviceDetectionTimeoutError` | serial/capture 検出が timeout 内に完了しない |
 | `DeviceNotFoundError` | 指定された serial/capture device が検出結果に存在しない |
 | `DummyDeviceNotAllowedError` | `allow_dummy=False` で dummy device を選択しようとした |
-| `FrameNotReadyError` | `FrameSourcePort.await_ready()` が timeout、または ready 前に `latest_frame()` が呼ばれた |
+| `FrameNotReadyError` | Runtime が `FrameSourcePort.await_ready()` の `False` を受け取った、または ready 前に `latest_frame()` が呼ばれた |
 | `FrameReadError` | capture device が `None` frame または空 frame を返した |
 | `ResourcePathError` | Resource File I/O の許可 root 外、絶対パス、空 filename、不正型の path が指定された。詳細は `RESOURCE_FILE_IO.md` |
 | `ResourceWriteError` | Resource File I/O の保存、atomic replace、OpenCV 書き込み検証に失敗した。詳細は `RESOURCE_FILE_IO.md` |

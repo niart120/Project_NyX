@@ -105,7 +105,7 @@
 | `src\nyxpy\framework\core\logger\log_manager.py` | 変更 | `LOGGING_FRAMEWORK.md` に従い `LoggerPort`、sink、実行 context、互換 adapter を実装 |
 | `src\nyxpy\framework\core\logger\events.py` | 新規 | `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext` を定義 |
 | `src\nyxpy\framework\core\logger\ports.py` | 新規 | `LoggerPort`、`LogSink`、backend 差し替え境界を定義 |
-| `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、GUI、test sink を実装 |
+| `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、test sink を実装。GUI sink は `src\nyxpy\gui\` 配下に置く |
 | `src\nyxpy\framework\core\settings\global_settings.py` | 変更 | schema 検証と Runtime 設定項目を整理 |
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | 通知設定の唯一の入力元と secret マスクを整理 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を構造化ログへ記録し、マクロ失敗へ伝播させない |
@@ -146,6 +146,7 @@
 | Signature gate | `initialize(cmd, args)`、`run(cmd)`、`finalize(cmd)`、主要 `Command` メソッドの呼び出し互換を維持する。`MacroExecutor.execute()` は互換対象に含めない |
 | Lifecycle gate | 成功、失敗、中断のいずれでも `finalize(cmd)` が可能な限り 1 回呼ばれる |
 | Settings gate | `static\<macro_name>\settings.toml` を読み、`exec_args` が file settings より優先される |
+| Builder ownership gate | GUI/CLI は settings と resource を個別解決せず、`MacroRuntimeBuilder.build()` を通して `ExecutionContext` を得る |
 | Existing macro gate | 代表マクロ `frlg_id_rng`、`frlg_initial_seed`、`frlg_gorgeous_resort`、`frlg_wild_rng` がソース変更なしでロードされる |
 | MacroExecutor removal gate | `test_macro_executor_removed` と `test_gui_cli_do_not_import_macro_executor` で、旧 executor の import 互換 shim と GUI/CLI 参照が残っていないことを検証する |
 | Cancellation gate | 既存 `MacroStopException` は `except MacroStopException` で捕捉でき、新中断も `RunStatus.CANCELLED` に正規化される |

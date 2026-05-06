@@ -11,51 +11,6 @@
 
 ## 2. 全体指摘
 
-### RC-008: GUI と core の境界で `GuiLogSink` の配置が曖昧である
-
-- **重要度**: Major
-- **対象**: `LOGGING_FRAMEWORK.md`, `OBSERVABILITY_AND_GUI_CLI.md`
-- **位置**:
-  - `LOGGING_FRAMEWORK.md` `GuiLogSink`
-  - `OBSERVABILITY_AND_GUI_CLI.md` `core 層は Qt 型へ依存しない`
-- **指摘**: core 層が Qt 型へ依存しない方針は明確だが、`GuiLogSink` が core の sink 実装なのか、GUI 層の adapter なのかが読み取りにくい。callback 登録・配信・Qt Signal emit のスレッドも未定義である。
-- **修正案**: `GuiLogSink` は `src\nyxpy\gui\` 配下に置く `LogSink` 実装であり、core は `LogSink` Protocol / ABC だけを知る、と明記する。配信スレッド、例外時の sink 隔離、Qt Signal への変換タイミングをシーケンス図にする。
-
-### RC-009: settings lookup と Resource File I/O の責務境界は明記されているが、Builder の所有権が曖昧である
-
-- **重要度**: Major
-- **対象**: `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`, `RUNTIME_AND_IO_PORTS.md`, `IMPLEMENTATION_PLAN.md`
-- **位置**:
-  - `RESOURCE_FILE_IO.md` `Resource Store は settings ファイルを探索しない`
-  - `CONFIGURATION_AND_RESOURCES.md` `MacroSettingsResolver`
-  - `RUNTIME_AND_IO_PORTS.md` `runtime builder`
-- **指摘**: settings lookup は `MacroSettingsResolver`、画像・成果物 I/O は Resource File I/O という方向は正しい。ただし `src\nyxpy\framework\core\runtime\builder.py` をどの仕様が所有するか、GUI/CLI が settings をどこへ問い合わせるかが明確でない。
-- **修正案**: `MacroRuntimeBuilder` の正本を `RUNTIME_AND_IO_PORTS.md` に置く。`CONFIGURATION_AND_RESOURCES.md` は settings の読み込み結果を提供するだけ、`RESOURCE_FILE_IO.md` は `MacroResourceScope` と Store だけを提供する、と分ける。GUI/CLI の settings 解決フローを以下の順に固定する。
-
-```text
-GUI/CLI
-  -> MacroRegistry.resolve(macro_id)
-  -> MacroSettingsResolver.load(descriptor)
-  -> MacroResourceScope.from_descriptor(descriptor)
-  -> MacroRuntimeBuilder.build(...)
-```
-
-### RC-010: Port インターフェースの未定義部分が実装分岐を生む
-
-- **重要度**: Major
-- **対象**: `RUNTIME_AND_IO_PORTS.md`, `TEST_STRATEGY.md`
-- **位置**:
-  - `ControllerOutputPort`
-  - `FrameSourcePort.await_ready()`
-  - `DefaultCommand(CommandFacade)`
-  - `Port close / cleanup_warnings`
-- **指摘**: `ControllerOutputPort.press()` は `dur` / `wait` を持たないが、`CommandFacade.press()` は互換のために `dur` / `wait` を持つ。変換責務が `CommandFacade` にあることは推測できるが、実装手順が不足している。`DefaultCommand(context=..., serial_device=...)` の両指定時の優先度、`FrameSourcePort.latest_frame()` の返却サイズ、close 失敗時の warning 蓄積ルールも不足している。
-- **修正案**: `RUNTIME_AND_IO_PORTS.md` の内部設計に以下を追加する。
-  - `CommandFacade.press()` は `controller.press -> wait(dur) -> controller.release -> wait(wait)` に変換する。
-  - `context` 指定時は旧引数を無視するのか、例外にするのかを決める。
-  - `FrameSourcePort.await_ready()` の timeout 時戻り値と例外送出有無を固定する。
-  - 複数 Port close 失敗は `cleanup_warnings: tuple[str, ...]` に全件保持し、`RunResult.status` は変えない。
-
 ### RC-011: スレッド安全性とロック戦略が設計方針止まりである
 
 - **重要度**: Major

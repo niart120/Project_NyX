@@ -21,11 +21,11 @@
 | LogEvent | ログ発生時の共通封筒。時刻、level、component、event、message、`run_id`、`macro_id`、`extra`、例外情報を持つ |
 | TechnicalLog | ファイル保存、障害調査、集計に使う技術ログ。traceback、例外型、詳細辞書を持てるが secret 値は含めない |
 | UserEvent | GUI/CLI へ表示する短いイベント。traceback、secret 値、内部絶対パス、通知 payload を含めない |
-| LogSink | `LogEvent`、`TechnicalLog`、`UserEvent` のいずれかを受け取る出力先。ファイル、コンソール、GUI、テスト用 memory sink を含む |
+| LogSink | `LogEvent`、`TechnicalLog`、`UserEvent` のいずれかを受け取る出力先。core 層では Protocol / ABC だけを定義し、Qt 型へ依存しない |
 | RunLogContext | 1 回の実行に紐づく `run_id`、`macro_id`、`macro_name`、入口種別、開始時刻を保持する immutable な値。型定義は本書、所有場所は `RUNTIME_AND_IO_PORTS.md` の `ExecutionContext.run_log_context` を正とする |
 | backend | 実際のログ出力を担う実装。候補は loguru、Python logging、structlog、独自 JSON writer である |
 | Structured Log | JSON Lines など機械処理しやすい形式の技術ログ。検索、集計、障害解析の入力にする |
-| GuiLogSink | GUI へ `UserEvent` を配信する sink。Qt 型を core 層へ持ち込まず、GUI adapter が Qt Signal へ変換する |
+| GuiLogSink | `src\nyxpy\gui\` 配下に置く GUI 層 adapter。`LogSink` を実装し、受け取った `UserEvent` を Qt Signal へ変換する。core 層はこの具象クラスを import しない |
 | TestLogSink | テストでログをメモリに保持し、イベント名、context、secret マスク、配信順序を検証する sink |
 
 ### 1.3 背景・問題
@@ -67,13 +67,14 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 | `src\nyxpy\framework\core\logger\events.py` | 新規 | `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext`、event 名を定義 |
 | `src\nyxpy\framework\core\logger\ports.py` | 新規 | `LoggerPort`、`LogSink`、`LogBackend` の抽象を定義 |
 | `src\nyxpy\framework\core\logger\log_manager.py` | 変更 | 既存 API 互換 adapter、sink 管理、context bind、backend 初期化、secret mask を実装 |
-| `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、GUI、test sink の標準実装を定義 |
+| `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、test sink の標準実装を定義。GUI sink は置かない |
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | Runtime から使う `LoggerPort` を io port 群へ re-export するか参照境界を整理 |
 | `src\nyxpy\framework\core\runtime\context.py` | 変更 | `RunLogContext` を `ExecutionContext.run_log_context` に含める |
 | `src\nyxpy\framework\core\runtime\builder.py` | 変更 | CLI/GUI/Legacy 用の logger 構成と `LoggerPort` 注入を担当 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` / `technical()` へ接続 |
 | `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
-| `src\nyxpy\gui\panes\log_pane.py` | 変更 | loguru 文字列 handler ではなく `GuiLogSink` 由来の `UserEvent` を購読 |
+| `src\nyxpy\gui\log_sink.py` | 新規 | `GuiLogSink` を定義し、`UserEvent` を Qt Signal へ変換する GUI 層 adapter |
+| `src\nyxpy\gui\panes\log_pane.py` | 変更 | loguru 文字列 handler ではなく `GuiLogSink` 由来の Qt Signal を購読 |
 | `tests\unit\framework\logger\test_logging_framework.py` | 新規 | logger port、sink 配信、secret mask、context、handler 例外隔離を検証 |
 | `tests\gui\test_log_pane_user_event.py` | 新規 | `LogPane` が `UserEvent` を Qt Signal 経由で表示することを検証 |
 | `tests\perf\test_logging_framework_perf.py` | 新規 | sink 配信と構造化ログの性能を検証 |
@@ -91,11 +92,11 @@ MacroRuntime / Command / NotificationHandler
   -> LogSink[]
        -> TechnicalFileSink
        -> ConsoleSink
-       -> GuiLogSink
        -> TestLogSink
+       -> GUI layer: GuiLogSink
 ```
 
-core 層は Qt 型へ依存しない。GUI は `GuiLogSink` に callback を登録し、受け取った `UserEvent` を Qt Signal で GUI スレッドへ渡す。
+core 層は Qt 型へ依存しない。GUI 層は `GuiLogSink` を作成して `LogManager.add_sink()` に `LogSink` として登録し、受け取った `UserEvent` を Qt Signal で GUI スレッドへ渡す。
 
 ### 公開 API 方針
 
@@ -292,6 +293,22 @@ LoggerPort.technical() / user()
 
 `LoggerPort.user()` は `UserEvent` と、対応する要約 `TechnicalLog` の両方を生成する。ユーザーに見せた文言も調査時に追跡できるようにするためである。`LoggerPort.technical()` は `user_visible=False` 相当であり、GUI/CLI へは出さない。
 
+#### GUI sink の境界
+
+`GuiLogSink` は core 層の sink 実装ではなく、GUI 層 adapter である。core 層は `LogSink` Protocol / ABC と `UserEvent` だけを知り、Qt 型、Qt Signal、GUI widget へ依存しない。
+
+```text
+LoggerPort.user()
+  -> LogManager が UserEvent を生成
+  -> LogManager が RLock 内で sink snapshot を作成
+  -> lock 外で LogSink.emit_user(UserEvent) を呼ぶ
+  -> src\nyxpy\gui\log_sink.py の GuiLogSink.emit_user()
+  -> Qt Signal emit
+  -> GUI thread の LogPane slot が表示を更新
+```
+
+`GuiLogSink.emit_user()` が呼ばれるスレッドは、ログを発行した Runtime worker thread または GUI thread のどちらでもあり得る。`GuiLogSink` は widget を直接更新せず、Qt Signal だけを emit する。Qt Signal から LogPane の slot への queued connection と UI 更新は GUI 層の責務である。`GuiLogSink` が例外を送出した場合、`LogManager` は `sink.emit_failed` の TechnicalLog を記録し、後続 sink とマクロ実行を継続する。
+
 #### UserEvent と TechnicalLog の分離
 
 | 項目 | UserEvent | TechnicalLog |
@@ -301,7 +318,7 @@ LoggerPort.technical() / user()
 | traceback | 含めない | DEBUG 詳細として保持可 |
 | 内部 path | 原則含めない | 相対 path または mask 済みで保持可 |
 | 通知 payload | 含めない | secret と本文を mask した要約のみ |
-| sink | GUI、CLI | JSONL file、人間向け file、console debug |
+| sink | GUI 層の `GuiLogSink`、CLI presenter | JSONL file、人間向け file、console debug |
 
 #### 実行単位コンテキスト
 
@@ -399,6 +416,7 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 | 結合 | `test_command_log_emits_macro_message_with_context` | 既存 `Command.log()` が `macro.message` と実行 context を付与する |
 | 結合 | `test_notification_failure_is_technical_log_only` | 通知失敗は secret mask 済み技術ログに残り、原則 GUI 表示しない |
 | GUI | `test_log_pane_receives_user_event` | `LogPane` が `UserEvent` を Qt Signal で表示する |
+| GUI | `test_gui_log_sink_emits_qt_signal_without_core_qt_dependency` | `GuiLogSink` が GUI 層で `UserEvent` を Qt Signal へ変換し、core 層が Qt 型を import しない |
 | GUI | `test_log_pane_level_filter_uses_gui_sink` | DEBUG 表示切替が GUI sink の level に反映される |
 | パフォーマンス | `test_logging_sink_dispatch_perf` | sink 3 件への配信が 1 件 5 ms 未満 |
 | パフォーマンス | `test_gui_user_event_dispatch_perf` | GUI sink 10 件への配信が 1 件 10 ms 未満 |

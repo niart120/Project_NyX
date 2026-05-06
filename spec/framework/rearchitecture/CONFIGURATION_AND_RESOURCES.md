@@ -1,6 +1,6 @@
 # 設定とリソース境界再設計 仕様書
 
-> **文書種別**: 仕様書。settings lookup、`MacroSettingsResolver`、通常設定、秘密設定、Resource File I/O との接続境界の正本である。
+> **文書種別**: 仕様書。settings lookup、`MacroSettingsResolver`、通常設定、秘密設定の正本である。Runtime builder の正本は `RUNTIME_AND_IO_PORTS.md`、Resource File I/O の正本は `RESOURCE_FILE_IO.md` に置く。
 > **対象モジュール**: `src\nyxpy\framework\core\settings\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`  
 > **目的**: 通常設定、秘密設定、マクロ設定 lookup の境界を分離し、画像・ファイル I/O の詳細を Resource File I/O 仕様へ独立させる。  
 > **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\RESOURCE_FILE_IO.md`, `spec\framework\rearchitecture\ERROR_CANCELLATION_LOGGING.md`  
@@ -20,8 +20,8 @@
 | SecretsSettings | Discord webhook、Bluesky password など、ログ表示や通常設定への複製を禁止する秘密設定を永続化するコンポーネント |
 | SettingsSchema | 設定キー、型、既定値、検証規則、秘密値フラグを表す schema 定義 |
 | MacroSettingsResolver | `macro.toml` の settings 指定と `static\<macro_name>\settings.toml` 互換を解決し、マクロ実行引数へ渡す辞書を作るコンポーネント |
-| Resource File I/O | assets 読み込みと outputs 書き込みを扱う別建て仕様。詳細は `RESOURCE_FILE_IO.md` に従う |
-| MacroRuntimeBuilder | GUI/CLI/Legacy 入口から設定を読み、Runtime、Ports、Resource scope を組み立てる adapter |
+| Resource File I/O | assets 読み込みと outputs 書き込みを扱う別建て仕様。詳細と API は `RESOURCE_FILE_IO.md` に従う |
+| MacroRuntimeBuilder | GUI/CLI/Legacy 入口から Runtime、Ports、settings、Resource scope を組み立てる adapter。API と責務の正本は `RUNTIME_AND_IO_PORTS.md` に置く |
 | ConfigurationError | 設定ファイル破損、schema 不一致、秘密設定の誤用など、実行前に検出できる不備を表す例外 |
 | SecretBoundaryError | secret 値が通常設定、例外、ログ、GUI 表示イベントへ漏れる構成を検出したことを表す例外 |
 
@@ -61,7 +61,7 @@
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | `SecretsSettings` schema、秘密値マスク、通知設定の正配置を実装 |
 | `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` と manifest / legacy settings 解決を実装 |
 | `src\nyxpy\framework\core\utils\helper.py` | 変更 | `load_macro_settings()` を `MacroSettingsResolver` へ接続 |
-| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | `GlobalSettings`、`SecretsSettings`、`MacroSettingsResolver` から Runtime 入力を構築 |
+| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | `RUNTIME_AND_IO_PORTS.md` が正本。本書の settings snapshot と `MacroSettingsResolver` を呼び出して Runtime 入力を構築 |
 | `tests\unit\settings\test_settings_schema.py` | 新規 | 通常設定と秘密設定の schema 検証を確認 |
 | `tests\unit\macro\test_settings_resolver.py` | 新規 | manifest settings と legacy settings の解決を確認 |
 | `tests\integration\test_configuration_runtime.py` | 新規 | Runtime builder と既存マクロ設定の結合を確認 |
@@ -70,15 +70,15 @@
 
 ### アーキテクチャ上の位置づけ
 
-設定境界は Runtime 実行前の構成処理に属する。`GlobalSettings` と `SecretsSettings` は永続化、`MacroSettingsResolver` はマクロ引数の初期値解決、Resource File I/O は実行中の assets / outputs 操作を担当する。
+設定境界は Runtime 実行前の構成処理に属する。`GlobalSettings` と `SecretsSettings` は永続化、`MacroSettingsResolver` はマクロ引数の初期値解決、Resource File I/O は実行中の assets / outputs 操作を担当する。`MacroRuntimeBuilder` はこれらを呼び出す側であり、本書は builder の API を再定義しない。
 
 ```text
 nyxpy.gui / nyxpy.cli
-  -> MacroRuntimeBuilder
-  -> GlobalSettings / SecretsSettings
-  -> MacroSettingsResolver
-  -> MacroRuntime
-  -> Resource File I/O
+  -> MacroRuntimeBuilder  # RUNTIME_AND_IO_PORTS.md が正本
+      -> GlobalSettings / SecretsSettings
+      -> MacroSettingsResolver
+      -> Resource File I/O
+      -> MacroRuntime
 ```
 
 フレームワーク層から GUI/CLI へ依存しない。個別マクロを動的に読むことは許可するが、個別マクロの名前へ静的依存しない。
@@ -101,7 +101,7 @@ nyxpy.gui / nyxpy.cli
 |----------|--------------|----------------|
 | settings | 通常設定、秘密設定、schema 検証、永続化 | 標準ライブラリ、TOML reader、`ConfigurationError` |
 | macro settings | manifest / legacy settings の解決と辞書化 | settings schema、`MacroDefinition` |
-| runtime builder | GUI/CLI/Legacy 入口の設定を Runtime 入力へ変換 | settings、macro、runtime、resource scope factory |
+| runtime builder | settings snapshot と resolver の結果を Runtime 入力へ変換。API と build 順序は `RUNTIME_AND_IO_PORTS.md` が正本 | settings、macro、runtime、resource scope factory |
 | resource file io | assets 読み込み、outputs 保存、path guard、atomic write | `RESOURCE_FILE_IO.md` の範囲 |
 
 ### 性能要件

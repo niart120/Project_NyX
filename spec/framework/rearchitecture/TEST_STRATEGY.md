@@ -224,7 +224,7 @@ Port fake adapter は「テストを通すだけの mock」ではなく、契約
 
 #### GUI/CLI integration
 
-CLI は subprocess 相当または `main(args)` 直接呼び出しで、Runtime builder 使用、`RunResult` 由来の終了コード、`SecretsSettings` 由来の通知設定を検証する。GUI は pytest-qt を使い、実行開始で `RunHandle` を保持し、cancel ボタンで `RunHandle.cancel()` を呼び、`GuiLogEvent` を `LogPane` に表示することを検証する。
+CLI は subprocess 相当または `main(args)` 直接呼び出しで、Runtime builder 使用、`RunResult` 由来の終了コード、`SecretsSettings` 由来の通知設定を検証する。GUI は pytest-qt を使い、実行開始で `RunHandle` を保持し、cancel ボタンで `RunHandle.cancel()` を呼び、`UserEvent` を `LogPane` に表示することを検証する。
 
 #### hardware / perf / thread-safety
 
@@ -252,7 +252,7 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 |------------|----------|----------|
 | ユニット | `test_macro_base_import_contract` | `MacroBase` の import path と lifecycle signature を検証する |
 | ユニット | `test_command_import_and_method_contract` | `Command` と `DefaultCommand` の import、既存メソッド、主要引数を検証する |
-| ユニット | `test_macro_executor_signature_contract` | `MacroExecutor` の既存 API と `exec_args={}` 互換を検証する |
+| ユニット | `test_macro_executor_removed` | `MacroExecutor` の import 互換 shim が残っていないことを検証する |
 | ユニット | `test_constants_import_contract` | `Button`, `Hat`, `LStick`, `RStick`, `KeyType` を import できる |
 | ユニット | `test_registry_loads_fixture_macros` | package / single file fixture を `MacroDefinition` 化する |
 | ユニット | `test_registry_collects_load_diagnostics` | 壊れた fixture が reload 全体を止めず診断に残る |
@@ -262,6 +262,10 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | ユニット | `test_runner_preserves_finalize_failure_details` | finalize 失敗が元エラー情報を失わせない |
 | ユニット | `test_runtime_run_with_fake_ports_success` | fake Ports で同期実行が成功する |
 | ユニット | `test_runtime_handle_cancel_is_thread_safe` | 複数 cancel と完了待ちが安全に動く |
+| ユニット | `test_command_facade_press_expands_to_port_sequence` | `press(dur, wait)` が press、cancel-aware wait、release、cancel-aware wait に展開される |
+| ユニット | `test_default_command_rejects_context_and_legacy_args` | `context` と旧具象引数の同時指定が `RuntimeConfigurationError` になる |
+| ユニット | `test_frame_source_latest_frame_contract` | `latest_frame()` が BGR `uint8` の native size copy を返し、resize は `CommandFacade.capture()` 側で行う |
+| ユニット | `test_runtime_collects_all_port_close_warnings` | 複数 Port close 失敗を `cleanup_warnings` に全件保持し、status を変えない |
 | ユニット | `test_fake_frame_source_readiness_failure` | readiness 未達を Runtime が失敗にする |
 | ユニット | `test_fake_resource_store_path_escape` | fake resource で root 外参照を拒否する |
 | ユニット | `test_fake_notification_does_not_expose_secret` | 通知 secret がログに平文で出ない |
@@ -271,7 +275,7 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | 結合 | `test_cli_uses_runtime_and_run_result` | CLI が Runtime 入口と `RunResult` 終了コードを使う |
 | GUI | `test_gui_start_uses_runtime_handle` | GUI 実行開始が `RunHandle` を保持する |
 | GUI | `test_gui_cancel_response` | GUI cancel が token を 100 ms 以内に発火させる |
-| GUI | `test_gui_log_pane_receives_display_event` | `GuiLogEvent` が GUI 表示に反映される |
+| GUI | `test_gui_log_pane_receives_display_event` | `UserEvent` が GUI 表示に反映される |
 | ハードウェア | `test_realdevice_controller_output_port` | `@pytest.mark.realdevice`。実シリアル送信 Port を検証する |
 | ハードウェア | `test_realdevice_frame_source_port` | `@pytest.mark.realdevice`。実キャプチャ frame readiness を検証する |
 | ハードウェア | `test_realdevice_runtime_smoke` | `@pytest.mark.realdevice`。最小マクロを Runtime 経由で実行する |
