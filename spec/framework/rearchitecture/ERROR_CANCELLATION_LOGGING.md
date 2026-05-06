@@ -34,11 +34,11 @@
 | FrameworkError | フレームワークが利用者へ返す異常を表す基底例外。分類、コード、コンポーネント、詳細を保持する |
 | DeviceError | シリアルデバイス、キャプチャデバイス、プロトコル操作の失敗を表す `FrameworkError` |
 | ResourceError | 画像、設定ファイル、マクロリソース、ログファイルなどの読み書き失敗を表す `FrameworkError` |
-| ConfigurationError | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の検証失敗を表す `FrameworkError` |
+| ConfigurationError | CLI/GUI 入力、マクロ引数、settings snapshot、secrets snapshot の検証失敗を表す `FrameworkError` |
 | RunResult | 1 回のマクロ実行の開始、終了、成功、失敗、中断、失敗情報、`run_id` を保持する値オブジェクト |
 | run_id | 1 回のマクロ実行を識別する UUID 文字列。構造化ログ、GUI 表示イベント、`RunResult` を関連付ける |
 | macro_id | 実行対象マクロを識別する文字列。原則としてパッケージ名または単一ファイル名を使う |
-| component | ログまたは例外の発生元を示す安定した名前。例: `MacroRuntime`, `DefaultCommand`, `GlobalSettings` |
+| component | ログまたは例外の発生元を示す安定した名前。例: `MacroRuntime`, `DefaultCommand`, `SettingsStore` |
 | 構造化ログ | `LOGGING_FRAMEWORK.md` で定義する `TechnicalLog`。異常・中断の詳細を検索・解析できる形で保存する |
 | GUI 表示イベント | `LOGGING_FRAMEWORK.md` で定義する `UserEvent`。GUI のログペインやステータス表示に渡す短い表示用イベント |
 
@@ -48,7 +48,7 @@
 
 `MainWindow.cancel_macro()` と `closeEvent()` は GUI スレッドから `cmd.stop()` を呼び出しており、`cmd.stop()` が `MacroStopException` を送出するため GUI 操作側で例外が発生し得る。旧 `MacroExecutor.execute()` は失敗情報を返さず、`finalize(cmd)` へ成功・失敗・中断の outcome を渡せない。新設計では GUI/CLI が `MacroExecutor` を経由せず `RunResult` を扱い、outcome は `MacroBase.finalize(cmd)` の抽象契約には含めず、受け取り可能なマクロだけの opt-in 拡張にする。
 
-`LogManager` は文字列メッセージと `component` のみを扱うため、同時実行や GUI 表示で `run_id` / `macro_id` とログを関連付けられない。ロギング基盤そのものの問題、backend 選定、sink 設計、GUI sink の例外処理と lock 方針は `LOGGING_FRAMEWORK.md` を正とする。`parse_define_args()` は `list[str]` 前提だが GUI 側から文字列が渡される経路があり、`GlobalSettings` / `SecretsSettings` は TOML 読み込み後の schema 検証を持たない。CLI 通知設定の入力元が `SecretsSettings` に統一されていない場合、GUI/CLI で Discord / Bluesky の挙動がずれる。
+現行 `LogManager` は文字列メッセージと `component` のみを扱うため、同時実行や GUI 表示で `run_id` / `macro_id` とログを関連付けられない。ロギング基盤そのものの問題、backend 選定、sink 設計、GUI sink の例外処理と lock 方針は `LOGGING_FRAMEWORK.md` を正とする。`parse_define_args()` は `list[str]` 前提だが GUI 側から文字列が渡される経路があり、settings / secrets は TOML 読み込み後の schema 検証を持たない。CLI 通知設定の入力元が secrets snapshot に統一されていない場合、GUI/CLI で Discord / Bluesky の挙動がずれる。
 
 ### 1.4 期待効果
 
@@ -83,14 +83,14 @@
 | `src/nyxpy/framework/core/macro/command.py` | 変更 | `Command.wait()` の即時キャンセル対応、GUI 用中断要求 API、構造化ログ対応、デバイス/リソース例外の正規化 |
 | `src/nyxpy/framework/core/macro/executor.py` | 削除 | GUI/CLI/テストの参照を Runtime へ移行した後に削除。戻り値 `None`、例外再送出、import 互換 shim は保証しない |
 | `src/nyxpy/framework/core/macro/base.py` | 変更 | `finalize(cmd)` 抽象シグネチャを維持し、outcome 受け取りは opt-in 拡張として説明する |
-| `src/nyxpy/framework/core/logger/log_manager.py` | 変更 | `LOGGING_FRAMEWORK.md` の `LoggerPort` / sink 基盤へ接続し、異常・中断イベントに `run_id` / `macro_id` / `component` を付与 |
-| `src/nyxpy/framework/core/settings/global_settings.py` | 変更 | `GlobalSettings` schema、既定値、型検証、設定読み込み失敗時の `ConfigurationError` を実装 |
-| `src/nyxpy/framework/core/settings/secrets_settings.py` | 変更 | `SecretsSettings` schema、秘匿値のログマスク、型検証、読み込み失敗時の `ConfigurationError` を実装 |
+| `src/nyxpy/framework/core/logger/dispatcher.py` | 新規 | `LOGGING_FRAMEWORK.md` の `LogSinkDispatcher` へ異常・中断イベントを配信 |
+| `src/nyxpy/framework/core/settings/global_settings.py` | 変更 | `SettingsStore` / settings snapshot の schema、既定値、型検証、設定読み込み失敗時の `ConfigurationError` を実装 |
+| `src/nyxpy/framework/core/settings/secrets_settings.py` | 変更 | `SecretsStore` / secrets snapshot の schema、秘匿値のログマスク、型検証、読み込み失敗時の `ConfigurationError` を実装 |
 | `src/nyxpy/framework/core/utils/helper.py` | 変更 | `parse_define_args()` を `str` / `Iterable[str]` 対応にし、パース失敗を `ConfigurationError` に正規化 |
 | `src/nyxpy/framework/core/api/notification_handler.py` | 変更 | 通知失敗を飲み込むだけでなく、秘匿情報を除いた `ResourceError` 相当の構造化ログに記録 |
 | `src/nyxpy/gui/main_window.py` | 変更 | GUI cancel が例外を送出しない経路へ変更し、`RunResult` に基づき完了/中断/失敗を表示 |
 | `src/nyxpy/gui/panes/log_pane.py` | 変更 | loguru 文字列 handler ではなく `LOGGING_FRAMEWORK.md` の `UserEvent` を購読 |
-| `src/nyxpy/cli/run_cli.py` | 変更 | `RunResult` に基づく終了コード、エラーメッセージ、キャンセル表示へ変更。通知設定は `SecretsSettings` から取得 |
+| `src/nyxpy/cli/run_cli.py` | 変更 | `RunResult` に基づく終了コード、エラーメッセージ、キャンセル表示へ変更。通知設定は secrets snapshot から取得 |
 | `tests/unit/` | 新規/変更 | 例外階層、キャンセル、入力検証、構造化ログ、executor outcome の単体テスト |
 | `tests/integration/` | 新規/変更 | GUI/CLI を含まないマクロ実行結果と `finalize` 互換の結合テスト |
 
@@ -120,8 +120,8 @@
 |----------|------|------|----------|
 | ユーティリティ | `CancellationToken` | スレッドセーフな中断状態、待機、理由保持 | GUI 型への依存 |
 | マクロ実行 | `MacroRuntime`, `MacroRunner`, `Command`, `decorators` | 実行制御、例外正規化、キャンセル送出、outcome 生成 | GUI/CLI 固有表示 |
-| ログ | `LoggerPort` / `LogManager` | 異常・中断 event を `LOGGING_FRAMEWORK.md` の sink 基盤へ渡す | 秘密情報の平文出力、sink 詳細の再定義 |
-| 設定 | `GlobalSettings`, `SecretsSettings`, `parse_define_args` | schema 検証、入力正規化、`ConfigurationError` 生成 | マクロ固有ロジックへの依存 |
+| ログ | `LoggerPort` / `DefaultLogger` | 異常・中断 event を `LOGGING_FRAMEWORK.md` の sink 基盤へ渡す | 秘密情報の平文出力、sink 詳細の再定義 |
+| 設定 | `SettingsStore`, `SecretsStore`, `parse_define_args` | schema 検証、入力正規化、`ConfigurationError` 生成 | マクロ固有ロジックへの依存 |
 | 上位 UI | GUI, CLI | ユーザー入力、cancel 要求、`RunResult` 表示 | フレームワーク内部例外への過剰依存 |
 
 ### 性能要件
@@ -291,7 +291,7 @@ class MacroRuntime:
 | `MacroCancelled` | `MacroStopException` | `cancelled` | `CancellationToken` 発火後の safe point、`@check_interrupt`、`Command.wait()` で送出 |
 | `DeviceError` | `FrameworkError` | `device` | シリアル送信、キャプチャ取得、プロトコル変換、デバイス未接続の失敗 |
 | `ResourceError` | `FrameworkError` | `resource` | 画像読み書き、マクロリソース、設定ファイル、ログファイル、通知先 I/O の失敗 |
-| `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の schema 検証失敗 |
+| `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、settings/secrets snapshot の schema 検証失敗 |
 | `MacroRuntimeError` | `FrameworkError` | `macro` | マクロ実装由来の未分類例外を executor が正規化したもの |
 
 `MacroStopException` は削除しない。`MacroStopException()` と `MacroStopException("stop")` は破壊しない。constructor は `__init__(*args, **kwargs)` で旧呼び出しを受け、`args[0]` がある場合は message として扱う。`kind` 未指定時は `ErrorKind.CANCELLED`、`code` 未指定時は `NYX_MACRO_CANCELLED`、`component` 未指定時は `MacroStopException`、`recoverable` 未指定時は `False` を既定値にする。kwargs に同名キーが渡された場合は kwargs を優先する。新規コードは `MacroCancelled` を送出するが、`MacroCancelled` が `MacroStopException` を継承するため、既存の `except MacroStopException` は中断を捕捉できる。既存マクロが `MacroStopException` を直接送出した場合、`MacroRunner` は `MacroCancelled` 相当の `RunResult(status=RunStatus.CANCELLED)` に正規化する。
@@ -324,8 +324,8 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_DEFINE_PARSE_FAILED` | `configuration` | `parse_define_args` | CLI/GUI の define 入力を TOML として解釈できない |
 | `NYX_DEFINE_INVALID` | `configuration` | `parse_define_args` | 空 key、key のみ、重複による型衝突など define 入力が不正 |
 | `NYX_MACRO_ARGS_INVALID` | `configuration` | `MacroRunner` / args schema | マクロ引数が schema に一致しない |
-| `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `GlobalSettings`, `SecretsSettings`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
-| `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `GlobalSettings`, `SecretsSettings` | 設定値が schema に一致しない |
+| `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `SettingsStore`, `SecretsStore`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
+| `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `SettingsStore`, `SecretsStore` | 設定値が schema に一致しない |
 | `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | 明示 settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
 | `NYX_DEVICE_SERIAL_FAILED` | `device` | `ControllerOutputPort` | シリアル送信、接続、プロトコル変換に失敗した |
 | `NYX_DEVICE_CAPTURE_FAILED` | `device` | `FrameSourcePort` | フレーム取得、初期化、切断検出に失敗した |
@@ -406,9 +406,9 @@ class MacroArgsSchema:
 
 検証順序は manifest または class metadata settings path から読み込んだ settings と、CLI/GUI `exec_args` のマージ後とする。`exec_args` が優先される現行仕様は維持する。旧 `static/<macro_id>/settings.toml` は探索しない。検証失敗は `ConfigurationError(code="NYX_MACRO_ARGS_INVALID", component="MacroRuntime")` に正規化する。
 
-#### GlobalSettings / SecretsSettings schema
+#### SettingsStore / SecretsStore schema
 
-`GlobalSettings` は既定値と型を schema として定義する。現行の `capture_device`, `serial_device`, `serial_baud`, `serial_protocol` は維持する。
+`SettingsStore` は既定値と型を schema として定義する。現行の `capture_device`, `serial_device`, `serial_baud`, `serial_protocol` は維持する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
@@ -420,7 +420,7 @@ class MacroArgsSchema:
 | `logging.console_level` | `str` | `"INFO"` | コンソールログの最低レベル |
 | `logging.gui_level` | `str` | `"INFO"` | GUI 表示イベントの最低レベル |
 
-`SecretsSettings` は通知設定を schema として定義する。CLI/GUI/Runtime builder は Discord / Bluesky 通知設定を `SecretsSettings` からのみ読み、`GlobalSettings` や CLI 独自構造に secret 値を複製しない。secret 値は `LogManager` に渡す前にマスクする。
+`SecretsStore` は通知設定を schema として定義する。CLI/GUI/Runtime builder は Discord / Bluesky 通知設定を secrets snapshot からのみ読み、通常設定や CLI 独自構造に secret 値を複製しない。secret 値は logger に渡す前にマスクする。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
@@ -468,15 +468,15 @@ class MacroArgsSchema:
 | `StaticResourceIO` の読み書き | `ResourceError` | パスは相対化して記録 |
 | `load_macro_settings()` の TOML 破損 | `ConfigurationError` | ファイルを上書きしない |
 | `parse_define_args()` の TOML 破損 | `ConfigurationError` | 入力全文は INFO 以上のログに出さない |
-| `GlobalSettings` / `SecretsSettings` 型不一致 | `ConfigurationError` | secret 値はマスク |
+| settings / secrets 型不一致 | `ConfigurationError` | secret 値はマスク |
 | マクロ `initialize` / `run` の任意例外 | `MacroRuntimeError` | 元例外名と traceback を DEBUG ログに保存 |
 | `NotificationHandler.publish()` の通知失敗 | `ResourceError` 相当の構造化ログ | マクロ実行は継続 |
 | GUI log sink の例外 | `LOGGING_FRAMEWORK.md` の sink 例外隔離 | 他 sink への配信とマクロ実行は継続 |
-| CLI 通知設定ソース不一致 | `ConfigurationError` | Runtime builder が `SecretsSettings` 以外から secret 値を受け取った場合 |
+| CLI 通知設定ソース不一致 | `ConfigurationError` | Runtime builder が secrets snapshot 以外から secret 値を受け取った場合 |
 
 ### シングルトン管理
 
-`LogManager` は現行どおり `log_manager` グローバルインスタンスを維持する。sink と GUI 表示イベントの reset 方針は `LOGGING_FRAMEWORK.md` を正とする。新しい `RunResult` や `CancellationToken` は実行ごとのオブジェクトであり、`singletons.py` への登録は不要である。
+`LogManager` と `log_manager` グローバルインスタンスは維持しない。logging components、`RunResult`、`CancellationToken` は実行または起動 lifetime のオブジェクトであり、`singletons.py` への登録は不要である。sink と GUI 表示イベントの reset 方針は `LOGGING_FRAMEWORK.md` を正とする。
 
 ## 5. テスト方針
 
@@ -498,10 +498,10 @@ class MacroArgsSchema:
 | ユニット | `test_finalize_cmd_only_remains_supported` | 既存 `finalize(cmd)` 形式が変更なしで呼ばれる |
 | ユニット | `test_parse_define_args_accepts_list_and_string` | CLI list 入力と GUI string 入力の両方を辞書へ変換する |
 | ユニット | `test_parse_define_args_raises_configuration_error` | 不正 TOML と不正 key を `ConfigurationError` にする |
-| ユニット | `test_global_settings_schema_validation` | `GlobalSettings` の型不一致と既定値を検証する |
-| ユニット | `test_secrets_settings_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |
+| ユニット | `test_settings_store_schema_validation` | settings snapshot の型不一致と既定値を検証する |
+| ユニット | `test_secrets_store_masks_secret_values_in_logs` | secret 値が構造化ログに平文で出ない |
 | ユニット | `test_error_events_use_logger_port` | 異常・中断 event が `LOGGING_FRAMEWORK.md` の `LoggerPort` へ渡る |
-| ユニット | `test_cli_notification_settings_source_is_secrets_settings` | CLI 通知設定が `SecretsSettings` に統一されていることを検証する |
+| ユニット | `test_cli_notification_settings_source_is_secrets_snapshot` | CLI 通知設定が secrets snapshot に統一されていることを検証する |
 | 結合 | `test_executor_cancel_flow_with_dummy_macro` | Dummy マクロ実行中に token を発火し、`finalize` と `RunResult(cancelled)` を確認する |
 | 結合 | `test_cli_uses_run_result_exit_code` | CLI が `RunResult` に基づき成功 0、失敗 非 0、中断 130 を返す |
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
@@ -521,12 +521,12 @@ class MacroArgsSchema:
 - [ ] `MacroExecutor` を削除対象とし、Runtime / Runner での `RunResult` 生成・例外正規化・`finalize` outcome 伝達を固定
 - [ ] 既存 `finalize(cmd)` マクロの互換テスト作成
 - [ ] `macro args schema` と検証処理の実装
-- [ ] `GlobalSettings` / `SecretsSettings` schema 検証と secret マスク実装
+- [ ] `SettingsStore` / `SecretsStore` schema 検証と secret マスク実装
 - [ ] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
 - [ ] 異常・中断イベントを `LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続
 - [ ] `LogPane` への表示経路は `LOGGING_FRAMEWORK.md` の `UserEvent` 購読へ委譲
 - [ ] `NotificationHandler` の通知失敗ログを構造化
-- [ ] CLI 通知設定ソースを `SecretsSettings` に統一
+- [ ] CLI 通知設定ソースを secrets snapshot に統一
 - [ ] ユニットテスト作成・パス
 - [ ] 結合テスト作成・パス
 - [ ] GUI テスト作成・パス

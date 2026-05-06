@@ -359,6 +359,8 @@ GUI/CLI
 
 `MacroRuntime` が registry 解決結果、`definition.factory.create()`、Ports の利用、Port close を担当し、`MacroRunner` がライフサイクル実行、`MacroStopException` 正規化、`RunResult` 生成を担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` の責務である。
 
+`ClassMacroFactory.macro_cls` は `MacroRegistry.reload()` が import した class object を保持する snapshot である。`MacroDefinition.module_name` と `class_name` は診断、表示、ログ相関用に保持し、実行時の再 import / 再解決には使わない。registry reload 後に開始する実行だけが新しい snapshot を使い、開始済み実行は開始時点の `MacroDefinition` で完走する。
+
 ### Manifest / class metadata / convention 仕様
 
 `macros/<macro_name>/macro.toml` は必須ではない。manifest が存在する場合は最優先で読み、存在しない場合は class metadata と convention default から `MacroDefinition` を生成する。
