@@ -249,6 +249,7 @@ from typing import BinaryIO, Protocol, runtime_checkable
 import cv2
 
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.errors import ErrorInfo, FrameworkValue
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.logger.ports import LoggerPort
 from nyxpy.framework.core.macro.command import Command
@@ -256,7 +257,7 @@ from nyxpy.framework.core.io.resources import OverwritePolicy, ResourceRef
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 
-type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, RuntimeValue] | None
+type RuntimeValue = FrameworkValue
 
 
 class RunStatus(StrEnum):
@@ -300,18 +301,6 @@ class RunContext:
     started_at: datetime
     cancellation_token: CancellationToken
     logger: LoggerPort
-
-
-@dataclass(frozen=True)
-class ErrorInfo:
-    kind: str
-    code: str
-    message: str
-    component: str
-    exception_type: str
-    recoverable: bool = False
-    details: Mapping[str, RuntimeValue] = field(default_factory=dict)
-    traceback: str | None = None
 
 
 @dataclass(frozen=True)

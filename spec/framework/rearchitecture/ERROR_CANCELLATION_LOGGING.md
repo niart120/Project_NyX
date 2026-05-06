@@ -154,13 +154,15 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Mapping, Protocol
 
+from nyxpy.framework.core.runtime import RunResult, RunStatus
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 
-type ErrorDetailValue = str | int | float | bool | list[ErrorDetailValue] | dict[str, ErrorDetailValue] | None
-type MacroArgValue = str | int | float | bool | list[MacroArgValue] | dict[str, MacroArgValue] | None
-type LogExtraValue = str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
+type FrameworkValue = str | int | float | bool | list[FrameworkValue] | dict[str, FrameworkValue] | None
+type ErrorDetailValue = FrameworkValue
+type MacroArgValue = FrameworkValue
+type LogExtraValue = FrameworkValue
 
 
 class ErrorKind(StrEnum):
@@ -214,29 +216,7 @@ class ErrorInfo:
     details: dict[str, ErrorDetailValue] = field(default_factory=dict)
     traceback: str | None = None
 
-
-class RunStatus(StrEnum):
-    SUCCESS = "success"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-@dataclass(frozen=True)
-class RunResult:
-    run_id: str
-    macro_id: str
-    macro_name: str
-    status: RunStatus
-    started_at: datetime
-    finished_at: datetime
-    error: ErrorInfo | None = None
-    cleanup_warnings: tuple[str, ...] = ()
-
-    @property
-    def ok(self) -> bool: ...
-
-    @property
-    def duration_seconds(self) -> float: ...
+# RunStatus / RunResult の型定義は RUNTIME_AND_IO_PORTS.md を正とする。
 ```
 
 ```python
@@ -530,7 +510,7 @@ class MacroArgsSchema:
 
 ## 6. 実装チェックリスト
 
-- [ ] `FrameworkError` 階層、`ErrorKind`、`ErrorInfo`、`RunResult` のシグネチャ確定
+- [ ] `FrameworkError` 階層、`ErrorKind`、`ErrorInfo` のシグネチャ確定
 - [ ] `MacroStopException` import 互換、constructor 互換、`MacroCancelled` adapter 方針の実装
 - [ ] `CancellationToken` の理由・要求元・時刻・即時 wait・`throw_if_requested()` 実装
 - [ ] `@check_interrupt` の `MacroCancelled` 送出対応

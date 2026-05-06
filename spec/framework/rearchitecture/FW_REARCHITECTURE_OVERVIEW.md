@@ -38,6 +38,17 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 | CancellationToken | `Command` の中断判定に使うスレッドセーフな中断メカニズム。現行では `DefaultCommand.stop()` が停止要求後に `MacroStopException` を送出する。 |
 | MacroStopException | マクロ中断を表す既存例外。再設計後も既存マクロと既存 GUI/CLI の catch 対象として維持する。 |
 
+#### 1.2.1 正本ドキュメント
+
+| 概念 | 正本ドキュメント | 参照側の扱い |
+|------|------------------|--------------|
+| `RunResult` / `RunHandle` / `ExecutionContext` / `RuntimeOptions` | `RUNTIME_AND_IO_PORTS.md` | 他仕様では再定義せず、生成・参照タイミングだけを記述する |
+| `ErrorInfo` / `ErrorKind` / `FrameworkValue` / `MacroStopException` | `ERROR_CANCELLATION_LOGGING.md` | Runtime / Logging / GUI/CLI 仕様は型を参照し、別名の error code や value 型を定義しない |
+| `LoggerPort` / `RunLogContext` / `UserEvent` / `TechnicalLog` | `LOGGING_FRAMEWORK.md` | Runtime は `ExecutionContext.run_log_context` と `LoggerPort` の注入だけを定義する |
+| `MacroResourceScope` / `ResourceStorePort` / `RunArtifactStore` / `ResourcePathGuard` | `RESOURCE_FILE_IO.md` | Runtime は Store の生成順と `ExecutionContext` への注入だけを定義する |
+| `MacroSettingsResolver` / `GlobalSettings` / `SecretsSettings` | `CONFIGURATION_AND_RESOURCES.md` | Registry / Runtime は読み込み結果と `SecretsSettings` snapshot を受け取る |
+| `MacroRegistry` / `MacroDefinition` / `MacroFactory` | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | Runtime は `MacroDefinition.factory` を実行ごとに使う |
+
 ### 1.3 背景・問題
 
 #### 現行コードから確認した事実

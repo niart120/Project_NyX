@@ -122,6 +122,8 @@ flowchart TB
         CommandNode["Command / DefaultCommand<br/>core.macro.command"]
         ConstantsNode["Button / Hat / LStick / RStick / KeyType"]
         StopNode["MacroStopException"]
+        SettingsNode["settings metadata<br/>manifest / class metadata"]
+        ExecutorNode["MacroExecutor<br/>(legacy entrypoint)"]
     end
 
     subgraph RuntimeCore["Framework Runtime core"]

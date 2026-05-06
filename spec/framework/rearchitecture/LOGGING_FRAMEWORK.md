@@ -53,7 +53,8 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 
 ### 1.5 着手条件
 
-- `ERROR_CANCELLATION_LOGGING.md` の `RunResult`、`ErrorInfo`、`MacroCancelled` 方針が確定している。
+- `RUNTIME_AND_IO_PORTS.md` の `RunResult` と、`ERROR_CANCELLATION_LOGGING.md` の `ErrorInfo` / `MacroCancelled` 方針が確定している。
+- `ERROR_CANCELLATION_LOGGING.md` の `FrameworkValue` を metadata / error details / log extra の共通値型として使う。
 - `RUNTIME_AND_IO_PORTS.md` で `ExecutionContext.run_log_context` が `RunLogContext` の保持場所として確定している。
 - 既存 `log_manager.log(level, message, component="")` 呼び出し元は `LoggerPort.technical()` または `LoggerPort.user()` へ置換する。
 - core 層から `nyxpy.gui`、Qt 型、CLI 表示実装へ依存しない。
@@ -170,8 +171,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
+from nyxpy.framework.core.errors import FrameworkValue
 
-type LogExtraValue = str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
+type LogExtraValue = FrameworkValue
 
 
 class LogLevel(StrEnum):
