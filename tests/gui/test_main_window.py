@@ -16,6 +16,9 @@ def dummy_catalog(monkeypatch):
         def __init__(self, registry):
             self.macros = {"DummyMacro": DummyMacro()}
 
+        def reload_macros(self) -> None:
+            self.macros = {"DummyMacro": DummyMacro()}
+
     monkeypatch.setattr("nyxpy.gui.main_window.MacroCatalog", DummyCatalog)
     yield
 
