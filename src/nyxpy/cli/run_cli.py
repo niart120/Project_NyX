@@ -1,5 +1,7 @@
 import argparse
 import pathlib
+import time
+from dataclasses import dataclass
 from typing import Any
 
 from nyxpy.framework.core.api.notification_handler import (
@@ -12,9 +14,33 @@ from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_legacy_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
-from nyxpy.framework.core.settings.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.framework.core.singletons import capture_manager, serial_manager
 from nyxpy.framework.core.utils.helper import parse_define_args
+
+
+@dataclass(frozen=True)
+class UserMessage:
+    level: str
+    text: str
+    code: str | None = None
+
+
+class CliPresenter:
+    def render_result(self, result: RunResult) -> UserMessage:
+        if result.status is RunStatus.SUCCESS:
+            return UserMessage("INFO", "Macro execution completed")
+        if result.status is RunStatus.CANCELLED:
+            return UserMessage("WARNING", "Macro execution was interrupted")
+        message = result.error.message if result.error is not None else "Macro execution failed"
+        return UserMessage("ERROR", message)
+
+    def exit_code(self, result: RunResult) -> int:
+        if result.status is RunStatus.SUCCESS:
+            return 0
+        if result.status is RunStatus.CANCELLED:
+            return 130
+        return 2
 
 
 def configure_logging(silence: bool = False, verbose: bool = False) -> LoggingComponents:
@@ -57,6 +83,11 @@ def create_runtime_builder(
     protocol: SerialProtocolInterface,
     logger: LoggerPort,
     resources_dir: pathlib.Path | None = None,
+    *,
+    serial_name: str | None = None,
+    capture_name: str | None = None,
+    baudrate: int | None = None,
+    detection_timeout_sec: float = 2.0,
 ) -> MacroRuntimeBuilder:
     """
     指定されたコンポーネントでCommandインスタンスを作成します。
@@ -65,6 +96,9 @@ def create_runtime_builder(
         protocol: 使用するプロトコル実装
         logger: Runtime に注入する logger
         resources_dir: 旧互換引数。指定時はプロジェクトルートとして扱います。
+        serial_name: 使用するシリアルデバイス名
+        capture_name: 使用するキャプチャデバイス名
+        baudrate: シリアルボーレート
 
     Returns:
         設定済みの Runtime builder
@@ -72,10 +106,16 @@ def create_runtime_builder(
     project_root = pathlib.Path.cwd() if resources_dir is None else resources_dir
     registry = MacroRegistry(project_root=project_root)
     registry.reload()
+    if serial_name is not None:
+        _select_serial_device(serial_name, baudrate, detection_timeout_sec)
+    if capture_name is not None:
+        _select_capture_device(capture_name, detection_timeout_sec)
     serial_device = serial_manager.get_active_device()
     capture_device = capture_manager.get_active_device()
-    global_settings = GlobalSettings()
-    notification_handler = create_notification_handler_from_settings(global_settings, logger=logger)
+    secrets_settings = SecretsSettings()
+    notification_handler = create_notification_handler_from_settings(
+        secrets_settings, logger=logger
+    )
     return create_legacy_runtime_builder(
         project_root=project_root,
         registry=registry,
@@ -85,6 +125,40 @@ def create_runtime_builder(
         notification_handler=notification_handler,
         logger=logger,
     )
+
+
+def _select_serial_device(name: str, baudrate: int | None, timeout_sec: float) -> None:
+    serial_manager.auto_register_devices()
+    available_devices = _wait_for_device(serial_manager, name, timeout_sec)
+    if name not in available_devices:
+        available_devices_str = ", ".join(available_devices)
+        raise ValueError(
+            f"Serial port '{name}' not found. Available devices: {available_devices_str}"
+        )
+    serial_manager.set_active(name, baudrate or 9600)
+
+
+def _select_capture_device(name: str, timeout_sec: float) -> None:
+    capture_manager.auto_register_devices()
+    available_devices = _wait_for_device(capture_manager, name, timeout_sec)
+    print(f"Available capture devices: {available_devices}")
+    if name not in available_devices:
+        available_devices_str = ", ".join(available_devices)
+        raise ValueError(
+            f"Capture device '{name}' not found. Available devices: {available_devices_str}"
+        )
+    capture_manager.set_active(name)
+
+
+def _wait_for_device(manager, desired_name: str, timeout_sec: float) -> list[str]:
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        devices = list(manager.list_devices())
+        if desired_name in devices:
+            return devices
+        if time.monotonic() >= deadline:
+            return devices
+        time.sleep(0.05)
 
 
 def execute_macro(
@@ -118,7 +192,7 @@ def execute_macro(
     if not result.ok:
         message = result.error.message if result.error is not None else "Macro execution failed"
         logger.user("ERROR", message, component="CLI", event="macro.failed")
-        raise RuntimeError(message)
+        return result
     logger.user("INFO", "Macro execution completed", component="CLI", event="macro.finished")
     return result
 
@@ -139,49 +213,34 @@ def cli_main(args: argparse.Namespace) -> int:
         logging = configure_logging(silence=args.silence, verbose=args.verbose)
         logger = logging.logger
 
-        # シングルトンの初期化
         capture_manager.set_logger(logger)
-        serial_manager.auto_register_devices()
-        capture_manager.auto_register_devices()
-
-        available_serial_devices = serial_manager.list_devices()
-        if not available_serial_devices:
-            raise ValueError("No serial devices detected")
-        if args.serial not in available_serial_devices:
-            available_devices_str = ", ".join(available_serial_devices)
-            raise ValueError(
-                f"Serial port '{args.serial}' not found. Available devices: {available_devices_str}"
-            )
         baudrate = ProtocolFactory.resolve_baudrate(args.protocol, getattr(args, "baud", None))
-        serial_manager.set_active(args.serial, baudrate)
-
-        available_capture_devices = capture_manager.list_devices()
-        print(f"Available capture devices: {available_capture_devices}")
-        if not available_capture_devices:
-            raise ValueError("No capture devices detected")
-        if args.capture not in available_capture_devices:
-            available_devices_str = ", ".join(available_capture_devices)
-            raise ValueError(
-                f"Capture device '{args.capture}' not found. "
-                f"Available devices: {available_devices_str}"
-            )
-        capture_manager.set_active(args.capture)
 
         protocol = create_protocol(args.protocol)
-        runtime_builder = create_runtime_builder(protocol=protocol, logger=logger)
+        runtime_builder = create_runtime_builder(
+            protocol=protocol,
+            logger=logger,
+            serial_name=args.serial,
+            capture_name=args.capture,
+            baudrate=baudrate,
+        )
 
         # マクロ実行引数の解析
         exec_args = parse_define_args(args.define)
 
         # マクロの実行
-        execute_macro(
+        result = execute_macro(
             runtime_builder=runtime_builder,
             macro_name=args.macro_name,
             exec_args=exec_args,
             logger=logger,
         )
 
-        return 0  # 成功時の終了コード
+        presenter = CliPresenter()
+        user_message = presenter.render_result(result)
+        if user_message.level != "INFO":
+            print(user_message.text)
+        return presenter.exit_code(result)
 
     except ValueError as ve:
         if "logger" in locals():
@@ -215,13 +274,10 @@ def cli_main(args: argparse.Namespace) -> int:
             pass
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     """
-    CLIのメインエントリーポイント
-    コマンドライン引数を解析してcli_mainを呼び出します
+    CLIの引数パーサーを構築します。
     """
-    import argparse
-
     parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
     parser.add_argument("macro_name", help="実行するマクロ名")
     parser.add_argument("--serial", required=True, help="シリアルデバイス名")
@@ -235,6 +291,15 @@ def main():
         action="append",
         help="マクロ実行時の変数定義 (key=value形式)",
     )
+    return parser
+
+
+def main():
+    """
+    CLIのメインエントリーポイント
+    コマンドライン引数を解析してcli_mainを呼び出します
+    """
+    parser = build_parser()
 
     args = parser.parse_args()
     exit_code = cli_main(args)
