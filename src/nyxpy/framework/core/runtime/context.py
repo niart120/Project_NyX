@@ -2,13 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
 
+from nyxpy.framework.core.logger.ports import LoggerPort
 from nyxpy.framework.core.utils.cancellation import CancellationToken
-
-
-class LoggerLike(Protocol):
-    def log(self, level: str, message: str, component: str | None = None) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -26,4 +22,4 @@ class RunContext:
     macro_name: str
     started_at: datetime
     cancellation_token: CancellationToken
-    logger: LoggerLike | None = None
+    logger: LoggerPort | None = None
