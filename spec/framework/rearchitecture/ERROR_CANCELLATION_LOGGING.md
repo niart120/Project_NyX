@@ -68,7 +68,7 @@
 - 既存マクロの `from nyxpy.framework.core.macro.exceptions import MacroStopException` を変更不要にする。
 - 既存マクロの `finalize(self, cmd)` を変更不要にする。
 - `Command.log(*values, sep=" ", end="\n", level="...")` の既存呼び出しを変更不要にする。
-- `Command.stop()` は協調キャンセル優先へ変更するため、即時例外送出に依存するマクロは `Command.stop(raise_immediately=True)` へ移行する。
+- `Command.stop()` は協調キャンセル専用へ変更し、即時例外送出の互換引数は提供しない。
 - GUI からの cancel は例外を直接送出せず、マクロ実行スレッド側の協調キャンセルで処理する。
 - 実装前に `uv run pytest tests/unit/` のベースラインを確認する。
 
@@ -235,7 +235,7 @@ class CancellationToken:
 ```python
 class Command(ABC):
     def wait(self, wait: float) -> None: ...
-    def stop(self, *, raise_immediately: bool = False) -> None: ...
+    def stop(self) -> None: ...
     def log(
         self,
         *values: object,
@@ -288,7 +288,7 @@ class MacroRuntime:
 |------------|----|--------|----------|
 | `FrameworkError` | `Exception` | 個別指定 | フレームワークが正規化して扱う全異常の基底 |
 | `MacroStopException` | `FrameworkError` | `cancelled` | 既存互換用。既存コードが直接送出した場合も中断として扱う |
-| `MacroCancelled` | `MacroStopException` | `cancelled` | `CancellationToken` 発火後の safe point、`Command.stop(raise_immediately=True)`、`@check_interrupt`、`Command.wait()` で送出 |
+| `MacroCancelled` | `MacroStopException` | `cancelled` | `CancellationToken` 発火後の safe point、`@check_interrupt`、`Command.wait()` で送出 |
 | `DeviceError` | `FrameworkError` | `device` | シリアル送信、キャプチャ取得、プロトコル変換、デバイス未接続の失敗 |
 | `ResourceError` | `FrameworkError` | `resource` | 画像読み書き、マクロリソース、設定ファイル、ログファイル、通知先 I/O の失敗 |
 | `ConfigurationError` | `FrameworkError` | `configuration` | CLI/GUI 入力、マクロ引数、`GlobalSettings`、`SecretsSettings` の schema 検証失敗 |
@@ -359,9 +359,9 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 |----|------------|-----|----------|
 | 外部操作 | GUI / CLI | `RunHandle.cancel()` | 送出しない |
 | Runtime 内部 | `RunHandle` / Runtime | `CancellationToken.request_cancel(reason, source)` | 送出しない |
-| マクロ内部 | マクロコード | `Command.stop(raise_immediately=False)` | 既定では送出しない。即時脱出が必要な場合だけ `raise_immediately=True` を指定する |
+| マクロ内部 | マクロコード | `Command.stop()` | 送出しない |
 
-`Command.stop()` はマクロ内部から停止要求を登録する API とし、既定では `cancellation_token.request_cancel(reason="stop requested", source="macro")` のみを行う。実際の脱出は `Command.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point で `MacroCancelled` を送出して行う。現行 `DefaultCommand.stop()` の即時例外送出とは意味論が変わるため、即時脱出に依存するマクロは `Command.stop(raise_immediately=True)` へ移行する。
+`Command.stop()` はマクロ内部から停止要求を登録する API とし、`cancellation_token.request_cancel(reason="stop requested", source="macro")` のみを行う。実際の脱出は `Command.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point で `MacroCancelled` を送出して行う。現行 `DefaultCommand.stop()` の即時例外送出とは意味論が変わるが、即時例外送出の互換引数や escape hatch は提供しない。
 
 ### finalize への outcome 伝達
 
@@ -488,8 +488,8 @@ class MacroArgsSchema:
 | ユニット | `test_cancellation_token_request_cancel_is_idempotent` | 複数回 cancel しても最初の理由と要求元を保持する |
 | ユニット | `test_command_wait_returns_immediately_on_cancel` | 長い `wait()` 中に token 発火後 100 ms 以内で `MacroCancelled` になる |
 | ユニット | `test_run_handle_cancel_does_not_raise` | 外部操作 API の `RunHandle.cancel()` が呼び出し元スレッドで例外を送出しない |
-| ユニット | `test_command_stop_requests_cancel_without_raising_by_default` | マクロ内部の `Command.stop()` は既定で停止要求だけを登録し、即時例外を送出しない |
-| ユニット | `test_command_stop_raise_immediately_opt_in` | `Command.stop(raise_immediately=True)` だけが即時に `MacroCancelled` を送出する |
+| ユニット | `test_command_stop_requests_cancel_without_raising` | マクロ内部の `Command.stop()` は停止要求だけを登録し、即時例外を送出しない |
+| ユニット | `test_command_stop_rejects_raise_immediately_argument` | `Command.stop(raise_immediately=True)` を互換引数として受け付けない |
 | ユニット | `test_runtime_returns_run_result_on_success` | 成功時 `RunResult(status="success", error=None)` を返す |
 | ユニット | `test_macro_executor_removed` | `MacroExecutor.execute()` の `None` 戻り値や例外再送出を互換契約として保証しない |
 | ユニット | `test_runtime_returns_run_result_on_framework_error` | `ConfigurationError` 等を `RunResult.error` に格納する |

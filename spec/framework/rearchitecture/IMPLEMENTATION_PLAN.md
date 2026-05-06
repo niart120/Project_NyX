@@ -270,7 +270,7 @@
 | 目的 | `MacroRuntime` を同期・非同期実行の入口にし、`DefaultCommand(context=...)` で既存 `Command` API を維持する |
 | 対象ファイル | `src\nyxpy\framework\core\runtime\runtime.py`, `context.py`, `handle.py`, `builder.py`, `src\nyxpy\framework\core\macro\command.py`, `tests\unit\framework\runtime\test_execution_context.py`, `test_default_command_ports.py`, `tests\integration\test_macro_runtime_entrypoints.py` |
 | 完了条件 | `MacroRuntime.run(context)` と `start(context)` が `MacroRunner` に委譲し、GUI/CLI/テストは `MacroExecutor` を経由しない |
-| テスト | `test_execution_context_shallow_copies_args_and_metadata`, `test_run_handle_wait_done_result_contract`, `test_run_handle_cancel_requests_token`, `test_gui_cli_do_not_import_macro_executor`, `test_default_command_press_delegates_to_controller_port`, `test_default_command_capture_resizes_crops_and_grayscales`, `test_default_command_stop_requests_cancel_without_raise` |
+| テスト | `test_execution_context_shallow_copies_args_and_metadata`, `test_run_handle_wait_done_result_contract`, `test_run_handle_cancel_requests_token`, `test_gui_cli_do_not_import_macro_executor`, `test_default_command_press_delegates_to_controller_port`, `test_default_command_capture_resizes_crops_and_grayscales`, `test_command_stop_rejects_raise_immediately_argument` |
 | リスク | `ExecutionContext` が `Command` を保持する、Runtime と Runner が lifecycle を二重実装する、Port close 失敗が本体失敗を上書きする |
 | ロールバック方針 | GUI/CLI の Runtime 呼び出しだけを戻し、Runtime クラスは新 API として残す。`DefaultCommand` 旧コンストラクタは復活させず、Builder 経由の生成契約を維持する |
 

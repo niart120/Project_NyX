@@ -275,6 +275,14 @@ class RuntimeOptions:
     wait_poll_interval_sec: float = 0.05
 
 
+class CleanupWarning(Exception):
+    port_name: str
+    exception_type: str
+    message: str
+
+    def __init__(self, port_name: str, exception_type: str, message: str) -> None: ...
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     run_id: str
@@ -312,7 +320,7 @@ class RunResult:
     started_at: datetime
     finished_at: datetime
     error: ErrorInfo | None = None
-    cleanup_warnings: tuple[str, ...] = ()
+    cleanup_warnings: tuple[CleanupWarning, ...] = ()
 
     @property
     def ok(self) -> bool: ...
@@ -499,7 +507,7 @@ class DefaultCommand(Command):
     def hold(self, *keys: KeyType) -> None: ...
     def release(self, *keys: KeyType) -> None: ...
     def wait(self, wait: float) -> None: ...
-    def stop(self, *, raise_immediately: bool = False) -> None: ...
+    def stop(self) -> None: ...
     def log(self, *values, sep: str = " ", end: str = "\n", level: str = "INFO") -> None: ...
     def capture(
         self,
@@ -541,7 +549,7 @@ MacroRuntime.run(context)
 
 `MacroRuntime` は registry 解決、`definition.factory.create()` によるマクロ生成、`DefaultCommand(context=...)` 生成、Port close だけを担当する。Ports 準備と `ExecutionContext` 生成は `MacroRuntimeBuilder` が担当する。`MacroRunner` は現行実行順序を引き継ぎ、`finalize()` を `finally` で呼び、outcome 判定、`MacroStopException` の `RunStatus.CANCELLED` 正規化、`RunResult` 生成を担当する。GUI/CLI/テストは `MacroExecutor.execute()` を経由しない。
 
-`RunResult` は常に `MacroRunner` が生成する。`MacroRuntime` は Runner が返した `RunResult.status`、`error`、`started_at`、`finished_at` を変更しない。Port close 失敗だけを `cleanup_warnings: tuple[str, ...]` に追記し、複数 close 失敗は発生順に全件保持する。close 失敗だけで `RunResult.status` を変更しない。
+`RunResult` は常に `MacroRunner` が生成する。`MacroRuntime` は Runner が返した `RunResult.status`、`error`、`started_at`、`finished_at` を変更しない。Port close 失敗だけを `cleanup_warnings: tuple[CleanupWarning, ...]` に追記し、複数 close 失敗は発生順に全件保持する。close 失敗だけで `RunResult.status` を変更しない。
 
 `ExecutionContext` は `Command` を保持しない。`MacroRuntimeBuilder.build()` は `exec_args` と `metadata` を `dict(...)` で shallow copy し、実行中は `Mapping[str, RuntimeValue]` として扱う。
 
@@ -567,7 +575,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `hold(*keys)` | `controller.hold(keys)` | 送信 lock は Port 側 |
 | `release(*keys)` | `controller.release(keys)` | 空 tuple は全解放 |
 | `wait(wait)` | `CancellationToken` aware wait | 中断要求から 100 ms 未満で停止確認 |
-| `stop(raise_immediately=False)` | `cancellation_token.request_cancel(reason="stop requested", source="macro")` | 既定では例外を送出しない。`raise_immediately=True` の場合だけ直後に `MacroCancelled` を送出。この意味論変更は移行対象である |
+| `stop()` | `cancellation_token.request_cancel(reason="stop requested", source="macro")` | 停止要求だけを登録し、即時例外は送出しない。`raise_immediately` 互換引数は提供しない |
 | `capture(crop_region, grayscale)` | `frame_source.latest_frame()` | 1280x720 resize、crop、grayscale は `DefaultCommand` で互換維持 |
 | `save_img()` | `artifacts.save_image()` | outputs 保存。詳細な保存先と overwrite policy は `RESOURCE_FILE_IO.md` |
 | `load_img()` | `resources.load_image()` | assets 読み込み。探索順序は `RESOURCE_FILE_IO.md` |
@@ -604,7 +612,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 標準配置、path traversal 防止、atomic write、overwrite policy は `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `MacroResourceScope` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
 
-Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `cleanup_warnings` へ `"<port_name>: <ExceptionType>: <message>"` 形式で追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
+Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `CleanupWarning(port_name, exception_type, message)` として `cleanup_warnings` へ追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
 
 #### NotificationPort
 
@@ -694,7 +702,7 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | `ResourceWriteError` | Resource File I/O の保存、atomic replace、OpenCV 書き込み検証に失敗した。詳細は `RESOURCE_FILE_IO.md` |
 | `ResourceReadError` | Resource File I/O の assets 読み込みに失敗した。詳細は `RESOURCE_FILE_IO.md` |
 | `ControllerOutputError` | serial send に失敗した |
-| `MacroStopException` | `DefaultCommand.stop(raise_immediately=True)` またはキャンセル検知時に送出され、Runtime では `RunStatus.CANCELLED` に変換 |
+| `MacroStopException` | 既存マクロが直接送出した場合、またはキャンセル safe point で送出され、Runtime では `RunStatus.CANCELLED` に変換 |
 
 `MacroRunner` は `MacroStopException` を `FAILED` ではなく `CANCELLED` に変換する。その他の例外は `RunStatus.FAILED` とし、`RunResult.error` に `ErrorInfo` として保持する。Runtime は Port close 失敗だけを `RunResult.cleanup_warnings` に追記する。
 

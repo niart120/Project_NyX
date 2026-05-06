@@ -9,16 +9,9 @@
 
 ## 2. 判断待ち
 
-### J-01 概要の未決事項と詳細仕様の確定記述が衝突している
+### J-01 概要の未決事項が残っている
 
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md:278-285`, `ERROR_CANCELLATION_LOGGING.md:376-384`, `DEPRECATION_AND_MIGRATION.md:165`
-- **問題**: Overview では `DefaultCommand.stop()` の例外送出、`MacroDefinition` の class 参照保持、singleton の runtime 登録が未決である。一方で、詳細仕様では `Command.stop(raise_immediately=False)` を既定にし、即時例外送出を廃止候補として扱っている。
-- **影響**: 実装者が Overview と詳細仕様のどちらを正とするか判断できない。キャンセル互換の挙動は既存マクロの破壊範囲に直結する。
-- **判断事項**: `DefaultCommand.stop()` の既定挙動、`MacroDefinition` の class 参照保持、singleton の runtime 登録方針を確定する。
-
-### J-02 `cleanup_warnings` の文字列形式が後続処理に弱い
-
-- **対象**: `RUNTIME_AND_IO_PORTS.md:618`, `RUNTIME_AND_IO_PORTS.md:325-326`
-- **問題**: Port close 失敗を `"<port_name>: <ExceptionType>: <message>"` の文字列で保持する設計である。
-- **影響**: message に `:` が含まれると機械的な解析が難しい。GUI/CLI 表示やログ構造化の際に再パースが必要になる。
-- **判断事項**: `cleanup_warnings` を現行の `tuple[str, ...]` のまま維持するか、`CleanupWarning` dataclass などの構造化型へ変更するかを決める。
+- **対象**: `FW_REARCHITECTURE_OVERVIEW.md:293-296`
+- **問題**: `MacroDefinition` の class 参照保持と singleton の runtime 登録方針が未決である。
+- **影響**: reload 時の古い class 参照混入や、テスト間状態汚染の扱いを実装者が判断できない。
+- **判断事項**: `MacroDefinition` が import 後の class object を保持するか、module/class 名だけを保持して factory で再解決するかを決める。`singletons.py` に既定 runtime を置くか、factory 関数に留めるかを決める。

@@ -239,7 +239,7 @@ def decide_next_button(state: dict[str, int]) -> Button:
 
 ### 4.5A `Command.stop()` の移行
 
-現行 `DefaultCommand.stop()` は停止要求後に即時 `MacroStopException` を送出していた。再設計後の `Command.stop()` は協調キャンセル優先とし、既定では停止要求だけを登録する。長い処理から即時脱出したい場合は `raise_immediately=True` を明示する。
+現行 `DefaultCommand.stop()` は停止要求後に即時 `MacroStopException` を送出していた。再設計後の `Command.stop()` は協調キャンセル専用とし、停止要求だけを登録する。即時例外送出の互換引数は提供しないため、長い処理から脱出したい箇所は `cmd.wait()`、`@check_interrupt`、`CancellationToken.throw_if_requested()` などの safe point に寄せる。
 
 ```python
 # 移行前: stop() 呼び出し直後の例外送出に依存
@@ -247,8 +247,9 @@ cmd.stop()
 ```
 
 ```python
-# 移行後: 即時脱出が必要な場合だけ明示
-cmd.stop(raise_immediately=True)
+# 移行後: 停止要求後は次の safe point で脱出する
+cmd.stop()
+cmd.wait(0)
 ```
 
 ### 4.6 設定パラメータ
