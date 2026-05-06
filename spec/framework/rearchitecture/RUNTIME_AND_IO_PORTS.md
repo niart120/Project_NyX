@@ -223,6 +223,16 @@ GUI/CLI
 - `NotificationPort` は通知先ごとの例外を握りつぶさず `LoggerPort` に警告として記録する。Runtime の成功・失敗判定は通知失敗で変更しない。
 - `LoggerPort` は `LogManager` の thread-safe 性に委譲する。テスト用実装は list への追記を lock で保護する。
 
+Runtime / Port の lock policy は次の表を正とする。取得順は `FW_REARCHITECTURE_OVERVIEW.md` の全体表に従う。`MacroRunner` の lifecycle、ユーザー macro、Port I/O、ログ sink emit 中は、次の lock を保持しない。
+
+| lock 名 | 種別 | 保護対象 | 取得順 | timeout | timeout 時の例外 | 保持してはいけない処理 | テスト名 |
+|---------|------|----------|--------|---------|------------------|------------------------|----------|
+| `run_start_lock` | `threading.Lock` | `MacroRuntime` 1 インスタンス内の active run、worker thread 作成、二重 start 防止 | `registry_reload_lock` の後、`run_handle_lock` の前 | 2 秒 | `RuntimeBusyError` | macro lifecycle、Port close、device detection、settings parse、ログ sink emit | `test_run_start_lock_rejects_concurrent_start` |
+| `run_handle_lock` | `threading.RLock` | `RunHandle` の done flag、result 参照、cancel 要求済み flag | `run_start_lock` の後。単独取得を基本とする | 1 秒 | `RuntimeLockTimeoutError` | worker thread join、macro lifecycle、GUI callback、ログ sink emit | `test_run_handle_result_cancel_thread_safety` |
+| `frame_lock` | `threading.Lock` | `FrameSourcePort` の最新 frame 参照、ready flag、copy | `run_handle_lock` の後。`sink_lock` より前 | 100 ms | `FrameReadError` | OpenCV resize / crop / grayscale、disk I/O、logger 呼び出し | `test_frame_source_lock_timeout` |
+
+`run_start_lock` は実行開始の状態遷移だけを保護し、`MacroRunner.run()` 呼び出し前に必ず解放する。`RunHandle.result()` は完了前なら lock 内で状態だけを確認して `RuntimeError` を送出し、完了後は `RunResult` 参照を取り出してから lock を解放する。`FrameSourcePort.latest_frame()` は lock 内で frame 参照を検証して copy し、resize、crop、grayscale は lock 外の `CommandFacade.capture()` で行う。
+
 ## 4. 実装仕様
 
 ### 公開インターフェース
@@ -692,11 +702,13 @@ GUI から `DefaultCommand` を直接構築しない。既存 `WorkerThread` は
 | 例外クラス | 発生条件 |
 |------------|----------|
 | `RuntimeConfigurationError` | Runtime builder に必要な設定が不足、または protocol/baudrate が不正 |
+| `RuntimeBusyError` | 同一 `MacroRuntime` で別実行の start / run が進行中、または `run_start_lock` の取得が 2 秒以内に完了しない |
+| `RuntimeLockTimeoutError` | `RunHandle` 状態 lock の取得が 1 秒以内に完了しない |
 | `DeviceDetectionTimeoutError` | serial/capture 検出が timeout 内に完了しない |
 | `DeviceNotFoundError` | 指定された serial/capture device が検出結果に存在しない |
 | `DummyDeviceNotAllowedError` | `allow_dummy=False` で dummy device を選択しようとした |
 | `FrameNotReadyError` | Runtime が `FrameSourcePort.await_ready()` の `False` を受け取った、または ready 前に `latest_frame()` が呼ばれた |
-| `FrameReadError` | capture device が `None` frame または空 frame を返した |
+| `FrameReadError` | capture device が `None` frame / 空 frame を返した、または `frame_lock` の取得が 100 ms 以内に完了しない |
 | `ResourcePathError` | Resource File I/O の許可 root 外、絶対パス、空 filename、不正型の path が指定された。詳細は `RESOURCE_FILE_IO.md` |
 | `ResourceWriteError` | Resource File I/O の保存、atomic replace、OpenCV 書き込み検証に失敗した。詳細は `RESOURCE_FILE_IO.md` |
 | `ResourceReadError` | Resource File I/O の assets 読み込みに失敗した。詳細は `RESOURCE_FILE_IO.md` |
@@ -750,8 +762,8 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 | GUI | `test_virtual_controller_uses_controller_output_port` | 仮想コントローラー操作が Port 経由で送信される |
 | ハードウェア | `test_serial_controller_output_port_realdevice` | `@pytest.mark.realdevice`。実 serial device へ CH552 press/release bytes を送信できる |
 | ハードウェア | `test_capture_frame_source_realdevice_ready` | `@pytest.mark.realdevice`。実 capture device が timeout 内に ready になる |
-| パフォーマンス | `test_command_facade_press_overhead_perf` | fake Port で `press()` の追加 overhead が 1 ms 未満 |
-| パフォーマンス | `test_frame_source_latest_frame_copy_perf` | 1280x720 frame copy が 10 ms 未満 |
+| 性能 | `test_command_facade_press_overhead_perf` | fake Port で `press()` の追加 overhead が 1 ms 未満 |
+| 性能 | `test_frame_source_latest_frame_copy_perf` | 1280x720 frame copy が 10 ms 未満 |
 
 テストでは Port fake を標準化する。実 serial/capture device を使わない単体テストは `DummySerialComm` や `DummyCaptureDevice` ではなく fake Port を優先し、Runtime の責務だけを検証する。
 

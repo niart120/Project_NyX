@@ -513,8 +513,8 @@ class MacroArgsSchema:
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | `cancel_macro()` が例外を送出せず、worker が中断結果を通知する |
 | ハードウェア | `test_device_error_on_serial_disconnect` | `@pytest.mark.realdevice`。シリアル切断時に `DeviceError` へ正規化する |
 | ハードウェア | `test_device_error_on_capture_disconnect` | `@pytest.mark.realdevice`。キャプチャ取得失敗時に `DeviceError` へ正規化する |
-| パフォーマンス | `test_command_wait_cancel_latency_perf` | cancel latency が 100 ms 以下である |
-| パフォーマンス | `test_structured_logging_overhead_perf` | 構造化ログ追加後の 1 件あたりオーバーヘッドが 1 ms 以下である |
+| 性能 | `test_command_wait_cancel_latency_perf` | cancel latency が 100 ms 以下である |
+| 性能 | `test_structured_logging_overhead_perf` | 構造化ログ追加後の 1 件あたりオーバーヘッドが 1 ms 以下である |
 
 ## 6. 実装チェックリスト
 

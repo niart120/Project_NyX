@@ -268,7 +268,7 @@ Resource File I/O の `ResourcePathError`、`ResourceReadError`、`ResourceWrite
 | ユニット | `test_macro_settings_resolver_is_separate_from_resource_store` | settings lookup が Resource Store を参照しない |
 | 結合 | `test_runtime_builder_uses_secrets_settings_for_notifications` | 通知 secret が `SecretsSettings` からのみ adapter へ渡る |
 | 結合 | `test_existing_macro_settings_load_without_macro_changes` | 代表既存マクロの settings が変更なしで読み込まれる |
-| パフォーマンス | `test_settings_schema_validation_perf` | 100 キー検証が 50 ms 未満で完了する |
+| 性能 | `test_settings_schema_validation_perf` | 100 キー検証が 50 ms 未満で完了する |
 
 Resource File I/O の path guard、画像読み書き、atomic write、`cmd.save_img()` / `load_img()` 互換テストは `RESOURCE_FILE_IO.md` のテスト方針を正とする。
 

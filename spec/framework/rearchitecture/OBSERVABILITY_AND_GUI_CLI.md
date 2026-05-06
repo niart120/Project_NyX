@@ -3,7 +3,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\settings\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
 > **目的**: GUI/CLI の実行入口を `MacroRuntime` へ寄せ、表示、終了コード、通知設定ソースを一貫させる。ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` を正とする。  
 > **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`  
-> **破壊的変更**: なし。既存 GUI/CLI の操作概念と既存マクロの `Command.log()` 呼び出しを維持する。
+> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。既存マクロの `Command.log()` 呼び出しは維持する。ただし GUI/CLI 内部入口、Worker / command 組み立て、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -235,8 +235,8 @@ Runtime worker thread
 | GUI | `test_log_pane_receives_user_event` | `LogPane` が `UserEvent` を表示する |
 | GUI | `test_gui_log_sink_emits_qt_signal` | `GuiLogSink` が `UserEvent` を Qt Signal へ変換し、LogPane slot が GUI thread で受け取る |
 | ハードウェア | `test_realdevice_cli_runtime_logging` | `@pytest.mark.realdevice`。実機 CLI 実行で run_id 付きログが残る |
-| パフォーマンス | `test_gui_user_event_dispatch_perf` | GUI `UserEvent` 受信から Qt Signal emit まで 10 ms 未満 |
-| パフォーマンス | `test_cancel_button_to_token_latency_perf` | GUI cancel から token 発火まで 100 ms 未満 |
+| 性能 | `test_gui_user_event_dispatch_perf` | GUI `UserEvent` 受信から Qt Signal emit まで 10 ms 未満 |
+| 性能 | `test_cancel_button_to_token_latency_perf` | GUI cancel から token 発火まで 100 ms 未満 |
 
 ## 6. 実装チェックリスト
 

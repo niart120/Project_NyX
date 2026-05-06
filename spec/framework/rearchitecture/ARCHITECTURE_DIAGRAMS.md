@@ -4,7 +4,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`  
 > **目的**: フレームワーク再設計における互換境界、Runtime 中核、Ports/Adapters、GUI/CLI、ハードウェア/外部 I/O の依存方向を Mermaid 図で固定する。  
 > **関連ドキュメント**: `spec\framework\rearchitecture\FW_REARCHITECTURE_OVERVIEW.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\MACRO_COMPATIBILITY_AND_REGISTRY.md`, `spec\framework\rearchitecture\RESOURCE_FILE_IO.md`, `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`, `spec\framework\rearchitecture\DEPRECATION_AND_MIGRATION.md`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。図は仕様理解を補助する文書であり、`MacroExecutor` など内部入口の削除可否は `DEPRECATION_AND_MIGRATION.md` を正とする。
+> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。図は仕様理解を補助する文書であり、`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback など互換維持対象外の削除可否は `DEPRECATION_AND_MIGRATION.md` を正とする。
 
 ## 1. 概要
 

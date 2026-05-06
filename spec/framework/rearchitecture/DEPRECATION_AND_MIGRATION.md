@@ -225,7 +225,7 @@ class DeprecationCandidate:
 | GUI | `test_main_window_uses_run_handle` | GUI が `RunHandle` で開始、完了、中断を扱う |
 | GUI | `test_main_window_cancel_does_not_raise_in_gui_thread` | GUI cancel が呼び出し元スレッドで例外を送出しない |
 | ハードウェア | `test_runtime_realdevice_without_dummy_fallback` | `@pytest.mark.realdevice`。実機実行で dummy fallback を使わない |
-| パフォーマンス | `test_registry_reload_100_macros_perf` | 廃止候補整理後も 100 件 reload が目標時間内に完了する |
+| 性能 | `test_registry_reload_100_macros_perf` | 廃止候補整理後も 100 件 reload が目標時間内に完了する |
 
 廃止判断前の最小ゲートは次の通りである。
 

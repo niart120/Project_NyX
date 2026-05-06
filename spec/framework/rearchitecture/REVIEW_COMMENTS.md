@@ -11,58 +11,7 @@
 
 ## 2. 全体指摘
 
-### RC-011: スレッド安全性とロック戦略が設計方針止まりである
-
-- **重要度**: Major
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `RUNTIME_AND_IO_PORTS.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `TEST_STRATEGY.md`
-- **位置**:
-  - `MacroRegistry.reload()` と run の排他
-  - `RunHandle.cancel()` と `result()`
-  - `FrameSourcePort.latest_frame()`
-  - logging sink snapshot
-- **指摘**: 排他が必要な箇所は列挙されているが、使用する lock、取得順、timeout、deadlock 検出、実行開始済みマクロへの影響が定義されていない。
-- **修正案**: lock policy を表にする。例: `registry_reload_lock`, `run_start_lock`, `frame_lock`, `sink_lock` について、保護対象、取得順、timeout、timeout 例外、テスト名を記載する。
-
-### RC-012: 性能目標はあるが測定方法が不足している
-
-- **重要度**: Major
-- **対象**: `FW_REARCHITECTURE_OVERVIEW.md`, `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `RESOURCE_FILE_IO.md`, `OBSERVABILITY_AND_GUI_CLI.md`
-- **位置**:
-  - `Command` 追加待機時間
-  - `RunHandle.cancel()` から `RunResult.cancelled`
-  - `GUI` 状態更新 500 ms
-  - path guard 解決
-  - frame readiness
-- **指摘**: 「50 ms 周期」「100 ms 以下」「500 ms 未満」「2 ms 未満」などの値はあるが、測定点、測定環境、許容誤差、CI で失敗させるか警告にするかが未定義である。
-- **修正案**: `TEST_STRATEGY.md` に測定ルールを追加する。`time.perf_counter()` の wall clock、試行回数、P95 判定、CI での扱い、実機不要の性能テストと実機必須テストの切り分けを明記する。
-
-### RC-013: テスト種別と配置ルールの粒度が不足している
-
-- **重要度**: Major
-- **対象**: `TEST_STRATEGY.md`, 各仕様書の `## 5. テスト方針`
-- **位置**:
-  - `tests\gui\`
-  - `tests\integration\`
-  - `tests\perf\`
-  - `@pytest.mark.realdevice`
-- **指摘**: GUI 統合、CLI 統合、性能、実機の分類が文書ごとに異なる。性能テストが必ず実機を使うとは限らず、GUI テストは `tests\gui\` と `tests\integration\` の境界が必要である。
-- **修正案**: `TEST_STRATEGY.md` に配置ルールを固定し、各仕様のテスト表はその分類だけを使う。
-
-| 種別 | 配置 | マーカー | 用途 |
-|---|---|---|---|
-| ユニット | `tests\unit\` | なし | 単一コンポーネント、実機不要 |
-| 結合 | `tests\integration\` | なし | CLI 入口、Runtime + fake Ports など |
-| GUI | `tests\gui\` | なし | pytest-qt を使う GUI adapter / widget |
-| 性能 | `tests\perf\` | `@pytest.mark.perf` | 実機不要の時間要件 |
-| ハードウェア | `tests\hardware\` | `@pytest.mark.realdevice` | 実機必須 |
-
-### RC-014: 「破壊的変更なし」の表現が強すぎる
-
-- **重要度**: Major
-- **対象**: 複数文書のヘッダ
-- **位置**: `> **破壊的変更**: なし`
-- **指摘**: 既存マクロの import/signature 互換を維持する方針は妥当である。ただし settings path、成果物保存先、GUI/CLI 内部入口、`MacroExecutor`、singleton 直接利用、dummy fallback などは変更を含むため、「破壊的変更なし」とだけ書くと実装者が削除対象や移行対象を見落としやすい。
-- **修正案**: 「既存ユーザーマクロの公開互換契約に対する破壊的変更なし。ただし `MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持せず削除または新 API へ置換する」と表現を分ける。
+全体指摘は対応済み。残件はファイル別指摘に集約する。
 
 ## 3. ファイル別指摘
 

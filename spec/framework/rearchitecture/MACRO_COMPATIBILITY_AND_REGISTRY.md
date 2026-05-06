@@ -5,7 +5,7 @@
 > **目的**: 既存マクロ互換を最優先し、ロード・識別・実行基盤をレジストリ中心へ再設計する  
 > **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
 > **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`  
-> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor` は互換契約に含めず、GUI/CLI/テストの参照解消後に削除する。
+> **破壊的変更**: 既存ユーザーマクロの公開互換契約に対してはなし。`MacroExecutor`、GUI/CLI 内部入口、singleton 直接利用、暗黙 fallback は互換維持対象に含めず、新 API へ置換または削除する。
 
 ## 1. 概要
 
@@ -145,7 +145,7 @@ nyxpy.framework.* -> macros/<name>       NG
 | レイヤー | 責務 | 主要クラス |
 |----------|------|------------|
 | 公開互換レイヤー | 既存ユーザーマクロが import する path と lifecycle / Command API を維持 | `MacroBase`, `Command`, `DefaultCommand`, constants, `MacroStopException` |
-| 移行アダプタ | 必要な場合だけ旧 GUI/CLI/テスト入口を Runtime へ委譲 | `MacroExecutor` |
+| 旧入口移行対象 | 旧 GUI/CLI/テスト入口の参照を Runtime へ移行し、削除対象を明確にする | なし。`MacroExecutor` は adapter ではなく削除対象 |
 | レジストリレイヤー | マクロ一覧、ID、診断、ファクトリを管理 | `MacroRegistry`, `MacroDefinition` |
 | 生成レイヤー | 実行ごとの新規インスタンス生成 | `MacroFactory` |
 | 宣言レイヤー | 新方式の `macro.toml` 読み込み。読み込み結果は `MacroDefinition` へ正規化する | `macro.toml` |
@@ -193,6 +193,14 @@ nyxpy.framework.* -> macros/<name>       NG
 ### 並行性・スレッド安全性
 
 マクロ実行自体は 1 `MacroRuntime` あたり単一実行を前提とする。`MacroRegistry.reload()` は内部ロックを持ち、GUI の reload ボタンと CLI 操作が同時に走っても `definitions` と `diagnostics` が中途半端な状態で参照されないようにする。
+
+| lock 名 | 種別 | 保護対象 | 取得順 | timeout | timeout 時の例外 | 保持してはいけない処理 | テスト名 |
+|---------|------|----------|--------|---------|------------------|------------------------|----------|
+| `registry_reload_lock` | `threading.RLock` | `definitions`、`diagnostics`、alias map の snapshot 交換 | 全体 1 番目。`run_start_lock` より先 | 2 秒 | `RegistryLockTimeoutError` | module import、ユーザー macro class 生成、settings TOML parse、GUI 通知、ログ sink emit | `test_registry_reload_swaps_snapshot_atomically` |
+
+`LegacyMacroAdapter.discover()` と `load_definition()` はローカル変数へ候補を集め、`MacroRegistry.reload()` の最後に `registry_reload_lock` を取得して snapshot を一括交換する。`resolve()`、`list()`、`definitions`、`diagnostics` は lock 内で immutable snapshot への参照または浅い copy を取得し、呼び出し元へ返す前に lock を解放する。
+
+`MacroRuntimeBuilder.build()` は `MacroRegistry.resolve()` で `MacroDefinition` の snapshot を取得した後、`registry_reload_lock` を保持しないまま settings 解決、resource scope 生成、Port 構築を行う。reload が実行中に完了しても、開始済みまたは開始準備済みの実行は取得済み `MacroDefinition` で完結する。
 
 `CancellationToken` と `Command` の中断挙動は現行を維持する。`MacroRegistry` はハードウェアデバイスを保持せず、`Command` の生成や実機接続は既存の上位処理に任せる。
 
@@ -331,9 +339,10 @@ class Command(ABC):
 
 ```text
 GUI/CLI
-  -> definition = registry.resolve(name_or_id)
-  -> settings = settings_resolver.load(definition)
-  -> context = runtime_builder.build(definition, settings, exec_args)
+  -> request = RuntimeBuildRequest(macro_id=name_or_id, entrypoint=..., exec_args=...)
+  -> context = runtime_builder.build(request)
+     -> definition = registry.resolve(name_or_id)
+     -> settings = settings_resolver.load(definition)
   -> result = runtime.run(context)
 ```
 
@@ -387,6 +396,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 |------------|----------|
 | `MacroLoadError` | module import、manifest parse、entrypoint 解決、`MacroBase` 継承確認に失敗 |
 | `AmbiguousMacroError` | 互換 alias が複数 `MacroDefinition` に一致 |
+| `RegistryLockTimeoutError` | `registry_reload_lock` の取得が 2 秒以内に完了しない |
 | `ValueError` | `set_active_macro()` で存在しない名前を指定。現行互換のため維持 |
 | `FileNotFoundError` | 明示 manifest settings が存在必須と指定された将来拡張で未検出 |
 
@@ -416,6 +426,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | ユニット | `test_class_name_alias_is_available_when_unique` | class 名が一意なら `set_active_macro("ClassName")` が通る |
 | ユニット | `test_class_name_collision_requires_qualified_id` | 同名 class が複数ある場合に `AmbiguousMacroError` と候補 ID を返す |
 | ユニット | `test_load_failure_is_reported_without_stopping_reload` | 1 件 import 失敗しても他マクロが登録され、diagnostics に失敗理由が残る |
+| ユニット | `test_registry_reload_swaps_snapshot_atomically` | reload 中に `definitions` と `diagnostics` の中途半端な snapshot が見えない |
 | ユニット | `test_execute_creates_new_instance_each_time` | 2 回 execute して `MacroFactory.create()` が 2 回呼ばれ、状態が共有されない |
 | ユニット | `test_settings_legacy_package_lookup` | `static/<package>/settings.toml` が読み込まれる |
 | ユニット | `test_settings_legacy_single_file_lookup` | `static/<module_stem>/settings.toml` が読み込まれる |
@@ -429,7 +440,7 @@ package に `macro.toml` がある場合は manifest を優先する。manifest 
 | 結合 | `test_gui_cli_do_not_import_macro_executor` | GUI/CLI が `MacroExecutor` を import せず `MacroRuntime` / `MacroRegistry` を使う |
 | GUI | `test_macro_reload_add_and_remove_real_env` | 既存 GUI リロードテストの追加・削除挙動を維持する |
 | GUI | `test_macro_reload_shows_load_diagnostics` | 壊れたマクロを追加しても一覧は表示され、診断が確認できる |
-| パフォーマンス | `test_registry_reload_100_macros_perf` | 100 件の dummy macro reload が 1 秒未満を目標に完了する |
+| 性能 | `test_registry_reload_100_macros_perf` | 100 件の dummy macro reload が 1 秒未満を目標に完了する |
 | ハードウェア | `test_macro_execution_realdevice` | 必要に応じて `@pytest.mark.realdevice` で実機接続時の Command 送信を確認する |
 
 既存 `tests/unit/executor/test_executor.py` は Runtime / Registry 入口のテストへ置き換える。`MacroExecutor.macros`、`MacroExecutor.macro`、`MacroExecutor.execute()` の戻り値互換は保証しない。新規テストは `tmp_path` と `monkeypatch.syspath_prepend()` を使い、実リポジトリの `macros/` を破壊しない。

@@ -263,7 +263,17 @@ nyxpy.framework.*     -> macros\{macro_name}\           禁止。ただし impor
 
 `MacroRunner.start()` は core 層では標準ライブラリのスレッド実行を基本とし、Qt へ依存しない。GUI は `RunHandle` を直接 UI スレッドから待たず、Qt adapter で完了通知へ変換する。中断は `CancellationToken` を経由し、既存 `cmd.stop()` の挙動を保つ。
 
-`MacroRegistry.reload()` は import キャッシュを更新するため、同時実行中の reload と run を許可しない。`MacroRuntime` は registry 更新と実行開始の境界にロックを置く。すでに開始したマクロは、開始時点の `MacroDefinition` と factory 生成済みインスタンスで完結させる。
+`MacroRegistry.reload()` は import キャッシュを更新するため、reload の snapshot 交換と run start の定義解決を同時に行わない。`MacroRuntime` は registry 更新と実行開始の境界にロックを置く。すでに開始したマクロは、開始時点の `MacroDefinition` と factory 生成済みインスタンスで完結させ、reload は実行中インスタンスを差し替えない。
+
+Lock policy の正本は対象コンポーネントの詳細仕様に置く。全体で使う lock 名と取得順は次の通りである。複数 lock を取る場合は表の上から下の順に限り、逆順取得を禁止する。macro lifecycle、Port I/O、sink emit、Qt Signal emit、ユーザー定義コード呼び出し中は、いずれの framework lock も保持しない。
+
+| 取得順 | lock 名 | 所有仕様 | 保護対象 | timeout | timeout 時の扱い |
+|--------|---------|----------|----------|---------|------------------|
+| 1 | `registry_reload_lock` | `MACRO_COMPATIBILITY_AND_REGISTRY.md` | `MacroRegistry` の `definitions` / `diagnostics` snapshot 交換、alias map | 2 秒 | `RegistryLockTimeoutError` |
+| 2 | `run_start_lock` | `RUNTIME_AND_IO_PORTS.md` | 1 Runtime 内の実行開始、active handle 参照、同時 start 防止 | 2 秒 | `RuntimeBusyError` |
+| 3 | `run_handle_lock` | `RUNTIME_AND_IO_PORTS.md` | `RunHandle.done()` / `result()` / `cancel()` の状態参照 | 1 秒 | `RuntimeLockTimeoutError` |
+| 4 | `frame_lock` | `RUNTIME_AND_IO_PORTS.md` | 最新 frame 参照の交換と copy | 100 ms | `FrameReadError` |
+| 5 | `sink_lock` | `LOGGING_FRAMEWORK.md` | sink 登録解除、level、配信先 snapshot | 1 秒 | `LogSinkError` と fallback stderr |
 
 ### 3.8 未決事項
 
@@ -619,7 +629,7 @@ Legacy Compatibility Layer は、既存ユーザーマクロが import する公
 | 結合 | `test_cli_adapter_runs_macro_with_define_args` | CLI 引数から実行引数を作り、runtime 経由でマクロを実行できることを検証する。 |
 | GUI | `test_main_window_runtime_adapter_updates_running_state` | GUI adapter が実行開始、完了、中断、失敗を `ControlPane` と status label に反映することを検証する。 |
 | ハードウェア | `test_macro_runtime_realdevice_press_and_capture` | 実機接続時に `DefaultCommand` 経由の press と capture が runtime 実行でも動作することを `@pytest.mark.realdevice` で検証する。 |
-| パフォーマンス | `test_macro_registry_reload_perf` | 既存 `macros` 規模で registry reload が目標時間内に収まることを検証する。 |
+| 性能 | `test_macro_registry_reload_perf` | 既存 `macros` 規模で registry reload が目標時間内に収まることを検証する。 |
 
 テスト用マクロは一時ディレクトリではなく、pytest の `tmp_path` 相当を使う場合でもリポジトリ外への固定パス書き込みを避ける。実装時は既存テスト配置規約に合わせ、純粋ロジックは `tests\unit\`、複数モジュール連携は `tests\integration\`、Qt 連携は `tests\gui\`、実機必須は `tests\hardware\`、性能測定は `tests\perf\` に置く。
 

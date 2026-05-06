@@ -122,6 +122,20 @@ import/signature 互換テストは最初の保護線である。次の import p
 | hardware | 実デバイス I/O | 実機、`@pytest.mark.realdevice` | 通常テストへの混入 |
 | perf/thread | 時間要件、deadlock、競合 | fake adapter、短時間 stress | 長時間・非決定的検証 |
 
+### テスト配置ルール
+
+再設計仕様のテスト種別は次の分類だけを使う。各仕様書の `## 5. テスト方針` では、この表の種別名と配置を参照する。テンプレート由来の `パフォーマンス` 表記は `性能` と同義だが、新規追記では `性能` に統一する。
+
+| 種別 | 配置 | マーカー | 用途 |
+|------|------|----------|------|
+| ユニット | `tests\unit\` | なし | 単一コンポーネント、純粋ロジック、fake adapter、実機不要 |
+| 結合 | `tests\integration\` | なし | Runtime + fake Ports、CLI entrypoint、複数コンポーネント接続 |
+| GUI | `tests\gui\` | なし | pytest-qt を使う GUI adapter / widget / Qt Signal |
+| 性能 | `tests\perf\` | `@pytest.mark.perf` | 実機不要の時間要件、fake adapter で決定的に測る処理 |
+| ハードウェア | `tests\hardware\` | `@pytest.mark.realdevice` | serial / capture / 実通知など実機・外部環境が必要な確認 |
+
+CLI entrypoint は Qt を使わないため `tests\integration\` に置く。GUI adapter が Runtime を呼ぶだけのテストでも、pytest-qt、widget、Qt Signal、QTimer を使う場合は `tests\gui\` に置く。性能テストは実機を使わず、実機の速度を測る必要がある場合は `tests\hardware\` の記録テストとして分離する。
+
 ### 性能要件
 
 | 指標 | 目標値 |
@@ -132,6 +146,28 @@ import/signature 互換テストは最初の保護線である。次の import p
 | GUI handler 10 件への event 配信 | 1 event 10 ms 未満 |
 | `SettingsSchema` 100 キー検証 | 50 ms 未満 |
 | `ResourcePathGuard.resolve()` | 1 path 2 ms 未満 |
+
+#### 性能測定ルール
+
+性能テストは `tests\perf\` に置き、`@pytest.mark.perf` を付ける。実機やネットワークを使う測定は `tests\hardware\` に置き、`@pytest.mark.realdevice` を付ける。実機必須の測定値は smoke / 記録用途とし、通常 CI の失敗条件にしない。
+
+| 項目 | ルール |
+|------|--------|
+| 時計 | `time.perf_counter()` の wall clock を使う |
+| warmup | 対象処理を 1 回以上実行して import / 初期化コストを除外する |
+| 試行回数 | fast path は 30 回、I/O を含む処理は 10 回を標準にする |
+| 判定値 | P95 をしきい値と比較する。単発上振れでは失敗させない |
+| 許容誤差 | fake adapter の通常 CI ではしきい値の 20% までを許容する |
+| CI 扱い | 実機不要の `tests\perf\` は CI で fail 条件にする。`@pytest.mark.realdevice` は CI 既定では skip する |
+| 測定対象外 | import 初回、pytest fixture 作成、実ファイルの大量コピー、ネットワーク通知、GUI 描画待ちは対象値から外す |
+
+| 測定対象 | 開始点 | 終了点 | 配置 | fail 条件 |
+|----------|--------|--------|------|-----------|
+| `Command.wait()` cancel latency | 別 thread で `RunHandle.cancel()` または token 発火 | `Command.wait()` が `MacroCancelled` または cancelled result へ到達 | `tests\perf\` | P95 が 100 ms 超 |
+| `RunHandle.cancel()` から `RunResult.cancelled` | `RunHandle.cancel()` 呼び出し直前 | `handle.result().status == CANCELLED` | `tests\perf\` | P95 が 100 ms 超。ただし macro が safe point 外にいるケースは別テスト |
+| GUI 状態更新 | cancel button click または `UserEvent` emit | pytest-qt で対象 widget state / LogPane 行を観測 | `tests\gui\` | 500 ms 超 |
+| path guard | `ResourcePathGuard.resolve()` 呼び出し直前 | `ResourceRef` 返却または expected error | `tests\perf\` | P95 が 2 ms 超 |
+| frame readiness | fake frame source の `initialize()` 直後 | `await_ready()` が `True` を返す | `tests\perf\` | P95 が設定値超。実キャプチャは `tests\hardware\` で記録 |
 
 ### 並行性・スレッド安全性
 
@@ -230,6 +266,8 @@ CLI は subprocess 相当または `main(args)` 直接呼び出しで、Runtime 
 
 hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.realdevice` を付ける。perf は fake adapter だけで決定的に測り、ネットワークや実機を前提にしない。thread-safety は短時間の複数スレッド stress と timeout を使い、deadlock を失敗として検出する。
 
+lock policy テストは `FW_REARCHITECTURE_OVERVIEW.md` の取得順と、各詳細仕様の lock 表を正とする。テストは lock を意図的に保持する fake / barrier を使い、timeout 例外、逆順取得禁止、lock 解放後に callback / sink emit が呼ばれることを検証する。deadlock 検出はテストごとに 2 秒以内の timeout を置き、timeout した thread が残った場合は `pytest.fail` にする。
+
 ### エラーハンドリング
 
 | 例外クラス | 発生条件 |
@@ -238,6 +276,8 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | `pytest.fail` | deadlock timeout、thread 未終了、想定外の実機前提混入 |
 | `pytest.skip` | `@pytest.mark.realdevice` 付きで実機が未接続、または明示環境変数がない |
 | `ConfigurationError` | テスト対象の設定不備が正しく検出されることを期待するケース |
+| `RuntimeBusyError` | 同一 Runtime の二重 start が正しく拒否されることを期待するケース |
+| `RuntimeLockTimeoutError` | `RunHandle` の状態 lock timeout を期待するケース |
 | `ResourceError` | fake resource store で path や画像読み書き失敗を期待するケース |
 
 テストが secret を扱う場合、値は固定のダミー文字列にし、ログ出力に平文がないことを検証する。
@@ -262,6 +302,11 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | ユニット | `test_runner_preserves_finalize_failure_details` | finalize 失敗が元エラー情報を失わせない |
 | ユニット | `test_runtime_run_with_fake_ports_success` | fake Ports で同期実行が成功する |
 | ユニット | `test_runtime_handle_cancel_is_thread_safe` | 複数 cancel と完了待ちが安全に動く |
+| ユニット | `test_registry_reload_swaps_snapshot_atomically` | `registry_reload_lock` が definitions / diagnostics を中途半端に見せない |
+| ユニット | `test_run_start_lock_rejects_concurrent_start` | 同一 `MacroRuntime` の二重 start が `RuntimeBusyError` になる |
+| ユニット | `test_frame_source_lock_timeout` | `frame_lock` timeout が `FrameReadError` として表面化する |
+| ユニット | `test_log_manager_sink_snapshot_lock_order` | `sink_lock` 内で sink emit せず、snapshot 後に lock 外配信する |
+| ユニット | `test_lock_policy_no_deadlock_under_stress` | registry / runtime / frame / sink の短時間並行操作で deadlock しない |
 | ユニット | `test_command_facade_press_expands_to_port_sequence` | `press(dur, wait)` が press、cancel-aware wait、release、cancel-aware wait に展開される |
 | ユニット | `test_default_command_rejects_context_and_legacy_args` | `context` と旧具象引数の同時指定が `RuntimeConfigurationError` になる |
 | ユニット | `test_frame_source_latest_frame_contract` | `latest_frame()` が BGR `uint8` の native size copy を返し、resize は `CommandFacade.capture()` 側で行う |
@@ -279,10 +324,10 @@ hardware tests は `tests\hardware\` に置き、全テストに `@pytest.mark.r
 | ハードウェア | `test_realdevice_controller_output_port` | `@pytest.mark.realdevice`。実シリアル送信 Port を検証する |
 | ハードウェア | `test_realdevice_frame_source_port` | `@pytest.mark.realdevice`。実キャプチャ frame readiness を検証する |
 | ハードウェア | `test_realdevice_runtime_smoke` | `@pytest.mark.realdevice`。最小マクロを Runtime 経由で実行する |
-| パフォーマンス | `test_registry_reload_100_macros_perf` | 100 件 reload が 1 秒未満で完了する |
-| パフォーマンス | `test_cancel_latency_perf` | `Command.wait()` 中の cancel 応答が 100 ms 以内 |
-| パフォーマンス | `test_log_handler_dispatch_thread_safety` | handler 登録解除と配信で deadlock しない |
-| パフォーマンス | `test_settings_schema_validation_perf` | 100 キー schema 検証が 50 ms 未満 |
+| 性能 | `test_registry_reload_100_macros_perf` | 100 件 reload が 1 秒未満で完了する |
+| 性能 | `test_cancel_latency_perf` | `Command.wait()` 中の cancel 応答が 100 ms 以内 |
+| 性能 | `test_log_handler_dispatch_thread_safety` | handler 登録解除と配信で deadlock しない |
+| 性能 | `test_settings_schema_validation_perf` | 100 キー schema 検証が 50 ms 未満 |
 
 ## 6. 実装チェックリスト
 
