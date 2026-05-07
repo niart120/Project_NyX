@@ -46,6 +46,8 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
 
 
 class SettingsStore:
+    """Schema-validated store for non-secret global settings."""
+
     schema: SettingsSchema
 
     def __init__(
@@ -120,9 +122,7 @@ class SettingsStore:
 
 
 class GlobalSettings(SettingsStore):
-    """
-    Manage global settings stored in .nyxpy/global.toml under the working directory.
-    """
+    """Compatibility shim for .nyxpy/global.toml under the working directory."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
         super().__init__(config_dir=config_dir, strict_load=False)

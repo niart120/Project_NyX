@@ -37,6 +37,8 @@ SECRETS_SETTINGS_SCHEMA = SettingsSchema(
 
 
 class SecretsStore:
+    """Schema-validated store for notification secrets and secret-adjacent flags."""
+
     schema: SettingsSchema
 
     def __init__(
@@ -116,9 +118,7 @@ class SecretsStore:
 
 
 class SecretsSettings(SecretsStore):
-    """
-    Manage secrets stored in .nyxpy/secrets.toml under the working directory.
-    """
+    """Compatibility shim for .nyxpy/secrets.toml under the working directory."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
         super().__init__(config_dir=config_dir, strict_load=False)

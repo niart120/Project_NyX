@@ -567,4 +567,4 @@ class MacroArgsSchema:
 - [x] パフォーマンステスト作成・パス
 - [x] `uv run ruff check .` がパス
 - [x] `uv run pytest tests/unit/` がパス
-- [ ] 公開 API のドキュメントコメント更新
+- [x] 公開 API のドキュメントコメント更新

@@ -779,7 +779,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 - [x] GUI の `DefaultCommand` 直接構築を Runtime 利用へ移行
 - [x] CLI の `DefaultCommand` 直接構築を Runtime 利用へ移行
 - [x] `VirtualControllerModel` を `ControllerOutputPort` 利用へ移行
-- [ ] `singletons.py` の `reset_for_testing()` が Runtime/Port 関連状態を初期化
+- [x] `singletons.py` の `reset_for_testing()` が Runtime/Port 関連状態を初期化
 
 ### 6.3 検証
 

@@ -11,6 +11,7 @@ class MacroBase(ABC):
     # GUI 用メタデータ: マクロの説明文とタグ
     description: str = ""
     tags: list[str] = []
+    # Optional SettingsSchema used by MacroRunner to validate initialize() args.
     args_schema: "SettingsSchema | None" = None
 
     @abstractmethod
