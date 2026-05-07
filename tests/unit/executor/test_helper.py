@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.utils.helper import (
     calc_aspect_size,
     extract_macro_tags,
@@ -153,6 +154,36 @@ class TestParseDefineArgs:
         """bool 値のパース"""
         result = parse_define_args(["flag=true"])
         assert result["flag"] is True
+
+    def test_accepts_single_define_string(self):
+        """単一文字列入力を 1 つの define として扱う"""
+        result = parse_define_args("count=42")
+        assert result["count"] == 42
+
+    def test_accepts_iterable_defines(self):
+        """list 以外の Iterable[str] 入力を受け付ける"""
+        result = parse_define_args(iter(['name="test"', "value=100"]))
+        assert result["name"] == "test"
+        assert result["value"] == 100
+
+    def test_equal_sign_inside_string_value(self):
+        """値の中の = を壊さず TOML として解釈する"""
+        result = parse_define_args(['token="a=b"'])
+        assert result["token"] == "a=b"
+
+    def test_invalid_missing_separator_raises_configuration_error(self):
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_define_args(["flag"])
+
+        assert exc_info.value.code == "NYX_DEFINE_INVALID"
+        assert exc_info.value.component == "parse_define_args"
+
+    def test_invalid_toml_raises_configuration_error(self):
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_define_args(['name="unterminated'])
+
+        assert exc_info.value.code == "NYX_DEFINE_PARSE_FAILED"
+        assert exc_info.value.component == "parse_define_args"
 
 
 # ============================================================
