@@ -7,6 +7,7 @@ class CustomSplitDropDownButton(QWidget):
     A button with a main action and a dropdown menu for additional actions.
     Used for macro execution with optional parameter input.
     """
+
     # Main button clicked signal
     main_clicked = Signal()
 
@@ -22,7 +23,7 @@ class CustomSplitDropDownButton(QWidget):
     def _create_widgets(self):
         self.mainButton = QPushButton(self.main_text, self)
         self.mainButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        #self.mainButton.setStyleSheet("margin-right: 0px; ")
+        # self.mainButton.setStyleSheet("margin-right: 0px; ")
 
         self.dropdownButton = QToolButton(self)
         self.dropdownButton.setArrowType(Qt.DownArrow)
