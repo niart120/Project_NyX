@@ -759,34 +759,34 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 
 ### 6.1 仕様確定
 
-- [ ] `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` のシグネチャ確定
-- [ ] `ExecutionContext`, `RunHandle`, `RunResult`, `RuntimeOptions` のシグネチャ確定
+- [x] `ControllerOutputPort`, `FrameSourcePort`, `ResourceStorePort`, `RunArtifactStore`, `NotificationPort`, `LoggerPort` のシグネチャ確定
+- [x] `ExecutionContext`, `RunHandle`, `RunResult`, `RuntimeOptions` のシグネチャ確定
 
 ### 6.2 実装
 
-- [ ] `MacroRuntime` の同期実行 `run()` 実装
-- [ ] `MacroRuntime` の非同期実行 `start()` と `RunHandle` 実装
-- [ ] `DefaultCommand(context=...)` の Port 委譲実装
-- [ ] `DefaultCommand` の import path 維持と旧コンストラクタ削除
-- [ ] `SerialControllerOutputPort` 実装
-- [ ] `CaptureFrameSourcePort` と frame readiness 実装
-- [ ] Resource File I/O の path traversal 防止を `RESOURCE_FILE_IO.md` に従って実装
-- [ ] Resource File I/O の atomic write と overwrite policy を `RESOURCE_FILE_IO.md` に従って実装
+- [x] `MacroRuntime` の同期実行 `run()` 実装
+- [x] `MacroRuntime` の非同期実行 `start()` と `RunHandle` 実装
+- [x] `DefaultCommand(context=...)` の Port 委譲実装
+- [x] `DefaultCommand` の import path 維持と旧コンストラクタ削除
+- [x] `SerialControllerOutputPort` 実装
+- [x] `CaptureFrameSourcePort` と frame readiness 実装
+- [x] Resource File I/O の path traversal 防止を `RESOURCE_FILE_IO.md` に従って実装
+- [x] Resource File I/O の atomic write と overwrite policy を `RESOURCE_FILE_IO.md` に従って実装
 - [ ] `NotificationHandlerAdapter` と `NoopNotificationAdapter` 実装
-- [ ] `LoggerPort` adapter 実装
-- [ ] serial/capture detection race を避ける検出完了待ち API 実装
-- [ ] 本番 Runtime 経路で暗黙 dummy fallback を禁止
-- [ ] GUI の `DefaultCommand` 直接構築を Runtime 利用へ移行
-- [ ] CLI の `DefaultCommand` 直接構築を Runtime 利用へ移行
+- [x] `LoggerPort` adapter 実装
+- [x] serial/capture detection race を避ける検出完了待ち API 実装
+- [x] 本番 Runtime 経路で暗黙 dummy fallback を禁止
+- [x] GUI の `DefaultCommand` 直接構築を Runtime 利用へ移行
+- [x] CLI の `DefaultCommand` 直接構築を Runtime 利用へ移行
 - [ ] `VirtualControllerModel` を `ControllerOutputPort` 利用へ移行
 - [ ] `singletons.py` の `reset_for_testing()` が Runtime/Port 関連状態を初期化
 
 ### 6.3 検証
 
-- [ ] ユニットテスト作成・パス
-- [ ] 結合テスト作成・パス
-- [ ] GUI テスト作成・パス
-- [ ] 実機テストに `@pytest.mark.realdevice` を付与
-- [ ] パフォーマンステスト作成・目標値達成
-- [ ] `uv run ruff check .` がパス
-- [ ] `uv run pytest tests/unit/` がパス
+- [x] ユニットテスト作成・パス
+- [x] 結合テスト作成・パス
+- [x] GUI テスト作成・パス
+- [x] 実機テストに `@pytest.mark.realdevice` を付与
+- [x] パフォーマンステスト作成・目標値達成
+- [x] `uv run ruff check .` がパス
+- [x] `uv run pytest tests/unit/` がパス
