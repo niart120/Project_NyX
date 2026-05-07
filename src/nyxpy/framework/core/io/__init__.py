@@ -1,5 +1,7 @@
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
+    NoopNotificationAdapter,
+    NotificationHandlerAdapter,
     NotificationHandlerPort,
     SerialControllerOutputPort,
 )
@@ -40,6 +42,8 @@ __all__ = [
     "LocalRunArtifactStore",
     "FrameSourcePort",
     "MacroResourceScope",
+    "NoopNotificationAdapter",
+    "NotificationHandlerAdapter",
     "NotificationPort",
     "NotificationHandlerPort",
     "OverwritePolicy",

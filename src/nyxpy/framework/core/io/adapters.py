@@ -96,10 +96,18 @@ class CaptureFrameSourcePort(FrameSourcePort):
         pass
 
 
-class NotificationHandlerPort(NotificationPort):
+class NotificationHandlerAdapter(NotificationPort):
     def __init__(self, notification_handler) -> None:
         self.notification_handler = notification_handler
 
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
-        if self.notification_handler is not None:
-            self.notification_handler.publish(text, img)
+        self.notification_handler.publish(text, img)
+
+
+class NoopNotificationAdapter(NotificationPort):
+    def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
+        pass
+
+
+class NotificationHandlerPort(NotificationHandlerAdapter):
+    """Backward-compatible alias for the notification port adapter."""

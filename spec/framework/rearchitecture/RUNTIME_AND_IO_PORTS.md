@@ -772,7 +772,7 @@ Runtime 自体は原則としてシングルトンにしない。GUI と CLI が
 - [x] `CaptureFrameSourcePort` と frame readiness 実装
 - [x] Resource File I/O の path traversal 防止を `RESOURCE_FILE_IO.md` に従って実装
 - [x] Resource File I/O の atomic write と overwrite policy を `RESOURCE_FILE_IO.md` に従って実装
-- [ ] `NotificationHandlerAdapter` と `NoopNotificationAdapter` 実装
+- [x] `NotificationHandlerAdapter` と `NoopNotificationAdapter` 実装
 - [x] `LoggerPort` adapter 実装
 - [x] serial/capture detection race を避ける検出完了待ち API 実装
 - [x] 本番 Runtime 経路で暗黙 dummy fallback を禁止
