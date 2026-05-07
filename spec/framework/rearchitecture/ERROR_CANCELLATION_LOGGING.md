@@ -545,26 +545,26 @@ class MacroArgsSchema:
 
 ## 6. 実装チェックリスト
 
-- [ ] `FrameworkError` 階層、`ErrorKind`、`ErrorInfo` のシグネチャ確定
-- [ ] `MacroStopException` import 互換、constructor 互換、`MacroCancelled` adapter 方針の実装
-- [ ] `CancellationToken` の理由・要求元・時刻・即時 wait・`throw_if_requested()` 実装
-- [ ] `@check_interrupt` の `MacroCancelled` 送出対応
-- [ ] `Command.wait()` の即時キャンセル対応
-- [ ] GUI/CLI cancel が例外を送出しない中断要求 API へ移行
-- [ ] `MacroExecutor` を削除対象とし、Runtime / Runner での `RunResult` 生成・例外正規化・`finalize` outcome 伝達を固定
-- [ ] 既存 `finalize(cmd)` マクロの互換テスト作成
+- [x] `FrameworkError` 階層、`ErrorKind`、`ErrorInfo` のシグネチャ確定
+- [x] `MacroStopException` import 互換、constructor 互換、`MacroCancelled` adapter 方針の実装
+- [x] `CancellationToken` の理由・要求元・時刻・即時 wait・`throw_if_requested()` 実装
+- [x] `@check_interrupt` の `MacroCancelled` 送出対応
+- [x] `Command.wait()` の即時キャンセル対応
+- [x] GUI/CLI cancel が例外を送出しない中断要求 API へ移行
+- [x] `MacroExecutor` を削除対象とし、Runtime / Runner での `RunResult` 生成・例外正規化・`finalize` outcome 伝達を固定
+- [x] 既存 `finalize(cmd)` マクロの互換テスト作成
 - [ ] `macro args schema` と検証処理の実装
 - [ ] `SettingsStore` / `SecretsStore` schema 検証と secret マスク実装
 - [ ] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
 - [ ] 異常・中断イベントを `LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続
-- [ ] `LogPane` への表示経路は `LOGGING_FRAMEWORK.md` の `UserEvent` 購読へ委譲
-- [ ] `NotificationHandler` の通知失敗ログを構造化
-- [ ] CLI 通知設定ソースを secrets snapshot に統一
-- [ ] ユニットテスト作成・パス
-- [ ] 結合テスト作成・パス
-- [ ] GUI テスト作成・パス
-- [ ] ハードウェアテストに `@pytest.mark.realdevice` を指定
-- [ ] パフォーマンステスト作成・パス
-- [ ] `uv run ruff check .` がパス
-- [ ] `uv run pytest tests/unit/` がパス
+- [x] `LogPane` への表示経路は `LOGGING_FRAMEWORK.md` の `UserEvent` 購読へ委譲
+- [x] `NotificationHandler` の通知失敗ログを構造化
+- [x] CLI 通知設定ソースを secrets snapshot に統一
+- [x] ユニットテスト作成・パス
+- [x] 結合テスト作成・パス
+- [x] GUI テスト作成・パス
+- [x] ハードウェアテストに `@pytest.mark.realdevice` を指定
+- [x] パフォーマンステスト作成・パス
+- [x] `uv run ruff check .` がパス
+- [x] `uv run pytest tests/unit/` がパス
 - [ ] 公開 API のドキュメントコメント更新

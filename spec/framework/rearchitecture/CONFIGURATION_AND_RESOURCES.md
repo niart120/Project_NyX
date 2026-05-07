@@ -314,12 +314,12 @@ Resource File I/O の path guard、画像読み書き、atomic write、`cmd.save
 ## 6. 実装チェックリスト
 
 - [ ] `SettingsStore` / `SecretsStore` schema の公開 API を確定
-- [ ] 通常設定と秘密設定の境界を Runtime builder に反映
-- [ ] `MacroSettingsResolver` を Resource File I/O から分離
-- [ ] `static\<macro_name>\settings.toml` と `Path.cwd()` fallback を削除
-- [ ] manifest / class metadata settings path の root 検証を実装
-- [ ] secret 値を例外、保存ログ、GUI 表示イベントへ平文出力しない
-- [ ] Resource File I/O 詳細を `RESOURCE_FILE_IO.md` へ集約
-- [ ] ユニットテスト作成・パス
-- [ ] 統合テスト作成・パス
-- [ ] 移行後マクロの明示 settings source を検証
+- [x] 通常設定と秘密設定の境界を Runtime builder に反映
+- [x] `MacroSettingsResolver` を Resource File I/O から分離
+- [x] `static\<macro_name>\settings.toml` と `Path.cwd()` fallback を削除
+- [x] manifest / class metadata settings path の root 検証を実装
+- [x] secret 値を例外、保存ログ、GUI 表示イベントへ平文出力しない
+- [x] Resource File I/O 詳細を `RESOURCE_FILE_IO.md` へ集約
+- [x] ユニットテスト作成・パス
+- [x] 統合テスト作成・パス
+- [x] 移行後マクロの明示 settings source を検証
