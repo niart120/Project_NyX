@@ -18,16 +18,13 @@ class _SettingsDefinition:
 
 def get_caller_class_name():
     """呼び出し元のクラス名を取得する"""
-    stack = inspect.stack()
-    # 0: get_caller_class_name, 1: log, 2: 呼び出し元
-    if len(stack) > 2:
-        frame = stack[2]
-        class_name = None
-        self_obj = frame.frame.f_locals.get("self")
-        if self_obj:
-            class_name = type(self_obj).__name__
-            return class_name
-    return None
+    frame = inspect.currentframe()
+    try:
+        caller = frame.f_back.f_back if frame and frame.f_back else None
+        self_obj = caller.f_locals.get("self") if caller is not None else None
+        return type(self_obj).__name__ if self_obj is not None else None
+    finally:
+        del frame
 
 
 def load_macro_settings(macro_cls) -> dict:
