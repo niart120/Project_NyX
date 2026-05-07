@@ -9,6 +9,7 @@ from typing import Protocol, runtime_checkable
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 from nyxpy.framework.core.macro.exceptions import (
+    ConfigurationError,
     ErrorInfo,
     ErrorKind,
     FrameworkError,
@@ -16,6 +17,7 @@ from nyxpy.framework.core.macro.exceptions import (
 )
 from nyxpy.framework.core.runtime.context import RunContext
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
+from nyxpy.framework.core.settings.schema import SettingsSchema
 
 type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, RuntimeValue] | None
 
@@ -36,7 +38,8 @@ class MacroRunner:
         started_at = run_context.started_at
         result: RunResult
         try:
-            macro.initialize(cmd, dict(exec_args))
+            macro_args = self._validate_exec_args(macro, exec_args)
+            macro.initialize(cmd, macro_args)
             macro.run(cmd)
         except MacroStopException as exc:
             result = self._result(
@@ -102,6 +105,36 @@ class MacroRunner:
                 error=replace(result.error, details=details),
             )
         return replace(result, finished_at=datetime.now())
+
+    def _validate_exec_args(
+        self,
+        macro: MacroBase,
+        exec_args: Mapping[str, RuntimeValue],
+    ) -> dict[str, RuntimeValue]:
+        schema = getattr(macro, "args_schema", None)
+        if schema is None:
+            return dict(exec_args)
+        if not isinstance(schema, SettingsSchema):
+            raise ConfigurationError(
+                "macro args_schema must be a SettingsSchema",
+                code="NYX_MACRO_ARGS_INVALID",
+                component="MacroRunner",
+                details={"macro": type(macro).__name__},
+            )
+        try:
+            return schema.validate(exec_args)
+        except ConfigurationError as exc:
+            raise ConfigurationError(
+                "macro arguments do not match schema",
+                code="NYX_MACRO_ARGS_INVALID",
+                component="MacroRunner",
+                details={
+                    "macro": type(macro).__name__,
+                    "schema_error_code": exc.code,
+                    "schema_error": exc.message,
+                },
+                cause=exc,
+            ) from exc
 
     def _result(
         self,

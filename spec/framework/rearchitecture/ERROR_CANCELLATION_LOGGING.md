@@ -553,7 +553,7 @@ class MacroArgsSchema:
 - [x] GUI/CLI cancel が例外を送出しない中断要求 API へ移行
 - [x] `MacroExecutor` を削除対象とし、Runtime / Runner での `RunResult` 生成・例外正規化・`finalize` outcome 伝達を固定
 - [x] 既存 `finalize(cmd)` マクロの互換テスト作成
-- [ ] `macro args schema` と検証処理の実装
+- [x] `macro args schema` と検証処理の実装
 - [x] `SettingsStore` / `SecretsStore` schema 検証と secret マスク実装
 - [x] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
 - [x] 異常・中断イベントを `LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続

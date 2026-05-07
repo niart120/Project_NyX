@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from .command import Command
+
+if TYPE_CHECKING:
+    from nyxpy.framework.core.settings.schema import SettingsSchema
 
 
 class MacroBase(ABC):
     # GUI 用メタデータ: マクロの説明文とタグ
     description: str = ""
     tags: list[str] = []
+    args_schema: "SettingsSchema | None" = None
 
     @abstractmethod
     def initialize(self, cmd: Command, args: dict) -> None:
