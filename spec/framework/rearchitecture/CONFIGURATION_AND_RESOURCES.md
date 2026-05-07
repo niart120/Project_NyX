@@ -313,7 +313,7 @@ Resource File I/O の path guard、画像読み書き、atomic write、`cmd.save
 
 ## 6. 実装チェックリスト
 
-- [ ] `SettingsStore` / `SecretsStore` schema の公開 API を確定
+- [x] `SettingsStore` / `SecretsStore` schema の公開 API を確定
 - [x] 通常設定と秘密設定の境界を Runtime builder に反映
 - [x] `MacroSettingsResolver` を Resource File I/O から分離
 - [x] `static\<macro_name>\settings.toml` と `Path.cwd()` fallback を削除
