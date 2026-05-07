@@ -453,27 +453,27 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 
 ### 6.1 仕様確定
 
-- [ ] `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext` のシグネチャ確定
-- [ ] `LoggerPort`、`LogSink`、`LogBackend` の抽象定義
+- [x] `LogEvent`、`TechnicalLog`、`UserEvent`、`RunLogContext` のシグネチャ確定
+- [x] `LoggerPort`、`LogSink`、`LogBackend` の抽象定義
 
 ### 6.2 実装
 
-- [ ] `LogManager` singleton と module-level `log_manager` を削除
-- [ ] `DefaultLogger`、`LogSinkDispatcher`、`LogBackend`、`LogSanitizer` を実装
-- [ ] 旧 `LogManager.log()` と handler API の呼び出し元を新 API へ置換
-- [ ] `UserEvent` と `TechnicalLog` の分離配信を実装
-- [ ] `RunLogContext` を `ExecutionContext` と `Command.log()` へ接続
-- [ ] secret mask と JSON 化不能値の縮退処理を実装
-- [ ] sink 登録解除の `RLock`、snapshot 配信、handler 例外隔離を実装
-- [ ] `TestLogSink` を実装
-- [ ] ログファイル配置、rotation、保持期間、cleanup を実装
-- [ ] `LogPane` を `UserEvent` 購読へ移行
+- [x] `LogManager` singleton と module-level `log_manager` を削除
+- [x] `DefaultLogger`、`LogSinkDispatcher`、`LogBackend`、`LogSanitizer` を実装
+- [x] 旧 `LogManager.log()` と handler API の呼び出し元を新 API へ置換
+- [x] `UserEvent` と `TechnicalLog` の分離配信を実装
+- [x] `RunLogContext` を `ExecutionContext` と `Command.log()` へ接続
+- [x] secret mask と JSON 化不能値の縮退処理を実装
+- [x] sink 登録解除の `RLock`、snapshot 配信、handler 例外隔離を実装
+- [x] `TestLogSink` を実装
+- [x] ログファイル配置、rotation、保持期間、cleanup を実装
+- [x] `LogPane` を `UserEvent` 購読へ移行
 - [ ] 通知失敗と Runtime 失敗を技術ログへ記録
 
 ### 6.3 検証
 
-- [ ] ユニットテスト作成・パス
-- [ ] GUI テスト作成・パス
-- [ ] パフォーマンステスト作成・パス
-- [ ] `uv run ruff check .` がパス
-- [ ] `uv run pytest tests\unit\` がパス
+- [x] ユニットテスト作成・パス
+- [x] GUI テスト作成・パス
+- [x] パフォーマンステスト作成・パス
+- [x] `uv run ruff check .` がパス
+- [x] `uv run pytest tests\unit\` がパス

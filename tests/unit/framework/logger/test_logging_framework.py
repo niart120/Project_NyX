@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
+from datetime import datetime
 from pathlib import Path
 
 from nyxpy.framework.core.logger import (
     DefaultLogger,
+    JsonlLogBackend,
+    LogEvent,
+    LogLevel,
     LogSanitizer,
     LogSinkDispatcher,
     RunLogContext,
+    TechnicalLog,
     TestLogSink,
+    create_default_logging,
 )
+from nyxpy.framework.core.logger.backend import NullLogBackend
 from nyxpy.framework.core.logger.ports import LogSink
 
 
@@ -23,6 +31,16 @@ class FailingSink(LogSink):
 
     def emit_user(self, event):
         raise RuntimeError(self.message)
+
+
+class FailingBackend(NullLogBackend):
+    def emit_technical(self, event):
+        raise RuntimeError("backend failed")
+
+
+class NonJsonValue:
+    def __repr__(self) -> str:
+        return "<non-json-value>"
 
 
 def test_logger_import_has_no_backend_side_effect(tmp_path: Path, monkeypatch) -> None:
@@ -61,6 +79,62 @@ def test_logger_port_binds_run_context() -> None:
 
     assert sink.technical_logs[0].event.run_id == "run-1"
     assert sink.technical_logs[0].event.macro_id == "sample"
+
+
+def test_jsonl_log_backend_writes_technical_log(tmp_path: Path) -> None:
+    backend = JsonlLogBackend(tmp_path / "framework.jsonl")
+    value = NonJsonValue()
+    event = LogEvent(
+        timestamp=datetime.now(),
+        level=LogLevel.INFO,
+        component="test",
+        event="macro.started",
+        message="started",
+        run_id="run-1",
+        macro_id="sample",
+        extra={"value": value},
+    )
+
+    backend.emit_technical(TechnicalLog(event))
+    payload = json.loads((tmp_path / "framework.jsonl").read_text(encoding="utf-8"))
+
+    assert payload["level"] == "INFO"
+    assert payload["component"] == "test"
+    assert payload["event"] == "macro.started"
+    assert payload["run_id"] == "run-1"
+    assert payload["macro_id"] == "sample"
+    assert payload["extra"]["value"] == repr(value)
+
+
+def test_default_logging_uses_framework_jsonl_backend(tmp_path: Path) -> None:
+    logging = create_default_logging(base_dir=tmp_path, console_enabled=False)
+
+    assert isinstance(logging.backend, JsonlLogBackend)
+    assert "framework_jsonl" not in logging.sink_ids
+
+    logger = logging.logger.bind_context(RunLogContext(run_id="run-1", macro_id="sample"))
+    logger.technical("INFO", "message", component="test", event="macro.started")
+    logging.close()
+    payload = json.loads((tmp_path / "framework.jsonl").read_text(encoding="utf-8"))
+
+    assert payload["event"] == "macro.started"
+    assert payload["run_id"] == "run-1"
+    assert payload["macro_id"] == "sample"
+
+
+def test_backend_exception_is_logged_and_dispatch_continues() -> None:
+    sink = TestLogSink()
+    sanitizer = LogSanitizer()
+    dispatcher = LogSinkDispatcher(sanitizer)
+    dispatcher.add_sink(sink, level="DEBUG")
+    logger = DefaultLogger(dispatcher, sanitizer, FailingBackend())
+
+    logger.technical("INFO", "message", component="test", event="macro.started")
+
+    assert [log.event.event for log in sink.technical_logs] == [
+        "backend.emit_failed",
+        "macro.started",
+    ]
 
 
 def test_user_event_does_not_include_traceback_or_secret() -> None:

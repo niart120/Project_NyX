@@ -3,6 +3,7 @@ from __future__ import annotations
 import traceback
 from datetime import datetime
 
+from nyxpy.framework.core.logger.backend import NullLogBackend
 from nyxpy.framework.core.logger.dispatcher import LogSinkDispatcher
 from nyxpy.framework.core.logger.events import (
     LogEvent,
@@ -12,6 +13,7 @@ from nyxpy.framework.core.logger.events import (
     UserEvent,
     normalize_level,
 )
+from nyxpy.framework.core.logger.ports import LogBackend
 from nyxpy.framework.core.logger.sanitizer import LogSanitizer
 
 
@@ -20,14 +22,16 @@ class DefaultLogger:
         self,
         dispatcher: LogSinkDispatcher,
         sanitizer: LogSanitizer,
+        backend: LogBackend | None = None,
         context: RunLogContext | None = None,
     ) -> None:
         self.dispatcher = dispatcher
         self.sanitizer = sanitizer
+        self.backend = backend or NullLogBackend()
         self.context = context
 
     def bind_context(self, context: RunLogContext) -> DefaultLogger:
-        return DefaultLogger(self.dispatcher, self.sanitizer, context)
+        return DefaultLogger(self.dispatcher, self.sanitizer, self.backend, context)
 
     def technical(
         self,
@@ -52,7 +56,9 @@ class DefaultLogger:
             exception_type=type(exc).__name__ if exc is not None else None,
             traceback="".join(traceback.format_exception(exc)) if exc is not None else None,
         )
-        self.dispatcher.emit_technical(TechnicalLog(log_event, include_traceback=exc is not None))
+        technical_log = TechnicalLog(log_event, include_traceback=exc is not None)
+        self._emit_backend(technical_log)
+        self.dispatcher.emit_technical(technical_log)
 
     def user(
         self,
@@ -78,21 +84,47 @@ class DefaultLogger:
             extra=self.sanitizer.sanitize_extra_for_user(extra),
         )
         self.dispatcher.emit_user(user_event)
-        self.dispatcher.emit_technical(
-            TechnicalLog(
+        technical_log = TechnicalLog(
+            LogEvent(
+                timestamp=timestamp,
+                level=log_level,
+                component=component,
+                event=event,
+                message=self.sanitizer.mask_text(message),
+                run_id=user_event.run_id,
+                macro_id=user_event.macro_id,
+                extra=self.sanitizer.sanitize_extra_for_technical(extra),
+            ),
+            include_traceback=False,
+        )
+        self._emit_backend(technical_log)
+        self.dispatcher.emit_technical(technical_log)
+
+    def _emit_backend(self, log: TechnicalLog) -> None:
+        try:
+            self.backend.emit_technical(log)
+        except Exception as exc:
+            failure = TechnicalLog(
                 LogEvent(
-                    timestamp=timestamp,
-                    level=log_level,
-                    component=component,
-                    event=event,
-                    message=self.sanitizer.mask_text(message),
-                    run_id=user_event.run_id,
-                    macro_id=user_event.macro_id,
-                    extra=self.sanitizer.sanitize_extra_for_technical(extra),
+                    timestamp=datetime.now(),
+                    level=normalize_level("ERROR"),
+                    component="DefaultLogger",
+                    event="backend.emit_failed",
+                    message="Log backend emit failed",
+                    run_id=log.event.run_id,
+                    macro_id=log.event.macro_id,
+                    extra=self.sanitizer.sanitize_extra_for_technical(
+                        {
+                            "emitted_event": log.event.event,
+                            "exception_type": type(exc).__name__,
+                            "message": str(exc),
+                        }
+                    ),
+                    exception_type=type(exc).__name__,
                 ),
                 include_traceback=False,
             )
-        )
+            self.dispatcher.emit_technical(failure)
 
 
 class NullLoggerPort:
