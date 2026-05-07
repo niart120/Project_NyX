@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.main_window import MainWindow
 
@@ -95,10 +96,22 @@ class FakeRunHandle:
         return self._result
 
 
-def run_result(status: RunStatus) -> RunResult:
+def run_result(status: RunStatus, message: str = "") -> RunResult:
     from datetime import datetime
 
     now = datetime.now()
+    error = (
+        ErrorInfo(
+            kind=ErrorKind.MACRO,
+            code="NYX_MACRO_FAILED",
+            message=message,
+            component="test",
+            exception_type="RuntimeError",
+            recoverable=False,
+        )
+        if message
+        else None
+    )
     return RunResult(
         run_id="run-1",
         macro_id="DummyMacro",
@@ -106,6 +119,7 @@ def run_result(status: RunStatus) -> RunResult:
         status=status,
         started_at=now,
         finished_at=now,
+        error=error,
     )
 
 
@@ -144,3 +158,14 @@ def test_main_window_poll_updates_status_from_run_result(window):
     assert window.status_label.text() == "完了"
     assert window.run_handle is None
     assert window.last_run_result.status is RunStatus.SUCCESS
+
+
+@pytest.mark.parametrize(
+    ("result", "expected_status"),
+    [
+        (run_result(RunStatus.CANCELLED), "中断"),
+        (run_result(RunStatus.FAILED, "fail"), "エラー: fail"),
+    ],
+)
+def test_main_window_formats_non_success_run_results(window, result, expected_status):
+    assert window._format_run_result(result) == expected_status
