@@ -1,6 +1,5 @@
 import argparse
 import pathlib
-import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -106,12 +105,6 @@ def create_runtime_builder(
     project_root = pathlib.Path.cwd() if resources_dir is None else resources_dir
     registry = MacroRegistry(project_root=project_root)
     registry.reload()
-    if serial_name is not None:
-        _select_serial_device(serial_name, baudrate, detection_timeout_sec)
-    if capture_name is not None:
-        _select_capture_device(capture_name, detection_timeout_sec)
-    serial_device = serial_manager.get_active_device()
-    capture_device = capture_manager.get_active_device()
     secrets_settings = SecretsSettings()
     notification_handler = create_notification_handler_from_settings(
         secrets_settings, logger=logger
@@ -119,46 +112,16 @@ def create_runtime_builder(
     return create_legacy_runtime_builder(
         project_root=project_root,
         registry=registry,
-        serial_device=serial_device,
-        capture_device=capture_device,
+        serial_manager=serial_manager,
+        capture_manager=capture_manager,
+        serial_name=serial_name,
+        capture_name=capture_name,
+        baudrate=baudrate,
+        detection_timeout_sec=detection_timeout_sec,
         protocol=protocol,
         notification_handler=notification_handler,
         logger=logger,
     )
-
-
-def _select_serial_device(name: str, baudrate: int | None, timeout_sec: float) -> None:
-    serial_manager.auto_register_devices()
-    available_devices = _wait_for_device(serial_manager, name, timeout_sec)
-    if name not in available_devices:
-        available_devices_str = ", ".join(available_devices)
-        raise ValueError(
-            f"Serial port '{name}' not found. Available devices: {available_devices_str}"
-        )
-    serial_manager.set_active(name, baudrate or 9600)
-
-
-def _select_capture_device(name: str, timeout_sec: float) -> None:
-    capture_manager.auto_register_devices()
-    available_devices = _wait_for_device(capture_manager, name, timeout_sec)
-    print(f"Available capture devices: {available_devices}")
-    if name not in available_devices:
-        available_devices_str = ", ".join(available_devices)
-        raise ValueError(
-            f"Capture device '{name}' not found. Available devices: {available_devices_str}"
-        )
-    capture_manager.set_active(name)
-
-
-def _wait_for_device(manager, desired_name: str, timeout_sec: float) -> list[str]:
-    deadline = time.monotonic() + timeout_sec
-    while True:
-        devices = list(manager.list_devices())
-        if desired_name in devices:
-            return devices
-        if time.monotonic() >= deadline:
-            return devices
-        time.sleep(0.05)
 
 
 def execute_macro(

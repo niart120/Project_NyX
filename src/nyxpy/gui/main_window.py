@@ -305,11 +305,15 @@ class MainWindow(QMainWindow):
         return create_legacy_runtime_builder(
             project_root=Path.cwd(),
             registry=self.registry,
-            serial_device=serial_manager.get_active_device(),
-            capture_device=capture_manager.get_active_device(),
+            serial_manager=serial_manager,
+            capture_manager=capture_manager,
+            serial_name=global_settings.get("serial_device"),
+            capture_name=global_settings.get("capture_device"),
+            baudrate=global_settings.get("serial_baud", 9600),
             protocol=protocol,
             notification_handler=notification_handler,
             logger=self.logger,
+            settings=global_settings.data,
         )
 
     def cancel_macro(self):

@@ -52,11 +52,11 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
     )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.serial_manager",
-        MagicMock(get_active_device=lambda: "serial"),
+        MagicMock(),
     )
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.capture_manager",
-        MagicMock(get_active_device=lambda: "capture"),
+        MagicMock(),
     )
 
     def create_notification_handler(settings, *, logger):
@@ -76,3 +76,5 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
 
     assert captured == {"settings": sentinel_secrets, "logger": logger}
     assert legacy_builder.call_args.kwargs["notification_handler"] == "notification-port"
+    assert "serial_device" not in legacy_builder.call_args.kwargs
+    assert "capture_device" not in legacy_builder.call_args.kwargs
