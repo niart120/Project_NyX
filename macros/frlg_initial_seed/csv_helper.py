@@ -12,7 +12,10 @@
 from __future__ import annotations
 
 import csv
+from io import TextIOWrapper
 from pathlib import Path
+
+from nyxpy.framework.core.io.resources import OverwritePolicy, RunArtifactStore
 
 from .config import FrlgInitialSeedConfig
 
@@ -64,13 +67,23 @@ CSV_DETAIL_FILENAME = "initial_seeds_details.csv"
 
 
 def build_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
-    """共有用 CSV パスを返す。"""
-    return Path(cfg.output_dir) / CSV_FILENAME
+    """共有用 CSV の run outputs 相対パスを返す。"""
+    return _build_output_path(cfg, CSV_FILENAME)
 
 
 def build_detail_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
-    """詳細ログ CSV パスを返す。"""
-    return Path(cfg.output_dir) / CSV_DETAIL_FILENAME
+    """詳細ログ CSV の run outputs 相対パスを返す。"""
+    return _build_output_path(cfg, CSV_DETAIL_FILENAME)
+
+
+def build_debug_image_dir(cfg: FrlgInitialSeedConfig) -> Path:
+    """デバッグ画像の run outputs 相対ディレクトリを返す。"""
+    return _build_output_path(cfg, "img")
+
+
+def _build_output_path(cfg: FrlgInitialSeedConfig, name: str) -> Path:
+    output_dir = cfg.output_dir.strip()
+    return Path(output_dir) / name if output_dir else Path(name)
 
 
 def _append_row(csv_path: Path, fieldnames: list[str], row: dict[str, str]) -> None:
@@ -93,3 +106,43 @@ def append_csv_row(csv_path: Path, row: dict[str, str]) -> None:
 def append_detail_csv_row(csv_path: Path, row: dict[str, str]) -> None:
     """詳細ログ CSV に 1 行追加する。"""
     _append_row(csv_path, CSV_DETAIL_FIELDNAMES, row)
+
+
+def append_csv_artifact(
+    artifacts: RunArtifactStore, output_path: Path, row: dict[str, str]
+) -> None:
+    """共有用 CSV を run outputs に追記する。"""
+    _append_artifact_row(artifacts, output_path, CSV_FIELDNAMES, row)
+
+
+def append_detail_csv_artifact(
+    artifacts: RunArtifactStore, output_path: Path, row: dict[str, str]
+) -> None:
+    """詳細 CSV を run outputs に追記する。"""
+    _append_artifact_row(artifacts, output_path, CSV_DETAIL_FIELDNAMES, row)
+
+
+def _append_artifact_row(
+    artifacts: RunArtifactStore,
+    output_path: Path,
+    fieldnames: list[str],
+    row: dict[str, str],
+) -> None:
+    ref = artifacts.resolve_output_path(output_path)
+    write_header = not ref.path.exists() or ref.path.stat().st_size == 0
+
+    with artifacts.open_output(
+        output_path,
+        mode="ab",
+        overwrite=OverwritePolicy.REPLACE,
+        atomic=False,
+    ) as raw:
+        text = TextIOWrapper(raw, encoding="utf-8", newline="")
+        try:
+            writer = csv.DictWriter(text, fieldnames=fieldnames)
+            if write_header:
+                writer.writeheader()
+            writer.writerow(row)
+            text.flush()
+        finally:
+            text.detach()

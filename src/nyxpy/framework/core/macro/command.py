@@ -153,6 +153,10 @@ class Command(ABC):
         """
         pass
 
+    @property
+    def artifacts(self) -> RunArtifactStore:
+        raise NotImplementedError("Current command does not expose run artifacts.")
+
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
         raise NotImplementedError("Current serial protocol does not support touch input.")
 
