@@ -13,6 +13,8 @@ _MISSING = object()
 
 
 class SecretBoundaryError(ConfigurationError):
+    """Raised when plaintext secret values cross into normal settings/logging paths."""
+
     def __init__(self, message: str = "secret boundary violation", **kwargs: object) -> None:
         super().__init__(
             message,
@@ -25,6 +27,8 @@ class SecretBoundaryError(ConfigurationError):
 
 @dataclass(frozen=True)
 class SettingField:
+    """Definition of one dotted settings key and its validation policy."""
+
     name: str
     type_: type | tuple[type, ...]
     default: SettingValue
@@ -35,6 +39,8 @@ class SettingField:
 
 @dataclass(frozen=True)
 class SettingsSchema:
+    """Validate, default, and mask settings mappings by dotted key."""
+
     fields: Mapping[str, SettingField]
     preserve_unknown: bool = True
 
@@ -72,6 +78,8 @@ class SettingsSchema:
 
 @dataclass(frozen=True)
 class SecretsSnapshot:
+    """Immutable secrets view that exposes plaintext only through get_secret()."""
+
     _data: Mapping[str, SettingValue]
     _schema: SettingsSchema
 
