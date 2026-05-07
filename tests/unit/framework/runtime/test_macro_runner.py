@@ -15,6 +15,7 @@ from nyxpy.framework.core.macro.exceptions import (
     MacroStopException,
 )
 from nyxpy.framework.core.runtime import MacroRunner, RunContext, RunResult, RunStatus
+from nyxpy.framework.core.settings.schema import SettingField, SettingsSchema
 from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
 
 
@@ -86,6 +87,20 @@ class OrderedMacro(MacroBase):
         self.events.append("finalize")
 
 
+class ArgsSchemaMacro(OrderedMacro):
+    args_schema = SettingsSchema(
+        fields={
+            "count": SettingField("count", int, 1),
+            "label": SettingField("label", str, "default"),
+        },
+        preserve_unknown=False,
+    )
+
+    def initialize(self, cmd: Command, args: dict) -> None:
+        self.events.append("initialize")
+        self.args = args
+
+
 def test_runner_calls_lifecycle_in_order() -> None:
     events: list[str] = []
     result = MacroRunner().run(
@@ -99,6 +114,29 @@ def test_runner_calls_lifecycle_in_order() -> None:
     assert result.status is RunStatus.SUCCESS
     assert result.error is None
     assert result.ok
+
+
+def test_runner_validates_macro_args_schema_and_applies_defaults() -> None:
+    events: list[str] = []
+    macro = ArgsSchemaMacro(events)
+
+    result = MacroRunner().run(macro, RecordingCommand(), {"count": 3}, _run_context())
+
+    assert result.status is RunStatus.SUCCESS
+    assert macro.args == {"count": 3, "label": "default"}
+
+
+def test_runner_returns_configuration_error_for_invalid_macro_args() -> None:
+    events: list[str] = []
+    macro = ArgsSchemaMacro(events)
+
+    result = MacroRunner().run(macro, RecordingCommand(), {"count": "many"}, _run_context())
+
+    assert result.status is RunStatus.FAILED
+    assert result.error is not None
+    assert result.error.code == "NYX_MACRO_ARGS_INVALID"
+    assert result.error.kind is ErrorKind.CONFIGURATION
+    assert events == ["finalize"]
 
 
 class ErrorMacro(MacroBase):
