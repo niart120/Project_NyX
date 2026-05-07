@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from nyxpy.framework.core.io.adapters import NoopNotificationAdapter, NotificationHandlerAdapter
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroDefinition
 from nyxpy.framework.core.runtime.builder import DUMMY_DEVICE_NAME, create_legacy_runtime_builder
@@ -76,13 +77,14 @@ def make_builder(
     capture_manager: CaptureDeviceManager,
     **kwargs,
 ):
+    notification_handler = kwargs.pop("notification_handler", None)
     return create_legacy_runtime_builder(
         project_root=tmp_path,
         registry=Registry(definition(tmp_path)),
         serial_manager=serial_manager,
         capture_manager=capture_manager,
         protocol=object(),
-        notification_handler=None,
+        notification_handler=notification_handler,
         logger=FakeLoggerPort(),
         **kwargs,
     )
@@ -110,6 +112,19 @@ def test_runtime_builder_allows_dummy_when_explicit(tmp_path: Path) -> None:
     assert context.options.allow_dummy is True
     assert serial.active_device is serial.devices[DUMMY_DEVICE_NAME]
     assert capture.active_device is capture.devices[DUMMY_DEVICE_NAME]
+    assert isinstance(context.notifications, NoopNotificationAdapter)
+
+
+def test_runtime_builder_wraps_notification_handler(tmp_path: Path) -> None:
+    serial = DeviceManager({DUMMY_DEVICE_NAME: Device()})
+    capture = CaptureDeviceManager({DUMMY_DEVICE_NAME: Device()})
+    handler = object()
+    builder = make_builder(tmp_path, serial, capture, notification_handler=handler)
+
+    context = builder.build(RuntimeBuildRequest(macro_id="sample", allow_dummy=True))
+
+    assert isinstance(context.notifications, NotificationHandlerAdapter)
+    assert context.notifications.notification_handler is handler
 
 
 def test_runtime_builder_selects_requested_devices(tmp_path: Path) -> None:

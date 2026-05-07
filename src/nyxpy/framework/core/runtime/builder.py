@@ -10,7 +10,8 @@ from uuid import uuid4
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
-    NotificationHandlerPort,
+    NoopNotificationAdapter,
+    NotificationHandlerAdapter,
     SerialControllerOutputPort,
 )
 from nyxpy.framework.core.io.ports import (
@@ -201,8 +202,10 @@ def create_legacy_runtime_builder(
             macro_id=definition.id,
             run_id=run_id,
         ),
-        notification_factory=lambda _request, _definition: NotificationHandlerPort(
-            notification_handler
+        notification_factory=lambda _request, _definition: (
+            NoopNotificationAdapter()
+            if notification_handler is None
+            else NotificationHandlerAdapter(notification_handler)
         ),
         logger_factory=lambda _request, _definition: logger,
     )

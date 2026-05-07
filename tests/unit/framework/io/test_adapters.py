@@ -6,6 +6,8 @@ import pytest
 from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
+    NoopNotificationAdapter,
+    NotificationHandlerAdapter,
     NotificationHandlerPort,
     SerialControllerOutputPort,
 )
@@ -130,6 +132,22 @@ def test_notification_port_forwards_to_handler() -> None:
             calls.append((text, img))
 
     image = np.zeros((1, 1, 3), dtype=np.uint8)
-    NotificationHandlerPort(Handler()).publish("hello", image)
+    NotificationHandlerAdapter(Handler()).publish("hello", image)
 
     assert calls == [("hello", image)]
+
+
+def test_notification_handler_port_remains_backward_compatible() -> None:
+    calls = []
+
+    class Handler:
+        def publish(self, text, img=None) -> None:
+            calls.append((text, img))
+
+    NotificationHandlerPort(Handler()).publish("hello")
+
+    assert calls == [("hello", None)]
+
+
+def test_noop_notification_adapter_ignores_publish() -> None:
+    NoopNotificationAdapter().publish("hello")
