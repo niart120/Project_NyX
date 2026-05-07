@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import tomlkit
@@ -61,8 +61,8 @@ class MacroSettingsResolver:
                 f"invalid portable settings path: {path_text!r}",
                 code="NYX_SETTINGS_PATH_INVALID",
             )
-        path = Path(path_text)
-        if path.is_absolute() or ".." in path.parts:
+        path = PurePosixPath(path_text)
+        if path.is_absolute() or any(part == ".." or part.strip() == ".." for part in path.parts):
             raise ConfigurationError(
                 f"invalid portable settings path: {path_text!r}",
                 code="NYX_SETTINGS_PATH_INVALID",
