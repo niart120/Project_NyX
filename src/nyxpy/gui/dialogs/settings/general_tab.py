@@ -5,7 +5,7 @@ from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
 
 class GeneralSettingsTab(QWidget):
-    def __init__(self, settings:GlobalSettings, secrets:SecretsSettings, parent=None):
+    def __init__(self, settings: GlobalSettings, secrets: SecretsSettings, parent=None):
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets
