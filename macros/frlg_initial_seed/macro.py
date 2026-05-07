@@ -9,7 +9,6 @@ Switch (720p) 専用。
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from macros.shared.frlg_opening import skip_opening_and_continue
 from macros.shared.game_restart import restart_game
@@ -21,16 +20,17 @@ from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
 from .csv_helper import (
-    append_csv_row,
-    append_detail_csv_row,
+    append_csv_artifact,
+    append_detail_csv_artifact,
     build_csv_path,
+    build_debug_image_dir,
     build_detail_csv_path,
 )
 from .recognizer import (
     ROI_STATS,
+    crop_and_pad,
     get_stat_digits,
     recognize_stats,
-    save_roi_image,
 )
 from .seed_solver import solve_initial_seed
 
@@ -96,19 +96,16 @@ class FrlgInitialSeedMacro(MacroBase):
             level="INFO",
         )
 
-        # デバッグ画像保存先を確保
-        self._img_dir = Path(cfg.output_dir) / "img"
-        self._img_dir.mkdir(parents=True, exist_ok=True)
-        cmd.log(f"デバッグ画像保存先: {self._img_dir}", level="DEBUG")
+        self._img_dir = build_debug_image_dir(cfg)
+        cmd.log(f"デバッグ画像保存先(run outputs相対): {self._img_dir}", level="DEBUG")
 
-        # CSV 追記パス
         self._csv_path = build_csv_path(cfg)
         self._detail_csv_path = build_detail_csv_path(cfg)
         cmd.log(
-            f"CSV 出力先: {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
+            f"CSV 出力先(run outputs相対): {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
             level="INFO",
         )
-        cmd.log(f"詳細CSV 出力先: {self._detail_csv_path}", level="INFO")
+        cmd.log(f"詳細CSV 出力先(run outputs相対): {self._detail_csv_path}", level="INFO")
 
         # OCR ウォームアップ (ステータス認識は en を使用)
         warmup_ocr(cmd, language="en")
@@ -177,11 +174,11 @@ class FrlgInitialSeedMacro(MacroBase):
                 else:
                     for k in ("hp", "atk", "def", "spa", "spd", "spe"):
                         detail_row[k] = ""
-                append_detail_csv_row(self._detail_csv_path, detail_row)
+                append_detail_csv_artifact(cmd.artifacts, self._detail_csv_path, detail_row)
 
                 # 共有用 (Seed 特定成功行のみ)
                 if seed_result not in ("MULT", "False"):
-                    append_csv_row(self._csv_path, {**meta, "note": ""})
+                    append_csv_artifact(cmd.artifacts, self._csv_path, {**meta, "note": ""})
 
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
@@ -331,7 +328,7 @@ class FrlgInitialSeedMacro(MacroBase):
             return None
 
         for roi, name in zip(ROI_STATS, _STAT_FILE_NAMES):
-            save_roi_image(stat_image, roi, self._img_dir / f"stat_{name}.png")
+            cmd.save_img(self._img_dir / f"stat_{name}.png", crop_and_pad(stat_image, roi))
 
         stat_raw = get_stat_digits(stat_image)
         cmd.log(

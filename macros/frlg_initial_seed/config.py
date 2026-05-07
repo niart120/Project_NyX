@@ -40,7 +40,7 @@ class FrlgInitialSeedConfig:
     edition: str = "Switch"
     hardware: Hardware = Hardware.SWITCH
     fps: float = 60.0
-    output_dir: str = "static/frlg_initial_seed"
+    output_dir: str = ""
 
     # === ゲーム内設定 ===
     sound_mode: str = "モノラル"

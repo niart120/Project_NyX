@@ -528,11 +528,15 @@ from frlg_initial_seed.csv_helper import (
     CSV_DETAIL_FILENAME,
     CSV_FIELDNAMES,
     CSV_FILENAME,
+    append_csv_artifact,
     append_csv_row,
     append_detail_csv_row,
     build_csv_path,
+    build_debug_image_dir,
     build_detail_csv_path,
 )
+
+from nyxpy.framework.core.io.resources import LocalRunArtifactStore
 
 
 class TestCSVHelper:
@@ -542,15 +546,21 @@ class TestCSVHelper:
         """固定ファイル名 initial_seeds.csv が返る"""
         cfg = FrlgInitialSeedConfig()
         path = build_csv_path(cfg)
-        expected = Path("static/frlg_initial_seed") / CSV_FILENAME
-        assert path == expected
+        assert path == Path(CSV_FILENAME)
 
     def test_build_detail_csv_path_fixed(self):
         """固定ファイル名 initial_seeds_details.csv が返る"""
         cfg = FrlgInitialSeedConfig()
         path = build_detail_csv_path(cfg)
-        expected = Path("static/frlg_initial_seed") / CSV_DETAIL_FILENAME
-        assert path == expected
+        assert path == Path(CSV_DETAIL_FILENAME)
+
+    def test_build_output_paths_respect_relative_output_dir(self):
+        """output_dir は run outputs 配下の相対ディレクトリとして扱う"""
+        cfg = FrlgInitialSeedConfig(output_dir="reports")
+
+        assert build_csv_path(cfg) == Path("reports") / CSV_FILENAME
+        assert build_detail_csv_path(cfg) == Path("reports") / CSV_DETAIL_FILENAME
+        assert build_debug_image_dir(cfg) == Path("reports") / "img"
 
     def test_append_creates_with_header(self, tmp_path):
         """ファイルが存在しない場合、ヘッダー付きで作成される"""
@@ -645,6 +655,39 @@ class TestCSVHelper:
             lines = f.readlines()
         # ヘッダー 1 行 + データ 2 行
         assert len(lines) == 3
+
+    def test_append_csv_artifact_writes_under_run_outputs(self, tmp_path):
+        """artifact store 経由で run outputs に CSV を追記する"""
+        store = LocalRunArtifactStore(
+            tmp_path / "runs" / "run-1" / "outputs",
+            macro_id="frlg_initial_seed",
+            run_id="run-1",
+        )
+        output_path = build_csv_path(FrlgInitialSeedConfig())
+
+        for seed in ("AAAA", "BBBB"):
+            append_csv_artifact(
+                store,
+                output_path,
+                {
+                    "frame": "2120",
+                    "seed": seed,
+                    "region": "JPN",
+                    "version": "FR",
+                    "edition": "Switch",
+                    "sound_mode": "モノラル",
+                    "button_mode": "ヘルプ",
+                    "keyinput": "none",
+                    "hardware": "Switch",
+                    "fps": "60.0",
+                    "note": "",
+                },
+            )
+
+        csv_path = tmp_path / "runs" / "run-1" / "outputs" / CSV_FILENAME
+        with open(csv_path, encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        assert [row["seed"] for row in rows] == ["AAAA", "BBBB"]
 
     def test_csv_contains_metadata_columns(self, tmp_path):
         """CSV に hardware/fps/note を含む全カラムが存在する"""
