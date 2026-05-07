@@ -9,9 +9,9 @@ from nyxpy.gui.run_gui import main as gui_main
 
 def init_app() -> int:
     """
-    Initialize the workspace for GUI/CLI: create macros, snapshots, static folders.
+    Initialize the workspace for GUI/CLI: create macros, snapshots, resources, runs folders.
     """
-    dirs = ["macros", "snapshots", "static"]
+    dirs = ["macros", "snapshots", "resources", "runs"]
     for d in dirs:
         Path(d).mkdir(exist_ok=True)
     # Ensure macros is a package
@@ -82,7 +82,8 @@ def parse_arguments() -> argparse.Namespace:
 
     # GUI/CLI 初期化および GUI 起動コマンド
     subparsers.add_parser(
-        "init", help="Initialize workspace (create macros, snapshots, static folders)"
+        "init",
+        help="Initialize workspace (create macros, snapshots, resources, runs folders)",
     )
 
     # GUI 起動サブコマンド
