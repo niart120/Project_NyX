@@ -65,10 +65,11 @@ class MacroRuntime:
             cleanup_warnings = self._close_ports(context)
 
         if cleanup_warnings:
-            return replace(
+            result = replace(
                 result,
                 cleanup_warnings=(*result.cleanup_warnings, *cleanup_warnings),
             )
+        self._emit_result_log(context, result)
         return result
 
     def start(self, context: ExecutionContext) -> RunHandle:
@@ -135,6 +136,48 @@ class MacroRuntime:
             recoverable=False,
             details={},
             traceback=traceback.format_exc(),
+        )
+
+    def _emit_result_log(self, context: ExecutionContext, result: RunResult) -> None:
+        if result.status is RunStatus.SUCCESS:
+            return
+
+        error = result.error
+        extra = {
+            "status": result.status.value,
+            "run_id": result.run_id,
+            "macro_id": result.macro_id,
+            "macro_name": result.macro_name,
+            "cleanup_warning_count": len(result.cleanup_warnings),
+        }
+        if error is not None:
+            extra.update(
+                {
+                    "error_kind": error.kind.value,
+                    "error_code": error.code,
+                    "error_component": error.component,
+                    "exception_type": error.exception_type,
+                    "recoverable": error.recoverable,
+                    "details": error.details,
+                }
+            )
+
+        if result.status is RunStatus.CANCELLED:
+            context.logger.technical(
+                "WARNING",
+                "macro cancelled",
+                component="MacroRuntime",
+                event="runtime.cancelled",
+                extra=extra,
+            )
+            return
+
+        context.logger.technical(
+            "ERROR",
+            "macro failed",
+            component="MacroRuntime",
+            event="runtime.failed",
+            extra=extra,
         )
 
     def _close_ports(self, context: ExecutionContext) -> tuple[CleanupWarning, ...]:

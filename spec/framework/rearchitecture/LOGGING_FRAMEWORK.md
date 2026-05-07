@@ -468,7 +468,7 @@ sink 例外はマクロ実行結果を失敗にしない。ただし技術ログ
 - [x] `TestLogSink` を実装
 - [x] ログファイル配置、rotation、保持期間、cleanup を実装
 - [x] `LogPane` を `UserEvent` 購読へ移行
-- [ ] 通知失敗と Runtime 失敗を技術ログへ記録
+- [x] 通知失敗と Runtime 失敗を技術ログへ記録
 
 ### 6.3 検証
 

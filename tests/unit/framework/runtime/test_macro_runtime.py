@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
+from nyxpy.framework.core.macro.exceptions import MacroStopException
 from nyxpy.framework.core.macro.registry import MacroDefinition
 from nyxpy.framework.core.runtime.result import RunStatus
 from nyxpy.framework.core.runtime.runtime import MacroRuntime
@@ -48,6 +49,18 @@ class RecordingMacro(MacroBase):
 
     def finalize(self, cmd: Command) -> None:
         self.calls.append("finalize")
+
+
+class ErrorMacro(RecordingMacro):
+    def run(self, cmd: Command) -> None:
+        self.calls.append("run")
+        raise RuntimeError("boom")
+
+
+class StopMacro(RecordingMacro):
+    def run(self, cmd: Command) -> None:
+        self.calls.append("run")
+        raise MacroStopException("stop")
 
 
 class NotReadyFrameSource(FakeFrameSourcePort):
@@ -101,6 +114,38 @@ def test_macro_runtime_pre_run_frame_not_ready_returns_failed_result(tmp_path) -
     assert result.error is not None
     assert result.error.code == "NYX_FRAME_NOT_READY"
     assert macro.calls == []
+    log = context.logger.technical_logs[-1].event
+    assert log.event == "runtime.failed"
+    assert log.extra["error_code"] == "NYX_FRAME_NOT_READY"
+
+
+def test_macro_runtime_logs_macro_failure_result(tmp_path) -> None:
+    macro = ErrorMacro()
+    context = make_fake_execution_context(tmp_path)
+    runtime = MacroRuntime(Registry(definition_for(macro)))
+
+    result = runtime.run(context)
+
+    assert result.status is RunStatus.FAILED
+    log = context.logger.technical_logs[-1].event
+    assert log.event == "runtime.failed"
+    assert log.level == "ERROR"
+    assert log.extra["error_code"] == "NYX_MACRO_FAILED"
+    assert log.extra["exception_type"] == "RuntimeError"
+
+
+def test_macro_runtime_logs_cancelled_result(tmp_path) -> None:
+    macro = StopMacro()
+    context = make_fake_execution_context(tmp_path)
+    runtime = MacroRuntime(Registry(definition_for(macro)))
+
+    result = runtime.run(context)
+
+    assert result.status is RunStatus.CANCELLED
+    log = context.logger.technical_logs[-1].event
+    assert log.event == "runtime.cancelled"
+    assert log.level == "WARNING"
+    assert log.extra["error_code"] == "NYX_MACRO_CANCELLED"
 
 
 def test_macro_runtime_adds_cleanup_warnings_without_overwriting_status(tmp_path) -> None:
