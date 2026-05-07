@@ -1,3 +1,4 @@
+from nyxpy.framework.core.logger.backend import JsonlLogBackend, NullLogBackend
 from nyxpy.framework.core.logger.default_logger import DefaultLogger, NullLoggerPort
 from nyxpy.framework.core.logger.dispatcher import LogSinkDispatcher
 from nyxpy.framework.core.logger.events import (
@@ -23,7 +24,9 @@ __all__ = [
     "LogSanitizer",
     "LogSink",
     "LogSinkDispatcher",
+    "JsonlLogBackend",
     "NullLoggerPort",
+    "NullLogBackend",
     "RunLogContext",
     "TestLogSink",
     "TechnicalLog",
