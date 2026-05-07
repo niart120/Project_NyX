@@ -181,20 +181,16 @@ def test_create_protocol_unknown():
         create_protocol("UNKNOWN")
 
 
-def test_create_runtime_builder_uses_active_devices(monkeypatch, tmp_path):
+def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatch, tmp_path):
     mock_registry = MagicMock()
     registry = MagicMock()
     mock_registry.return_value = registry
     mock_builder = MagicMock()
+    mock_serial_manager = MagicMock()
+    mock_capture_manager = MagicMock()
     monkeypatch.setattr("nyxpy.cli.run_cli.MacroRegistry", mock_registry)
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.serial_manager",
-        MagicMock(get_active_device=lambda: "serial"),
-    )
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.capture_manager",
-        MagicMock(get_active_device=lambda: "capture"),
-    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_notification_handler_from_settings",
         lambda settings, logger: "notifier",
@@ -206,7 +202,10 @@ def test_create_runtime_builder_uses_active_devices(monkeypatch, tmp_path):
 
     mock_registry.assert_called_once_with(project_root=tmp_path)
     registry.reload.assert_called_once()
-    mock_builder.assert_called_once()
+    assert mock_builder.call_args.kwargs["serial_manager"] is mock_serial_manager
+    assert mock_builder.call_args.kwargs["capture_manager"] is mock_capture_manager
+    assert "serial_device" not in mock_builder.call_args.kwargs
+    assert "capture_device" not in mock_builder.call_args.kwargs
 
 
 def test_execute_macro_success(monkeypatch, mock_log_manager):

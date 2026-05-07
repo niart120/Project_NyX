@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import sys
 from pathlib import Path
 
@@ -22,3 +23,15 @@ def test_gui_cli_entrypoints_do_not_import_macro_executor() -> None:
     importlib.import_module("nyxpy.gui.main_window")
 
     assert "nyxpy.framework.core.macro.executor" not in sys.modules
+
+
+def test_gui_cli_runtime_builder_paths_do_not_resolve_devices_directly() -> None:
+    from nyxpy.cli.run_cli import create_runtime_builder
+    from nyxpy.gui.main_window import MainWindow
+
+    cli_source = inspect.getsource(create_runtime_builder)
+    gui_source = inspect.getsource(MainWindow._create_runtime_builder)
+
+    assert "get_active_device" not in cli_source
+    assert "auto_register_devices" not in cli_source
+    assert "get_active_device" not in gui_source
