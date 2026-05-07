@@ -1,8 +1,13 @@
 import inspect
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import tomlkit
+from tomlkit.exceptions import TOMLKitError
+
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 @dataclass(frozen=True)
@@ -42,7 +47,7 @@ def load_macro_settings(macro_cls) -> dict:
     return MacroSettingsResolver(Path.cwd()).load(definition)
 
 
-def parse_define_args(defines: list[str]) -> dict:
+def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:
     """
     コマンドライン引数で渡された定義を解析して辞書に変換する関数
     key=value 形式の文字列を受け取り、tomlパーサに従う形で辞書に変換する。
@@ -63,9 +68,39 @@ def parse_define_args(defines: list[str]) -> dict:
 
     """
 
-    toml_str = "\n".join(defines)  # 引数を改行で結合
-    toml_str = toml_str.replace("=", " = ")  # 等号の前後にスペースを追加
-    exec_args = tomlkit.loads(toml_str)  # toml形式で解析
+    if isinstance(defines, str):
+        define_items = [defines]
+    else:
+        define_items = list(defines)
+
+    for index, define in enumerate(define_items):
+        if not isinstance(define, str):
+            raise ConfigurationError(
+                "define argument must be a string",
+                code="NYX_DEFINE_INVALID",
+                component="parse_define_args",
+                details={"index": index},
+            )
+        key, separator, _value = define.partition("=")
+        if not separator or not key.strip():
+            raise ConfigurationError(
+                "define argument must be key=value",
+                code="NYX_DEFINE_INVALID",
+                component="parse_define_args",
+                details={"index": index},
+            )
+
+    toml_str = "\n".join(define_items)
+    try:
+        exec_args = tomlkit.loads(toml_str)
+    except TOMLKitError as exc:
+        raise ConfigurationError(
+            "failed to parse define arguments",
+            code="NYX_DEFINE_PARSE_FAILED",
+            component="parse_define_args",
+            details={"exception_type": type(exc).__name__},
+            cause=exc,
+        ) from exc
 
     # 変換された辞書を返す
     return exec_args

@@ -555,7 +555,7 @@ class MacroArgsSchema:
 - [x] 既存 `finalize(cmd)` マクロの互換テスト作成
 - [ ] `macro args schema` と検証処理の実装
 - [ ] `SettingsStore` / `SecretsStore` schema 検証と secret マスク実装
-- [ ] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
+- [x] `parse_define_args()` の `str` / `Iterable[str]` 対応と `ConfigurationError` 正規化
 - [ ] 異常・中断イベントを `LOGGING_FRAMEWORK.md` の `LoggerPort` へ接続
 - [x] `LogPane` への表示経路は `LOGGING_FRAMEWORK.md` の `UserEvent` 購読へ委譲
 - [x] `NotificationHandler` の通知失敗ログを構造化
