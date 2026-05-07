@@ -4,6 +4,8 @@ from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialCommInterface
+from nyxpy.framework.core.io.adapters import SerialControllerOutputPort
+from nyxpy.framework.core.io.ports import ControllerOutputPort
 from nyxpy.framework.core.logger import LoggerPort
 from nyxpy.gui.events import EventBus, EventType
 
@@ -17,13 +19,17 @@ class VirtualControllerModel(QObject):
     def __init__(
         self,
         logger: LoggerPort,
+        controller: ControllerOutputPort | None = None,
         serial_device: SerialCommInterface | None = None,
         protocol: SerialProtocolInterface | None = None,
     ) -> None:
         super().__init__()
         self.logger = logger
-        self.serial_device = serial_device
         self.protocol = protocol or ProtocolFactory.create_protocol("CH552")
+        self.serial_device = serial_device
+        self.controller = controller
+        if self.controller is None and self.serial_device is not None:
+            self.controller = SerialControllerOutputPort(self.serial_device, self.protocol)
         self.event_bus = EventBus.get_instance()
         self.event_bus.subscribe(EventType.SERIAL_DEVICE_CHANGED, self.on_serial_device_changed)
         self.event_bus.subscribe(EventType.PROTOCOL_CHANGED, self.on_protocol_changed)
@@ -37,10 +43,17 @@ class VirtualControllerModel(QObject):
     def set_serial_device(self, serial_device: SerialCommInterface) -> None:
         """シリアルデバイスを設定"""
         self.serial_device = serial_device
+        self.controller = SerialControllerOutputPort(serial_device, self.protocol)
+
+    def set_controller(self, controller: ControllerOutputPort | None) -> None:
+        """コントローラー出力 Port を設定"""
+        self.controller = controller
 
     def set_protocol(self, protocol: SerialProtocolInterface) -> None:
         """シリアルプロトコルを設定"""
         self.protocol = protocol
+        if self.serial_device is not None:
+            self.controller = SerialControllerOutputPort(self.serial_device, self.protocol)
 
     def button_press(self, button: Button) -> None:
         """ボタンが押されたときの処理"""
@@ -98,11 +111,10 @@ class VirtualControllerModel(QObject):
             self.current_r_stick = RStick.CENTER
 
     def send_release_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
-        if not self.serial_device:
+        if self.controller is None:
             return
         try:
-            command_data = self.protocol.build_release_command(keys)
-            self.serial_device.send(command_data)
+            self.controller.release(keys)
         except Exception as e:
             self.logger.technical(
                 "ERROR",
@@ -111,14 +123,13 @@ class VirtualControllerModel(QObject):
                 event="controller.release_failed",
                 exc=e,
             )
-            raise e
+            raise
 
     def send_press_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
-        if not self.serial_device:
+        if self.controller is None:
             return
         try:
-            command_data = self.protocol.build_press_command(keys)
-            self.serial_device.send(command_data)
+            self.controller.press(keys)
         except Exception as e:
             self.logger.technical(
                 "ERROR",
@@ -127,7 +138,7 @@ class VirtualControllerModel(QObject):
                 event="controller.press_failed",
                 exc=e,
             )
-            raise e
+            raise
 
     def on_serial_device_changed(self, data):
         self.set_serial_device(data["device"])

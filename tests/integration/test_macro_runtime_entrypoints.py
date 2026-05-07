@@ -35,3 +35,12 @@ def test_gui_cli_runtime_builder_paths_do_not_resolve_devices_directly() -> None
     assert "get_active_device" not in cli_source
     assert "auto_register_devices" not in cli_source
     assert "get_active_device" not in gui_source
+
+
+def test_virtual_controller_model_uses_controller_output_port() -> None:
+    from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
+
+    source = inspect.getsource(VirtualControllerModel)
+
+    assert "ControllerOutputPort" in source
+    assert ".send(" not in source
