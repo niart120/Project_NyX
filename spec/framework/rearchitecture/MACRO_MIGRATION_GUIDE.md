@@ -237,9 +237,18 @@ output_path.write_text(csv_text, encoding="utf-8")
 
 ```python
 # 移行後: run outputs へ成果物として保存する
-with cmd.artifacts.open_output("result.csv", mode="w", encoding="utf-8") as fp:
-    fp.write(csv_text)
+from nyxpy.framework.core.io.resources import OverwritePolicy
+
+
+with cmd.artifacts.open_output(
+    "result.csv",
+    mode="wb",
+    overwrite=OverwritePolicy.REPLACE,
+) as fp:
+    fp.write(csv_text.encode("utf-8"))
 ```
+
+`RunArtifactStore.open_output()` は binary mode のみを受け付ける。テキストを保存する場合は呼び出し側で `bytes` へ変換する。
 
 ### 4.6 `DefaultCommand` 直接生成の修正
 
