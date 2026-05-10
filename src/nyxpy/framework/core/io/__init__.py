@@ -1,5 +1,6 @@
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
+    DummyFrameSourcePort,
     NoopNotificationAdapter,
     NotificationHandlerAdapter,
     NotificationHandlerPort,
@@ -8,6 +9,7 @@ from nyxpy.framework.core.io.adapters import (
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
     FrameNotReadyError,
+    FrameReadError,
     FrameSourcePort,
     NotificationPort,
     SleepControlCapability,
@@ -37,7 +39,9 @@ __all__ = [
     "ControllerOutputPort",
     "CaptureFrameSourcePort",
     "DefaultResourcePathGuard",
+    "DummyFrameSourcePort",
     "FrameNotReadyError",
+    "FrameReadError",
     "LocalResourceStore",
     "LocalRunArtifactStore",
     "FrameSourcePort",

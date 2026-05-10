@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 
 import cv2
 import numpy as np
@@ -77,6 +78,7 @@ class FakeFrameSourcePort(FrameSourcePort):
         self.frame = frame if frame is not None else np.zeros((2, 2, 3), dtype=np.uint8)
         self.initialized = False
         self.closed = False
+        self.frame_lock = Lock()
 
     def initialize(self) -> None:
         self.initialized = True
@@ -89,7 +91,18 @@ class FakeFrameSourcePort(FrameSourcePort):
     def latest_frame(self) -> cv2.typing.MatLike:
         if not self.initialized:
             raise FrameNotReadyError()
-        return self.frame.copy()
+        with self.frame_lock:
+            return self.frame.copy()
+
+    def try_latest_frame(self) -> cv2.typing.MatLike | None:
+        if not self.initialized:
+            return None
+        if not self.frame_lock.acquire(blocking=False):
+            return None
+        try:
+            return self.frame.copy()
+        finally:
+            self.frame_lock.release()
 
     def close(self) -> None:
         self.closed = True

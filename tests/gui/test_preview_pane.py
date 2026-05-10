@@ -49,9 +49,10 @@ class TestPreviewPane:
         result = preview_pane.take_snapshot()
         expected_path = Path.cwd() / SNAPSHOT_DIR / f"{mock_timestamp}.png"
         assert os.path.exists(Path.cwd() / SNAPSHOT_DIR)
-        mock_cv2.resize.assert_called_once_with(
-            test_frame, (1280, 720), interpolation=mock_cv2.INTER_AREA
-        )
+        resized_frame, target_size = mock_cv2.resize.call_args.args
+        assert np.array_equal(resized_frame, test_frame)
+        assert target_size == (1280, 720)
+        assert mock_cv2.resize.call_args.kwargs == {"interpolation": mock_cv2.INTER_AREA}
         mock_cv2.imwrite.assert_called_once_with(str(expected_path), test_frame)
         signal_mock.emit.assert_called_once_with(f"スナップショット保存: {mock_timestamp}.png")
         assert result == f"スナップショット保存: {mock_timestamp}.png"
@@ -99,3 +100,20 @@ class TestPreviewPane:
         expected_msg = f"スナップショット保存: {mock_timestamp}.png"
         signal_mock.emit.assert_called_once_with(expected_msg)
         assert result == expected_msg
+
+    def test_update_preview_skips_when_frame_source_busy(self, preview_pane, qtbot):
+        """Busy FrameSourcePort should keep the current pixmap and not block the UI."""
+        frame_source = Mock()
+        frame_source.try_latest_frame.return_value = None
+        preview_pane.set_frame_source(frame_source)
+        preview_pane.show()
+        qtbot.wait(10)
+        before_pixmap = preview_pane.label.pixmap()
+        before_key = before_pixmap.cacheKey() if before_pixmap is not None else None
+
+        preview_pane.update_preview()
+
+        after_pixmap = preview_pane.label.pixmap()
+        after_key = after_pixmap.cacheKey() if after_pixmap is not None else None
+        assert after_key == before_key
+        frame_source.try_latest_frame.assert_called()

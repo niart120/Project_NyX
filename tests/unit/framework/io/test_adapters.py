@@ -6,6 +6,7 @@ import pytest
 from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
+    DummyFrameSourcePort,
     NoopNotificationAdapter,
     NotificationHandlerAdapter,
     NotificationHandlerPort,
@@ -122,6 +123,41 @@ def test_frame_source_latest_frame_returns_copy_and_reports_not_ready() -> None:
 
     with pytest.raises(FrameNotReadyError):
         port.latest_frame()
+
+
+def test_frame_source_try_latest_frame_returns_copy_and_skips_not_ready() -> None:
+    frame = np.ones((2, 2, 3), dtype=np.uint8)
+    port = CaptureFrameSourcePort(CaptureDevice([frame, None]))
+
+    latest = port.try_latest_frame()
+
+    assert latest is not None
+    latest[0, 0, 0] = 0
+    assert frame[0, 0, 0] == 1
+    assert port.try_latest_frame() is None
+
+
+def test_frame_source_try_latest_frame_is_nonblocking() -> None:
+    port = CaptureFrameSourcePort(CaptureDevice([np.ones((2, 2, 3), dtype=np.uint8)]))
+
+    assert port._frame_lock.acquire(blocking=False)
+    try:
+        assert port.try_latest_frame() is None
+    finally:
+        port._frame_lock.release()
+
+
+def test_dummy_frame_source_port_is_ready_after_initialize() -> None:
+    port = DummyFrameSourcePort()
+
+    assert port.await_ready(0) is False
+    assert port.try_latest_frame() is None
+
+    port.initialize()
+
+    assert port.await_ready(0) is True
+    assert port.latest_frame().shape == (720, 1280, 3)
+    assert port.try_latest_frame() is not None
 
 
 def test_notification_port_forwards_to_handler() -> None:

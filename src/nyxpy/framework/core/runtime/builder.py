@@ -44,6 +44,7 @@ from nyxpy.framework.core.runtime.runtime import MacroRuntime
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 type PortFactory[T] = Callable[[RuntimeBuildRequest, MacroDefinition], T]
+type LifetimePortFactory[T] = Callable[[], T]
 type ArtifactStoreFactory = Callable[[RuntimeBuildRequest, MacroDefinition, str], RunArtifactStore]
 
 DUMMY_DEVICE_NAME = "ダミーデバイス"
@@ -63,6 +64,8 @@ class MacroRuntimeBuilder:
         artifact_store_factory: ArtifactStoreFactory,
         notification_factory: PortFactory[NotificationPort],
         logger_factory: PortFactory[LoggerPort],
+        preview_frame_source_factory: LifetimePortFactory[FrameSourcePort] | None = None,
+        manual_controller_factory: LifetimePortFactory[ControllerOutputPort] | None = None,
     ) -> None:
         self.project_root = Path(project_root).resolve()
         self.registry = registry
@@ -74,6 +77,10 @@ class MacroRuntimeBuilder:
         self._artifact_store_factory = artifact_store_factory
         self._notification_factory = notification_factory
         self._logger_factory = logger_factory
+        self._preview_frame_source_factory = preview_frame_source_factory
+        self._manual_controller_factory = manual_controller_factory
+        self._preview_frame_source: FrameSourcePort | None = None
+        self._manual_controller: ControllerOutputPort | None = None
 
     def build(self, request: RuntimeBuildRequest) -> ExecutionContext:
         definition = self.registry.resolve(request.macro_id)
@@ -112,6 +119,30 @@ class MacroRuntimeBuilder:
 
     def start(self, request: RuntimeBuildRequest) -> RunHandle:
         return self.runtime.start(self.build(request))
+
+    def frame_source_for_preview(self) -> FrameSourcePort | None:
+        if self._preview_frame_source is None and self._preview_frame_source_factory is not None:
+            self._preview_frame_source = self._preview_frame_source_factory()
+        return self._preview_frame_source
+
+    def controller_output_for_manual_input(self) -> ControllerOutputPort | None:
+        if self._manual_controller is None and self._manual_controller_factory is not None:
+            self._manual_controller = self._manual_controller_factory()
+        return self._manual_controller
+
+    def shutdown(self) -> None:
+        errors: list[Exception] = []
+        for port in (self._manual_controller, self._preview_frame_source):
+            if port is None:
+                continue
+            try:
+                port.close()
+            except Exception as exc:
+                errors.append(exc)
+        self._manual_controller = None
+        self._preview_frame_source = None
+        if errors:
+            raise ExceptionGroup("Runtime builder shutdown failed", errors)
 
     def _allow_dummy(self, request: RuntimeBuildRequest) -> bool:
         if request.allow_dummy is not None:
@@ -165,6 +196,7 @@ def create_legacy_runtime_builder(
     resolved_baudrate = _optional_int(
         baudrate if baudrate is not None else settings_snapshot.get("serial_baud")
     )
+    lifetime_request = RuntimeBuildRequest(macro_id="__gui_lifetime__")
 
     return MacroRuntimeBuilder(
         project_root=project_root,
@@ -208,6 +240,30 @@ def create_legacy_runtime_builder(
             else NotificationHandlerAdapter(notification_handler)
         ),
         logger_factory=lambda _request, _definition: logger,
+        preview_frame_source_factory=lambda: CaptureFrameSourcePort(
+            capture_device
+            if direct_devices
+            else _resolve_capture_device(
+                capture_manager,
+                resolved_capture_name,
+                detection_timeout_sec,
+                _allow_dummy(settings_snapshot, lifetime_request),
+            )
+        ),
+        manual_controller_factory=lambda: SerialControllerOutputPort(
+            (
+                serial_device
+                if direct_devices
+                else _resolve_serial_device(
+                    serial_manager,
+                    resolved_serial_name,
+                    resolved_baudrate,
+                    detection_timeout_sec,
+                    _allow_dummy(settings_snapshot, lifetime_request),
+                )
+            ),
+            protocol,
+        ),
     )
 
 

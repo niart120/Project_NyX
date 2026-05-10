@@ -117,7 +117,7 @@ def try_latest_frame(self) -> cv2.typing.MatLike | None:
 
 ### 4.3 removal gate
 
-framework 新 Runtime 経路では次を禁止する。
+framework 新 Runtime 経路では次を禁止する。静的テストの探索対象は `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\` に限定し、後続の CLI 追加修正が完了するまで GUI / CLI の composition root は対象外にする。
 
 | 禁止対象 | 代替 |
 |----------|------|
@@ -142,10 +142,10 @@ framework 新 Runtime 経路では次を禁止する。
 
 ## 6. 実装チェックリスト
 
-- [ ] `FrameSourcePort.try_latest_frame()` のシグネチャを確定する。
-- [ ] `CaptureFrameSourcePort` / `DummyFrameSourcePort` に非ブロッキング取得を実装する。
-- [ ] GUI preview が UI thread から `latest_frame()` を呼ばないことを固定する。
-- [ ] `MacroRuntimeBuilder.shutdown()` が GUI lifetime Port を閉じる。
-- [ ] preview / Runtime 同時利用の性能テストを追加する。
-- [ ] 標準 CPython で性能ゲートを測定し、未達時だけ free-threaded CPython 評価仕様を作る。
-- [ ] removal gate の静的テストで旧 API への逆戻りを防ぐ。
+- [x] `FrameSourcePort.try_latest_frame()` のシグネチャを確定する。
+- [x] `CaptureFrameSourcePort` / `DummyFrameSourcePort` に非ブロッキング取得を実装する。
+- [x] GUI preview が UI thread から `latest_frame()` を呼ばないことを固定する。
+- [x] `MacroRuntimeBuilder.shutdown()` が GUI lifetime Port を閉じる。
+- [x] preview / Runtime 同時利用の性能テストを追加する。
+- [x] 標準 CPython で性能ゲートを測定し、未達時だけ free-threaded CPython 評価仕様を作る。
+- [x] removal gate の静的テストで旧 API への逆戻りを防ぐ。
