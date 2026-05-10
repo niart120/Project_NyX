@@ -7,11 +7,16 @@ import pytest
 
 from nyxpy.framework.core.api.notification_handler import NotificationHandler
 from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice
+from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
+from nyxpy.framework.core.io.device_factories import (
+    ControllerOutputPortFactory,
+    FrameSourcePortFactory,
+)
 from nyxpy.framework.core.logger import NullLoggerPort
 from nyxpy.framework.core.macro.registry import MacroRegistry
-from nyxpy.framework.core.runtime.builder import create_legacy_runtime_builder
+from nyxpy.framework.core.runtime.builder import create_device_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunStatus
 
@@ -49,6 +54,24 @@ class RuntimeRealDeviceMacro(MacroBase):
     )
 
 
+class StaticDiscovery:
+    def __init__(self, serial_port: str, capture_index: int) -> None:
+        self.serial = DeviceInfo(kind="serial", name=serial_port, identifier=serial_port)
+        self.capture = DeviceInfo(kind="capture", name=str(capture_index), identifier=capture_index)
+
+    def serial_names(self) -> list[str]:
+        return [self.serial.name]
+
+    def capture_names(self) -> list[str]:
+        return [self.capture.name]
+
+    def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
+        return self.serial if name == self.serial.name else None
+
+    def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
+        return self.capture if name == self.capture.name else None
+
+
 @pytest.mark.realdevice
 def test_macro_runtime_runs_with_real_serial_and_capture(tmp_path: Path) -> None:
     serial_port = _required_env("NYX_REAL_SERIAL_PORT")
@@ -60,27 +83,36 @@ def test_macro_runtime_runs_with_real_serial_and_capture(tmp_path: Path) -> None
     registry = MacroRegistry(project_root=tmp_path)
     registry.reload()
 
-    serial = SerialComm(serial_port)
-    capture = AsyncCaptureDevice(device_index=capture_index, fps=30.0)
-    try:
-        serial.open(baudrate)
-    except Exception as exc:
-        pytest.skip(f"serial device is not available: {exc}")
+    discovery = StaticDiscovery(serial_port, capture_index)
+    protocol = ProtocolFactory.create_protocol(protocol_name)
+    controller_factory = ControllerOutputPortFactory(
+        discovery=discovery,
+        protocol=protocol,
+        serial_factory=SerialComm,
+    )
+    frame_factory = FrameSourcePortFactory(
+        discovery=discovery,
+        logger=NullLoggerPort(),
+        capture_factory=AsyncCaptureDevice,
+    )
+    builder = create_device_runtime_builder(
+        project_root=tmp_path,
+        registry=registry,
+        device_discovery=discovery,
+        controller_output_factory=controller_factory,
+        frame_source_factory=frame_factory,
+        serial_name=serial_port,
+        capture_name=str(capture_index),
+        baudrate=baudrate,
+        protocol=protocol,
+        notification_handler=NotificationHandler([]),
+        logger=NullLoggerPort(),
+    )
 
     try:
-        builder = create_legacy_runtime_builder(
-            project_root=tmp_path,
-            registry=registry,
-            serial_device=serial,
-            capture_device=capture,
-            protocol=ProtocolFactory.create_protocol(protocol_name),
-            notification_handler=NotificationHandler([]),
-            logger=NullLoggerPort(),
-        )
-
         result = builder.run(RuntimeBuildRequest(macro_id="runtime_realdevice"))
-
         assert result.status is RunStatus.SUCCESS
+    except Exception as exc:
+        pytest.skip(f"real devices are not available: {exc}")
     finally:
-        serial.close()
-        capture.release()
+        builder.shutdown()

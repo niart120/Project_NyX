@@ -141,6 +141,9 @@ class VirtualControllerModel(QObject):
             raise
 
     def on_serial_device_changed(self, data):
+        if "controller" in data:
+            self.set_controller(data["controller"])
+            return
         self.set_serial_device(data["device"])
 
     def on_protocol_changed(self, data):

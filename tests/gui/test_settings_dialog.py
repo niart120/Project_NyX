@@ -1,19 +1,7 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
 
-from nyxpy.framework.core.hardware.capture import CaptureManager
-from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
-
-
-@pytest.fixture(autouse=True)
-def dummy_devices(monkeypatch):
-    # Mock device managers to return predictable lists
-    monkeypatch.setattr(CaptureManager, "auto_register_devices", lambda self: None)
-    monkeypatch.setattr(CaptureManager, "list_devices", lambda self: ["Cam1", "Cam2"])
-    monkeypatch.setattr(SerialManager, "auto_register_devices", lambda self: None)
-    monkeypatch.setattr(SerialManager, "list_devices", lambda self: ["COMX", "COMY"])
-    yield
 
 
 @pytest.fixture

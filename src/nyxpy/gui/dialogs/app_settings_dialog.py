@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QVBoxLayout
 
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
@@ -10,7 +11,14 @@ from .settings.tab_widget import SettingsTabWidget
 class AppSettingsDialog(QDialog):
     settings_applied = Signal()
 
-    def __init__(self, parent, settings: GlobalSettings = None, secrets: SecretsSettings = None):
+    def __init__(
+        self,
+        parent,
+        settings: GlobalSettings = None,
+        secrets: SecretsSettings = None,
+        *,
+        device_discovery: DeviceDiscoveryService | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("デバイス・通知・一般設定")
         self.resize(500, 400)
@@ -19,7 +27,12 @@ class AppSettingsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # タブウィジェット
-        self.tab_widget = SettingsTabWidget(self, self.settings, self.secrets)
+        self.tab_widget = SettingsTabWidget(
+            self,
+            self.settings,
+            self.secrets,
+            device_discovery=device_discovery,
+        )
         layout.addWidget(self.tab_widget)
 
         # ボタンレイアウト

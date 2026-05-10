@@ -9,7 +9,6 @@ from nyxpy.framework.core.io.adapters import (
     DummyFrameSourcePort,
     NoopNotificationAdapter,
     NotificationHandlerAdapter,
-    NotificationHandlerPort,
     SerialControllerOutputPort,
 )
 from nyxpy.framework.core.io.ports import FrameNotReadyError
@@ -211,18 +210,6 @@ def test_notification_port_forwards_to_handler() -> None:
     NotificationHandlerAdapter(Handler()).publish("hello", image)
 
     assert calls == [("hello", image)]
-
-
-def test_notification_handler_port_remains_backward_compatible() -> None:
-    calls = []
-
-    class Handler:
-        def publish(self, text, img=None) -> None:
-            calls.append((text, img))
-
-    NotificationHandlerPort(Handler()).publish("hello")
-
-    assert calls == [("hello", None)]
 
 
 def test_noop_notification_adapter_ignores_publish() -> None:

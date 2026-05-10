@@ -22,7 +22,7 @@ class CancellationToken:
         return self._stop_event.is_set()
 
     def request_stop(self) -> None:
-        self.request_cancel(reason="stop requested", source="legacy")
+        self.request_cancel(reason="stop requested", source="request_stop")
 
     def request_cancel(self, reason: str = "", source: str = "") -> None:
         with self._lock:

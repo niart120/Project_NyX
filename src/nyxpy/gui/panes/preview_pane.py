@@ -51,6 +51,9 @@ class PreviewPane(QWidget):
         QTimer.singleShot(500, self.update_preview)
 
     def on_capture_device_changed(self, data):
+        if "frame_source" in data:
+            self.set_frame_source(data["frame_source"])
+            return
         self.set_capture_device(data["device"])
 
     def set_capture_device(self, device: CaptureDeviceInterface):

@@ -9,17 +9,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
-from nyxpy.framework.core.singletons import capture_manager, serial_manager
 
 
 class DeviceSettingsTab(QWidget):
-    def __init__(self, settings: GlobalSettings, secrets: SecretsSettings, parent=None):
+    def __init__(
+        self,
+        settings: GlobalSettings,
+        secrets: SecretsSettings,
+        parent=None,
+        *,
+        device_discovery: DeviceDiscoveryService | None = None,
+    ):
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets
+        self.device_discovery = device_discovery or DeviceDiscoveryService()
         layout = QFormLayout(self)
 
         # キャプチャ関連設定
@@ -105,7 +113,7 @@ class DeviceSettingsTab(QWidget):
         self.ser_baud.setCurrentText(default_baud)
 
     def refresh_capture_devices(self):
-        devices = capture_manager.list_devices()
+        devices = self.device_discovery.detect(timeout_sec=2.0).capture_names()
         self.cap_device.clear()
         self.cap_device.addItems(devices)
         current_cap = self.settings.get("capture_device", "")
@@ -113,7 +121,7 @@ class DeviceSettingsTab(QWidget):
             self.cap_device.setCurrentText(current_cap)
 
     def refresh_serial_devices(self):
-        serials = serial_manager.list_devices()
+        serials = self.device_discovery.detect(timeout_sec=2.0).serial_names()
         self.ser_device.clear()
         self.ser_device.addItems(serials)
         current_ser = self.settings.get("serial_device", "")
