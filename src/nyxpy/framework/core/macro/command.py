@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import cv2
 
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
-from nyxpy.framework.core.io.ports import SleepControlCapability, TouchInputCapability
 from nyxpy.framework.core.macro.decorators import check_interrupt
 from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
 from nyxpy.framework.core.utils.helper import (
@@ -221,22 +220,16 @@ class DefaultCommand(Command):
     @check_interrupt
     def touch_down(self, x: int, y: int) -> None:
         self.log(f"Touch down: ({x}, {y})", level="DEBUG")
-        if not isinstance(self.context.controller, TouchInputCapability):
-            raise NotImplementedError("Current serial protocol does not support touch input.")
         self.context.controller.touch_down(x, y)
 
     @check_interrupt
     def touch_up(self) -> None:
         self.log("Touch up", level="DEBUG")
-        if not isinstance(self.context.controller, TouchInputCapability):
-            raise NotImplementedError("Current serial protocol does not support touch input.")
         self.context.controller.touch_up()
 
     @check_interrupt
     def disable_sleep(self, enabled: bool = True) -> None:
         self.log(f"Disable sleep: {enabled}", level="DEBUG")
-        if not isinstance(self.context.controller, SleepControlCapability):
-            raise NotImplementedError("Current serial protocol does not support sleep control.")
         self.context.controller.disable_sleep(enabled)
 
     @check_interrupt

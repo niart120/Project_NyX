@@ -57,7 +57,7 @@ Nintendo 3DS 向け touch / sleep 制御を、リアーキテクチャ後の `De
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | `ControllerOutputPort` に touch / sleep の非抽象任意メソッドを追加する |
 | `src\nyxpy\framework\core\io\adapters.py` | 変更 | `SerialControllerOutputPort` で 3DS touch / sleep command を serial 送信へ橋渡しする |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `DefaultCommand` の touch / sleep を capability 判定ではなく Port 委譲へ簡素化する |
-| `tests\unit\framework\io\test_serial_controller_output_port.py` | 新規 | 3DS / 非 3DS protocol の任意操作と送信バイト列を検証する |
+| `tests\unit\framework\io\test_adapters.py` | 変更 | 3DS / 非 3DS protocol の任意操作と送信バイト列を検証する |
 | `tests\unit\framework\runtime\test_default_command_ports.py` | 変更 | `DefaultCommand` が Port へ委譲し、非対応時の例外を伝播することを検証する |
 | `tests\integration\test_3ds_runtime_serial_protocol.py` | 新規 | Runtime + fake serial + fake capture で `cmd.touch()` / `cmd.disable_sleep()` を検証する |
 | `tests\hardware\test_3ds_serial_protocol_device.py` | 新規 | 実機接続時の代表 3DS コマンド送信を `@pytest.mark.realdevice` で検証する |
@@ -82,7 +82,7 @@ MacroRuntime
 
 ### 3.2 採用方針
 
-採用する方針は A' 案である。`ControllerOutputPort` は基本操作を抽象メソッドとして持ち、touch / sleep は非抽象の任意メソッドとして持つ。既定実装は `NotImplementedError` を送出する。
+採用する方針は、`ControllerOutputPort` に任意操作の既定実装を置き、`DefaultCommand` が Port へ直接委譲する方式である。`ControllerOutputPort` は基本操作を抽象メソッドとして持ち、touch / sleep は非抽象の任意メソッドとして持つ。既定実装は `NotImplementedError` を送出する。
 
 `DefaultCommand` は `isinstance(..., TouchInputCapability)` のような capability 判定を行わず、controller Port へ委譲する。非対応 controller では Port 側の `NotImplementedError` がそのまま呼び出し元へ伝播する。
 
@@ -129,7 +129,7 @@ cmd.touch(x, y)
 
 破壊的変更は行わない。CH552 / PokeCon など touch / sleep 非対応 protocol は、これまでどおり `cmd.touch()` / `cmd.disable_sleep()` 呼び出し時に `NotImplementedError` になる。
 
-既存の `TouchInputCapability` / `SleepControlCapability` は不要になれば削除候補とする。ただし削除する場合は、参照元テストと仕様を同じ変更で更新する。互換 shim として残す必要はない。
+`TouchInputCapability` / `SleepControlCapability` のような別 interface は追加しない。既存実装に残っている場合は、本追加修正で参照を解消し、互換 shim として残さない。
 
 ### 3.7 レイヤー構成
 
@@ -279,11 +279,11 @@ def disable_sleep(self, enabled: bool = True) -> None:
 
 ## 6. 実装チェックリスト
 
-- [ ] `ControllerOutputPort` に touch / sleep の非抽象任意メソッドを追加する。
-- [ ] `DefaultCommand` の touch / sleep を Port 直接委譲へ簡素化する。
-- [ ] `SerialControllerOutputPort` で touch / sleep command を serial 送信へ橋渡しする。
-- [ ] CH552 / PokeCon の非対応任意操作が `NotImplementedError` で失敗することを固定する。
-- [ ] `DefaultCommand` が protocol / serial を直接参照しないことを固定する。
-- [ ] Runtime 統合テストで 3DS touch / sleep 送信経路を検証する。
-- [ ] 実機テストを `@pytest.mark.realdevice` として追加する。
-- [ ] `NINTENDO_3DS_SERIAL_PROTOCOL.md` の未完了チェックリストを更新する。
+- [x] `ControllerOutputPort` に touch / sleep の非抽象任意メソッドを追加する。
+- [x] `DefaultCommand` の touch / sleep を Port 直接委譲へ簡素化する。
+- [x] `SerialControllerOutputPort` で touch / sleep command を serial 送信へ橋渡しする。
+- [x] CH552 / PokeCon の非対応任意操作が `NotImplementedError` で失敗することを固定する。
+- [x] `DefaultCommand` が protocol / serial を直接参照しないことを固定する。
+- [x] Runtime 統合テストで 3DS touch / sleep 送信経路を検証する。
+- [x] 実機テストを `@pytest.mark.realdevice` として追加する。
+- [x] `NINTENDO_3DS_SERIAL_PROTOCOL.md` の未完了チェックリストを更新する。

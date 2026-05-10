@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Protocol, runtime_checkable
 
 import cv2
 
@@ -46,17 +45,14 @@ class ControllerOutputPort(ABC):
     @abstractmethod
     def close(self) -> None: ...
 
+    def touch_down(self, x: int, y: int) -> None:
+        raise NotImplementedError("Current controller output does not support touch input.")
 
-@runtime_checkable
-class TouchInputCapability(Protocol):
-    def touch_down(self, x: int, y: int) -> None: ...
+    def touch_up(self) -> None:
+        raise NotImplementedError("Current controller output does not support touch input.")
 
-    def touch_up(self) -> None: ...
-
-
-@runtime_checkable
-class SleepControlCapability(Protocol):
-    def disable_sleep(self, enabled: bool = True) -> None: ...
+    def disable_sleep(self, enabled: bool = True) -> None:
+        raise NotImplementedError("Current controller output does not support sleep control.")
 
 
 class FrameSourcePort(ABC):

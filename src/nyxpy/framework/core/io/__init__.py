@@ -12,8 +12,6 @@ from nyxpy.framework.core.io.ports import (
     FrameReadError,
     FrameSourcePort,
     NotificationPort,
-    SleepControlCapability,
-    TouchInputCapability,
 )
 from nyxpy.framework.core.io.resources import (
     DefaultResourcePathGuard,
@@ -64,6 +62,4 @@ __all__ = [
     "ResourceWriteError",
     "RunArtifactStore",
     "SerialControllerOutputPort",
-    "SleepControlCapability",
-    "TouchInputCapability",
 ]

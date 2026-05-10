@@ -1,6 +1,8 @@
+import ast
 import importlib
 import inspect
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -128,3 +130,40 @@ def test_macro_executor_removed() -> None:
     sys.modules.pop("nyxpy.framework.core.macro.executor", None)
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("nyxpy.framework.core.macro.executor")
+
+
+def test_default_command_does_not_import_serial_protocol_or_comm() -> None:
+    command_path = (
+        Path(__file__).resolve().parents[4]
+        / "src"
+        / "nyxpy"
+        / "framework"
+        / "core"
+        / "macro"
+        / "command.py"
+    )
+    tree = ast.parse(command_path.read_text(encoding="utf-8"), filename=str(command_path))
+    imported_names: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imported_names.update(alias.name.split("."))
+                if alias.asname:
+                    imported_names.add(alias.asname)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                imported_names.update(node.module.split("."))
+            for alias in node.names:
+                imported_names.add(alias.name)
+                if alias.asname:
+                    imported_names.add(alias.asname)
+
+    forbidden_names = {
+        "SerialProtocolInterface",
+        "SerialCommInterface",
+        "protocol",
+        "serial_comm",
+        "hardware",
+    }
+    assert imported_names.isdisjoint(forbidden_names)
