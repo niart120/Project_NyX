@@ -7,16 +7,18 @@ from typing import Any
 from nyxpy.framework.core.api.notification_handler import (
     create_notification_handler_from_settings,
 )
+from nyxpy.framework.core.hardware.capture import CaptureManager
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.serial_comm import SerialManager
 from nyxpy.framework.core.logger import LoggerPort, LoggingComponents, create_default_logging
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroRegistry
-from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_legacy_runtime_builder
+from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_device_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
-from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
-from nyxpy.framework.core.singletons import capture_manager, serial_manager
+from nyxpy.framework.core.settings.global_settings import SettingsStore
+from nyxpy.framework.core.settings.secrets_settings import SecretsStore
 from nyxpy.framework.core.utils.helper import parse_define_args
 
 
@@ -89,6 +91,10 @@ def create_runtime_builder(
     capture_name: str | None = None,
     baudrate: int | None = None,
     detection_timeout_sec: float = 2.0,
+    settings_store: SettingsStore | None = None,
+    secrets_store: SecretsStore | None = None,
+    serial_device_manager: SerialManager | None = None,
+    capture_device_manager: CaptureManager | None = None,
 ) -> MacroRuntimeBuilder:
     """
     CLI で利用する Runtime builder を作成します。
@@ -107,15 +113,20 @@ def create_runtime_builder(
     project_root = pathlib.Path.cwd() if resources_dir is None else resources_dir
     registry = MacroRegistry(project_root=project_root)
     registry.reload()
-    secrets_settings = SecretsSettings()
+    config_dir = project_root / ".nyxpy"
+    settings = settings_store or SettingsStore(config_dir=config_dir, strict_load=False)
+    secrets = secrets_store or SecretsStore(config_dir=config_dir, strict_load=False)
+    capture_devices = capture_device_manager or CaptureManager()
+    capture_devices.set_logger(logger)
+    serial_devices = serial_device_manager or SerialManager()
     notification_handler = create_notification_handler_from_settings(
-        secrets_settings, logger=logger
+        secrets.snapshot(), logger=logger
     )
-    return create_legacy_runtime_builder(
+    return create_device_runtime_builder(
         project_root=project_root,
         registry=registry,
-        serial_manager=serial_manager,
-        capture_manager=capture_manager,
+        serial_manager=serial_devices,
+        capture_manager=capture_devices,
         serial_name=serial_name,
         capture_name=capture_name,
         baudrate=baudrate,
@@ -123,6 +134,7 @@ def create_runtime_builder(
         protocol=protocol,
         notification_handler=notification_handler,
         logger=logger,
+        settings=settings.snapshot(),
     )
 
 
@@ -213,7 +225,6 @@ def cli_main(args: argparse.Namespace) -> int:
         logging = configure_logging(silence=args.silence, verbose=args.verbose)
         logger = logging.logger
 
-        capture_manager.set_logger(logger)
         baudrate = ProtocolFactory.resolve_baudrate(args.protocol, getattr(args, "baud", None))
 
         protocol = create_protocol(args.protocol)
@@ -269,8 +280,8 @@ def cli_main(args: argparse.Namespace) -> int:
 
     finally:
         cleanup_logger = logger if "logger" in locals() else None
-        _run_cleanup("release capture device", capture_manager.release_active, cleanup_logger)
-        _run_cleanup("close serial device", serial_manager.close_active, cleanup_logger)
+        if "runtime_builder" in locals():
+            _run_cleanup("shutdown runtime builder", runtime_builder.shutdown, cleanup_logger)
         if "logging" in locals():
             _run_cleanup("close logging", logging.close, cleanup_logger)
 

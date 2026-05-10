@@ -10,6 +10,9 @@ class DummySettings:
     def get(self, k, default=None):
         return self.d.get(k, default)
 
+    def get_secret(self, k):
+        return self.d.get(k, "")
+
 
 def test_create_notification_handler_from_settings():
     # Discordのみ
