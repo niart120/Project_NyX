@@ -18,6 +18,15 @@ class FrameNotReadyError(DeviceError):
         )
 
 
+class FrameReadError(DeviceError):
+    def __init__(self, message: str = "Frame source read failed.") -> None:
+        super().__init__(
+            message,
+            code="NYX_FRAME_READ_FAILED",
+            component="FrameSourcePort",
+        )
+
+
 class ControllerOutputPort(ABC):
     @abstractmethod
     def press(self, keys: tuple[KeyType, ...]) -> None: ...
@@ -59,6 +68,9 @@ class FrameSourcePort(ABC):
 
     @abstractmethod
     def latest_frame(self) -> cv2.typing.MatLike: ...
+
+    @abstractmethod
+    def try_latest_frame(self) -> cv2.typing.MatLike | None: ...
 
     @abstractmethod
     def close(self) -> None: ...

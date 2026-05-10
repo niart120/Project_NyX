@@ -3,11 +3,23 @@ from pathlib import Path
 import pytest
 
 from nyxpy.framework.core.io.adapters import NoopNotificationAdapter, NotificationHandlerAdapter
+from nyxpy.framework.core.io.resources import MacroResourceScope
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroDefinition
-from nyxpy.framework.core.runtime.builder import DUMMY_DEVICE_NAME, create_legacy_runtime_builder
+from nyxpy.framework.core.runtime.builder import (
+    DUMMY_DEVICE_NAME,
+    MacroRuntimeBuilder,
+    create_legacy_runtime_builder,
+)
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
-from tests.support.fakes import FakeLoggerPort
+from tests.support.fakes import (
+    FakeControllerOutputPort,
+    FakeFrameSourcePort,
+    FakeLoggerPort,
+    FakeNotificationPort,
+    FakeResourceStore,
+    FakeRunArtifactStore,
+)
 
 
 class Registry:
@@ -184,3 +196,36 @@ def test_runtime_builder_rejects_mixed_direct_and_managed_devices(tmp_path: Path
             notification_handler=None,
             logger=FakeLoggerPort(),
         )
+
+
+def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path) -> None:
+    registry = Registry(definition(tmp_path))
+    preview_source = FakeFrameSourcePort()
+    manual_controller = FakeControllerOutputPort()
+    builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id: FakeRunArtifactStore(
+            tmp_path / "runs" / run_id / "outputs",
+            macro_id=definition.id,
+            run_id=run_id,
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+        preview_frame_source_factory=lambda: preview_source,
+        manual_controller_factory=lambda: manual_controller,
+    )
+
+    assert builder.frame_source_for_preview() is preview_source
+    assert builder.frame_source_for_preview() is preview_source
+    assert builder.controller_output_for_manual_input() is manual_controller
+
+    builder.shutdown()
+
+    assert preview_source.closed is True
+    assert manual_controller.closed is True

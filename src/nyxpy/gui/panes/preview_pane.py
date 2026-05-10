@@ -8,6 +8,8 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
+from nyxpy.framework.core.io.adapters import CaptureFrameSourcePort
+from nyxpy.framework.core.io.ports import FrameSourcePort
 from nyxpy.framework.core.utils.helper import calc_aspect_size
 from nyxpy.gui.events import EventBus, EventType
 from nyxpy.gui.widgets import AspectRatioLabel
@@ -22,7 +24,11 @@ class PreviewPane(QWidget):
     """
 
     def __init__(
-        self, capture_device: CaptureDeviceInterface | None = None, parent=None, preview_fps=30
+        self,
+        capture_device: CaptureDeviceInterface | None = None,
+        parent=None,
+        preview_fps=30,
+        frame_source: FrameSourcePort | None = None,
     ):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -31,7 +37,10 @@ class PreviewPane(QWidget):
         self.label.setMinimumHeight(100)
         layout.addWidget(self.label)
 
-        self.capture_device: CaptureDeviceInterface = capture_device
+        self.capture_device: CaptureDeviceInterface | None = capture_device
+        self.frame_source: FrameSourcePort | None = frame_source
+        if self.frame_source is None and capture_device is not None:
+            self.frame_source = CaptureFrameSourcePort(capture_device)
         self.preview_fps = preview_fps  # プレビュー用のみ
         self.event_bus = EventBus.get_instance()
         self.event_bus.subscribe(EventType.CAPTURE_DEVICE_CHANGED, self.on_capture_device_changed)
@@ -46,16 +55,26 @@ class PreviewPane(QWidget):
 
     def set_capture_device(self, device: CaptureDeviceInterface):
         self.capture_device = device
+        self.frame_source = CaptureFrameSourcePort(device) if device is not None else None
         self.update_preview()
 
+    def set_frame_source(self, frame_source: FrameSourcePort | None) -> None:
+        self.capture_device = None
+        self.frame_source = frame_source
+        self.update_preview()
+
+    def pause(self) -> None:
+        self.timer.stop()
+
+    def resume(self) -> None:
+        if self.isVisible() and self.frame_source is not None:
+            self.apply_fps()
+
     def update_preview(self):
-        if not self.isVisible() or self.capture_device is None:
+        if not self.isVisible() or self.frame_source is None:
             return
-        try:
-            frame = self.capture_device.get_frame()
-            if frame is None:
-                return
-        except RuntimeError:
+        frame = self.frame_source.try_latest_frame()
+        if frame is None:
             return
         size = self.label.size()
         target_w, target_h = calc_aspect_size(size, self.label.aspect_w, self.label.aspect_h)
@@ -76,10 +95,10 @@ class PreviewPane(QWidget):
         snaps_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = snaps_dir / f"{timestamp}.png"
-        if self.capture_device is None:
+        if self.frame_source is None:
             msg = "プレビューがありません。スナップショットに失敗しました。"
         else:
-            pix = self.capture_device.get_frame()
+            pix = self.frame_source.try_latest_frame()
             if pix is not None:
                 target_w, target_h = 1280, 720
                 pix = cv2.resize(pix, (target_w, target_h), interpolation=cv2.INTER_AREA)

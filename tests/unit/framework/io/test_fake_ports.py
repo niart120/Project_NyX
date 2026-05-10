@@ -33,6 +33,21 @@ def test_fake_frame_source_readiness() -> None:
     latest = source.latest_frame()
     latest[0, 0, 0] = 99
     assert frame[0, 0, 0] == 7
+    preview_frame = source.try_latest_frame()
+    assert preview_frame is not None
+    preview_frame[0, 0, 0] = 88
+    assert frame[0, 0, 0] == 7
+
+
+def test_fake_frame_source_try_latest_frame_is_nonblocking() -> None:
+    source = FakeFrameSourcePort()
+    source.initialize()
+
+    assert source.frame_lock.acquire(blocking=False)
+    try:
+        assert source.try_latest_frame() is None
+    finally:
+        source.frame_lock.release()
 
 
 def test_fake_frame_source_rejects_invalid_timeout() -> None:
