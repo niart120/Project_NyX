@@ -2,14 +2,14 @@
 
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\logger\`, `src\nyxpy\framework\core\settings\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
 > **目的**: GUI/CLI の実行入口を `MacroRuntime` へ寄せ、表示、終了コード、通知設定ソースを一貫させる。ロギング基盤の詳細は `LOGGING_FRAMEWORK.md` を正とする。  
-> **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`  
+> **関連ドキュメント**: `RUNTIME_AND_IO_PORTS.md`, `ERROR_CANCELLATION_LOGGING.md`, `CONFIGURATION_AND_RESOURCES.md`, `LOGGING_FRAMEWORK.md`, `spec\cli\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md`
 > **破壊的変更**: GUI/CLI 入口に関する破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書は `MacroRuntime` 入口化、表示、終了コード、通知 secret、ログ接続の詳細だけを定義する。
 
 ## 1. 概要
 
 ### 1.1 目的
 
-GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立てる状態を解消し、`MacroRuntime` を実行入口として統一する。ログの保存形式、GUI 表示イベント、`run_id` / `macro_id` 追跡、秘密値保護、sink 例外隔離は `LOGGING_FRAMEWORK.md` の仕様を参照する。
+GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立てる状態を解消し、`MacroRuntime` を実行入口として統一する。ログの保存形式、GUI 表示イベント、`run_id` / `macro_id` 追跡、秘密値保護、sink 例外隔離は `LOGGING_FRAMEWORK.md` の仕様を参照する。CLI / GUI 側の実装修正項目と完了ゲートは `spec\cli\rearchitecture\IMPLEMENTATION_PLAN.md` と `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md` を正とする。
 
 ### 1.2 用語定義
 
