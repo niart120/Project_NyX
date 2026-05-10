@@ -37,10 +37,10 @@ class GuiAppServices:
 
 - `create_default_logging(base_dir=project_root / "logs", console_enabled=False)` を生成する。
 - `MacroRegistry(project_root)` を生成し、`MacroCatalog` へ渡す。
-- `ProtocolFactory`、serial / capture manager、notification handler、settings / secrets から Runtime builder を構成する。
+- `DeviceDiscoveryService`、`ControllerOutputPort` / `FrameSourcePort` factory、`ProtocolFactory`、notification adapter、settings / secrets から Runtime builder を構成する。
 - `create_runtime_builder()` は cached builder を返す。起動直後または `apply_settings()` で snapshot が変わった場合だけ builder を再構成する。
 - `apply_settings()` で serial、capture、protocol、notification の変更反映を扱う。実行中に builder 再構成が必要な変更は即時反映せず、実行完了後に適用するか、UI で変更適用不可にする。
-- `close()` で manager release と logging close を扱う。例外記録の詳細は Phase 4 に委譲する。
+- `close()` で GUI lifetime Port / device service close と logging close を扱う。例外記録の詳細は Phase 4 に委譲する。
 
 `GuiAppServices` は singleton ではない。`MainWindow` の lifetime に 1 個だけ持ち、テストでは fake service に差し替える。
 
@@ -57,7 +57,7 @@ class MacroCatalog:
     def get(self, macro_id: str) -> MacroDefinition: ...
 ```
 
-互換上 `macros` 属性を残す場合も、値は `definitions_by_id` と同じ stable ID key にする。class name key の辞書は作らない。
+`MacroCatalog.macros` は旧内部 API 名なので最終状態に残さない。移行中に同一 phase 内で一時的に残す場合も、値は `definitions_by_id` と同じ stable ID key にし、class name key の辞書は作らない。Phase 1 完了時点では `definitions_by_id` / `list()` / `get(macro_id)` に一本化する。
 
 ### 3.3 `MacroBrowserPane`
 
@@ -74,6 +74,7 @@ class MacroCatalog:
 | テスト名 | 検証内容 |
 |----------|----------|
 | `test_macro_catalog_keys_by_definition_id` | `MacroCatalog` が `definition.id` を key にする |
+| `test_macro_catalog_does_not_expose_legacy_macros_map` | `MacroCatalog.macros` を公開 API として残していない |
 | `test_macro_catalog_reload_preserves_stable_ids` | reload 後も stable ID で参照できる |
 | `test_macro_browser_selection_returns_macro_id` | 表示名ではなく `macro_id` を返す |
 | `test_main_window_uses_selected_macro_id` | `_start_macro()` が `RuntimeBuildRequest.macro_id` に stable ID を渡す |
@@ -85,5 +86,6 @@ class MacroCatalog:
 |--------|------|
 | Service boundary gate | `MainWindow` が Runtime builder 構成の詳細を直接持たない |
 | Stable ID gate | GUI 実行要求の `macro_id` が `MacroDefinition.id` である |
+| No legacy catalog gate | `MacroCatalog.macros` と class name key map が残っていない |
 | Testability gate | `MainWindow` テストで fake service を注入できる |
 | No cross-layer gate | framework 層に GUI import が増えていない |

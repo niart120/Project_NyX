@@ -18,7 +18,7 @@ GUI の実行制御を `RunHandle` / `RunResult` に寄せ、GUI スレッドか
 | `CANCELLING` | 中断要求済み、結果待ち | 無効 | 無効 | done -> `FINISHED` |
 | `FINISHED` | 結果反映済み | 選択ありで有効 | 無効 | run -> `RUNNING` |
 
-`ControlPane.set_running(bool)` は `RUNNING` と `CANCELLING` を区別できないため、`set_run_state(state)` を追加する。既存 method は内部互換 wrapper として残してよい。
+`ControlPane.set_running(bool)` は `RUNNING` と `CANCELLING` を区別できないため、`set_run_state(state)` を追加する。既存 method は呼び出し元置換中の一時 wrapper に限り許可し、Phase 2 の実装差分内で全呼び出しを `set_run_state()` へ移す。Phase 4 完了までに公開 API から削除する。
 
 ## 3. 実装仕様
 
@@ -71,6 +71,7 @@ RUNNING
 | `test_main_window_uses_selected_macro_id` | stable ID を request に渡す |
 | `test_main_window_cancel_enters_cancelling_state` | cancel 後に再実行できない |
 | `test_main_window_cancel_calls_handle_cancel_only` | `Command.stop()` 相当を呼ばない |
+| `test_control_pane_exposes_run_state_api_only` | 最終公開 API が `set_run_state()` で、`set_running(bool)` を残していない |
 | `test_main_window_poll_updates_status_from_run_result` | `RunResult` から UI を更新する |
 | `test_main_window_poll_logs_result_exception` | result 取得例外を技術ログへ出す |
 
@@ -81,4 +82,5 @@ RUNNING
 | Runtime handle gate | GUI は `RunHandle` だけで実行中状態を管理する |
 | Cancellation gate | cancel は `RunHandle.cancel()` のみ |
 | Double-run prevention gate | `CANCELLING` 中に run button が有効にならない |
+| No boolean state gate | `ControlPane.set_running(bool)` へ依存する GUI 呼び出しが残っていない |
 | User display gate | traceback や内部 path を status / dialog に出さない |

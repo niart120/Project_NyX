@@ -3,7 +3,7 @@
 > **文書種別**: 実装計画。実装順序と完了条件を定義する。型・API・責務の正本は関連仕様書を参照する。
 > **対象モジュール**: `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\cli\`, `src\nyxpy\gui\`  
 > **目的**: 維持対象の公開互換を固定し、マクロ側移行が必要な Resource I/O、settings、entrypoint を明示したうえで、実行中核を `MacroRuntime` / `MacroRunner` / `MacroRegistry` / `MacroFactory` へ段階移行する。
-> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `ARCHITECTURE_DIAGRAMS.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`, `spec\cli\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md`
+> **関連ドキュメント**: `FW_REARCHITECTURE_OVERVIEW.md`, `ARCHITECTURE_DIAGRAMS.md`, `MACRO_COMPATIBILITY_AND_REGISTRY.md`, `RUNTIME_AND_IO_PORTS.md`, `FOLLOWUP_FIXES.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `DEPRECATION_AND_MIGRATION.md`, `TEST_STRATEGY.md`, `spec\cli\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md`
 > **破壊的変更**: 維持する互換契約は `FW_REARCHITECTURE_OVERVIEW.md` と `MACRO_COMPATIBILITY_AND_REGISTRY.md` を参照する。破壊的変更、削除条件、代替 API、テストゲート、移行順の詳細は `DEPRECATION_AND_MIGRATION.md` を正とし、本書は実装順序へ落とし込む。
 
 ## 1. 概要
@@ -339,7 +339,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 完了条件 | CLI は `DefaultCommand` を直接構築せず、Runtime 経由で実行し、成功 0、中断 130、失敗 非 0 の終了コードを `RunResult` から決める |
 | テスト | `test_cli_uses_runtime_and_run_result`, `test_execute_macro_success`, `test_cli_notification_settings_source_is_secrets_store`, `test_cli_presenter_exit_codes`, `test_cli_does_not_accept_notification_secret_args` |
 | リスク | CLI 引数互換、`-D` 解析、通知設定ソース、デバイス検出待ち、既存コマンド出力が変わる |
-| ロールバック方針 | CLI adapter の呼び出しだけ旧経路へ戻す。旧 `create_command()` と `execute_macro()` の長期互換関数は残さない |
+| ロールバック方針 | CLI adapter の表示・引数処理だけを前段の実装へ戻す。`MacroRuntimeBuilder` 入口、Port 経路、旧 `create_command()` 削除方針は戻さない |
 
 CLI は `serial_manager.get_active_device()` と `capture_manager.get_active_device()` を直接呼ばない。検出完了待ちと dummy 許可は builder に集約する。
 
@@ -349,10 +349,10 @@ CLI は `serial_manager.get_active_device()` と `capture_manager.get_active_dev
 |------|------|
 | 目的 | GUI の実行制御を `RunHandle` / `RunResult` へ移行し、GUI スレッドから `cmd.stop()` による例外送出をなくす |
 | 対象ファイル | `src\nyxpy\gui\main_window.py`, GUI log pane 関連ファイル, `src\nyxpy\framework\core\logger\dispatcher.py`, `src\nyxpy\framework\core\runtime\builder.py`, `tests\gui\test_main_window.py` |
-| 完了条件 | Run button は `runtime.start(context)` を呼び、Cancel button は `handle.cancel()` を呼び、完了時に `RunResult` を UI 状態へ反映する |
+| 完了条件 | Run button は `MacroRuntimeBuilder.start(request)` を呼び、Cancel button は `handle.cancel()` を呼び、完了時に `RunResult` を UI 状態へ反映する |
 | テスト | `test_main_window_uses_run_handle`, `test_main_window_cancel_calls_handle_cancel`, `test_main_window_poll_updates_status_from_run_result`, `test_gui_log_pane_displays_user_event_from_sink`, `test_gui_log_sink_removed_on_close` |
 | リスク | Qt thread と Runtime thread の責務混在、GUI log handler の deadlock、preview capture と runtime frame source の所有権競合、終了時 cancel 待ち |
-| ロールバック方針 | 既存 `WorkerThread` を Qt signal adapter として残し、Runtime 実行呼び出しだけ旧 executor 経路へ戻す |
+| ロールバック方針 | 既存 `WorkerThread` を Qt signal adapter として残す場合でも、Runtime 実行入口は `MacroRuntimeBuilder.start(request)` に固定する。旧 executor 経路へは戻さない |
 
 core 層に Qt 依存を入れない。GUI は `RunResult` と GUI 表示イベントを Qt signal へ変換する adapter に徹する。
 

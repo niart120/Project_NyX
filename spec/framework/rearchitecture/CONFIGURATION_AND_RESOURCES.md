@@ -22,7 +22,7 @@
 | SettingsSchema | 設定キー、型、既定値、検証規則、秘密値フラグを表す schema 定義 |
 | MacroSettingsResolver | `macro.toml` または class metadata の settings 指定を解決し、マクロ実行引数へ渡す辞書を作るコンポーネント |
 | Resource File I/O | assets 読み込みと outputs 書き込みを扱う別建て仕様。詳細と API は `RESOURCE_FILE_IO.md` に従う |
-| MacroRuntimeBuilder | GUI/CLI/Legacy 入口から Runtime、Ports、settings、Resource scope を組み立てる adapter。API と責務の正本は `RUNTIME_AND_IO_PORTS.md` に置く |
+| MacroRuntimeBuilder | GUI/CLI 入口から Runtime、Ports、settings、Resource scope を組み立てる adapter。API と責務の正本は `RUNTIME_AND_IO_PORTS.md` に置く |
 | ConfigurationError | 設定ファイル破損、schema 不一致、秘密設定の誤用など、実行前に検出できる不備を表す例外 |
 | SecretBoundaryError | secret 値が通常設定、例外、ログ、GUI 表示イベントへ漏れる構成を検出したことを表す例外 |
 
