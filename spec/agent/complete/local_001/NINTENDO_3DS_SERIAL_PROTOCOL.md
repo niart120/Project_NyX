@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`
 > **目的**: Nintendo 3DS 向けシリアル通信デバイスを NyX の `SerialProtocolInterface` 経由で利用可能にする。
-> **関連ドキュメント**: `../../../framework/archive/protocol_design.md`, `../../../framework/archive/hardware_design.md`
+> **関連ドキュメント**: `../../../framework/archive/protocol_design.md`, `../../../framework/archive/hardware_design.md`, `FOLLOWUP_FIXES.md`
 > **参考資料**: ユーザ提供の通信仕様スクリーンショット、<https://www.3dscontroller.com/>
 > **破壊的変更**: なし
 
@@ -441,7 +441,7 @@ GUI ではプロトコル選択時に `ProtocolFactory.get_default_baudrate(prot
 - [x] 既存テストが破壊されないことの確認
 - [x] ユニットテスト作成・パス
 - [x] GUI テスト作成・パス
-- [ ] 統合テスト作成・パス
-- [ ] 実機テストを `@pytest.mark.realdevice` として追加
+- [x] 統合テスト作成・パス
+- [x] 実機テストを `@pytest.mark.realdevice` として追加
 - [x] 型ヒントの整合性チェック（ruff）
 - [x] ドキュメントコメント（公開 API のみ）

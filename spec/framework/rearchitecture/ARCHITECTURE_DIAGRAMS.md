@@ -284,14 +284,12 @@ flowchart TB
     VirtualController["GUI VirtualControllerModel"]
 
     subgraph PortLayer["Port layer"]
-        Controller["ControllerOutputPort<br/>press / hold / release / keyboard / type_key"]
+        Controller["ControllerOutputPort<br/>press / hold / release / keyboard / type_key<br/>touch / sleep optional methods"]
         Capture["FrameSourcePort<br/>initialize / await_ready / latest_frame / try_latest_frame"]
         Resource["ResourceStorePort<br/>resolve_asset_path / load_image"]
         Artifact["RunArtifactStore<br/>resolve_output_path / save_image / open_output"]
         Notify["NotificationPort<br/>publish"]
         Logger["LoggerPort<br/>log"]
-        Touch["TouchInputCapability<br/>任意 capability"]
-        Sleep["SleepControlCapability<br/>任意 capability"]
     end
 
     subgraph AdapterLayer["Adapter layer"]
@@ -323,15 +321,11 @@ flowchart TB
     DefaultCommandImpl --> Artifact
     DefaultCommandImpl --> Notify
     DefaultCommandImpl --> Logger
-    DefaultCommandImpl -. "touch*" .-> Touch
-    DefaultCommandImpl -. "disable_sleep" .-> Sleep
     PreviewPane --> Capture
     VirtualController --> Controller
 
     Controller --> SerialPort --> SerialComm --> Protocol
     Controller --> DummyController
-    Touch -.-> SerialPort
-    Sleep -.-> SerialPort
     Capture --> CapturePort --> CaptureDevice
     Capture --> DummyFrame
     Resource --> ResourceStore --> AssetsRoot
@@ -349,7 +343,7 @@ flowchart TB
 
     class DefaultCommandImpl commandimpl;
     class PreviewPane,VirtualController gui;
-    class Controller,Capture,Resource,Artifact,Notify,Logger,Touch,Sleep port;
+    class Controller,Capture,Resource,Artifact,Notify,Logger port;
     class SerialPort,DummyController,CapturePort,DummyFrame,ResourceStore,ArtifactStore,NotificationHandlerAdapter,LoggerPortAdapter adapter;
     class SerialComm,Protocol,CaptureDevice,AssetsRoot,OutputsRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
 ```

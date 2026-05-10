@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 
 from nyxpy.framework.core.constants import Button, KeyCode
-from nyxpy.framework.core.io.ports import SleepControlCapability, TouchInputCapability
 from nyxpy.framework.core.io.resources import (
     DefaultResourcePathGuard,
     MacroResourceScope,
@@ -32,14 +31,29 @@ def test_controller_output_port_contract_records_basic_operations() -> None:
     ]
 
 
-def test_optional_controller_capabilities_are_runtime_checkable() -> None:
-    base = FakeControllerOutputPort()
-    full = FakeFullCapabilityController()
+def test_controller_output_port_optional_methods_raise_by_default() -> None:
+    controller = FakeControllerOutputPort()
 
-    assert not isinstance(base, TouchInputCapability)
-    assert not isinstance(base, SleepControlCapability)
-    assert isinstance(full, TouchInputCapability)
-    assert isinstance(full, SleepControlCapability)
+    with pytest.raises(NotImplementedError, match="touch input"):
+        controller.touch_down(1, 2)
+    with pytest.raises(NotImplementedError, match="touch input"):
+        controller.touch_up()
+    with pytest.raises(NotImplementedError, match="sleep control"):
+        controller.disable_sleep(True)
+
+
+def test_full_fake_controller_overrides_optional_methods() -> None:
+    controller = FakeFullCapabilityController()
+
+    controller.touch_down(1, 2)
+    controller.touch_up()
+    controller.disable_sleep(True)
+
+    assert controller.events[-3:] == [
+        ("touch_down", (1, 2)),
+        ("touch_up", None),
+        ("disable_sleep", True),
+    ]
 
 
 def test_resource_path_guard_accepts_windows_relative_path(tmp_path: Path) -> None:

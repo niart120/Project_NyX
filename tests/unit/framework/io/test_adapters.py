@@ -45,6 +45,17 @@ class Protocol:
         return ("keytype", key, op)
 
 
+class ThreeDSProtocol(Protocol):
+    def build_touch_down_command(self, x, y):
+        return ("touch_down", x, y)
+
+    def build_touch_up_command(self):
+        return ("touch_up",)
+
+    def build_disable_sleep_command(self, enabled):
+        return ("disable_sleep", enabled)
+
+
 def test_controller_output_port_serializes_send_operations() -> None:
     serial = SerialDevice()
     port = SerialControllerOutputPort(serial, Protocol())
@@ -64,6 +75,35 @@ def test_controller_output_port_serializes_send_operations() -> None:
         ("keytype", KeyCode("C"), KeyboardOp.PRESS),
         ("keytype", KeyCode("C"), KeyboardOp.RELEASE),
     ]
+
+
+def test_serial_controller_touch_sends_3ds_frames() -> None:
+    serial = SerialDevice()
+    port = SerialControllerOutputPort(serial, ThreeDSProtocol())
+
+    port.touch_down(320, 240)
+    port.touch_up()
+
+    assert serial.sent == [("touch_down", 320, 240), ("touch_up",)]
+
+
+def test_serial_controller_disable_sleep_sends_3ds_command() -> None:
+    serial = SerialDevice()
+    port = SerialControllerOutputPort(serial, ThreeDSProtocol())
+
+    port.disable_sleep(True)
+    port.disable_sleep(False)
+
+    assert serial.sent == [("disable_sleep", True), ("disable_sleep", False)]
+
+
+def test_serial_controller_touch_unsupported_protocol_raises() -> None:
+    port = SerialControllerOutputPort(SerialDevice(), Protocol())
+
+    with pytest.raises(NotImplementedError, match="touch input"):
+        port.touch_down(320, 240)
+    with pytest.raises(NotImplementedError, match="sleep control"):
+        port.disable_sleep(True)
 
 
 def test_controller_output_port_keyboard_fallback_types_each_char() -> None:

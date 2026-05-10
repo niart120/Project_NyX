@@ -118,6 +118,14 @@ def test_default_command_unsupported_capabilities_raise(tmp_path) -> None:
         cmd.disable_sleep(True)
 
 
+def test_default_command_unsupported_touch_error_propagates(tmp_path) -> None:
+    controller = FakeControllerOutputPort()
+    cmd = DefaultCommand(context=make_fake_execution_context(tmp_path, controller=controller))
+
+    with pytest.raises(NotImplementedError, match="touch input"):
+        cmd.touch(1, 2, dur=0, wait=0)
+
+
 def test_default_command_wait_raises_after_cancel(tmp_path) -> None:
     context = make_fake_execution_context(tmp_path)
     context.cancellation_token.request_cancel(reason="test", source="test")

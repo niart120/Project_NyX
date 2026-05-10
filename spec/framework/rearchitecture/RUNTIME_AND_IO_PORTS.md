@@ -30,7 +30,7 @@
 | RunLogContext | 1 回の実行に紐づくログ相関情報。型定義は `LOGGING_FRAMEWORK.md` を正とし、所有は `ExecutionContext.run_log_context` とする |
 | RunHandle | 非同期実行中のマクロに対するキャンセル、完了待ち、結果取得のハンドル |
 | RunResult | `macro_id`、`macro_name`、マクロ実行の終了状態、`datetime` の開始・終了時刻、`ErrorInfo | None`、`cleanup_warnings` を表す値オブジェクト |
-| ControllerOutputPort | ボタン、スティック、キーボード入力をコントローラー出力へ送る基本 Port。touch と sleep は optional capability に分離する |
+| ControllerOutputPort | ボタン、スティック、キーボード入力をコントローラー出力へ送る Port。touch と sleep は非抽象の任意操作として持ち、非対応時は `NotImplementedError` を送出する |
 | FrameSourcePort | キャプチャデバイスまたはテスト用フレームソースから最新フレームを取得する Port |
 | ResourceStorePort | Resource File I/O の assets 読み込みを行う Port。詳細は `RESOURCE_FILE_IO.md` を正とし、settings TOML 解決は担当しない |
 | RunArtifactStore | Resource File I/O の writable outputs 保存を行う Port。実行 ID ごとの成果物 root、atomic write、overwrite policy を担当する |
@@ -460,17 +460,14 @@ class ControllerOutputPort(ABC):
     @abstractmethod
     def close(self) -> None: ...
 
+    def touch_down(self, x: int, y: int) -> None:
+        raise NotImplementedError("Current controller output does not support touch input.")
 
-@runtime_checkable
-class TouchInputCapability(Protocol):
-    def touch_down(self, x: int, y: int) -> None: ...
+    def touch_up(self) -> None:
+        raise NotImplementedError("Current controller output does not support touch input.")
 
-    def touch_up(self) -> None: ...
-
-
-@runtime_checkable
-class SleepControlCapability(Protocol):
-    def disable_sleep(self, enabled: bool = True) -> None: ...
+    def disable_sleep(self, enabled: bool = True) -> None:
+        raise NotImplementedError("Current controller output does not support sleep control.")
 
 
 class FrameSourcePort(ABC):
@@ -594,7 +591,7 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 #### ControllerOutputPort
 
-`ControllerOutputPort` の基本契約は `press`、`hold`、`release`、`keyboard`、`type_key`、`close` に限定する。touch 操作は `TouchInputCapability`、スリープ制御は `SleepControlCapability` を実装した Port だけが提供する。`DefaultCommand.touch*()` と `disable_sleep()` は `isinstance(port, TouchInputCapability)` / `isinstance(port, SleepControlCapability)` で capability の有無を検査し、未対応なら既存どおり `NotImplementedError` を送出する。
+`ControllerOutputPort` の必須契約は `press`、`hold`、`release`、`keyboard`、`type_key`、`close` とする。touch 操作とスリープ制御は非抽象の任意操作として同じ Port に置き、既定実装は `NotImplementedError` を送出する。`DefaultCommand.touch*()` と `disable_sleep()` は capability 判定を行わず Port へ委譲し、未対応時は Port 側の `NotImplementedError` をそのまま伝播する。
 
 `SerialControllerOutputPort` は `SerialCommInterface` と `SerialProtocolInterface` を受け取り、既存 `DefaultCommand` 内の protocol build 処理を移管する。`VirtualControllerModel` も同じ Port を使うことで、マクロ実行と手動操作の送信経路を統一する。
 
