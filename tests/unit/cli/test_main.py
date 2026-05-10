@@ -13,7 +13,7 @@ from nyxpy.cli.run_cli import (
     execute_macro,
 )
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, ThreeDSSerialProtocol
-from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
+from nyxpy.framework.core.macro.exceptions import ConfigurationError, ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 
 
@@ -45,6 +45,11 @@ class MockLoggingComponents:
 
     def close(self):
         self.closed = True
+
+
+class FailingLoggingComponents(MockLoggingComponents):
+    def close(self):
+        raise RuntimeError("close failed")
 
 
 class MockSerialManager:
@@ -392,3 +397,74 @@ def test_cli_main_exception(
         log[1] == "ERROR" and "Unhandled exception" in log[2]
         for log in mock_log_manager.logger.logs
     )
+
+
+def test_cli_unhandled_exception_uses_fixed_user_message(
+    monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager, capsys
+):
+    args = make_args()
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_protocol",
+        lambda name: (_ for _ in ()).throw(
+            RuntimeError("secret value leaked from E:\\secret\\payload.txt")
+        ),
+    )
+
+    assert cli_main(args) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "Unexpected error. See logs for details."
+    assert "secret value" not in captured.out
+    assert "E:\\secret\\payload.txt" not in captured.out
+    assert any(log[4] == "cli.unhandled" for log in mock_log_manager.logger.logs)
+
+
+def test_cli_configuration_error_returns_1(
+    monkeypatch, mock_log_manager, mock_serial_manager, mock_capture_manager
+):
+    args = make_args()
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", mock_capture_manager)
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_protocol",
+        lambda name: (_ for _ in ()).throw(ConfigurationError("invalid protocol settings")),
+    )
+
+    assert cli_main(args) == 1
+    assert any(log[4] == "configuration.invalid" for log in mock_log_manager.logger.logs)
+
+
+def test_cli_cleanup_failures_are_logged(monkeypatch, mock_serial_manager):
+    args = make_args()
+    logging = FailingLoggingComponents()
+    capture_manager = MockCaptureManager({"Camera1": MagicMock()})
+    capture_manager.release_active = MagicMock(side_effect=RuntimeError("release failed"))
+    mock_serial_manager.close_active = MagicMock(side_effect=RuntimeError("close failed"))
+
+    monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=logging))
+    monkeypatch.setattr("nyxpy.cli.run_cli.serial_manager", mock_serial_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.capture_manager", capture_manager)
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: MagicMock())
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_runtime_builder",
+        MagicMock(return_value=MagicMock()),
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.execute_macro",
+        MagicMock(return_value=result(RunStatus.SUCCESS)),
+    )
+
+    assert cli_main(args) == 0
+    cleanup_events = [
+        log for log in logging.logger.logs if log[0] == "technical" and log[4] == "resource.cleanup_failed"
+    ]
+    assert len(cleanup_events) == 3
