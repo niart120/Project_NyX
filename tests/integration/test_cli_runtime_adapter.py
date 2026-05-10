@@ -57,24 +57,19 @@ def test_create_runtime_builder_docstring_describes_runtime_builder() -> None:
 
 
 def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path) -> None:
-    sentinel_secrets = object()
+    sentinel_snapshot = object()
     captured = {}
+    settings_store = MagicMock(snapshot=MagicMock(return_value={}))
+    secrets_store = MagicMock(snapshot=MagicMock(return_value=sentinel_snapshot))
+    serial_devices = MagicMock()
+    capture_devices = MagicMock()
 
-    monkeypatch.setattr("nyxpy.cli.run_cli.SecretsSettings", lambda: sentinel_secrets)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.MacroRegistry", lambda project_root: MagicMock(reload=lambda: None)
     )
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.serial_manager",
-        MagicMock(),
-    )
-    monkeypatch.setattr(
-        "nyxpy.cli.run_cli.capture_manager",
-        MagicMock(),
-    )
 
-    def create_notification_handler(settings, *, logger):
-        captured["settings"] = settings
+    def create_notification_handler(secrets_snapshot, *, logger):
+        captured["secrets_snapshot"] = secrets_snapshot
         captured["logger"] = logger
         return "notification-port"
 
@@ -82,21 +77,40 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
         "nyxpy.cli.run_cli.create_notification_handler_from_settings",
         create_notification_handler,
     )
-    legacy_builder = MagicMock()
-    monkeypatch.setattr("nyxpy.cli.run_cli.create_legacy_runtime_builder", legacy_builder)
+    device_builder = MagicMock()
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_device_runtime_builder", device_builder)
     logger = Logger()
 
-    run_cli.create_runtime_builder(MagicMock(), logger=logger, resources_dir=tmp_path)
+    run_cli.create_runtime_builder(
+        MagicMock(),
+        logger=logger,
+        resources_dir=tmp_path,
+        settings_store=settings_store,
+        secrets_store=secrets_store,
+        serial_device_manager=serial_devices,
+        capture_device_manager=capture_devices,
+    )
 
-    assert captured == {"settings": sentinel_secrets, "logger": logger}
-    assert legacy_builder.call_args.kwargs["notification_handler"] == "notification-port"
-    assert "serial_device" not in legacy_builder.call_args.kwargs
-    assert "capture_device" not in legacy_builder.call_args.kwargs
+    assert captured == {"secrets_snapshot": sentinel_snapshot, "logger": logger}
+    assert device_builder.call_args.kwargs["notification_handler"] == "notification-port"
+    assert device_builder.call_args.kwargs["settings"] == {}
+    assert "serial_device" not in device_builder.call_args.kwargs
+    assert "capture_device" not in device_builder.call_args.kwargs
 
 
 def test_cli_does_not_import_removed_runtime_apis() -> None:
     cli_dir = Path(__file__).resolve().parents[2] / "src" / "nyxpy" / "cli"
-    forbidden_names = {"MacroExecutor", "DefaultCommand", "LogManager", "log_manager"}
+    forbidden_names = {
+        "MacroExecutor",
+        "DefaultCommand",
+        "LogManager",
+        "log_manager",
+        "create_legacy_runtime_builder",
+        "SecretsSettings",
+        "singletons",
+        "serial_manager",
+        "capture_manager",
+    }
 
     for source_path in cli_dir.glob("*.py"):
         source = source_path.read_text(encoding="utf-8")

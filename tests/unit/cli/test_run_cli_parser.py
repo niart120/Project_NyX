@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
 from nyxpy.cli import run_cli
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
@@ -31,6 +30,7 @@ class Logging:
 class RecordingBuilder:
     def __init__(self) -> None:
         self.request: RuntimeBuildRequest | None = None
+        self.shutdown_called = False
 
     def run(self, request: RuntimeBuildRequest) -> RunResult:
         self.request = request
@@ -43,6 +43,9 @@ class RecordingBuilder:
             started_at=now,
             finished_at=now,
         )
+
+    def shutdown(self) -> None:
+        self.shutdown_called = True
 
 
 def test_cli_parser_keeps_existing_options() -> None:
@@ -98,8 +101,6 @@ def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
         "create_runtime_builder",
         lambda **kwargs: builder,
     )
-    monkeypatch.setattr(run_cli, "capture_manager", _Manager())
-    monkeypatch.setattr(run_cli, "serial_manager", _Manager())
 
     args = run_cli.build_parser().parse_args(
         [
@@ -122,6 +123,7 @@ def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
     assert builder.request.macro_id == "sample"
     assert builder.request.entrypoint == "cli"
     assert builder.request.exec_args == {"count": 3, "name": "nyx"}
+    assert builder.shutdown_called is True
 
 
 def test_cli_define_defaults_to_empty_request_args(monkeypatch) -> None:
@@ -131,8 +133,6 @@ def test_cli_define_defaults_to_empty_request_args(monkeypatch) -> None:
     monkeypatch.setattr(run_cli, "create_protocol", lambda protocol_name: object())
     monkeypatch.setattr(run_cli.ProtocolFactory, "resolve_baudrate", lambda protocol, baud: baud)
     monkeypatch.setattr(run_cli, "create_runtime_builder", lambda **kwargs: builder)
-    monkeypatch.setattr(run_cli, "capture_manager", _Manager())
-    monkeypatch.setattr(run_cli, "serial_manager", _Manager())
 
     args = run_cli.build_parser().parse_args(
         ["sample", "--serial", "serial-1", "--capture", "capture-1"]
@@ -143,14 +143,4 @@ def test_cli_define_defaults_to_empty_request_args(monkeypatch) -> None:
     assert exit_code == 0
     assert builder.request is not None
     assert builder.request.exec_args == {}
-
-
-class _Manager:
-    def set_logger(self, logger: Any) -> None:
-        pass
-
-    def release_active(self) -> None:
-        pass
-
-    def close_active(self) -> None:
-        pass
+    assert builder.shutdown_called is True

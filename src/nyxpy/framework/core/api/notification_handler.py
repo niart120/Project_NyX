@@ -1,7 +1,9 @@
+from typing import Protocol
+
 import cv2
 
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
-from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.framework.core.settings.schema import SettingValue
 
 from .bluesky_notification import BlueskyNotification
 from .discord_notification import DiscordNotification
@@ -32,11 +34,17 @@ class NotificationHandler:
                     event="notification.failed",
                     extra={"notifier": type(notifier).__name__},
                     exc=exc,
-                )
+            )
+
+
+class NotificationSettings(Protocol):
+    def get(self, key: str, default: SettingValue = None) -> SettingValue: ...
+
+    def get_secret(self, key: str) -> str: ...
 
 
 def create_notification_handler_from_settings(
-    secrets: SecretsSettings,
+    secrets: NotificationSettings,
     logger: LoggerPort | None = None,
 ):
     """
@@ -53,14 +61,14 @@ def create_notification_handler_from_settings(
 
     # Discord通知の設定
     if secrets.get("notification.discord.enabled", False):
-        webhook_url = secrets.get("notification.discord.webhook_url", "")
+        webhook_url = secrets.get_secret("notification.discord.webhook_url")
         if webhook_url:
             notifiers.append(DiscordNotification(webhook_url, logger=logger))
 
     # Bluesky通知の設定
     if secrets.get("notification.bluesky.enabled", False):
-        identifier = secrets.get("notification.bluesky.identifier", "")
-        password = secrets.get("notification.bluesky.password", "")
+        identifier = secrets.get_secret("notification.bluesky.identifier")
+        password = secrets.get_secret("notification.bluesky.password")
         if identifier and password:
             notifiers.append(BlueskyNotification(identifier, password, logger=logger))
 

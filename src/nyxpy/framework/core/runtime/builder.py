@@ -150,7 +150,7 @@ class MacroRuntimeBuilder:
         return bool(self.settings.get("runtime.allow_dummy", False))
 
 
-def create_legacy_runtime_builder(
+def create_device_runtime_builder(
     *,
     project_root: Path,
     registry: MacroRegistry,
@@ -167,7 +167,7 @@ def create_legacy_runtime_builder(
     detection_timeout_sec: float = 2.0,
     settings: SettingsSnapshot | None = None,
 ) -> MacroRuntimeBuilder:
-    """既存具象実装を Port 契約へ接続する Runtime builder。"""
+    """Device managers or direct devices を Port 契約へ接続する Runtime builder。"""
     settings_snapshot = dict(settings or {})
     direct_devices = serial_device is not None or capture_device is not None
     managed_devices = serial_manager is not None or capture_manager is not None
@@ -392,3 +392,8 @@ def _optional_int(value: object) -> int | None:
     if value is None or value == "":
         return None
     return int(value)
+
+
+def create_legacy_runtime_builder(**kwargs) -> MacroRuntimeBuilder:
+    """Backward-compatible alias for older GUI/CLI composition roots."""
+    return create_device_runtime_builder(**kwargs)
