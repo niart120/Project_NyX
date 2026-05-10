@@ -1,8 +1,8 @@
 # GUI 再設計 Phase 2: Runtime 実行制御
 
-> **文書種別**: Phase 仕様。GUI の実行開始、cancel、polling、UI 状態を扱う。  
-> **対象モジュール**: `src\nyxpy\gui\main_window.py`, `src\nyxpy\gui\panes\control_pane.py`, `tests\gui\test_main_window.py`  
-> **親仕様**: `IMPLEMENTATION_PLAN.md`  
+> **文書種別**: Phase 仕様。GUI の実行開始、cancel、polling、UI 状態を扱う。
+> **対象モジュール**: `src\nyxpy\gui\main_window.py`, `src\nyxpy\gui\panes\control_pane.py`, `tests\gui\test_main_window.py`
+> **親仕様**: `IMPLEMENTATION_PLAN.md`
 > **先行条件**: Phase 1 完了。GUI が stable `macro_id` と service 経由の Runtime builder を使える。
 
 ## 1. 目的
@@ -82,4 +82,3 @@ RUNNING
 | Cancellation gate | cancel は `RunHandle.cancel()` のみ |
 | Double-run prevention gate | `CANCELLING` 中に run button が有効にならない |
 | User display gate | traceback や内部 path を status / dialog に出さない |
-

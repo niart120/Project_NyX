@@ -1,9 +1,9 @@
 # GUI 再設計追従 実装修正仕様書
 
-> **文書種別**: 実装修正仕様。フレームワーク再設計後に GUI adapter が満たすべき責務、残修正、検証ゲートを定義する。  
-> **対象モジュール**: `src\nyxpy\gui\`, `tests\gui\`  
-> **目的**: GUI の実行制御を `RunHandle` / `RunResult` / `UserEvent` ベースへ固定し、旧 `Command.stop()`、`MacroExecutor`、GUI スレッドからの Runtime 詳細操作、capture 所有権競合を排除する。  
-> **関連ドキュメント**: `spec\framework\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`, `spec\framework\rearchitecture\DEPRECATION_AND_MIGRATION.md`, `PHASE_1_APP_SERVICES_AND_CATALOG.md`, `PHASE_2_RUNTIME_CONTROL.md`, `PHASE_3_PREVIEW_AND_OBSERVABILITY.md`, `PHASE_4_CLEANUP_AND_REGRESSION.md`  
+> **文書種別**: 実装修正仕様。フレームワーク再設計後に GUI adapter が満たすべき責務、残修正、検証ゲートを定義する。
+> **対象モジュール**: `src\nyxpy\gui\`, `tests\gui\`
+> **目的**: GUI の実行制御を `RunHandle` / `RunResult` / `UserEvent` ベースへ固定し、旧 `Command.stop()`、`MacroExecutor`、GUI スレッドからの Runtime 詳細操作、capture 所有権競合を排除する。
+> **関連ドキュメント**: `spec\framework\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`, `spec\framework\rearchitecture\DEPRECATION_AND_MIGRATION.md`, `PHASE_1_APP_SERVICES_AND_CATALOG.md`, `PHASE_2_RUNTIME_CONTROL.md`, `PHASE_3_PREVIEW_AND_OBSERVABILITY.md`, `PHASE_4_CLEANUP_AND_REGRESSION.md`
 > **破壊的変更**: マクロ実行、停止、設定、ログ表示の GUI 操作は維持する。マクロ一覧の内部識別子は class name から stable `macro_id` へ移行するが、表示名は維持する。
 
 ## 1. 概要
@@ -268,4 +268,3 @@ GUI 移行は次をすべて満たした時点で完了とする。
 | Log sink gate | `GuiLogSink` は Qt adapter に留まり、close 時に dispatcher から解除される |
 | Cleanup visibility gate | close / release / wait 失敗を沈黙させない |
 | Removal gate | `MacroExecutor`、`DefaultCommand`、`LogManager` 参照が GUI にない |
-

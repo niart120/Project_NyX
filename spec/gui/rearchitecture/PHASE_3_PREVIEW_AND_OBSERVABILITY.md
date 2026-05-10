@@ -1,8 +1,8 @@
 # GUI 再設計 Phase 3: Preview 所有権と可観測性
 
-> **文書種別**: Phase 仕様。Runtime 実行中の capture 所有権と GUI ログ表示を扱う。  
-> **対象モジュール**: `src\nyxpy\gui\panes\preview_pane.py`, `src\nyxpy\gui\panes\log_pane.py`, `src\nyxpy\gui\log_sink.py`, `src\nyxpy\gui\main_window.py`  
-> **親仕様**: `IMPLEMENTATION_PLAN.md`  
+> **文書種別**: Phase 仕様。Runtime 実行中の capture 所有権と GUI ログ表示を扱う。
+> **対象モジュール**: `src\nyxpy\gui\panes\preview_pane.py`, `src\nyxpy\gui\panes\log_pane.py`, `src\nyxpy\gui\log_sink.py`, `src\nyxpy\gui\main_window.py`
+> **親仕様**: `IMPLEMENTATION_PLAN.md`
 > **先行条件**: Phase 2 完了。GUI 実行状態が `RunHandle` ベースで管理されている。
 
 ## 1. 目的
@@ -75,4 +75,3 @@ def resume_after_runtime(self) -> None: ...
 | Resume gate | 成功、失敗、中断、result 例外のいずれでも preview の扱いが一貫する |
 | Qt boundary gate | framework 層が `nyxpy.gui` / Qt を import しない |
 | Sink lifecycle gate | `LogPane` close 後に sink が解除される |
-

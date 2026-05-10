@@ -1,9 +1,9 @@
 # CLI 再設計追従 実装修正仕様書
 
-> **文書種別**: 実装修正仕様。フレームワーク再設計後に CLI adapter が満たすべき責務、残修正、検証ゲートを定義する。  
-> **対象モジュール**: `src\nyxpy\cli\`, `tests\integration\test_cli_runtime_adapter.py`, `tests\unit\cli\`  
-> **目的**: CLI を `MacroRuntimeBuilder` / `RuntimeBuildRequest` / `RunResult` ベースの薄い adapter に固定し、旧 `DefaultCommand` 直接構築、通知 secret の独自入力、実行後 cleanup の沈黙失敗を排除する。  
-> **関連ドキュメント**: `spec\framework\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`, `spec\framework\rearchitecture\DEPRECATION_AND_MIGRATION.md`  
+> **文書種別**: 実装修正仕様。フレームワーク再設計後に CLI adapter が満たすべき責務、残修正、検証ゲートを定義する。
+> **対象モジュール**: `src\nyxpy\cli\`, `tests\integration\test_cli_runtime_adapter.py`, `tests\unit\cli\`
+> **目的**: CLI を `MacroRuntimeBuilder` / `RuntimeBuildRequest` / `RunResult` ベースの薄い adapter に固定し、旧 `DefaultCommand` 直接構築、通知 secret の独自入力、実行後 cleanup の沈黙失敗を排除する。
+> **関連ドキュメント**: `spec\framework\rearchitecture\IMPLEMENTATION_PLAN.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `spec\framework\rearchitecture\LOGGING_FRAMEWORK.md`, `spec\framework\rearchitecture\OBSERVABILITY_AND_GUI_CLI.md`, `spec\framework\rearchitecture\DEPRECATION_AND_MIGRATION.md`
 > **破壊的変更**: CLI オプション互換は維持する。終了コードは成功 `0`、設定不正 `1`、実行失敗 `2`、中断 `130` を正とする。通知 secret を CLI 引数で受け取る機能は追加しない。
 
 ## 1. 概要
@@ -221,4 +221,3 @@ CLI 移行は次をすべて満たした時点で完了とする。
 | Exit code gate | `RunResult` と構成不正から終了コードを一意に決める |
 | Cleanup visibility gate | release / close 失敗を沈黙させない |
 | Removal gate | `MacroExecutor`、`LogManager`、`log_manager` 参照が CLI にない |
-

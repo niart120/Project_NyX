@@ -1,7 +1,7 @@
 # GUI 再設計 Phase 1: AppServices と MacroCatalog
 
-> **文書種別**: Phase 仕様。GUI 再設計追従のうち、composition root と macro identity を扱う。  
-> **対象モジュール**: `src\nyxpy\gui\app_services.py`, `src\nyxpy\gui\macro_catalog.py`, `src\nyxpy\gui\panes\macro_browser.py`, `src\nyxpy\gui\main_window.py`  
+> **文書種別**: Phase 仕様。GUI 再設計追従のうち、composition root と macro identity を扱う。
+> **対象モジュール**: `src\nyxpy\gui\app_services.py`, `src\nyxpy\gui\macro_catalog.py`, `src\nyxpy\gui\panes\macro_browser.py`, `src\nyxpy\gui\main_window.py`
 > **親仕様**: `IMPLEMENTATION_PLAN.md`
 
 ## 1. 目的
@@ -86,4 +86,3 @@ class MacroCatalog:
 | Stable ID gate | GUI 実行要求の `macro_id` が `MacroDefinition.id` である |
 | Testability gate | `MainWindow` テストで fake service を注入できる |
 | No cross-layer gate | framework 層に GUI import が増えていない |
-
