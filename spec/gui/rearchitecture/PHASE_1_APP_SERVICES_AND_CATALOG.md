@@ -8,7 +8,7 @@
 
 `MainWindow` に集中している logging、registry、runtime builder、device 設定反映を `GuiAppServices` 相当の collaborator へ切り出す。あわせて、GUI のマクロ選択値を class name から stable `MacroDefinition.id` へ移す。
 
-この phase では実行状態や preview pause は変更しない。後続 phase が安全に Runtime 実行制御へ手を入れられるよう、依存生成と macro identity の土台だけを固定する。
+この phase では実行状態や preview の device 切り替え処理は変更しない。後続 phase が安全に Runtime 実行制御へ手を入れられるよう、依存生成と macro identity の土台だけを固定する。
 
 ## 2. 現状と問題
 
@@ -38,7 +38,8 @@ class GuiAppServices:
 - `create_default_logging(base_dir=project_root / "logs", console_enabled=False)` を生成する。
 - `MacroRegistry(project_root)` を生成し、`MacroCatalog` へ渡す。
 - `ProtocolFactory`、serial / capture manager、notification handler、settings / secrets から Runtime builder を構成する。
-- `apply_settings()` で serial、capture、protocol、notification の変更反映を扱う。
+- `create_runtime_builder()` は cached builder を返す。起動直後または `apply_settings()` で snapshot が変わった場合だけ builder を再構成する。
+- `apply_settings()` で serial、capture、protocol、notification の変更反映を扱う。実行中に builder 再構成が必要な変更は即時反映せず、実行完了後に適用するか、UI で変更適用不可にする。
 - `close()` で manager release と logging close を扱う。例外記録の詳細は Phase 4 に委譲する。
 
 `GuiAppServices` は singleton ではない。`MainWindow` の lifetime に 1 個だけ持ち、テストでは fake service に差し替える。
