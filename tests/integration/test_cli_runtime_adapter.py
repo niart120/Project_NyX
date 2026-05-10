@@ -8,11 +8,14 @@ from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 
 
 class Logger:
+    def __init__(self) -> None:
+        self.user_events = []
+
     def bind_context(self, context):
         return self
 
     def user(self, level, message, *, component, event, code=None, extra=None):
-        pass
+        self.user_events.append((level, message, component, event))
 
     def technical(self, level, message, *, component, event="log.message", extra=None, exc=None):
         pass
@@ -31,15 +34,24 @@ def run_result(status: RunStatus = RunStatus.SUCCESS) -> RunResult:
 
 
 def test_cli_uses_runtime_and_run_result() -> None:
+    logger = Logger()
     builder = MagicMock(run=MagicMock(return_value=run_result(RunStatus.CANCELLED)))
 
-    result = run_cli.execute_macro(builder, "sample", {"count": 1}, Logger())
+    result = run_cli.execute_macro(builder, "sample", {"count": 1}, logger)
 
     assert result.status is RunStatus.CANCELLED
     request = builder.run.call_args.args[0]
     assert request.macro_id == "sample"
     assert request.entrypoint == "cli"
     assert request.exec_args == {"count": 1}
+    assert logger.user_events == [
+        ("WARNING", "Macro execution was interrupted", "CLI", "macro.cancelled")
+    ]
+
+
+def test_create_runtime_builder_docstring_describes_runtime_builder() -> None:
+    assert "Runtime builder" in (run_cli.create_runtime_builder.__doc__ or "")
+    assert "Command" not in (run_cli.create_runtime_builder.__doc__ or "")
 
 
 def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path) -> None:

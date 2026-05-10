@@ -89,7 +89,7 @@ def create_runtime_builder(
     detection_timeout_sec: float = 2.0,
 ) -> MacroRuntimeBuilder:
     """
-    指定されたコンポーネントでCommandインスタンスを作成します。
+    CLI で利用する Runtime builder を作成します。
 
     Args:
         protocol: 使用するプロトコル実装
@@ -131,15 +131,15 @@ def execute_macro(
     logger: LoggerPort,
 ) -> RunResult:
     """
-    適切なエラー処理でマクロを実行します。
+    CLI entrypoint の RuntimeBuildRequest を作成し、Runtime builder で実行します。
 
     Args:
         runtime_builder: 実行用 Runtime builder
         macro_name: 実行するマクロの名前
         exec_args: マクロに渡す引数
 
-    Raises:
-        RuntimeError: マクロ実行が失敗した場合
+    Returns:
+        Runtime が返した RunResult
     """
     result = runtime_builder.run(
         RuntimeBuildRequest(macro_id=macro_name, entrypoint="cli", exec_args=exec_args)
@@ -163,7 +163,7 @@ def execute_macro(
 def cli_main(args: argparse.Namespace) -> int:
     """
     CLIアプリケーションのメインエントリーポイント。
-    この関数はコマンドライン引数を解析し、適切なコマンドを実行します。
+    この関数は解析済み引数から Runtime 実行要求を組み立てます。
 
     Args:
         args: コマンドライン引数
