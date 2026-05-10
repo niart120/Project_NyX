@@ -18,42 +18,27 @@ class FakeSettings:
         self.data[key] = value
 
 
-class FakeManager:
-    def __init__(self, devices):
-        self.devices = devices
+class FakeDiscovery:
+    def detect(self, timeout_sec=2.0):
+        return self
 
-    def list_devices(self):
-        return self.devices
+    def capture_names(self):
+        return ["Camera1"]
+
+    def serial_names(self):
+        return ["COM1"]
 
 
-def test_device_tab_protocol_options_include_3ds(monkeypatch, qtbot):
-    monkeypatch.setattr(
-        "nyxpy.gui.dialogs.settings.device_tab.capture_manager",
-        FakeManager(["Camera1"]),
-    )
-    monkeypatch.setattr(
-        "nyxpy.gui.dialogs.settings.device_tab.serial_manager",
-        FakeManager(["COM1"]),
-    )
-
-    tab = DeviceSettingsTab(FakeSettings(), None)
+def test_device_tab_protocol_options_include_3ds(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
     options = [tab.ser_protocol.itemText(i) for i in range(tab.ser_protocol.count())]
     assert "3DS" in options
 
 
-def test_device_tab_selects_3ds_default_baudrate(monkeypatch, qtbot):
-    monkeypatch.setattr(
-        "nyxpy.gui.dialogs.settings.device_tab.capture_manager",
-        FakeManager(["Camera1"]),
-    )
-    monkeypatch.setattr(
-        "nyxpy.gui.dialogs.settings.device_tab.serial_manager",
-        FakeManager(["COM1"]),
-    )
-
-    tab = DeviceSettingsTab(FakeSettings(), None)
+def test_device_tab_selects_3ds_default_baudrate(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
     tab.ser_protocol.setCurrentText("3DS")

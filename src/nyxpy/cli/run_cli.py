@@ -7,10 +7,13 @@ from typing import Any
 from nyxpy.framework.core.api.notification_handler import (
     create_notification_handler_from_settings,
 )
-from nyxpy.framework.core.hardware.capture import CaptureManager
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.hardware.serial_comm import SerialManager
+from nyxpy.framework.core.io.device_factories import (
+    ControllerOutputPortFactory,
+    FrameSourcePortFactory,
+)
 from nyxpy.framework.core.logger import LoggerPort, LoggingComponents, create_default_logging
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroRegistry
@@ -93,8 +96,9 @@ def create_runtime_builder(
     detection_timeout_sec: float = 2.0,
     settings_store: SettingsStore | None = None,
     secrets_store: SecretsStore | None = None,
-    serial_device_manager: SerialManager | None = None,
-    capture_device_manager: CaptureManager | None = None,
+    device_discovery: DeviceDiscoveryService | None = None,
+    controller_output_factory: ControllerOutputPortFactory | None = None,
+    frame_source_factory: FrameSourcePortFactory | None = None,
 ) -> MacroRuntimeBuilder:
     """
     CLI で利用する Runtime builder を作成します。
@@ -116,17 +120,24 @@ def create_runtime_builder(
     config_dir = project_root / ".nyxpy"
     settings = settings_store or SettingsStore(config_dir=config_dir, strict_load=False)
     secrets = secrets_store or SecretsStore(config_dir=config_dir, strict_load=False)
-    capture_devices = capture_device_manager or CaptureManager()
-    capture_devices.set_logger(logger)
-    serial_devices = serial_device_manager or SerialManager()
+    discovery = device_discovery or DeviceDiscoveryService(logger=logger)
+    controller_factory = controller_output_factory or ControllerOutputPortFactory(
+        discovery=discovery,
+        protocol=protocol,
+    )
+    frame_factory = frame_source_factory or FrameSourcePortFactory(
+        discovery=discovery,
+        logger=logger,
+    )
     notification_handler = create_notification_handler_from_settings(
         secrets.snapshot(), logger=logger
     )
     return create_device_runtime_builder(
         project_root=project_root,
         registry=registry,
-        serial_manager=serial_devices,
-        capture_manager=capture_devices,
+        device_discovery=discovery,
+        controller_output_factory=controller_factory,
+        frame_source_factory=frame_factory,
         serial_name=serial_name,
         capture_name=capture_name,
         baudrate=baudrate,

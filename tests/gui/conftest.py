@@ -1,20 +1,26 @@
-"""GUI テスト用 conftest.
-
-すべての GUI テストで実ハードウェアへのアクセスを防止する。
-"""
+"""GUI テスト用 conftest."""
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
 def _no_real_hardware(monkeypatch):
-    """initialize_managers を no-op にして実デバイス検出を防止する。
+    """GUI テストで実デバイス検出を防止する。"""
 
-    MainWindow.__init__() が呼ぶ initialize_managers() は、
-    CaptureManager/SerialManager のシングルトン上でバックグラウンドスレッドを
-    起動し実デバイスを探索する。テストでは不要なため無効化する。
-    """
-    monkeypatch.setattr(
-        "nyxpy.gui.main_window.initialize_managers",
-        lambda: None,
-    )
+    class FakeDiscovery:
+        def detect(self, timeout_sec=2.0):
+            return self
+
+        def serial_names(self):
+            return []
+
+        def capture_names(self):
+            return []
+
+        def find_serial(self, name, timeout_sec):
+            return None
+
+        def find_capture(self, name, timeout_sec):
+            return None
+
+    monkeypatch.setattr("nyxpy.gui.main_window.DeviceDiscoveryService", lambda **_: FakeDiscovery())

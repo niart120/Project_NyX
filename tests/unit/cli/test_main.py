@@ -52,70 +52,9 @@ class FailingLoggingComponents(MockLoggingComponents):
         raise RuntimeError("close failed")
 
 
-class MockSerialManager:
-    def __init__(self, devices=None):
-        self.devices = devices or {}
-        self.active_name = None
-        self.active_baudrate = None
-
-    def auto_register_devices(self):
-        pass
-
-    def list_devices(self):
-        return list(self.devices.keys())
-
-    def set_active(self, name, baudrate=9600):
-        if name not in self.devices:
-            raise ValueError(f"SerialManager: Device '{name}' not registered.")
-        self.active_name = name
-        self.active_baudrate = baudrate
-
-    def get_active_device(self):
-        return self.devices[self.active_name]
-
-    def close_active(self):
-        pass
-
-
-class MockCaptureManager:
-    def __init__(self, devices=None):
-        self.devices = devices or {}
-        self.active_name = None
-
-    def auto_register_devices(self):
-        pass
-
-    def set_logger(self, logger):
-        self.logger = logger
-
-    def list_devices(self):
-        return list(self.devices.keys())
-
-    def set_active(self, name):
-        if name not in self.devices:
-            raise ValueError(f"CaptureManager: Device '{name}' not registered.")
-        self.active_name = name
-
-    def get_active_device(self):
-        return self.devices[self.active_name]
-
-    def release_active(self):
-        pass
-
-
 @pytest.fixture
 def mock_log_manager():
     return MockLoggingComponents()
-
-
-@pytest.fixture
-def mock_serial_manager():
-    return MockSerialManager({"COM1": MagicMock(), "COM2": MagicMock()})
-
-
-@pytest.fixture
-def mock_capture_manager():
-    return MockCaptureManager({"Camera1": MagicMock(), "Camera2": MagicMock()})
 
 
 def result(status: RunStatus, message: str = "") -> RunResult:
@@ -191,8 +130,9 @@ def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatc
     registry = MagicMock()
     mock_registry.return_value = registry
     mock_builder = MagicMock()
-    mock_serial_manager = MagicMock()
-    mock_capture_manager = MagicMock()
+    discovery = MagicMock()
+    controller_factory = MagicMock()
+    frame_factory = MagicMock()
     settings_store = MagicMock(snapshot=MagicMock(return_value={"runtime.allow_dummy": False}))
     secrets_snapshot = object()
     secrets_store = MagicMock(snapshot=MagicMock(return_value=secrets_snapshot))
@@ -210,14 +150,16 @@ def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatc
         resources_dir=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
-        serial_device_manager=mock_serial_manager,
-        capture_device_manager=mock_capture_manager,
+        device_discovery=discovery,
+        controller_output_factory=controller_factory,
+        frame_source_factory=frame_factory,
     )
 
     mock_registry.assert_called_once_with(project_root=tmp_path)
     registry.reload.assert_called_once()
-    assert mock_builder.call_args.kwargs["serial_manager"] is mock_serial_manager
-    assert mock_builder.call_args.kwargs["capture_manager"] is mock_capture_manager
+    assert mock_builder.call_args.kwargs["device_discovery"] is discovery
+    assert mock_builder.call_args.kwargs["controller_output_factory"] is controller_factory
+    assert mock_builder.call_args.kwargs["frame_source_factory"] is frame_factory
     assert mock_builder.call_args.kwargs["settings"] == {"runtime.allow_dummy": False}
     assert "serial_device" not in mock_builder.call_args.kwargs
     assert "capture_device" not in mock_builder.call_args.kwargs

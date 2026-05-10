@@ -182,7 +182,3 @@ class NotificationHandlerAdapter(NotificationPort):
 class NoopNotificationAdapter(NotificationPort):
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         pass
-
-
-class NotificationHandlerPort(NotificationHandlerAdapter):
-    """Backward-compatible alias for the notification port adapter."""

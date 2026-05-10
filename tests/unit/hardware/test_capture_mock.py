@@ -1,5 +1,5 @@
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -7,7 +7,6 @@ import pytest
 
 from nyxpy.framework.core.hardware.capture import (
     AsyncCaptureDevice,
-    CaptureManager,
     DummyCaptureDevice,
 )
 
@@ -94,62 +93,10 @@ def test_get_latest_frame_no_update():
         device.release()
 
 
-# テストケース４: CaptureManager の正常系テスト（デバイス登録、設定、フレーム取得、リリース）
-def test_capture_manager_operations():
-    with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
-        manager = CaptureManager()
-        device = AsyncCaptureDevice(device_index=3, fps=100.0)
-        manager.register_device("cam1", device)
-        manager.set_active("cam1")
-        # 待機してフレーム取得
-        time.sleep(0.05)
-        frame = manager.get_active_device().get_frame()
-        assert isinstance(frame, np.ndarray)
-        assert frame.shape == (720, 1280, 3)
-        # アクティブデバイスの確認
-        manager.release_active()
-        assert manager.active_device is None
-
-
-# テストケース５: CaptureManagerでアクティブデバイスがない場合はダミーデバイスが自動的に設定される
-def test_capture_manager_auto_dummy_device():
-    manager = CaptureManager()
-    # 確実にアクティブデバイスがないことを確認
-    manager.active_device = None
-
-    # get_active_deviceを呼び出すとダミーデバイスが自動設定されることを確認
-    device = manager.get_active_device()
-    assert device is not None
+def test_dummy_capture_device_returns_black_frame():
+    device = DummyCaptureDevice()
     assert isinstance(device, DummyCaptureDevice)
 
-    # デバイスからフレームが取得できることを確認
     frame = device.get_frame()
     assert isinstance(frame, np.ndarray)
     assert frame.shape == (720, 1280, 3)
-
-    # 後始末
-    manager.release_active()
-
-
-# テストケース６: CaptureManager.get_frame() でフレームが取得できない場合
-# ここではダミーのデバイスの get_latest_frame() をオーバーライドして None を返す
-class DummyDeviceNoFrame(AsyncCaptureDevice):
-    def initialize(self):
-        self.cap = MagicMock()
-        self._running = True
-
-    def get_frame(self):
-        raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
-
-    def release(self):
-        self.cap = None
-
-
-def test_capture_manager_no_frame_available():
-    manager = CaptureManager()
-    dummy = DummyDeviceNoFrame(device_index=4)
-    manager.register_device("cam_none", dummy)
-    manager.set_active("cam_none")
-    with pytest.raises(RuntimeError, match="AsyncCaptureDevice: No frame available yet."):
-        manager.get_active_device().get_frame()
-    manager.release_active()

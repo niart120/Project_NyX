@@ -173,15 +173,13 @@ class DefaultCommand(Command):
     """
     DefaultCommand は、フレームワーク側で提供するコマンド実装です。
     SerialProtocol を利用して各操作をプロトコルに基づくコマンドデータに変換し、
-    SerialManager 経由で送信します。
+    Runtime の controller Port 経由で送信します。
 
     操作実行時のログ出力はデフォルトで DEBUG レベルにし、
     外部からログレベルを柔軟に変更できるようにしています。
     """
 
-    def __init__(self, context: ExecutionContext | None = None, **legacy_kwargs: object) -> None:
-        if context is None or legacy_kwargs:
-            raise TypeError("DefaultCommand requires context=ExecutionContext")
+    def __init__(self, context: ExecutionContext) -> None:
         self.context = context
         self.ct: CancellationToken = context.cancellation_token
 

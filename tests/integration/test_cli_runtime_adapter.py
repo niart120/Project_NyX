@@ -61,8 +61,9 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
     captured = {}
     settings_store = MagicMock(snapshot=MagicMock(return_value={}))
     secrets_store = MagicMock(snapshot=MagicMock(return_value=sentinel_snapshot))
-    serial_devices = MagicMock()
-    capture_devices = MagicMock()
+    discovery = MagicMock()
+    controller_factory = MagicMock()
+    frame_factory = MagicMock()
 
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.MacroRegistry", lambda project_root: MagicMock(reload=lambda: None)
@@ -87,8 +88,9 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
         resources_dir=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
-        serial_device_manager=serial_devices,
-        capture_device_manager=capture_devices,
+        device_discovery=discovery,
+        controller_output_factory=controller_factory,
+        frame_source_factory=frame_factory,
     )
 
     assert captured == {"secrets_snapshot": sentinel_snapshot, "logger": logger}
@@ -108,6 +110,8 @@ def test_cli_does_not_import_removed_runtime_apis() -> None:
         "create_legacy_runtime_builder",
         "SecretsSettings",
         "singletons",
+        "SerialManager",
+        "CaptureManager",
         "serial_manager",
         "capture_manager",
     }

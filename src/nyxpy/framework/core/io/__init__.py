@@ -3,8 +3,11 @@ from nyxpy.framework.core.io.adapters import (
     DummyFrameSourcePort,
     NoopNotificationAdapter,
     NotificationHandlerAdapter,
-    NotificationHandlerPort,
     SerialControllerOutputPort,
+)
+from nyxpy.framework.core.io.device_factories import (
+    ControllerOutputPortFactory,
+    FrameSourcePortFactory,
 )
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
@@ -36,8 +39,10 @@ from nyxpy.framework.core.io.resources import (
 __all__ = [
     "ControllerOutputPort",
     "CaptureFrameSourcePort",
+    "ControllerOutputPortFactory",
     "DefaultResourcePathGuard",
     "DummyFrameSourcePort",
+    "FrameSourcePortFactory",
     "FrameNotReadyError",
     "FrameReadError",
     "LocalResourceStore",
@@ -47,7 +52,6 @@ __all__ = [
     "NoopNotificationAdapter",
     "NotificationHandlerAdapter",
     "NotificationPort",
-    "NotificationHandlerPort",
     "OverwritePolicy",
     "ResourceAlreadyExistsError",
     "ResourceConfigurationError",
