@@ -27,7 +27,7 @@
 | RunHandle | 非同期実行中のマクロに対する中断要求、完了待ち、結果取得を提供するハンドル |
 | ExecutionContext | 1 回のマクロ実行に必要な `run_id`、`macro_id`、`RunLogContext`、Ports、中断トークン、options、`exec_args`、`metadata` を束ねる値オブジェクト。`Command` は保持しない。完全なフィールド一覧は `RUNTIME_AND_IO_PORTS.md` を正とする |
 | Ports/Adapters | Runtime 中核がハードウェア・通知・ログ・GUI/CLI に直接依存しないための抽象境界と接続実装 |
-| Legacy Compatibility Layer | 既存マクロと既存 GUI/CLI import を壊さない互換層。旧パス・旧クラス名・旧メソッドシグネチャを維持する |
+| Compatibility Layer | 既存マクロ import を壊さない互換層。`MacroBase`、`Command`、`DefaultCommand`、constants、`MacroStopException` の既存 path とメソッドシグネチャを維持する |
 | CancellationToken | `threading.Event` ベースのスレッドセーフな協調キャンセル機構 |
 | MacroCancelled | マクロ実行スレッド内で中断を表す新しい例外。既存 `MacroStopException` との互換を持つ |
 | MacroStopException | 既存マクロ・GUI・CLI が import している中断例外名。削除せず adapter として維持する |

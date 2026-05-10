@@ -275,15 +275,17 @@ flowchart LR
 
 ### 4.3 I/O Port 図
 
-`DefaultCommand` から controller、capture、resource、artifact、notification、logger の各 Port へ分岐し、Adapter が現行実装または外部 I/O へ接続する。
+`DefaultCommand` から controller、capture、resource、artifact、notification、logger の各 Port へ分岐し、Adapter が現行実装または外部 I/O へ接続する。GUI preview と仮想コントローラーも同じ Port 抽象を使うが、Qt widget は framework core へ渡さない。
 
 ```mermaid
 flowchart TB
     DefaultCommandImpl["DefaultCommand<br/>既存 Command API"]
+    PreviewPane["GUI PreviewPane<br/>QTimer polling"]
+    VirtualController["GUI VirtualControllerModel"]
 
     subgraph PortLayer["Port layer"]
         Controller["ControllerOutputPort<br/>press / hold / release / keyboard / type_key"]
-        Capture["FrameSourcePort<br/>initialize / await_ready / latest_frame"]
+        Capture["FrameSourcePort<br/>initialize / await_ready / latest_frame / try_latest_frame"]
         Resource["ResourceStorePort<br/>resolve_asset_path / load_image"]
         Artifact["RunArtifactStore<br/>resolve_output_path / save_image / open_output"]
         Notify["NotificationPort<br/>publish"]
@@ -323,6 +325,8 @@ flowchart TB
     DefaultCommandImpl --> Logger
     DefaultCommandImpl -. "touch*" .-> Touch
     DefaultCommandImpl -. "disable_sleep" .-> Sleep
+    PreviewPane --> Capture
+    VirtualController --> Controller
 
     Controller --> SerialPort --> SerialComm --> Protocol
     Controller --> DummyController
@@ -341,8 +345,10 @@ flowchart TB
     classDef adapter fill:#f3e5f5,stroke:#6a1b9a,stroke-width:1px;
     classDef io fill:#eeeeee,stroke:#424242,stroke-width:1px;
     classDef commandimpl fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef gui fill:#e8eaf6,stroke:#3949ab,stroke-width:2px;
 
     class DefaultCommandImpl commandimpl;
+    class PreviewPane,VirtualController gui;
     class Controller,Capture,Resource,Artifact,Notify,Logger,Touch,Sleep port;
     class SerialPort,DummyController,CapturePort,DummyFrame,ResourceStore,ArtifactStore,NotificationHandlerAdapter,LoggerPortAdapter adapter;
     class SerialComm,Protocol,CaptureDevice,AssetsRoot,OutputsRoot,SettingsResolver,Discord,Bluesky,LoggerComponents io;
@@ -351,9 +357,12 @@ flowchart TB
 | 分類 | 意味 |
 |------|------|
 | commandimpl | 既存 `Command` API を実装する `DefaultCommand` |
+| gui | GUI adapter 側の Port 利用者。Qt widget / model は framework core へ渡さない |
 | port | `DefaultCommand` が依存する抽象境界 |
 | adapter | Port を現行実装またはファイル配置へ接続する実装 |
 | io | 実ファイル、デバイス、外部サービスなどの具体 I/O |
+
+GUI preview / manual input の Port は `MacroRuntimeBuilder` の GUI lifetime API から取得し、Runtime 実行の `ExecutionContext` 用 Port と同じ抽象・adapter 契約に従う。GUI は Port を QTimer や Qt signal へ接続するだけで、`CaptureDeviceInterface` や manager singleton を直接扱わない。
 
 参照: [RUNTIME_AND_IO_PORTS.md](RUNTIME_AND_IO_PORTS.md)、[RESOURCE_FILE_IO.md](RESOURCE_FILE_IO.md)、[CONFIGURATION_AND_RESOURCES.md](CONFIGURATION_AND_RESOURCES.md)、[LOGGING_FRAMEWORK.md](LOGGING_FRAMEWORK.md)。
 

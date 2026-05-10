@@ -15,8 +15,8 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 
 | 用語 | 定義 |
 |------|------|
-| MacroRuntime | GUI/CLI/Legacy 入口から呼ばれるマクロ実行中核。同期実行、非同期実行、キャンセル、結果取得を提供する |
-| MacroRuntimeBuilder | settings snapshot、secrets snapshot、デバイス検出結果、LoggerPort から `MacroRuntime` と `ExecutionContext` を組み立てる adapter |
+| MacroRuntime | GUI/CLI 入口から呼ばれるマクロ実行中核。同期実行、非同期実行、キャンセル、結果取得を提供する |
+| MacroRuntimeBuilder | settings snapshot、secrets snapshot、デバイス検出結果、Port factory、LoggerPort から `MacroRuntime` と `ExecutionContext` を組み立てる adapter。GUI lifetime の preview / manual input 用 Port 取得と shutdown も担当する |
 | RunHandle | GUI から非同期実行を監視し、中断要求、完了待ち、結果取得を行うハンドル |
 | RunResult | CLI の終了コード、GUI の実行完了表示、構造化ログに使う実行結果 |
 | run_id | 1 回の実行を識別する UUID 文字列。ログ、GUI 表示イベント、`RunResult` を関連付ける |
@@ -49,7 +49,7 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 
 ### 1.5 着手条件
 
-- `MacroRuntime.run()` / `MacroRuntime.start()` / `RunHandle` / `RunResult` の基本仕様が確定している。
+- `MacroRuntimeBuilder.run()` / `MacroRuntimeBuilder.start()` / `RunHandle` / `RunResult` の基本仕様が確定している。
 - `SettingsStore` と `SecretsStore` の schema 化方針が確定している。
 - GUI 層は Qt 依存を保持してよいが、Runtime 本体へ Qt 依存を入れない。
 - CLI は `RunResult.status` に基づく終了コードを返す。
@@ -60,14 +60,15 @@ GUI と CLI が個別に `DefaultCommand`、通知、ログ、中断を組み立
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `spec/framework/rearchitecture/OBSERVABILITY_AND_GUI_CLI.md` | 新規 | 本仕様書 |
-| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | GUI/CLI/Legacy 入口から Runtime と Ports を組み立てる |
+| `src\nyxpy\framework\core\runtime\builder.py` | 新規 | GUI/CLI 入口から Runtime と Ports を組み立てる |
 | `src\nyxpy\framework\core\runtime\result.py` | 新規 | `RunResult`, `RunStatus`, `ErrorInfo` を GUI/CLI 表示へ利用可能にする |
 | `src\nyxpy\framework\core\logger\dispatcher.py` | 新規 | `LOGGING_FRAMEWORK.md` の `LogSinkDispatcher` を Runtime builder から利用 |
 | `src\nyxpy\framework\core\logger\backend.py` | 新規 | `LOGGING_FRAMEWORK.md` の `LogBackend` を CLI/GUI composition root で構成 |
 | `src\nyxpy\framework\core\logger\events.py` | 新規 | `LOGGING_FRAMEWORK.md` の `UserEvent` / `TechnicalLog` 定義を利用 |
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | CLI/GUI 共通の通知設定ソースとして schema を提供 |
 | `src\nyxpy\cli\run_cli.py` | 変更 | `RuntimeBuildRequest` と `MacroRuntimeBuilder.run()` を使い、終了コードを `RunResult` から決定 |
-| `src\nyxpy\gui\main_window.py` | 変更 | `MacroRuntime.start()` と `RunHandle` を使う実行制御へ移行 |
+| `src\nyxpy\gui\main_window.py` | 変更 | `MacroRuntimeBuilder.start()` と `RunHandle` を使う実行制御へ移行 |
+| `src\nyxpy\gui\log_sink.py` | 変更 | `GuiLogSink` を GUI 層の `LogSink` adapter として提供 |
 | `src\nyxpy\gui\panes\log_pane.py` | 変更 | `UserEvent` を表示し、保存ログ sink へ直接依存しない |
 | `tests\unit\framework\logger\test_logging_framework.py` | 新規 | ロギング基盤の詳細テストは `LOGGING_FRAMEWORK.md` に従う |
 | `tests\integration\test_cli_runtime_entry.py` | 新規 | CLI が Runtime 入口と `SecretsStore` 由来の secrets snapshot を使うことを検証 |
@@ -235,7 +236,7 @@ Runtime worker thread
 
 ### シングルトン管理
 
-最終状態では `log_manager` シングルトンと `LogManager` クラスを維持しない。移行期間に許可する shim と最終削除 API は `DEPRECATION_AND_MIGRATION.md` の「移行期間 shim と最終削除 API」を正とする。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult`、`LoggerPort`、`LogSinkDispatcher`、`LogBackend` は必要な lifetime で生成するオブジェクトであり、シングルトンにしない。
+最終状態では `log_manager` シングルトンと `LogManager` クラスを維持しない。移行期間の互換 shim も作らず、呼び出し元を `LoggerPort` / `LogSinkDispatcher` へ置換してから削除する。GUI sink は GUI の lifetime に合わせて登録・解除し、詳細な reset 方針は `LOGGING_FRAMEWORK.md` に従う。`MacroRuntimeBuilder`、`RunHandle`、`RunResult`、`LoggerPort`、`LogSinkDispatcher`、`LogBackend` は必要な lifetime で生成するオブジェクトであり、シングルトンにしない。
 
 ## 5. テスト方針
 
