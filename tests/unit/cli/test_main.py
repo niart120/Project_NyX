@@ -465,6 +465,8 @@ def test_cli_cleanup_failures_are_logged(monkeypatch, mock_serial_manager):
 
     assert cli_main(args) == 0
     cleanup_events = [
-        log for log in logging.logger.logs if log[0] == "technical" and log[4] == "resource.cleanup_failed"
+        log
+        for log in logging.logger.logs
+        if log[0] == "technical" and log[4] == "resource.cleanup_failed"
     ]
     assert len(cleanup_events) == 3

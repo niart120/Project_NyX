@@ -81,11 +81,7 @@ def test_cli_parser_keeps_existing_options() -> None:
 def test_cli_does_not_accept_notification_secret_args() -> None:
     parser = run_cli.build_parser()
 
-    option_strings = {
-        option
-        for action in parser._actions
-        for option in action.option_strings
-    }
+    option_strings = {option for action in parser._actions for option in action.option_strings}
 
     assert "--discord-webhook-url" not in option_strings
     assert "--bluesky-password" not in option_strings

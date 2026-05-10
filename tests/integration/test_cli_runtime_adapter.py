@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from nyxpy.cli import run_cli
@@ -90,3 +92,28 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
     assert legacy_builder.call_args.kwargs["notification_handler"] == "notification-port"
     assert "serial_device" not in legacy_builder.call_args.kwargs
     assert "capture_device" not in legacy_builder.call_args.kwargs
+
+
+def test_cli_does_not_import_removed_runtime_apis() -> None:
+    cli_dir = Path(__file__).resolve().parents[2] / "src" / "nyxpy" / "cli"
+    forbidden_names = {"MacroExecutor", "DefaultCommand", "LogManager", "log_manager"}
+
+    for source_path in cli_dir.glob("*.py"):
+        source = source_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(source_path))
+        imported_names: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported_names.update(alias.name.split("."))
+                    if alias.asname:
+                        imported_names.add(alias.asname)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imported_names.update(node.module.split("."))
+                for alias in node.names:
+                    imported_names.add(alias.name)
+                    if alias.asname:
+                        imported_names.add(alias.asname)
+
+        assert imported_names.isdisjoint(forbidden_names), source_path
