@@ -39,8 +39,8 @@ Nintendo 3DS 向け touch / sleep 制御を、リアーキテクチャ後の `De
 | 3DS Runtime 経路の `cmd.touch()` | 実シリアル adapter 経路へ接続されていない | 3DS protocol 選択時に touch down / up frame をシリアル送信する |
 | 3DS Runtime 経路の `cmd.disable_sleep()` | 実シリアル adapter 経路へ接続されていない | `FC 01` / `FC 00` をシリアル送信する |
 | 非 3DS protocol の任意操作 | 実装方針が未整理 | `NotImplementedError` で明示的に失敗する |
-| 統合テスト | 仕様書上未完了 | fake serial / fake capture で Runtime 経路を検証する |
-| 実機テスト | 仕様書上未完了 | `@pytest.mark.realdevice` 付き 3DS smoke test を追加する |
+| 統合テスト | 未整備 | fake serial / fake capture で Runtime 経路を検証する |
+| 実機テスト | 未整備 | `@pytest.mark.realdevice` 付き 3DS smoke test を追加する |
 
 ### 1.5 着手条件
 
@@ -53,7 +53,7 @@ Nintendo 3DS 向け touch / sleep 制御を、リアーキテクチャ後の `De
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `spec\agent\wip\local_001\FOLLOWUP_FIXES.md` | 新規 | 本仕様書 |
+| `spec\agent\complete\local_001\FOLLOWUP_FIXES.md` | 新規 | 本仕様書 |
 | `src\nyxpy\framework\core\io\ports.py` | 変更 | `ControllerOutputPort` に touch / sleep の非抽象任意メソッドを追加する |
 | `src\nyxpy\framework\core\io\adapters.py` | 変更 | `SerialControllerOutputPort` で 3DS touch / sleep command を serial 送信へ橋渡しする |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `DefaultCommand` の touch / sleep を capability 判定ではなく Port 委譲へ簡素化する |
@@ -61,7 +61,7 @@ Nintendo 3DS 向け touch / sleep 制御を、リアーキテクチャ後の `De
 | `tests\unit\framework\runtime\test_default_command_ports.py` | 変更 | `DefaultCommand` が Port へ委譲し、非対応時の例外を伝播することを検証する |
 | `tests\integration\test_3ds_runtime_serial_protocol.py` | 新規 | Runtime + fake serial + fake capture で `cmd.touch()` / `cmd.disable_sleep()` を検証する |
 | `tests\hardware\test_3ds_serial_protocol_device.py` | 新規 | 実機接続時の代表 3DS コマンド送信を `@pytest.mark.realdevice` で検証する |
-| `spec\agent\wip\local_001\NINTENDO_3DS_SERIAL_PROTOCOL.md` | 変更 | 本仕様への参照と未完了チェックリストの完了状態を反映する |
+| `spec\agent\complete\local_001\NINTENDO_3DS_SERIAL_PROTOCOL.md` | 変更 | 本仕様への参照と実装チェックリストの完了状態を反映する |
 
 ## 3. 設計方針
 
@@ -286,4 +286,4 @@ def disable_sleep(self, enabled: bool = True) -> None:
 - [x] `DefaultCommand` が protocol / serial を直接参照しないことを固定する。
 - [x] Runtime 統合テストで 3DS touch / sleep 送信経路を検証する。
 - [x] 実機テストを `@pytest.mark.realdevice` として追加する。
-- [x] `NINTENDO_3DS_SERIAL_PROTOCOL.md` の未完了チェックリストを更新する。
+- [x] `NINTENDO_3DS_SERIAL_PROTOCOL.md` の実装チェックリストを更新する。
