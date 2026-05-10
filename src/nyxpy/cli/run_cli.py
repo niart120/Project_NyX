@@ -189,7 +189,7 @@ def cli_main(args: argparse.Namespace) -> int:
         )
 
         # マクロ実行引数の解析
-        exec_args = parse_define_args(args.define)
+        exec_args = parse_define_args(args.define or [])
 
         # マクロの実行
         result = execute_macro(
