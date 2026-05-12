@@ -1,16 +1,8 @@
-import pytest
+from pathlib import Path
 
 from nyxpy.framework.core.constants import Button, Hat
-from nyxpy.gui.events import EventBus, EventType
 from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
 from tests.support.fakes import FakeControllerOutputPort, FakeLoggerPort
-
-
-@pytest.fixture(autouse=True)
-def reset_event_bus():
-    EventBus._instance = None
-    yield
-    EventBus._instance = None
 
 
 def test_button_operations_use_controller_output_port() -> None:
@@ -48,25 +40,23 @@ def test_missing_controller_is_noop() -> None:
     assert model.pressed_buttons == set()
 
 
-def test_serial_device_event_replaces_controller_port() -> None:
-    class SerialDevice:
-        def __init__(self) -> None:
-            self.sent: list[bytes] = []
+def test_set_controller_replaces_controller_output_port() -> None:
+    first = FakeControllerOutputPort()
+    second = FakeControllerOutputPort()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=first)
 
-        def send(self, data: bytes) -> None:
-            self.sent.append(data)
-
-    class Protocol:
-        def build_press_command(self, keys):
-            return b"press:" + b",".join(key.name.encode() for key in keys)
-
-        def build_release_command(self, keys=()):
-            return b"release:" + b",".join(key.name.encode() for key in keys)
-
-    serial = SerialDevice()
-    model = VirtualControllerModel(logger=FakeLoggerPort(), protocol=Protocol())
-
-    EventBus.get_instance().publish(EventType.SERIAL_DEVICE_CHANGED, {"device": serial})
+    model.set_controller(second)
     model.button_press(Button.X)
 
-    assert serial.sent == [b"press:X"]
+    assert first.events == []
+    assert second.events == [("press", (Button.X,))]
+
+
+def test_virtual_controller_model_has_no_event_bus_dependency() -> None:
+    source = (
+        Path("src") / "nyxpy" / "gui" / "models" / "virtual_controller_model.py"
+    ).read_text(encoding="utf-8")
+
+    assert "EventBus" not in source
+    assert "EventType" not in source
+    assert "serial_device" not in source

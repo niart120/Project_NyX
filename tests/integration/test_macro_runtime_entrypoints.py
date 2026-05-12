@@ -49,3 +49,14 @@ def test_virtual_controller_model_uses_controller_output_port() -> None:
 
     assert "ControllerOutputPort" in source
     assert ".send(" not in source
+
+
+def test_gui_has_no_event_bus_module() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    gui_root = repo_root / "src" / "nyxpy" / "gui"
+
+    assert not (gui_root / "events.py").exists()
+    for source_path in gui_root.rglob("*.py"):
+        source = source_path.read_text(encoding="utf-8")
+        assert "EventBus" not in source
+        assert "EventType" not in source

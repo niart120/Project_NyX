@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import QDialog
 
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
@@ -243,6 +244,46 @@ def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeSe
     assert window.control_pane.cancel_btn.isEnabled()
 
 
+def test_main_window_start_logs_start_exception(window: MainWindow, services: FakeServices):
+    services.builder.start.side_effect = RuntimeError("start failed")
+    window.macro_browser.table.selectRow(0)
+
+    window._start_macro({"count": 1})
+
+    assert window.run_handle is None
+    assert window.status_label.text() == "エラー: マクロを開始できません"
+    assert services.logger.technical_events[-1][3] == "runtime.start_failed"
+    assert window.control_pane.run_btn.isEnabled()
+
+
+def test_execute_macro_with_params_logs_parse_exception(
+    window: MainWindow, services: FakeServices, monkeypatch
+):
+    class FakeParamEdit:
+        def text(self):
+            return "broken"
+
+    class FakeDialog:
+        def __init__(self, parent, macro_name):
+            self.param_edit = FakeParamEdit()
+
+        def exec(self):
+            return QDialog.Accepted
+
+    def fail_parse(params):
+        raise ValueError("invalid params")
+
+    monkeypatch.setattr("nyxpy.gui.main_window.MacroParamsDialog", FakeDialog)
+    monkeypatch.setattr("nyxpy.gui.main_window.parse_define_args", fail_parse)
+    window.macro_browser.table.selectRow(0)
+
+    window.execute_macro_with_params()
+
+    assert window.status_label.text() == "パラメータを解析できません"
+    assert services.logger.technical_events[-1][3] == "macro.params_invalid"
+    services.builder.start.assert_not_called()
+
+
 def test_main_window_cancel_enters_cancelling_state(window: MainWindow):
     handle = FakeRunHandle(done=False)
     window.run_handle = handle
@@ -309,6 +350,19 @@ def test_apply_settings_defers_builder_swap_during_run(window: MainWindow, servi
 
     assert services.apply_calls[-1] is True
     assert window.status_label.text() == "設定変更は実行完了後に反映されます"
+
+
+def test_apply_settings_logs_apply_exception(window: MainWindow, services: FakeServices):
+    def fail_apply(*, is_run_active: bool = False):
+        services.apply_calls.append(is_run_active)
+        raise RuntimeError("settings failed")
+
+    services.apply_settings = fail_apply
+
+    window.apply_app_settings()
+
+    assert window.status_label.text() == "設定を反映できません"
+    assert services.logger.technical_events[-1][3] == "configuration.apply_failed"
 
 
 def test_apply_settings_pauses_only_for_active_capture_change(

@@ -1,14 +1,12 @@
 """
 helper.py ユニットテスト
 
-load_macro_settings / parse_define_args / validate_keyboard_text /
-extract_macro_tags / calc_aspect_size のテストを提供する。
+parse_define_args / validate_keyboard_text / extract_macro_tags /
+calc_aspect_size のテストを提供する。
 """
 
 from __future__ import annotations
 
-import textwrap
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -17,109 +15,9 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.utils.helper import (
     calc_aspect_size,
     extract_macro_tags,
-    load_macro_settings,
     parse_define_args,
     validate_keyboard_text,
 )
-
-
-# --- テスト用ダミーマクロ構造の構築ヘルパー ---
-def _write_single_file_macro(macros_dir: Path, name: str, body: str = "") -> Path:
-    """macros/<name>.py を作成し、ダミーマクロクラスを定義する。"""
-    body_block = textwrap.indent(textwrap.dedent(body).strip(), "    ")
-    body_section = f"{body_block}\n" if body_block else ""
-    src = textwrap.dedent(f"""\
-        class {name.title().replace("_", "")}Macro:
-        {body_section}
-            pass
-    """)
-    path = macros_dir / f"{name}.py"
-    path.write_text(src, encoding="utf-8")
-    return path
-
-
-def _write_package_macro(macros_dir: Path, pkg_name: str, body: str = "") -> Path:
-    """macros/<pkg_name>/ パッケージを作成し、macro.py にダミークラスを定義する。"""
-    pkg_dir = macros_dir / pkg_name
-    pkg_dir.mkdir(parents=True, exist_ok=True)
-    (pkg_dir / "__init__.py").write_text(
-        f"from .macro import {pkg_name.title().replace('_', '')}Macro\n",
-        encoding="utf-8",
-    )
-    body_block = textwrap.indent(textwrap.dedent(body).strip(), "    ")
-    body_section = f"{body_block}\n" if body_block else ""
-    src = textwrap.dedent(f"""\
-        class {pkg_name.title().replace("_", "")}Macro:
-        {body_section}
-            pass
-    """)
-    (pkg_dir / "macro.py").write_text(src, encoding="utf-8")
-    return pkg_dir / "macro.py"
-
-
-def _write_settings_toml(static_dir: Path, macro_name: str, content: str) -> Path:
-    """static/<macro_name>/settings.toml を作成する。"""
-    d = static_dir / macro_name
-    d.mkdir(parents=True, exist_ok=True)
-    path = d / "settings.toml"
-    path.write_text(content, encoding="utf-8")
-    return path
-
-
-def _import_class_from_file(path: Path, class_name: str):
-    """指定 .py ファイルからクラスを動的インポートする。
-
-    inspect.getfile() が動作するよう sys.modules にも登録する。
-    """
-    import importlib.util
-    import sys
-
-    module_name = f"_tmp_{path.stem}_{id(path)}"
-    spec = importlib.util.spec_from_file_location(module_name, str(path))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = mod
-    spec.loader.exec_module(mod)
-    return getattr(mod, class_name)
-
-
-class TestLoadMacroSettings:
-    def test_explicit_class_settings_path(self, tmp_path, monkeypatch):
-        macros_dir = tmp_path / "macros"
-        macros_dir.mkdir()
-        py_path = _write_single_file_macro(
-            macros_dir, "my_sample", 'settings_path = "settings.toml"'
-        )
-        (macros_dir / "settings.toml").write_text('key1 = "hello"\nkey2 = 42\n')
-
-        monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "MySampleMacro")
-
-        assert load_macro_settings(cls) == {"key1": "hello", "key2": 42}
-
-    def test_project_settings_path(self, tmp_path, monkeypatch):
-        macros_dir = tmp_path / "macros"
-        macros_dir.mkdir()
-        py_path = _write_package_macro(
-            macros_dir, "my_pkg", 'settings_path = "project:project_settings.toml"'
-        )
-        (tmp_path / "project_settings.toml").write_text("value = 100\n")
-
-        monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "MyPkgMacro")
-
-        assert load_macro_settings(cls) == {"value": 100}
-
-    def test_static_fallback_is_not_supported(self, tmp_path, monkeypatch):
-        macros_dir = tmp_path / "macros"
-        macros_dir.mkdir()
-        py_path = _write_single_file_macro(macros_dir, "legacy")
-        _write_settings_toml(tmp_path / "static", "legacy", "wrong = true\n")
-
-        monkeypatch.chdir(tmp_path)
-        cls = _import_class_from_file(py_path, "LegacyMacro")
-
-        assert load_macro_settings(cls) == {}
-
 
 # ============================================================
 # parse_define_args テスト

@@ -136,7 +136,18 @@ class MainWindow(QMainWindow):
         self.apply_app_settings()
 
     def apply_app_settings(self):
-        outcome = self.services.apply_settings(is_run_active=self._is_run_active())
+        try:
+            outcome = self.services.apply_settings(is_run_active=self._is_run_active())
+        except Exception as exc:
+            self.logger.technical(
+                "ERROR",
+                "GUI settings application failed.",
+                component="MainWindow",
+                event="configuration.apply_failed",
+                exc=exc,
+            )
+            self.status_label.setText("設定を反映できません")
+            return
         if "preview_fps" in outcome.changed_keys:
             self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)
             self.preview_pane.apply_fps()
@@ -161,7 +172,18 @@ class MainWindow(QMainWindow):
 
         # パラメータを解析して実行に渡す
         params = dlg.param_edit.text()
-        exec_args = parse_define_args(params)
+        try:
+            exec_args = parse_define_args(params)
+        except Exception as exc:
+            self.logger.technical(
+                "WARNING",
+                "Macro parameter parse failed.",
+                component="MainWindow",
+                event="macro.params_invalid",
+                exc=exc,
+            )
+            self.status_label.setText("パラメータを解析できません")
+            return
         self._start_macro(exec_args)
 
     def _start_macro(self, exec_args):
@@ -175,10 +197,23 @@ class MainWindow(QMainWindow):
         if macro_id is None:
             self.status_label.setText("マクロが選択されていません")
             return
-        builder = self.services.create_runtime_builder()
-        self.run_handle = builder.start(
-            RuntimeBuildRequest(macro_id=macro_id, entrypoint="gui", exec_args=exec_args)
-        )
+        try:
+            builder = self.services.create_runtime_builder()
+            self.run_handle = builder.start(
+                RuntimeBuildRequest(macro_id=macro_id, entrypoint="gui", exec_args=exec_args)
+            )
+        except Exception as exc:
+            self.run_handle = None
+            self.logger.technical(
+                "ERROR",
+                "Macro start failed.",
+                component="MainWindow",
+                event="runtime.start_failed",
+                exc=exc,
+            )
+            self.status_label.setText("エラー: マクロを開始できません")
+            self.control_pane.set_run_state(RunUiState.FINISHED)
+            return
         self.control_pane.set_run_state(RunUiState.RUNNING)
         self.status_label.setText("実行中")
         self._run_poll_timer.start(self.global_settings.get("runtime.gui_poll_interval_ms", 100))

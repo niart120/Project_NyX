@@ -22,7 +22,6 @@ from nyxpy.framework.core.runtime.builder import (
 )
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
-from nyxpy.gui.events import EventBus, EventType
 from nyxpy.gui.macro_catalog import MacroCatalog
 
 
@@ -227,25 +226,13 @@ class GuiAppServices:
                 event="configuration.changed",
             )
         if "serial_protocol" in changed_keys:
-            try:
-                protocol = ProtocolFactory.create_protocol(
-                    self.global_settings.get("serial_protocol", "CH552")
-                )
-                EventBus.get_instance().publish(EventType.PROTOCOL_CHANGED, {"protocol": protocol})
-                self.logger.user(
-                    "INFO",
-                    f"コントローラープロトコルを切り替えました: {self.global_settings.get('serial_protocol', 'CH552')}",
-                    component="GuiAppServices",
-                    event="configuration.changed",
-                )
-            except Exception as exc:
-                self.logger.technical(
-                    "ERROR",
-                    "プロトコル切り替えエラー",
-                    component="GuiAppServices",
-                    event="configuration.invalid",
-                    exc=exc,
-                )
+            ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
+            self.logger.user(
+                "INFO",
+                f"コントローラープロトコルを切り替えました: {self.global_settings.get('serial_protocol', 'CH552')}",
+                component="GuiAppServices",
+                event="configuration.changed",
+            )
         if {
             "notification.discord.enabled",
             "notification.bluesky.enabled",

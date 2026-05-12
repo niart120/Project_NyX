@@ -16,12 +16,12 @@ Phase 5 では、実装上の互換面ではない旧経路を削除する。互
 | 項目 | 現状 | 判断 |
 |------|------|------|
 | `EventBus.CAPTURE_DEVICE_CHANGED` | Phase 4 で削除済み | 完了 |
-| `EventBus.PROTOCOL_CHANGED` | `GuiAppServices` が publish し、`VirtualControllerModel` が subscribe する | 削除候補 |
-| `EventBus.SERIAL_DEVICE_CHANGED` | publish 側は実装上残っていない。テストだけが publish する | 削除候補 |
-| `VirtualControllerModel.serial_device` | `ControllerOutputPort` 導入前の旧入力として残る | 削除候補 |
-| `VirtualControllerModel.protocol` | `serial_device` から `SerialControllerOutputPort` を組み立てるために残る | `serial_device` と同時削除 |
-| `GuiAppServices` -> `EventBus` | protocol 変更時だけ残るグローバル通知 | manual controller 再構成へ置換 |
-| framework 旧経路 | GUI からの参照は減ったが、FW 側の旧 API / singleton / alias は別途棚卸しが必要 | 静的検査と削除条件を追加 |
+| `EventBus.PROTOCOL_CHANGED` | Phase 5 で削除済み | 完了 |
+| `EventBus.SERIAL_DEVICE_CHANGED` | Phase 5 で削除済み | 完了 |
+| `VirtualControllerModel.serial_device` | Phase 5 で削除済み | 完了 |
+| `VirtualControllerModel.protocol` | Phase 5 で削除済み | 完了 |
+| `GuiAppServices` -> `EventBus` | Phase 5 で削除済み。manual controller は builder 再構成結果を `set_controller()` へ渡す | 完了 |
+| framework 旧経路 | `MacroExecutor` / singleton / `LogManager` は削除済み。`load_macro_settings()` は Phase 5 で削除済み | 静的検査で固定 |
 
 ## 3. 実装方針
 
@@ -54,6 +54,7 @@ GUI から参照しないだけでは削除完了としない。framework 側に
 - `LogManager` / `log_manager` singleton
 - `singletons.py` 経由で Runtime 実行に使われる manager
 - `legacy` を含む builder / adapter / helper
+- `load_macro_settings()` 旧 settings helper
 - 旧 static resource fallback
 - `Path.cwd()` 固定の settings / resource fallback
 
@@ -68,6 +69,8 @@ GUI から参照しないだけでは削除完了としない。framework 側に
 | `test_gui_has_no_event_bus_module` | `src\nyxpy\gui\events.py` が存在しない、または GUI から参照されない |
 | `test_gui_settings_change_updates_manual_controller_without_event_bus` | 設定変更後の manual controller 差し替えが `set_controller()` だけで完結する |
 | `test_framework_has_no_removed_legacy_runtime_routes` | framework 旧経路が import / public API として残っていない |
+
+`SettingsStore` / `SecretsStore` の既定 `.nyxpy` 解決はアプリケーション設定 store の責務として残す。これはマクロ settings / resource fallback ではないため、本 phase の削除対象に含めない。
 
 ## 5. 完了ゲート
 
