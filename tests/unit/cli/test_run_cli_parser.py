@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from types import SimpleNamespace
 
 from nyxpy.cli import run_cli
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
@@ -48,6 +49,17 @@ class RecordingBuilder:
         self.shutdown_called = True
 
 
+def patch_cli_workspace(monkeypatch, tmp_path):
+    paths = SimpleNamespace(
+        project_root=tmp_path,
+        config_dir=tmp_path / ".nyxpy",
+        logs_dir=tmp_path / "logs",
+    )
+    monkeypatch.setattr(run_cli, "resolve_project_root", lambda **_kwargs: tmp_path)
+    monkeypatch.setattr(run_cli, "ensure_workspace", lambda project_root: paths)
+    return paths
+
+
 def test_cli_parser_keeps_existing_options() -> None:
     parser = run_cli.build_parser()
 
@@ -90,8 +102,9 @@ def test_cli_does_not_accept_notification_secret_args() -> None:
     assert "--bluesky-password" not in option_strings
 
 
-def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
+def test_cli_define_args_are_passed_to_request(monkeypatch, tmp_path) -> None:
     builder = RecordingBuilder()
+    patch_cli_workspace(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         run_cli,
@@ -130,8 +143,9 @@ def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
     assert builder.shutdown_called is True
 
 
-def test_cli_define_defaults_to_empty_request_args(monkeypatch) -> None:
+def test_cli_define_defaults_to_empty_request_args(monkeypatch, tmp_path) -> None:
     builder = RecordingBuilder()
+    patch_cli_workspace(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         run_cli,
