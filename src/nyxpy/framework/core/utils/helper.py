@@ -1,19 +1,11 @@
 import inspect
 from collections.abc import Iterable
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import tomlkit
 from tomlkit.exceptions import TOMLKitError
 
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
-
-
-@dataclass(frozen=True)
-class _SettingsDefinition:
-    settings_path: Path | str | None
-    macro_root: Path
 
 
 def get_caller_class_name():
@@ -25,23 +17,6 @@ def get_caller_class_name():
         return type(self_obj).__name__ if self_obj is not None else None
     finally:
         del frame
-
-
-def load_macro_settings(macro_cls) -> dict:
-    """
-    マクロクラスが明示した settings_path を読み込みます。
-
-    旧 static/<macro_name>/settings.toml fallback は Runtime の settings 契約に含めない。
-
-    :param macro_cls: マクロクラス（例: DummyTestMacro）
-    :return: 設定辞書。settings_path が未指定なら空 dict
-    """
-    macro_file = Path(inspect.getfile(macro_cls))
-    settings_path = getattr(macro_cls, "settings_path", None)
-    definition = _SettingsDefinition(settings_path=settings_path, macro_root=macro_file.parent)
-    from nyxpy.framework.core.macro.settings_resolver import MacroSettingsResolver
-
-    return MacroSettingsResolver(Path.cwd()).load(definition)
 
 
 def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:

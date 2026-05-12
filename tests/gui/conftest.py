@@ -23,4 +23,6 @@ def _no_real_hardware(monkeypatch):
         def find_capture(self, name, timeout_sec):
             return None
 
-    monkeypatch.setattr("nyxpy.gui.main_window.DeviceDiscoveryService", lambda **_: FakeDiscovery())
+    monkeypatch.setattr(
+        "nyxpy.gui.app_services.DeviceDiscoveryService", lambda **_: FakeDiscovery()
+    )

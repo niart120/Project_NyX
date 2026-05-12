@@ -27,14 +27,19 @@ def test_gui_cli_entrypoints_do_not_import_macro_executor() -> None:
 
 def test_gui_cli_runtime_builder_paths_do_not_resolve_devices_directly() -> None:
     from nyxpy.cli.run_cli import create_runtime_builder
+    from nyxpy.gui.app_services import GuiAppServices
     from nyxpy.gui.main_window import MainWindow
 
     cli_source = inspect.getsource(create_runtime_builder)
-    gui_source = inspect.getsource(MainWindow._create_runtime_builder)
+    gui_source = (
+        inspect.getsource(GuiAppServices._replace_runtime_builder)
+        + inspect.getsource(MainWindow._start_macro)
+    )
 
     assert "get_active_device" not in cli_source
     assert "auto_register_devices" not in cli_source
     assert "get_active_device" not in gui_source
+    assert "create_device_runtime_builder" not in inspect.getsource(MainWindow)
 
 
 def test_virtual_controller_model_uses_controller_output_port() -> None:
@@ -44,3 +49,14 @@ def test_virtual_controller_model_uses_controller_output_port() -> None:
 
     assert "ControllerOutputPort" in source
     assert ".send(" not in source
+
+
+def test_gui_has_no_event_bus_module() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    gui_root = repo_root / "src" / "nyxpy" / "gui"
+
+    assert not (gui_root / "events.py").exists()
+    for source_path in gui_root.rglob("*.py"):
+        source = source_path.read_text(encoding="utf-8")
+        assert "EventBus" not in source
+        assert "EventType" not in source

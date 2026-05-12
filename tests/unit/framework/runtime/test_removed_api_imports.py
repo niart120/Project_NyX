@@ -13,6 +13,7 @@ REMOVED_NAMES = {
     "SerialManager",
     "capture_manager",
     "create_legacy_runtime_builder",
+    "load_macro_settings",
     "log_manager",
     "serial_manager",
 }
