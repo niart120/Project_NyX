@@ -27,9 +27,19 @@ from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, services: GuiAppServices | None = None):
+    def __init__(
+        self,
+        services: GuiAppServices | None = None,
+        *,
+        project_root: Path | None = None,
+    ):
         super().__init__()
-        self.project_root = Path.cwd()
+        if services is None:
+            self.project_root = Path.cwd() if project_root is None else Path(project_root)
+        else:
+            self.project_root = (
+                Path(project_root) if project_root is not None else services.project_root
+            )
         self.services = services or GuiAppServices(project_root=self.project_root)
         self.logging = self.services.logging
         self.logger = self.services.logger

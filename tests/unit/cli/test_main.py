@@ -1,4 +1,5 @@
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -147,7 +148,7 @@ def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatc
     create_runtime_builder(
         MagicMock(),
         logger=logger,
-        resources_dir=tmp_path,
+        project_root=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
         device_discovery=discovery,
@@ -163,6 +164,37 @@ def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatc
     assert mock_builder.call_args.kwargs["settings"] == {"runtime.allow_dummy": False}
     assert "serial_device" not in mock_builder.call_args.kwargs
     assert "capture_device" not in mock_builder.call_args.kwargs
+
+
+def test_create_runtime_builder_passes_project_config_dir_to_stores(monkeypatch, tmp_path):
+    mock_registry = MagicMock()
+    mock_registry.return_value = MagicMock(reload=lambda: None)
+    mock_builder = MagicMock()
+    settings_store = MagicMock(snapshot=MagicMock(return_value={}))
+    secrets_snapshot = object()
+    secrets_store = MagicMock(snapshot=MagicMock(return_value=secrets_snapshot))
+    mock_settings_store = MagicMock(return_value=settings_store)
+    mock_secrets_store = MagicMock(return_value=secrets_store)
+
+    monkeypatch.setattr("nyxpy.cli.run_cli.MacroRegistry", mock_registry)
+    monkeypatch.setattr("nyxpy.cli.run_cli.SettingsStore", mock_settings_store)
+    monkeypatch.setattr("nyxpy.cli.run_cli.SecretsStore", mock_secrets_store)
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_notification_handler_from_settings",
+        lambda settings, logger: "notifier",
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.create_device_runtime_builder", mock_builder)
+
+    create_runtime_builder(MagicMock(), logger=MockLogger(), project_root=tmp_path)
+
+    mock_settings_store.assert_called_once_with(
+        config_dir=tmp_path.resolve() / ".nyxpy",
+        strict_load=False,
+    )
+    mock_secrets_store.assert_called_once_with(
+        config_dir=tmp_path.resolve() / ".nyxpy",
+        strict_load=False,
+    )
 
 
 def test_execute_macro_success(monkeypatch, mock_log_manager):
@@ -222,8 +254,20 @@ def make_args():
     return args
 
 
-def test_cli_main_success(monkeypatch):
+def patch_cli_workspace(monkeypatch, tmp_path):
+    paths = SimpleNamespace(
+        project_root=tmp_path,
+        config_dir=tmp_path / ".nyxpy",
+        logs_dir=tmp_path / "logs",
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.resolve_project_root", lambda **_kwargs: tmp_path)
+    monkeypatch.setattr("nyxpy.cli.run_cli.ensure_workspace", MagicMock(return_value=paths))
+    return paths
+
+
+def test_cli_main_success(monkeypatch, tmp_path):
     args = make_args()
+    paths = patch_cli_workspace(monkeypatch, tmp_path)
     mock_logging = MockLoggingComponents()
     mock_configure = MagicMock(return_value=mock_logging)
     mock_protocol = MagicMock()
@@ -241,10 +285,15 @@ def test_cli_main_success(monkeypatch):
     monkeypatch.setattr("nyxpy.cli.run_cli.execute_macro", mock_execute)
 
     assert cli_main(args) == 0
-    mock_configure.assert_called_once()
+    mock_configure.assert_called_once_with(
+        silence=False,
+        verbose=False,
+        base_dir=paths.logs_dir,
+    )
     mock_create_builder.assert_called_once_with(
         protocol=mock_protocol,
         logger=mock_logging.logger,
+        project_root=paths.project_root,
         serial_name="COM1",
         capture_name="Camera1",
         baudrate=9600,
@@ -257,9 +306,10 @@ def test_cli_main_success(monkeypatch):
     )
 
 
-def test_cli_main_uses_3ds_default_baudrate(monkeypatch):
+def test_cli_main_uses_3ds_default_baudrate(monkeypatch, tmp_path):
     args = make_args()
     args.protocol = "3DS"
+    patch_cli_workspace(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging",
@@ -282,10 +332,11 @@ def test_cli_main_uses_3ds_default_baudrate(monkeypatch):
     assert create_builder.call_args.kwargs["baudrate"] == 115200
 
 
-def test_cli_main_baud_override(monkeypatch):
+def test_cli_main_baud_override(monkeypatch, tmp_path):
     args = make_args()
     args.protocol = "3DS"
     args.baud = 9600
+    patch_cli_workspace(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging",
@@ -308,9 +359,10 @@ def test_cli_main_baud_override(monkeypatch):
     assert create_builder.call_args.kwargs["baudrate"] == 9600
 
 
-def test_cli_main_value_error(monkeypatch, mock_log_manager):
+def test_cli_main_value_error(monkeypatch, mock_log_manager, tmp_path):
     args = make_args()
     args.serial = "COM3"
+    patch_cli_workspace(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
@@ -324,8 +376,9 @@ def test_cli_main_value_error(monkeypatch, mock_log_manager):
     assert any(log[1] == "ERROR" for log in mock_log_manager.logger.logs)
 
 
-def test_cli_main_exception(monkeypatch, mock_log_manager):
+def test_cli_main_exception(monkeypatch, mock_log_manager, tmp_path):
     args = make_args()
+    patch_cli_workspace(monkeypatch, tmp_path)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
@@ -342,9 +395,10 @@ def test_cli_main_exception(monkeypatch, mock_log_manager):
 
 
 def test_cli_unhandled_exception_uses_fixed_user_message(
-    monkeypatch, mock_log_manager, capsys
+    monkeypatch, mock_log_manager, capsys, tmp_path
 ):
     args = make_args()
+    patch_cli_workspace(monkeypatch, tmp_path)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
@@ -364,8 +418,9 @@ def test_cli_unhandled_exception_uses_fixed_user_message(
     assert any(log[4] == "cli.unhandled" for log in mock_log_manager.logger.logs)
 
 
-def test_cli_configuration_error_returns_1(monkeypatch, mock_log_manager):
+def test_cli_configuration_error_returns_1(monkeypatch, mock_log_manager, tmp_path):
     args = make_args()
+    patch_cli_workspace(monkeypatch, tmp_path)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
@@ -378,8 +433,9 @@ def test_cli_configuration_error_returns_1(monkeypatch, mock_log_manager):
     assert any(log[4] == "configuration.invalid" for log in mock_log_manager.logger.logs)
 
 
-def test_cli_cleanup_failures_are_logged(monkeypatch):
+def test_cli_cleanup_failures_are_logged(monkeypatch, tmp_path):
     args = make_args()
+    patch_cli_workspace(monkeypatch, tmp_path)
     logging = FailingLoggingComponents()
     builder = MagicMock()
     builder.shutdown = MagicMock(side_effect=RuntimeError("shutdown failed"))

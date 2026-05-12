@@ -85,7 +85,7 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
     run_cli.create_runtime_builder(
         MagicMock(),
         logger=logger,
-        resources_dir=tmp_path,
+        project_root=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
         device_discovery=discovery,

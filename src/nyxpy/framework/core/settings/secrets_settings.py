@@ -43,14 +43,14 @@ class SecretsStore:
 
     def __init__(
         self,
-        config_dir: Path | None = None,
+        config_dir: Path,
         *,
         schema: SettingsSchema = SECRETS_SETTINGS_SCHEMA,
         filename: str = "secrets.toml",
         strict_load: bool = True,
     ) -> None:
-        self.config_dir = config_dir or Path.cwd() / ".nyxpy"
-        self.config_dir.mkdir(exist_ok=True)
+        self.config_dir = Path(config_dir)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.config_dir / filename
         self.schema = schema
         self.strict_load = strict_load
@@ -118,7 +118,7 @@ class SecretsStore:
 
 
 class SecretsSettings(SecretsStore):
-    """Compatibility shim for .nyxpy/secrets.toml under the working directory."""
+    """Schema-fixed store for notification secrets and flags."""
 
-    def __init__(self, config_dir: Path | None = None) -> None:
+    def __init__(self, config_dir: Path) -> None:
         super().__init__(config_dir=config_dir, strict_load=False)

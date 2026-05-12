@@ -52,7 +52,7 @@ class SettingsStore:
 
     def __init__(
         self,
-        config_dir: Path | None = None,
+        config_dir: Path,
         *,
         schema: SettingsSchema = GLOBAL_SETTINGS_SCHEMA,
         filename: str = "global.toml",
@@ -60,8 +60,8 @@ class SettingsStore:
     ) -> None:
         if any(field.secret for field in schema.fields.values()):
             raise SecretBoundaryError("SettingsStore schema must not contain secret fields")
-        self.config_dir = config_dir or Path.cwd() / ".nyxpy"
-        self.config_dir.mkdir(exist_ok=True)
+        self.config_dir = Path(config_dir)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.config_dir / filename
         self.schema = schema
         self.strict_load = strict_load
@@ -122,7 +122,7 @@ class SettingsStore:
 
 
 class GlobalSettings(SettingsStore):
-    """Compatibility shim for .nyxpy/global.toml under the working directory."""
+    """Schema-fixed store for non-secret global settings."""
 
-    def __init__(self, config_dir: Path | None = None) -> None:
+    def __init__(self, config_dir: Path) -> None:
         super().__init__(config_dir=config_dir, strict_load=False)

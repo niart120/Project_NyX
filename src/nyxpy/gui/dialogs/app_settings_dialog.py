@@ -14,16 +14,16 @@ class AppSettingsDialog(QDialog):
     def __init__(
         self,
         parent,
-        settings: GlobalSettings = None,
-        secrets: SecretsSettings = None,
+        settings: GlobalSettings,
+        secrets: SecretsSettings,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("デバイス・通知・一般設定")
         self.resize(500, 400)
-        self.settings = settings or GlobalSettings()
-        self.secrets = secrets or SecretsSettings()
+        self.settings = settings
+        self.secrets = secrets
         layout = QVBoxLayout(self)
 
         # タブウィジェット
