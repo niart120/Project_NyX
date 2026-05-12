@@ -93,7 +93,11 @@ def test_cli_does_not_accept_notification_secret_args() -> None:
 def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
     builder = RecordingBuilder()
 
-    monkeypatch.setattr(run_cli, "configure_logging", lambda *, silence, verbose: Logging(Logger()))
+    monkeypatch.setattr(
+        run_cli,
+        "configure_logging",
+        lambda *, silence, verbose, base_dir: Logging(Logger()),
+    )
     monkeypatch.setattr(run_cli, "create_protocol", lambda protocol_name: object())
     monkeypatch.setattr(run_cli.ProtocolFactory, "resolve_baudrate", lambda protocol, baud: baud)
     monkeypatch.setattr(
@@ -129,7 +133,11 @@ def test_cli_define_args_are_passed_to_request(monkeypatch) -> None:
 def test_cli_define_defaults_to_empty_request_args(monkeypatch) -> None:
     builder = RecordingBuilder()
 
-    monkeypatch.setattr(run_cli, "configure_logging", lambda *, silence, verbose: Logging(Logger()))
+    monkeypatch.setattr(
+        run_cli,
+        "configure_logging",
+        lambda *, silence, verbose, base_dir: Logging(Logger()),
+    )
     monkeypatch.setattr(run_cli, "create_protocol", lambda protocol_name: object())
     monkeypatch.setattr(run_cli.ProtocolFactory, "resolve_baudrate", lambda protocol, baud: baud)
     monkeypatch.setattr(run_cli, "create_runtime_builder", lambda **kwargs: builder)

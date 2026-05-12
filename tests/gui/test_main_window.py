@@ -97,7 +97,8 @@ class FakeBuilder:
 
 
 class FakeServices:
-    def __init__(self) -> None:
+    def __init__(self, project_root: Path | None = None) -> None:
+        self.project_root = Path.cwd() if project_root is None else project_root
         self.logger = RecordingLogger()
         self.logging = FakeLogging(self.logger)
         self.global_settings = FakeSettings()
@@ -167,8 +168,8 @@ class FakeRunHandle:
 
 
 @pytest.fixture
-def services() -> FakeServices:
-    return FakeServices()
+def services(tmp_path) -> FakeServices:
+    return FakeServices(project_root=tmp_path)
 
 
 @pytest.fixture
@@ -179,6 +180,16 @@ def window(qtbot, services: FakeServices) -> MainWindow:
     w.status_label.setText("準備完了")
     yield w
     w.preview_pane.timer.stop()
+
+
+def test_main_window_accepts_injected_project_root(qtbot, tmp_path) -> None:
+    services = FakeServices(project_root=tmp_path / "service-root")
+    project_root = tmp_path / "explicit-root"
+
+    w = MainWindow(services=services, project_root=project_root)
+    qtbot.addWidget(w)
+
+    assert w.project_root == project_root
 
 
 def run_result(status: RunStatus, message: str = "") -> RunResult:

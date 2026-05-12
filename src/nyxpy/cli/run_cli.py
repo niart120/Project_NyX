@@ -22,6 +22,7 @@ from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.global_settings import SettingsStore
 from nyxpy.framework.core.settings.secrets_settings import SecretsStore
+from nyxpy.framework.core.settings.workspace import ensure_workspace, resolve_project_root
 from nyxpy.framework.core.utils.helper import parse_define_args
 
 
@@ -49,7 +50,12 @@ class CliPresenter:
         return 2
 
 
-def configure_logging(silence: bool = False, verbose: bool = False) -> LoggingComponents:
+def configure_logging(
+    silence: bool = False,
+    verbose: bool = False,
+    *,
+    base_dir: pathlib.Path | None = None,
+) -> LoggingComponents:
     """
     コマンドライン引数に基づいてログレベルを設定します。
 
@@ -57,7 +63,7 @@ def configure_logging(silence: bool = False, verbose: bool = False) -> LoggingCo
         silence: Trueの場合、ほとんどのログ出力を抑制します
         verbose: Trueの場合、デバッグレベルのログを有効にします
     """
-    logging = create_default_logging(base_dir=pathlib.Path.cwd() / "logs")
+    logging = create_default_logging(base_dir=base_dir or pathlib.Path.cwd() / "logs")
     if silence:
         print("Running in silent mode; logging is disabled.")
         logging.set_all_levels("ERROR")
@@ -88,8 +94,8 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
 def create_runtime_builder(
     protocol: SerialProtocolInterface,
     logger: LoggerPort,
-    resources_dir: pathlib.Path | None = None,
     *,
+    project_root: pathlib.Path | None = None,
     serial_name: str | None = None,
     capture_name: str | None = None,
     baudrate: int | None = None,
@@ -106,7 +112,7 @@ def create_runtime_builder(
     Args:
         protocol: 使用するプロトコル実装
         logger: Runtime に注入する logger
-        resources_dir: 旧互換引数。指定時はプロジェクトルートとして扱います。
+        project_root: 使用する NyX workspace root
         serial_name: 使用するシリアルデバイス名
         capture_name: 使用するキャプチャデバイス名
         baudrate: シリアルボーレート
@@ -114,12 +120,15 @@ def create_runtime_builder(
     Returns:
         設定済みの Runtime builder
     """
-    project_root = pathlib.Path.cwd() if resources_dir is None else resources_dir
-    registry = MacroRegistry(project_root=project_root)
+    resolved_root = resolve_project_root(
+        explicit_root=project_root,
+        allow_current_as_new=False,
+    )
+    paths = ensure_workspace(resolved_root)
+    registry = MacroRegistry(project_root=paths.project_root)
     registry.reload()
-    config_dir = project_root / ".nyxpy"
-    settings = settings_store or SettingsStore(config_dir=config_dir, strict_load=False)
-    secrets = secrets_store or SecretsStore(config_dir=config_dir, strict_load=False)
+    settings = settings_store or SettingsStore(config_dir=paths.config_dir, strict_load=False)
+    secrets = secrets_store or SecretsStore(config_dir=paths.config_dir, strict_load=False)
     discovery = device_discovery or DeviceDiscoveryService(logger=logger)
     controller_factory = controller_output_factory or ControllerOutputPortFactory(
         discovery=discovery,
@@ -133,7 +142,7 @@ def create_runtime_builder(
         secrets.snapshot(), logger=logger
     )
     return create_device_runtime_builder(
-        project_root=project_root,
+        project_root=paths.project_root,
         registry=registry,
         device_discovery=discovery,
         controller_output_factory=controller_factory,
@@ -232,8 +241,15 @@ def cli_main(args: argparse.Namespace) -> int:
         終了コード（0:成功、0以外:エラー）
     """
     try:
+        project_root = resolve_project_root(allow_current_as_new=False)
+        paths = ensure_workspace(project_root)
+
         # ログの設定
-        logging = configure_logging(silence=args.silence, verbose=args.verbose)
+        logging = configure_logging(
+            silence=args.silence,
+            verbose=args.verbose,
+            base_dir=paths.logs_dir,
+        )
         logger = logging.logger
 
         baudrate = ProtocolFactory.resolve_baudrate(args.protocol, getattr(args, "baud", None))
@@ -242,6 +258,7 @@ def cli_main(args: argparse.Namespace) -> int:
         runtime_builder = create_runtime_builder(
             protocol=protocol,
             logger=logger,
+            project_root=paths.project_root,
             serial_name=args.serial,
             capture_name=args.capture,
             baudrate=baudrate,

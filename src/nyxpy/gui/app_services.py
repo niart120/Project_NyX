@@ -38,13 +38,14 @@ class SettingsApplyOutcome:
 class GuiAppServices:
     def __init__(self, *, project_root: Path) -> None:
         self.project_root = Path(project_root)
+        config_dir = self.project_root / ".nyxpy"
         self.logging = create_default_logging(
             base_dir=self.project_root / "logs",
             console_enabled=False,
         )
         self.logger = self.logging.logger
-        self.global_settings = GlobalSettings()
-        self.secrets_settings = SecretsSettings()
+        self.global_settings = GlobalSettings(config_dir=config_dir)
+        self.secrets_settings = SecretsSettings(config_dir=config_dir)
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)

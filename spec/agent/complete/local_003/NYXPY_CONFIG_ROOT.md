@@ -50,7 +50,7 @@
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `spec\agent\wip\local_003\NYXPY_CONFIG_ROOT.md` | 新規 | `.nyxpy` 配置と生成責務の仕様を定義する |
+| `spec\agent\complete\local_003\NYXPY_CONFIG_ROOT.md` | 新規 | `.nyxpy` 配置と生成責務の仕様を定義する |
 | `src\nyxpy\framework\core\settings\global_settings.py` | 変更 | `SettingsStore` / `GlobalSettings` の `config_dir` を必須化し、`Path.cwd()` fallback を削除する |
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | `SecretsStore` / `SecretsSettings` の `config_dir` を必須化し、`Path.cwd()` fallback を削除する |
 | `src\nyxpy\framework\core\settings\workspace.py` | 新規 | project root 解決と workspace 初期化の共通関数を定義する |
@@ -174,7 +174,7 @@ framework settings は GUI に依存しない。GUI は `WorkspacePaths` と sto
 | 3 | `allow_current_as_new=True` の cwd | 新規 workspace root として `ensure_workspace()` で生成する |
 | 4 | 上記なし | workspace 未決定として `ConfigurationError` を送出する |
 
-`nyxpy init` は `allow_current_as_new=True` で cwd を初期化する。GUI の初回起動は root 選択 UI がない間だけ `allow_current_as_new=True` で cwd を使う。CLI の macro 実行は明示 root または既存 workspace を優先し、未初期化 cwd を新規 workspace として扱うかどうかを実装時に CLI UX と合わせて決定する。
+`nyxpy init` は `allow_current_as_new=True` で cwd を初期化する。GUI の初回起動は root 選択 UI がない間だけ `allow_current_as_new=True` で cwd を使う。CLI の macro 実行は既存 workspace marker を探索し、未初期化 cwd では `NYX_WORKSPACE_NOT_FOUND` を返す。
 
 ### 生成タイミング
 
@@ -184,7 +184,7 @@ framework settings は GUI に依存しない。GUI は `WorkspacePaths` と sto
 |------------------|----------|------|
 | `nyxpy init` | 生成する | ユーザが cwd を workspace root として初期化する意思を示している |
 | GUI 初回起動 | 生成する | root 選択 UI がない現状では cwd を起動 root とする必要がある |
-| CLI macro 実行 | 条件付きで生成する | macro discovery の project root と同一である場合のみ一貫性がある |
+| CLI macro 実行 | 既存 workspace または明示 root でのみ生成する | 未初期化 cwd への暗黙 workspace 生成を避ける |
 | `SettingsStore(config_dir=...)` | 生成する | config_dir は呼び出し元が既に決定済みである |
 | `SettingsStore()` | 不可 | 保存先を推測しない |
 
@@ -252,7 +252,7 @@ def ensure_workspace(project_root: Path) -> WorkspacePaths:
 | `runs` | 実行成果物の保存先 |
 | `logs` | `create_default_logging()` の保存先 |
 
-`macros\__init__.py` の生成は既存 `init_app()` と同じく維持する。`static` は migration 後の旧ディレクトリであるため生成しない。
+`macros\__init__.py` は `ensure_workspace()` が `macros` を新規作成した場合に生成する。既存 `macros` ディレクトリには追加しない。`static` は migration 後の旧ディレクトリであるため生成しない。
 
 ### settings store
 
@@ -269,7 +269,7 @@ store は `Path.cwd()`、project root 探索、GUI 状態を参照しない。
 
 ### CLI / GUI wiring
 
-CLI は runtime builder 作成前に `WorkspacePaths` を得て、`SettingsStore(config_dir=paths.config_dir)` と `SecretsStore(config_dir=paths.config_dir)` を生成する。GUI は `run_gui.main()` または `MainWindow` 生成前に project root を決め、`GuiAppServices(project_root=paths.project_root)` が `GlobalSettings(config_dir=paths.config_dir)` と `SecretsSettings(config_dir=paths.config_dir)` を生成する。
+CLI は runtime builder 作成前に `WorkspacePaths` を得て、`SettingsStore(config_dir=paths.config_dir)` と `SecretsStore(config_dir=paths.config_dir)` を生成する。CLI logging は `paths.logs_dir` を使い、サブディレクトリ起動時にも `project_root\logs` へ揃える。GUI は `run_gui.main()` または `MainWindow` 生成前に project root を決め、`GuiAppServices(project_root=paths.project_root)` が `GlobalSettings(config_dir=paths.config_dir)` と `SecretsSettings(config_dir=paths.config_dir)` を生成する。
 
 `AppSettingsDialog` は原則として `MainWindow` から渡された store を使う。引数省略時に新しい `GlobalSettings()` / `SecretsSettings()` を作る fallback は削除する。
 
@@ -317,15 +317,15 @@ project root 未決定時の `ConfigurationError` は `code="NYX_WORKSPACE_NOT_F
 
 ## 6. 実装チェックリスト
 
-- [ ] `WorkspacePaths`, `resolve_project_root()`, `ensure_workspace()` のシグネチャ確定
-- [ ] `SettingsStore` / `SecretsStore` の `config_dir` 必須化
-- [ ] `GlobalSettings` / `SecretsSettings` の `config_dir` 必須化
-- [ ] CLI の workspace 解決と store wiring 更新
-- [ ] GUI の workspace 解決と store wiring 更新
-- [ ] `AppSettingsDialog` の引数なし store fallback 削除
-- [ ] `nyxpy init` の workspace 初期化処理更新
-- [ ] ユニットテスト作成・パス
-- [ ] GUI テスト作成・パス
-- [ ] 結合テスト作成・パス
-- [ ] `uv run ruff check .` パス
-- [ ] `uv run pytest tests\unit tests\gui tests\integration` パス
+- [x] `WorkspacePaths`, `resolve_project_root()`, `ensure_workspace()` のシグネチャ確定
+- [x] `SettingsStore` / `SecretsStore` の `config_dir` 必須化
+- [x] `GlobalSettings` / `SecretsSettings` の `config_dir` 必須化
+- [x] CLI の workspace 解決と store wiring 更新
+- [x] GUI の workspace 解決と store wiring 更新
+- [x] `AppSettingsDialog` の引数なし store fallback 削除
+- [x] `nyxpy init` の workspace 初期化処理更新
+- [x] ユニットテスト作成・パス
+- [x] GUI テスト作成・パス
+- [x] 結合テスト作成・パス
+- [x] `uv run ruff check .` パス
+- [x] `uv run pytest tests\unit tests\gui tests\integration` パス

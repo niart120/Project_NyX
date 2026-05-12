@@ -10,8 +10,10 @@ def test_init_app_creates_resource_io_directories_without_static(tmp_path, monke
     result = nyx_main.init_app()
 
     assert result == 0
-    for name in ("macros", "snapshots", "resources", "runs", ".nyxpy"):
+    for name in ("macros", "snapshots", "resources", "runs", "logs", ".nyxpy"):
         assert (tmp_path / name).exists()
+    assert (tmp_path / ".nyxpy" / "global.toml").exists()
+    assert (tmp_path / ".nyxpy" / "secrets.toml").exists()
     assert not (tmp_path / "static").exists()
 
 
@@ -23,7 +25,12 @@ def test_gui_startup_creates_resource_io_directories_without_static(tmp_path, mo
         def exec(self):
             return 0
 
+    captured = {}
+
     class FakeMainWindow:
+        def __init__(self, *, project_root):
+            captured["project_root"] = project_root
+
         def show(self):
             pass
 
@@ -35,6 +42,7 @@ def test_gui_startup_creates_resource_io_directories_without_static(tmp_path, mo
         run_gui.main()
 
     assert exc_info.value.code == 0
-    for name in ("macros", "snapshots", "resources", "runs"):
+    for name in ("macros", "snapshots", "resources", "runs", "logs", ".nyxpy"):
         assert (tmp_path / name).exists()
+    assert captured["project_root"] == tmp_path.resolve()
     assert not (tmp_path / "static").exists()

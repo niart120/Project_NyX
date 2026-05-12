@@ -26,6 +26,27 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
         snapshot["runtime"]["allow_dummy"] = True
 
 
+def test_settings_store_requires_config_dir() -> None:
+    with pytest.raises(TypeError):
+        SettingsStore()
+    with pytest.raises(TypeError):
+        SecretsStore()
+
+
+def test_settings_store_writes_only_to_config_dir(tmp_path, monkeypatch) -> None:
+    cwd = tmp_path / "cwd"
+    config_dir = tmp_path / "workspace" / ".nyxpy"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+
+    SettingsStore(config_dir=config_dir)
+    SecretsStore(config_dir=config_dir)
+
+    assert (config_dir / "global.toml").exists()
+    assert (config_dir / "secrets.toml").exists()
+    assert not (cwd / ".nyxpy").exists()
+
+
 def test_settings_store_get_set_supports_dotted_keys(tmp_path) -> None:
     store = SettingsStore(config_dir=tmp_path)
 

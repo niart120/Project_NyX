@@ -4,6 +4,8 @@ from pathlib import Path
 
 from nyxpy.cli.run_cli import cli_main
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
+from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.framework.core.settings.workspace import ensure_workspace
 from nyxpy.gui.run_gui import main as gui_main
 
 
@@ -11,15 +13,10 @@ def init_app() -> int:
     """
     Initialize the workspace for GUI/CLI: create macros, snapshots, resources, runs folders.
     """
-    dirs = ["macros", "snapshots", "resources", "runs"]
-    for d in dirs:
-        Path(d).mkdir(exist_ok=True)
-    # Ensure macros is a package
-    init_file = Path("macros") / "__init__.py"
-    if not init_file.exists():
-        init_file.write_text("")
-    # Initialize global settings directory and default config
-    GlobalSettings()
+    paths = ensure_workspace(Path.cwd())
+    GlobalSettings(config_dir=paths.config_dir)
+    SecretsSettings(config_dir=paths.config_dir)
+    dirs = ["macros", "snapshots", "resources", "runs", "logs"]
     print(f"Initialized directories: {', '.join(dirs)}, .nyxpy")
     return 0
 
