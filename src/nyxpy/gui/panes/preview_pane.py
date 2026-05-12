@@ -11,7 +11,6 @@ from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.io.adapters import CaptureFrameSourcePort
 from nyxpy.framework.core.io.ports import FrameSourcePort
 from nyxpy.framework.core.utils.helper import calc_aspect_size
-from nyxpy.gui.events import EventBus, EventType
 from nyxpy.gui.widgets import AspectRatioLabel
 
 SNAPSHOT_DIR = "snapshots"
@@ -42,29 +41,19 @@ class PreviewPane(QWidget):
         if self.frame_source is None and capture_device is not None:
             self.frame_source = CaptureFrameSourcePort(capture_device)
         self.preview_fps = preview_fps  # プレビュー用のみ
-        self.event_bus = EventBus.get_instance()
-        self.event_bus.subscribe(EventType.CAPTURE_DEVICE_CHANGED, self.on_capture_device_changed)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_preview)
         self.apply_fps()
         QTimer.singleShot(500, self.update_preview)
 
-    def on_capture_device_changed(self, data):
-        if "frame_source" in data:
-            self.set_frame_source(data["frame_source"])
-            return
-        self.set_capture_device(data["device"])
-
     def set_capture_device(self, device: CaptureDeviceInterface):
         self.capture_device = device
         self.frame_source = CaptureFrameSourcePort(device) if device is not None else None
-        self.update_preview()
 
     def set_frame_source(self, frame_source: FrameSourcePort | None) -> None:
         self.capture_device = None
         self.frame_source = frame_source
-        self.update_preview()
 
     def pause(self) -> None:
         self.timer.stop()

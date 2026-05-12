@@ -23,7 +23,7 @@ class LogPane(QWidget):
         super().__init__(parent)
         self.dispatcher = dispatcher
         self.gui_sink = GuiLogSink(self)
-        self.gui_sink_id = self.dispatcher.add_sink(
+        self.gui_sink_id: str | None = self.dispatcher.add_sink(
             self.gui_sink,
             level=("DEBUG" if self.debug_enabled else "INFO"),
         )
@@ -64,11 +64,19 @@ class LogPane(QWidget):
     def _format_event(self, event: UserEvent) -> str:
         return f"{event.timestamp:%H:%M:%S} | {event.level} | {event.message}"
 
-    def closeEvent(self, event):
+    def dispose(self) -> None:
+        if self.gui_sink_id is None:
+            return
         self.dispatcher.remove_sink(self.gui_sink_id)
+        self.gui_sink_id = None
         self.gui_sink.stop()
+
+    def closeEvent(self, event):
+        self.dispose()
         super().closeEvent(event)
 
     def _on_debug_checkbox_changed(self, state):
+        if self.gui_sink_id is None:
+            return
         level = "DEBUG" if self.debug_checkbox.isChecked() else "INFO"
         self.dispatcher.set_level(self.gui_sink_id, level)

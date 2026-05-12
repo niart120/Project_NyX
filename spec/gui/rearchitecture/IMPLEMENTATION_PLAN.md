@@ -251,22 +251,22 @@ def set_frame_source(self, frame_source: FrameSourcePort | None) -> None: ...
 
 ## 6. 実装チェックリスト
 
-- [ ] `GuiAppServices` 相当の composition root を導入する。
-- [ ] GUI から `legacy` 名の Runtime builder 補助関数参照を削除する。
-- [ ] `MacroCatalog` を stable `MacroDefinition.id` key に変更する。
-- [ ] `MacroCatalog.macros` 互換属性を残さず、`definitions_by_id` に一本化する。
-- [ ] `MacroBrowserPane` に `selected_macro_id()` を追加する。
-- [ ] `MainWindow._start_macro()` が table text ではなく stable macro ID を使う。
-- [ ] active capture device 実変更時だけ `PreviewPane.pause()` / `set_frame_source()` / `resume()` で `FrameSourcePort` 参照を更新する。
-- [ ] PreviewPane は `try_latest_frame()` を使い、UI thread で frame lock の blocking wait をしない。
-- [ ] cancel 後に `CANCELLING` 状態を維持し、`RunResult` 確定まで再実行を禁止する。
-- [ ] `RunHandle.result()` 例外と close cleanup 例外を `LoggerPort.technical()` へ記録する。
-- [ ] close wait timeout を設定値から読む。
-- [ ] logging close 前に GUI log sink を明示解除する。
-- [ ] `ControlPane` の状態 API を `IDLE` / `RUNNING` / `CANCELLING` 対応に拡張する。
-- [ ] `ControlPane.set_running(bool)` の一時 wrapper を削除する。
-- [ ] `src\nyxpy\gui\` から削除対象 API の import がないことをテストで固定する。
-- [ ] `uv run pytest tests\gui\test_main_window.py tests\gui\test_log_pane_user_event.py` を通す。
+- [x] `GuiAppServices` 相当の composition root を導入する。
+- [x] GUI から `legacy` 名の Runtime builder 補助関数参照を削除する。
+- [x] `MacroCatalog` を stable `MacroDefinition.id` key に変更する。
+- [x] `MacroCatalog.macros` 互換属性を残さず、`definitions_by_id` に一本化する。
+- [x] `MacroBrowserPane` に `selected_macro_id()` を追加する。
+- [x] `MainWindow._start_macro()` が table text ではなく stable macro ID を使う。
+- [x] active capture device 実変更時だけ `PreviewPane.pause()` / `set_frame_source()` / `resume()` で `FrameSourcePort` 参照を更新する。
+- [x] PreviewPane は `try_latest_frame()` を使い、UI thread で frame lock の blocking wait をしない。
+- [x] cancel 後に `CANCELLING` 状態を維持し、`RunResult` 確定まで再実行を禁止する。
+- [x] `RunHandle.result()` 例外と close cleanup 例外を `LoggerPort.technical()` へ記録する。
+- [x] close wait timeout を設定値から読む。
+- [x] logging close 前に GUI log sink を明示解除する。
+- [x] `ControlPane` の状態 API を `IDLE` / `RUNNING` / `CANCELLING` 対応に拡張する。
+- [x] `ControlPane.set_running(bool)` の一時 wrapper を削除する。
+- [x] `src\nyxpy\gui\` から削除対象 API の import がないことをテストで固定する。
+- [x] `uv run pytest tests\gui\test_main_window.py tests\gui\test_log_pane_user_event.py` を通す。
 
 ## 7. 完了ゲート
 

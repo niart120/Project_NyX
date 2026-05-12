@@ -1,6 +1,6 @@
 import os  # 追加
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon  # 追加
 from PySide6.QtWidgets import (
     QHBoxLayout,  # 追加
@@ -52,7 +52,6 @@ class MacroBrowserPane(QWidget):
         layout.addWidget(self.table)
 
         self.catalog = catalog
-        self.macros = self.catalog.macros
         self.update_macro_table()
 
         self.search_box.textChanged.connect(self.apply_macro_filter)
@@ -63,19 +62,37 @@ class MacroBrowserPane(QWidget):
         )
 
     def on_reload_button_clicked(self):
-        # macrosを再取得し、テーブルを更新
         self.catalog.reload_macros()
-        self.macros = self.catalog.macros
         self.update_macro_table()
 
     def update_macro_table(self):
         self.table.setRowCount(0)
-        for name, macro in self.macros.items():
+        for macro in self.catalog.list():
             row = self.table.rowCount()
             self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(name))
+            name_item = QTableWidgetItem(macro.display_name)
+            name_item.setData(Qt.ItemDataRole.UserRole, macro.id)
+            name_item.setToolTip(macro.class_name)
+            self.table.setItem(row, 0, name_item)
             self.table.setItem(row, 1, QTableWidgetItem(macro.description))
             self.table.setItem(row, 2, QTableWidgetItem(", ".join(macro.tags)))
+
+    def selected_macro_id(self) -> str | None:
+        row = self.table.currentRow()
+        if row < 0:
+            return None
+        item = self.table.item(row, 0)
+        if item is None:
+            return None
+        macro_id = item.data(Qt.ItemDataRole.UserRole)
+        return str(macro_id) if macro_id else None
+
+    def selected_macro_display_name(self) -> str | None:
+        row = self.table.currentRow()
+        if row < 0:
+            return None
+        item = self.table.item(row, 0)
+        return item.text() if item is not None else None
 
     def apply_macro_filter(self):
         keyword = self.search_box.text().lower()

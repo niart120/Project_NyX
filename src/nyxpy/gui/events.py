@@ -5,9 +5,7 @@ from typing import Any
 
 class EventType(Enum):
     SERIAL_DEVICE_CHANGED = auto()
-    CAPTURE_DEVICE_CHANGED = auto()
     PROTOCOL_CHANGED = auto()
-    # その他必要なイベント
 
 
 class EventBus:

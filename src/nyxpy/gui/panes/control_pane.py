@@ -1,7 +1,16 @@
+from enum import Enum
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
 
 from nyxpy.gui.widgets.split_button import CustomSplitDropDownButton
+
+
+class RunUiState(Enum):
+    IDLE = "idle"
+    RUNNING = "running"
+    CANCELLING = "cancelling"
+    FINISHED = "finished"
 
 
 class ControlPane(QWidget):
@@ -42,9 +51,8 @@ class ControlPane(QWidget):
         self.settings_btn.clicked.connect(self.settings_requested)
         self.snapshot_btn.clicked.connect(self.snapshot_requested)
 
-        # 状態変数
         self._selected = False
-        self._running = False
+        self._run_state = RunUiState.IDLE
         self.update_buttons()
 
     def _on_run_with_params(self):
@@ -55,13 +63,14 @@ class ControlPane(QWidget):
         self._selected = selected
         self.update_buttons()
 
-    def set_running(self, running: bool):
-        self._running = running
-        self.running_changed.emit(running)
+    def set_run_state(self, state: RunUiState):
+        self._run_state = state
+        self.running_changed.emit(state is RunUiState.RUNNING)
         self.update_buttons()
 
     def update_buttons(self):
-        self.run_btn.setEnabled(self._selected and not self._running)
-        self.settings_btn.setEnabled(not self._running)
-        self.cancel_btn.setEnabled(self._running)
-        # snapshotボタンは常時有効（必要に応じて条件追加可）
+        running = self._run_state in {RunUiState.RUNNING, RunUiState.CANCELLING}
+        self.run_btn.setEnabled(self._selected and not running)
+        self.settings_btn.setEnabled(not running)
+        self.cancel_btn.setEnabled(self._run_state is RunUiState.RUNNING)
+        self.snapshot_btn.setEnabled(not running)

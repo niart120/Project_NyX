@@ -27,14 +27,19 @@ def test_gui_cli_entrypoints_do_not_import_macro_executor() -> None:
 
 def test_gui_cli_runtime_builder_paths_do_not_resolve_devices_directly() -> None:
     from nyxpy.cli.run_cli import create_runtime_builder
+    from nyxpy.gui.app_services import GuiAppServices
     from nyxpy.gui.main_window import MainWindow
 
     cli_source = inspect.getsource(create_runtime_builder)
-    gui_source = inspect.getsource(MainWindow._create_runtime_builder)
+    gui_source = (
+        inspect.getsource(GuiAppServices._replace_runtime_builder)
+        + inspect.getsource(MainWindow._start_macro)
+    )
 
     assert "get_active_device" not in cli_source
     assert "auto_register_devices" not in cli_source
     assert "get_active_device" not in gui_source
+    assert "create_device_runtime_builder" not in inspect.getsource(MainWindow)
 
 
 def test_virtual_controller_model_uses_controller_output_port() -> None:
