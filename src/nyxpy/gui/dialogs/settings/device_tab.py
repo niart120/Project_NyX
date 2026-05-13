@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -56,6 +58,8 @@ class DeviceSettingsTab(QWidget):
 
         window_row = QHBoxLayout()
         self.window_source = QComboBox()
+        self.window_debug_label = QLabel("")
+        self.window_debug_label.setWordWrap(True)
         self.refresh_window_sources()
         refresh_window_btn = QPushButton("リロード")
         refresh_window_btn.setFixedWidth(60)
@@ -63,6 +67,7 @@ class DeviceSettingsTab(QWidget):
         window_row.addWidget(self.window_source)
         window_row.addWidget(refresh_window_btn)
         cap_form.addRow(QLabel("Window:"), window_row)
+        cap_form.addRow(QLabel("Window Debug:"), self.window_debug_label)
 
         self.window_match_mode = QComboBox()
         self.window_match_mode.addItems(["exact", "contains"])
@@ -186,7 +191,8 @@ class DeviceSettingsTab(QWidget):
         current_identifier = str(self.settings.get("capture_window_identifier", "") or "")
         current_title = self.settings.get("capture_window_title", "")
         self.window_source.clear()
-        for window in self.device_discovery.detect_window_sources(timeout_sec=2.0):
+        windows = self.device_discovery.detect_window_sources(timeout_sec=2.0)
+        for window in windows:
             self.window_source.addItem(
                 window.display_name,
                 {
@@ -195,6 +201,7 @@ class DeviceSettingsTab(QWidget):
                     "process_id": window.process_id,
                 },
             )
+        self._update_window_debug_label(windows)
         for index in range(self.window_source.count()):
             data = self.window_source.itemData(index) or {}
             if data.get("identifier") == current_identifier or data.get("title") == current_title:
@@ -210,6 +217,13 @@ class DeviceSettingsTab(QWidget):
                 },
             )
             self.window_source.setCurrentIndex(self.window_source.count() - 1)
+
+    def _update_window_debug_label(self, windows) -> None:
+        discovery_file = _source_file(self.device_discovery)
+        first_title = windows[0].title if windows else "なし"
+        self.window_debug_label.setText(
+            f"候補 {len(windows)} 件 / 先頭: {first_title} / discovery: {discovery_file}"
+        )
 
     def refresh_serial_devices(self):
         serials = self.device_discovery.detect(timeout_sec=2.0).serial_names()
@@ -265,3 +279,10 @@ class DeviceSettingsTab(QWidget):
         spinbox.setRange(minimum, 100000)
         spinbox.setValue(int(value))
         return spinbox
+
+
+def _source_file(obj: object) -> str:
+    try:
+        return inspect.getfile(type(obj))
+    except TypeError:
+        return type(obj).__module__

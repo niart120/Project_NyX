@@ -98,6 +98,8 @@ def test_device_settings_tab_uses_framework_window_candidates_in_combo(qtbot):
 
     assert tab.window_source.itemText(0) == "Viewer pid=1234"
     assert data == {"title": "Viewer", "identifier": "hwnd-1", "process_id": 1234}
+    assert "候補 1 件" in tab.window_debug_label.text()
+    assert "Viewer" in tab.window_debug_label.text()
 
 
 def test_device_settings_tab_applies_screen_region_settings(qtbot):

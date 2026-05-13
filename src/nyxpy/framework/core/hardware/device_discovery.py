@@ -114,14 +114,12 @@ class DeviceDiscoveryService:
         if timeout_sec < 0:
             raise ValueError("timeout_sec must be greater than or equal to 0")
         result: tuple[WindowInfo, ...] | None = None
-        errors: list[str] = []
 
         def worker() -> None:
             nonlocal result
             try:
                 result = self.window_locator.list_windows()
             except Exception as exc:
-                errors.append(f"window: {type(exc).__name__}: {exc}")
                 self.logger.technical(
                     "WARNING",
                     "Window source discovery failed.",
@@ -140,8 +138,26 @@ class DeviceDiscoveryService:
         thread.start()
         thread.join(timeout_sec)
         if thread.is_alive():
+            self.logger.technical(
+                "WARNING",
+                "Window source discovery timed out.",
+                component="DeviceDiscoveryService",
+                event="device.window_discovery_timeout",
+                extra={"timeout_sec": timeout_sec},
+            )
             return ()
-        return result or ()
+        detected = result or ()
+        self.logger.technical(
+            "INFO",
+            "Window source discovery completed.",
+            component="DeviceDiscoveryService",
+            event="device.window_discovery_completed",
+            extra={
+                "count": len(detected),
+                "titles": [window.title for window in detected[:5]],
+            },
+        )
+        return detected
 
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self._find(name, "serial", timeout_sec)
