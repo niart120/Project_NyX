@@ -94,8 +94,24 @@ def test_device_settings_tab_uses_framework_window_candidates_in_combo(qtbot):
 
     data = tab.window_source.itemData(0)
 
+    assert tab.window_source.isEditable()
     assert tab.window_source.itemText(0) == "Viewer"
     assert data == {"title": "Viewer", "identifier": "hwnd-1"}
+
+
+def test_device_settings_tab_saves_custom_window_title_without_identifier(qtbot):
+    settings = FakeSettings()
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    tab.capture_source_type.setCurrentText("window")
+    tab.window_source.setEditText("View")
+    tab.window_match_mode.setCurrentText("contains")
+    tab.apply()
+
+    assert settings.data["capture_window_title"] == "View"
+    assert settings.data["capture_window_identifier"] == ""
+    assert settings.data["capture_window_match_mode"] == "contains"
 
 
 def test_device_settings_tab_applies_screen_region_settings(qtbot):

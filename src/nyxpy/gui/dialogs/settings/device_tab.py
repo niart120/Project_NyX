@@ -54,6 +54,7 @@ class DeviceSettingsTab(QWidget):
 
         window_row = QHBoxLayout()
         self.window_source = QComboBox()
+        self.window_source.setEditable(True)
         self.refresh_window_sources()
         refresh_window_btn = QPushButton("リロード")
         refresh_window_btn.setFixedWidth(60)
@@ -220,8 +221,13 @@ class DeviceSettingsTab(QWidget):
         self.settings.set("capture_source_type", self.capture_source_type.currentText())
         self.settings.set("capture_device", self.cap_device.currentText())
         window_data = self.window_source.currentData() or {}
-        self.settings.set("capture_window_title", str(window_data.get("title", "")))
-        self.settings.set("capture_window_identifier", str(window_data.get("identifier", "")))
+        window_title = self.window_source.currentText().strip()
+        selected_title = str(window_data.get("title", ""))
+        selected_identifier = str(window_data.get("identifier", ""))
+        if window_title != selected_title:
+            selected_identifier = ""
+        self.settings.set("capture_window_title", window_title or selected_title)
+        self.settings.set("capture_window_identifier", selected_identifier)
         self.settings.set("capture_window_match_mode", self.window_match_mode.currentText())
         self.settings.set("capture_backend", self.capture_backend.currentText())
         self.settings.set(
