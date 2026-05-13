@@ -195,7 +195,7 @@ MVP は `mss` による「対象ウィンドウの現在位置を矩形として
 
 フレームワーク層から GUI へは依存しない。外部ライブラリ依存は backend 実装内へ閉じ込め、import 失敗時は明示的な設定エラーとして扱う。
 
-`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは `capture_devices`、ウィンドウは新規の `window_sources` フィールドで返し、既存の `find_capture()` はカメラ専用として維持する。
+`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは既存の `detect()` / `capture_devices`、ウィンドウは新規の `detect_window_sources()` で扱い、既存の `find_capture()` はカメラ専用として維持する。
 
 ### キャッシュキーと lifetime
 
