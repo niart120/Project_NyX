@@ -242,7 +242,7 @@ class FrameSourcePortFactory:
 
 MVP では `capture_backend=auto` を常に `mss` へ解決する。Windows backend 仕様の実装後に、Windows かつ optional dependency が使用可能な場合だけ `auto` の解決先を `windows_graphics_capture` へ変更する余地を残す。
 
-`DeviceDiscoveryService.detect()` はカメラ候補とシリアル候補の既存挙動を維持する。ウィンドウ候補は新規 `detect_window_sources(timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]` で列挙し、GUI やテストが必要なときだけ呼び出す。通常の `detect()` にウィンドウ列挙を混ぜず、既存のデバイス設定リロードを遅くしない。
+`DeviceDiscoveryService.detect()` はカメラ候補とシリアル候補の既存挙動を維持する。キャプチャ対象ウィンドウ候補は `detect_window_sources(timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]` で列挙し、GUI やテストが必要なときだけ呼び出す。通常の `detect()` にウィンドウ列挙を混ぜず、既存のデバイス設定リロードを遅くしない。GUI はこの API の戻り値をプルダウン候補として扱い、framework から GUI へは依存しない。
 
 `WindowCaptureDevice.initialize()` は locator で初回 `WindowInfo` を解決してから session を開始する。対象ウィンドウが消失した場合は以下の状態機械で再解決する。
 

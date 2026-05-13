@@ -90,6 +90,16 @@ def test_device_settings_tab_applies_window_capture_settings(qtbot):
     assert settings.data["capture_backend"] == "mss"
 
 
+def test_device_settings_tab_uses_framework_window_candidates_in_combo(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    data = tab.window_source.itemData(0)
+
+    assert tab.window_source.itemText(0) == "Viewer pid=1234"
+    assert data == {"title": "Viewer", "identifier": "hwnd-1", "process_id": 1234}
+
+
 def test_device_settings_tab_applies_screen_region_settings(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())

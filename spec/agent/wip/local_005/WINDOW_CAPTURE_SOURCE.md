@@ -219,14 +219,14 @@ MVP は `mss` による「対象ウィンドウの現在位置を矩形として
 
 | レイヤー | 責務 | 依存先 |
 |----------|------|--------|
-| `core/hardware/window_discovery.py` | ウィンドウ候補の列挙と照合 | OS API / 任意ライブラリ |
+| `core/hardware/window_discovery.py` | キャプチャ対象ウィンドウ候補の列挙と照合 | OS API / 任意ライブラリ |
 | `core/hardware/window_capture.py` | 画素取得、色変換、非同期フレームキャッシュ | `WindowCaptureBackend`, `LoggerPort` |
 | `core/io/device_factories.py` | 設定値から `CaptureDeviceInterface` を生成 | `core/hardware` |
 | `gui/dialogs/settings/device_tab.py` | ユーザー設定 UI | `DeviceDiscoveryService` |
 
 フレームワーク層から GUI へは依存しない。外部ライブラリ依存は backend 実装内へ閉じ込め、import 失敗時は明示的な設定エラーとして扱う。
 
-`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは既存の `detect()` / `capture_devices`、ウィンドウは新規の `detect_window_sources()` で扱い、既存の `find_capture()` はカメラ専用として維持する。
+`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは既存の `detect()` / `capture_devices`、キャプチャ対象ウィンドウ候補は `DeviceDiscoveryService.detect_window_sources()` で扱い、既存の `find_capture()` はカメラ専用として維持する。GUI はこの framework API から取得した `WindowInfo` をプルダウンに表示し、選択結果の title / identifier / process id を settings へ保存する。アクティブウィンドウの推定や GUI 側での OS API 呼び出しは行わない。
 
 ### キャッシュキーと lifetime
 

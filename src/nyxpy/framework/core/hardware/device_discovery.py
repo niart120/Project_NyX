@@ -44,6 +44,7 @@ class DeviceDiscoveryResult:
 class DeviceDiscoveryService:
     def __init__(self, *, logger: LoggerPort | None = None) -> None:
         self.logger = logger or NullLoggerPort()
+        self.window_locator = DefaultWindowLocatorBackend()
         self._last_result = DeviceDiscoveryResult()
         self._lock = threading.Lock()
 
@@ -118,7 +119,7 @@ class DeviceDiscoveryService:
         def worker() -> None:
             nonlocal result
             try:
-                result = DefaultWindowLocatorBackend().list_windows()
+                result = self.window_locator.list_windows()
             except Exception as exc:
                 errors.append(f"window: {type(exc).__name__}: {exc}")
                 self.logger.technical(

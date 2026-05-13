@@ -113,7 +113,7 @@ class SettingsApplyOutcome:
 |----|--------|------|
 | 入力ソース種別 combo | `capture_source_type` | `camera` / `window` / `screen_region` |
 | カメラ候補 combo | `capture_device` | `camera` 選択時に有効 |
-| ウィンドウ候補 combo | `capture_window_title`, `capture_window_identifier`, `capture_window_process_id` | `window` 選択時に有効 |
+| ウィンドウ候補 combo | `capture_window_title`, `capture_window_identifier`, `capture_window_process_id` | framework が列挙したキャプチャ対象ウィンドウ候補を表示し、`window` 選択時に有効 |
 | backend combo | `capture_backend` | `auto` / `mss` / `windows_graphics_capture` |
 | 領域入力 | `capture_region` | `screen_region` 選択時に有効。`left` / `top` / `width` / `height` の 4 個の `QSpinBox` で入力する |
 | アスペクトボックス checkbox | `capture_aspect_box_enabled` | 有効時は 16:9 になるよう黒帯を中央揃えで追加する |
@@ -121,7 +121,7 @@ class SettingsApplyOutcome:
 
 ### 内部設計
 
-`DeviceSettingsTab.refresh_capture_devices()` はカメラ候補だけを更新する。新規 `refresh_window_sources()` は `DeviceDiscoveryService.detect_window_sources()` を呼び、表示名と識別子を combo item data に保持する。通常の `detect()` にウィンドウ列挙を混ぜず、既存のカメラ・シリアルリロードを遅くしない。ユーザーがウィンドウ候補を選択した場合、タイトルだけでなく識別子と process id も settings へ保存する。
+`DeviceSettingsTab.refresh_capture_devices()` はカメラ候補だけを更新する。`refresh_window_sources()` は framework の `DeviceDiscoveryService.detect_window_sources()` を呼び、キャプチャ対象ウィンドウ候補の表示名と識別子を combo item data に保持する。通常の `detect()` にウィンドウ列挙を混ぜず、既存のカメラ・シリアルリロードを遅くしない。ユーザーがウィンドウ候補を選択した場合、タイトルだけでなく識別子と process id も settings へ保存する。GUI は候補を表示するだけで、アクティブウィンドウ判定や OS API への直接アクセスは行わない。
 
 `GuiAppServices.apply_settings()` は以下の keys のいずれかが変更された場合に frame source 変更とみなす。
 

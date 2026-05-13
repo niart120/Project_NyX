@@ -1,10 +1,12 @@
 import time
 
+from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import (
     DUMMY_DEVICE_NAME,
     DeviceDiscoveryService,
     DeviceInfo,
 )
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 
 
 class Discovery(DeviceDiscoveryService):
@@ -21,6 +23,11 @@ class Discovery(DeviceDiscoveryService):
         if self.delay:
             time.sleep(self.delay)
         return [DeviceInfo(kind="capture", name="Camera1", identifier=1)]
+
+
+class WindowLocator:
+    def list_windows(self) -> tuple[WindowInfo, ...]:
+        return (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),)
 
 
 def test_device_discovery_returns_detected_names_without_dummy() -> None:
@@ -55,3 +62,15 @@ def test_device_discovery_reports_detection_errors() -> None:
     assert result.serial_names() == []
     assert result.capture_names() == ["Camera1"]
     assert result.errors == ("serial: RuntimeError: serial failed",)
+
+
+def test_device_discovery_lists_capture_target_windows_separately() -> None:
+    discovery = Discovery()
+    discovery.window_locator = WindowLocator()
+
+    windows = discovery.detect_window_sources(timeout_sec=1.0)
+
+    assert windows == (
+        WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),
+    )
+    assert discovery.capture_names() == []
