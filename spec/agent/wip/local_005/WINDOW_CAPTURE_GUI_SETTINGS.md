@@ -182,14 +182,14 @@ GUI は設定保存時に値の型を可能な範囲で検証する。実際の 
 
 ## 6. 実装チェックリスト
 
-- [ ] settings schema の capture source 項目確認
-- [ ] `DeviceSettingsTab` の UI 追加
-- [ ] ウィンドウ候補リロード実装
-- [ ] 固定領域入力実装
-- [ ] アスペクトボックス有効 / 無効入力実装
-- [ ] `SettingsApplyOutcome.frame_source_changed` へ改名
-- [ ] `GuiAppServices` の変更判定拡張
-- [ ] `MainWindow` の Preview 差し替え条件更新
-- [ ] GUI テスト作成・パス
-- [ ] `uv run ruff check .` パス
-- [ ] `uv run pytest tests/gui/` パス
+- [x] settings schema の capture source 項目確認
+- [x] `DeviceSettingsTab` の UI 追加
+- [x] ウィンドウ候補リロード実装
+- [x] 固定領域入力実装
+- [x] アスペクトボックス有効 / 無効入力実装
+- [x] `SettingsApplyOutcome.frame_source_changed` へ改名
+- [x] `GuiAppServices` の変更判定拡張
+- [x] `MainWindow` の Preview 差し替え条件更新
+- [x] GUI テスト作成・パス
+- [x] `uv run ruff check .` パス
+- [x] `uv run pytest tests/gui/` パス

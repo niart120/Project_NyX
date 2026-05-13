@@ -320,19 +320,19 @@ MVP では `capture_backend=auto` を常に `mss` へ解決する。Windows back
 
 ## 6. 実装チェックリスト
 
-- [ ] `mss` の依存追加
-- [ ] `CaptureSourceConfig` / `CaptureSourceKey` 定義
-- [ ] `FrameTransformConfig` / `FrameTransformer` 実装
-- [ ] `WindowCaptureBackend` / `WindowCaptureSession` 定義
-- [ ] Windows DPI awareness / 物理座標正規化方針の実装
-- [ ] `WindowLocatorBackend` とタイトル照合実装
-- [ ] `MssCaptureSession` 実装
-- [ ] `MssWindowCaptureBackend` 実装
-- [ ] `WindowCaptureDevice` / `ScreenRegionCaptureDevice` 実装
-- [ ] `FrameSourcePortFactory` と runtime builder の接続変更
-- [ ] 設定 schema 追加
-- [ ] 600x720 入力に左右黒帯を追加するテスト作成・パス
-- [ ] ユニットテスト作成・パス
-- [ ] 結合テスト作成・パス
-- [ ] `uv run ruff check .` パス
-- [ ] `uv run pytest tests/unit/` パス
+- [x] `mss` の依存追加
+- [x] `CaptureSourceConfig` / `CaptureSourceKey` 定義
+- [x] `FrameTransformConfig` / `FrameTransformer` 実装
+- [x] `WindowCaptureBackend` / `WindowCaptureSession` 定義
+- [x] Windows DPI awareness / 物理座標正規化方針の実装
+- [x] `WindowLocatorBackend` とタイトル照合実装
+- [x] `MssCaptureSession` 実装
+- [x] `MssWindowCaptureBackend` 実装
+- [x] `WindowCaptureDevice` / `ScreenRegionCaptureDevice` 実装
+- [x] `FrameSourcePortFactory` と runtime builder の接続変更
+- [x] 設定 schema 追加
+- [x] 600x720 入力に左右黒帯を追加するテスト作成・パス
+- [x] ユニットテスト作成・パス
+- [x] 結合テスト作成・パス
+- [x] `uv run ruff check .` パス
+- [x] `uv run pytest tests/unit/` パス
