@@ -17,6 +17,7 @@
 | DeviceSettingsTab | キャプチャデバイス、シリアルデバイス、プレビュー FPS を設定する既存 GUI |
 | CaptureSourceConfig | framework 側で定義する入力ソース設定 |
 | WindowInfo | framework 側のウィンドウ候補情報 |
+| FrameTransformConfig | 入力フレームを 1280x720 などの target frame へ合成する設定 |
 | PreviewPane | `FrameSourcePort` から取得したフレームを GUI に表示する pane |
 | GuiAppServices | settings 変更を runtime builder、preview、manual controller に反映するサービス |
 | 入力ソース種別 | `camera` / `window` / `screen_region` の選択値 |
@@ -32,6 +33,7 @@
 | 指標 | 現状 | 目標 |
 |------|------|------|
 | GUI で選べる入力 | カメラデバイスのみ | カメラ、ウィンドウ、画面領域 |
+| 特殊ウィンドウ補正 | 設定不可 | 600x720 などを 1280x720 キャンバスへ合成する offset を設定可能 |
 | ウィンドウ候補更新 | 未対応 | リロード操作で候補一覧を更新 |
 | 設定反映 | `capture_device` 中心 | source type 変更時に Preview / Runtime builder を再生成 |
 | ユーザーの設定ファイル手編集 | 必要 | 不要 |
@@ -83,6 +85,7 @@ GUI 外部へ新しい公開 API は追加しない。`SettingsApplyOutcome` は
 |------|--------|
 | ウィンドウ候補リロード | UI 操作から 2 秒以内。timeout 時は空候補と警告扱い |
 | 設定反映 | builder 再生成と preview 差し替えを 1 回に集約 |
+| 正規化設定 | 600x720 入力に対して x/y offset と 1280x720 target を保存できる |
 | Preview 停止時間 | source 切替時のみ pause / resume |
 
 ### 並行性・スレッド安全性
@@ -113,6 +116,9 @@ class SettingsApplyOutcome:
 | ウィンドウ候補 combo | `capture_window_title`, `capture_window_identifier`, `capture_window_process_id` | `window` 選択時に有効 |
 | backend combo | `capture_backend` | `auto` / `mss` / `windows_graphics_capture` |
 | 領域入力 | `capture_region` | `screen_region` 選択時に有効。`left` / `top` / `width` / `height` の 4 個の `QSpinBox` で入力する |
+| 出力サイズ入力 | `capture_output_width`, `capture_output_height` | 既定は 1280x720。通常は変更しない |
+| リサイズ方式 combo | `capture_resize_policy` | `none` / `fit` / `stretch` |
+| 合成オフセット入力 | `capture_offset_x`, `capture_offset_y` | 「中央配置」チェック時は `None` を保存する。手動指定時は `QSpinBox` の値を使う。600x720 の横中央は x=340, y=0 |
 | FPS combo | `capture_fps` または `preview_fps` | capture FPS と preview FPS の扱いを明示する |
 
 ### 内部設計
@@ -132,6 +138,11 @@ class SettingsApplyOutcome:
 | `capture_backend` |
 | `capture_region` |
 | `capture_fps` |
+| `capture_output_width` |
+| `capture_output_height` |
+| `capture_resize_policy` |
+| `capture_offset_x` |
+| `capture_offset_y` |
 
 ### 設定パラメータ
 
@@ -146,6 +157,11 @@ class SettingsApplyOutcome:
 | `capture_backend` | `str` | `"auto"` | backend 選択 |
 | `capture_region` | `dict[str, int]` | `{}` | 固定領域 |
 | `capture_fps` | `float` | source type 依存 | capture thread の目標 FPS |
+| `capture_output_width` | `int` | `1280` | 正規化後の target frame 幅 |
+| `capture_output_height` | `int` | `720` | 正規化後の target frame 高さ |
+| `capture_resize_policy` | `str` | `"none"` | `none` / `fit` / `stretch` |
+| `capture_offset_x` | `int | None` | `None` | `None` は中央配置。整数は target 左上基準の x |
+| `capture_offset_y` | `int | None` | `None` | `None` は中央配置。整数は target 左上基準の y |
 | `preview_fps` | `int` | `60` | GUI Preview 更新 FPS |
 
 ### エラーハンドリング
@@ -168,6 +184,7 @@ GUI は設定保存時に値の型を可能な範囲で検証する。実際の 
 | GUI | `test_device_settings_tab_shows_capture_source_type` | 入力ソース種別 combo が表示される |
 | GUI | `test_device_settings_tab_applies_window_capture_settings` | ウィンドウ候補の title / identifier / pid を保存する |
 | GUI | `test_device_settings_tab_applies_screen_region_settings` | 固定領域の数値を保存する |
+| GUI | `test_device_settings_tab_applies_frame_transform_settings` | 出力サイズ、リサイズ方式、オフセットを保存する |
 | GUI | `test_device_settings_tab_disables_irrelevant_fields` | source type に応じて不要な入力欄を無効化する |
 | ユニット | `test_app_services_rebuilds_builder_when_frame_source_key_changes` | frame source 関連 key 変更時に builder を再生成する |
 | ユニット | `test_app_services_does_not_rebuild_for_unrelated_setting` | 無関係な設定変更では frame source を差し替えない |
@@ -179,6 +196,7 @@ GUI は設定保存時に値の型を可能な範囲で検証する。実際の 
 - [ ] `DeviceSettingsTab` の UI 追加
 - [ ] ウィンドウ候補リロード実装
 - [ ] 固定領域入力実装
+- [ ] 1280x720 出力サイズ・リサイズ方式・オフセット入力実装
 - [ ] `SettingsApplyOutcome.frame_source_changed` へ改名
 - [ ] `GuiAppServices` の変更判定拡張
 - [ ] `MainWindow` の Preview 差し替え条件更新
