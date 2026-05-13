@@ -1,6 +1,13 @@
 import pytest
 
+from nyxpy.framework.core.hardware.capture_source import (
+    CameraCaptureSourceConfig,
+    CaptureRect,
+    ScreenRegionCaptureSourceConfig,
+    WindowCaptureSourceConfig,
+)
 from nyxpy.framework.core.hardware.device_discovery import DUMMY_DEVICE_NAME, DeviceInfo
+from nyxpy.framework.core.hardware.window_capture import WindowCaptureBackend, WindowCaptureSession
 from nyxpy.framework.core.io.device_factories import (
     ControllerOutputPortFactory,
     FrameSourcePortFactory,
@@ -69,6 +76,28 @@ class CaptureDevice:
         self.release_calls += 1
 
 
+class Session(WindowCaptureSession):
+    def start(self) -> None:
+        pass
+
+    def latest_frame(self):
+        return object()
+
+    def stop(self) -> None:
+        pass
+
+
+class Backend(WindowCaptureBackend):
+    def __init__(self) -> None:
+        self.release_calls = 0
+
+    def create_session(self, config, locator):
+        return Session()
+
+    def release(self) -> None:
+        self.release_calls += 1
+
+
 def test_controller_factory_reuses_named_device_and_closes_once() -> None:
     SerialDevice.instances.clear()
     factory = ControllerOutputPortFactory(
@@ -95,8 +124,9 @@ def test_frame_source_factory_reuses_device_and_initializes_once() -> None:
         capture_factory=CaptureDevice,
     )
 
-    first = factory.create(name="Camera1", allow_dummy=False, timeout_sec=0)
-    second = factory.create(name="Camera1", allow_dummy=False, timeout_sec=0)
+    source = CameraCaptureSourceConfig(device_name="Camera1")
+    first = factory.create(source=source, allow_dummy=False, timeout_sec=0)
+    second = factory.create(source=source, allow_dummy=False, timeout_sec=0)
 
     assert first.capture_device is second.capture_device
     first.initialize()
@@ -107,6 +137,57 @@ def test_frame_source_factory_reuses_device_and_initializes_once() -> None:
     factory.close()
 
     assert CaptureDevice.instances[0].release_calls == 1
+
+
+def test_frame_source_factory_recreates_device_when_key_changes() -> None:
+    CaptureDevice.instances.clear()
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        capture_factory=CaptureDevice,
+    )
+
+    first = factory.create(
+        source=CameraCaptureSourceConfig(device_name="Camera1", fps=30.0),
+        allow_dummy=False,
+        timeout_sec=0,
+    )
+    second = factory.create(
+        source=CameraCaptureSourceConfig(device_name="Camera1", fps=60.0),
+        allow_dummy=False,
+        timeout_sec=0,
+    )
+
+    assert first.capture_device is not second.capture_device
+
+
+def test_frame_source_factory_creates_screen_region_source() -> None:
+    backend = Backend()
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        window_backend_factory=lambda _name: backend,
+    )
+
+    source = ScreenRegionCaptureSourceConfig(CaptureRect(0, 0, 1280, 720))
+    first = factory.create(source=source, allow_dummy=False, timeout_sec=0)
+    second = factory.create(source=source, allow_dummy=False, timeout_sec=0)
+
+    assert first.capture_device is second.capture_device
+
+
+def test_frame_source_factory_creates_window_source() -> None:
+    backend = Backend()
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        window_backend_factory=lambda _name: backend,
+    )
+
+    port = factory.create(
+        source=WindowCaptureSourceConfig(title_pattern="Viewer"),
+        allow_dummy=False,
+        timeout_sec=0,
+    )
+
+    assert port.capture_device is not None
 
 
 @pytest.mark.parametrize("name", [None, DUMMY_DEVICE_NAME])

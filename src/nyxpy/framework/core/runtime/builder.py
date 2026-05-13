@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from nyxpy.framework.core.hardware.capture_source import capture_source_from_settings
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.io.adapters import (
@@ -180,8 +181,10 @@ def create_device_runtime_builder(
     resolved_serial_name = _optional_name(
         serial_name if serial_name is not None else settings_snapshot.get("serial_device")
     )
-    resolved_capture_name = _optional_name(
-        capture_name if capture_name is not None else settings_snapshot.get("capture_device")
+    resolved_capture_name = _optional_name(capture_name)
+    capture_source = capture_source_from_settings(
+        settings_snapshot,
+        capture_name_override=resolved_capture_name,
     )
     resolved_baudrate = _optional_int(
         baudrate if baudrate is not None else settings_snapshot.get("serial_baud")
@@ -216,7 +219,7 @@ def create_device_runtime_builder(
             timeout_sec=detection_timeout_sec,
         ),
         frame_source_factory=lambda request, _definition: frame_factory.create(
-            name=resolved_capture_name,
+            source=capture_source,
             allow_dummy=allow_dummy(request),
             timeout_sec=detection_timeout_sec,
         ),
@@ -235,7 +238,7 @@ def create_device_runtime_builder(
         ),
         logger_factory=lambda _request, _definition: logger,
         preview_frame_source_factory=lambda: frame_factory.create(
-            name=resolved_capture_name,
+            source=capture_source,
             allow_dummy=lifetime_dummy(),
             timeout_sec=detection_timeout_sec,
         ),

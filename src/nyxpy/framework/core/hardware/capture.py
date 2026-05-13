@@ -32,7 +32,7 @@ class CaptureDeviceInterface(ABC):
         pass
 
 
-class AsyncCaptureDevice:
+class CameraCaptureDevice(CaptureDeviceInterface):
     """
     キャプチャデバイスの非同期スレッド実装。
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
@@ -60,7 +60,7 @@ class AsyncCaptureDevice:
         self.cap = cv2.VideoCapture(self.device_index, self.api_pref)
         if not self.cap.isOpened():
             raise RuntimeError(
-                f"AsyncCaptureDevice: Device {self.device_index} could not be opened."
+                f"CameraCaptureDevice: Device {self.device_index} could not be opened."
             )
         # Try to set FPS and buffer size if supported
         try:
@@ -69,7 +69,7 @@ class AsyncCaptureDevice:
             self.logger.technical(
                 "ERROR",
                 "Failed to set FPS.",
-                component="AsyncCaptureDevice",
+                component="CameraCaptureDevice",
                 event="capture.configure_failed",
             )
         try:
@@ -83,7 +83,7 @@ class AsyncCaptureDevice:
                 self.logger.technical(
                     "WARNING",
                     "Failed to set frame size to 1920x1080. Device may not support this resolution.",
-                    component="AsyncCaptureDevice",
+                    component="CameraCaptureDevice",
                     event="capture.configure_failed",
                 )
                 # Try setting to a lower resolution
@@ -93,7 +93,7 @@ class AsyncCaptureDevice:
             self.logger.technical(
                 "ERROR",
                 "Failed to set frame size.",
-                component="AsyncCaptureDevice",
+                component="CameraCaptureDevice",
                 event="capture.configure_failed",
             )
         try:
@@ -102,7 +102,7 @@ class AsyncCaptureDevice:
             self.logger.technical(
                 "ERROR",
                 "Failed to set buffer size.",
-                component="AsyncCaptureDevice",
+                component="CameraCaptureDevice",
                 event="capture.configure_failed",
             )
         self._running = True
@@ -126,7 +126,7 @@ class AsyncCaptureDevice:
         """
         with self._lock:
             if self.latest_frame is None:
-                raise RuntimeError("AsyncCaptureDevice: No frame available yet.")
+                raise RuntimeError("CameraCaptureDevice: No frame available yet.")
             # Return a copy of the latest or the latest frame
             return self.latest_frame.copy()
 

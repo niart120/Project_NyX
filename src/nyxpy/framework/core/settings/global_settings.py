@@ -22,6 +22,35 @@ from nyxpy.framework.core.settings.schema import (
 GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
     fields={
         "capture_device": SettingField("capture_device", str, ""),
+        "capture_source_type": SettingField(
+            "capture_source_type",
+            str,
+            "camera",
+            choices=("camera", "window", "screen_region"),
+        ),
+        "capture_window_title": SettingField("capture_window_title", str, ""),
+        "capture_window_match_mode": SettingField(
+            "capture_window_match_mode",
+            str,
+            "exact",
+            choices=("exact", "contains"),
+        ),
+        "capture_window_identifier": SettingField("capture_window_identifier", str, ""),
+        "capture_window_process_id": SettingField(
+            "capture_window_process_id",
+            (int, type(None)),
+            None,
+        ),
+        "capture_backend": SettingField(
+            "capture_backend",
+            str,
+            "auto",
+            choices=("auto", "mss", "windows_graphics_capture"),
+        ),
+        "capture_region": SettingField("capture_region", dict, {}),
+        "capture_fps": SettingField("capture_fps", (float, type(None)), None),
+        "capture_aspect_box_enabled": SettingField("capture_aspect_box_enabled", bool, False),
+        "preview_fps": SettingField("preview_fps", int, 60),
         "serial_device": SettingField("serial_device", str, ""),
         "serial_baud": SettingField("serial_baud", int, 9600),
         "serial_protocol": SettingField("serial_protocol", str, "CH552"),
@@ -100,7 +129,7 @@ class SettingsStore:
         with self._lock:
             self.data = self.schema.validate(self.data)
             tmp_path = self.config_path.with_suffix(f"{self.config_path.suffix}.tmp")
-            tmp_path.write_text(tomlkit.dumps(self.data), encoding="utf-8")
+            tmp_path.write_text(tomlkit.dumps(_drop_none(self.data)), encoding="utf-8")
             tmp_path.replace(self.config_path)
 
     def snapshot(self) -> Mapping[str, SettingValue]:
@@ -126,3 +155,11 @@ class GlobalSettings(SettingsStore):
 
     def __init__(self, config_dir: Path) -> None:
         super().__init__(config_dir=config_dir, strict_load=False)
+
+
+def _drop_none(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _drop_none(nested) for key, nested in value.items() if nested is not None}
+    if isinstance(value, list):
+        return [_drop_none(item) for item in value]
+    return value

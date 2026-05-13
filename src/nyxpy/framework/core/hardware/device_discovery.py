@@ -9,6 +9,10 @@ import cv2
 import serial.tools.list_ports
 from cv2_enumerate_cameras import enumerate_cameras
 
+from nyxpy.framework.core.hardware.window_discovery import (
+    DefaultWindowLocatorBackend,
+    WindowInfo,
+)
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 DUMMY_DEVICE_NAME = "ダミーデバイス"
@@ -104,6 +108,39 @@ class DeviceDiscoveryService:
 
     def capture_names(self) -> list[str]:
         return self.last_result.capture_names()
+
+    def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
+        if timeout_sec < 0:
+            raise ValueError("timeout_sec must be greater than or equal to 0")
+        result: tuple[WindowInfo, ...] | None = None
+        errors: list[str] = []
+
+        def worker() -> None:
+            nonlocal result
+            try:
+                result = DefaultWindowLocatorBackend().list_windows()
+            except Exception as exc:
+                errors.append(f"window: {type(exc).__name__}: {exc}")
+                self.logger.technical(
+                    "WARNING",
+                    "Window source discovery failed.",
+                    component="DeviceDiscoveryService",
+                    event="device.discovery_failed",
+                    extra={"device_type": "window"},
+                    exc=exc,
+                )
+                result = ()
+
+        thread = threading.Thread(
+            target=worker,
+            name="nyx-window-discovery",
+            daemon=True,
+        )
+        thread.start()
+        thread.join(timeout_sec)
+        if thread.is_alive():
+            return ()
+        return result or ()
 
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self._find(name, "serial", timeout_sec)
