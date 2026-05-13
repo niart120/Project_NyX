@@ -43,6 +43,14 @@ class FakeDiscovery:
         return (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),)
 
 
+class EmptyWindowDiscovery(FakeDiscovery):
+    def detect_window_sources(self, timeout_sec=2.0):
+        return ()
+
+    def window_source_diagnostics(self):
+        return "platform=Windows total=5 visible=2 titled=0 rect=0 returned=0"
+
+
 def test_device_tab_protocol_options_include_3ds(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
@@ -100,6 +108,15 @@ def test_device_settings_tab_uses_framework_window_candidates_in_combo(qtbot):
     assert data == {"title": "Viewer", "identifier": "hwnd-1", "process_id": 1234}
     assert "候補 1 件" in tab.window_debug_label.text()
     assert "Viewer" in tab.window_debug_label.text()
+
+
+def test_device_settings_tab_shows_empty_window_diagnostics(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=EmptyWindowDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.window_source.count() == 0
+    assert "候補 0 件" in tab.window_debug_label.text()
+    assert "total=5 visible=2 titled=0 rect=0 returned=0" in tab.window_debug_label.text()
 
 
 def test_device_settings_tab_applies_screen_region_settings(qtbot):

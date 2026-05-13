@@ -6,7 +6,10 @@ from nyxpy.framework.core.hardware.device_discovery import (
     DeviceDiscoveryService,
     DeviceInfo,
 )
-from nyxpy.framework.core.hardware.window_discovery import WindowInfo
+from nyxpy.framework.core.hardware.window_discovery import (
+    WindowDiscoveryDiagnostics,
+    WindowInfo,
+)
 
 
 class Discovery(DeviceDiscoveryService):
@@ -28,6 +31,16 @@ class Discovery(DeviceDiscoveryService):
 class WindowLocator:
     def list_windows(self) -> tuple[WindowInfo, ...]:
         return (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),)
+
+    def diagnostics(self) -> WindowDiscoveryDiagnostics:
+        return WindowDiscoveryDiagnostics(
+            platform_name="Windows",
+            total_handles=1,
+            visible_handles=1,
+            titled_handles=1,
+            valid_rect_handles=1,
+            returned_windows=1,
+        )
 
 
 def test_device_discovery_returns_detected_names_without_dummy() -> None:
@@ -74,3 +87,12 @@ def test_device_discovery_lists_capture_target_windows_separately() -> None:
         WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),
     )
     assert discovery.capture_names() == []
+
+
+def test_device_discovery_exposes_window_source_diagnostics() -> None:
+    discovery = Discovery()
+    discovery.window_locator = WindowLocator()
+
+    assert discovery.window_source_diagnostics() == (
+        "platform=Windows total=1 visible=1 titled=1 rect=1 returned=1"
+    )

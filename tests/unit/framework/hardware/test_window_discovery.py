@@ -1,7 +1,11 @@
 import pytest
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect, WindowCaptureSourceConfig
-from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
+from nyxpy.framework.core.hardware.window_discovery import (
+    WindowDiscoveryDiagnostics,
+    WindowInfo,
+    resolve_window,
+)
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
@@ -36,3 +40,16 @@ def test_window_identifier_takes_priority() -> None:
     )
 
     assert resolved.title == "Viewer Settings"
+
+
+def test_window_discovery_diagnostics_summary() -> None:
+    diagnostics = WindowDiscoveryDiagnostics(
+        platform_name="Windows",
+        total_handles=10,
+        visible_handles=4,
+        titled_handles=3,
+        valid_rect_handles=2,
+        returned_windows=2,
+    )
+
+    assert diagnostics.summary() == "platform=Windows total=10 visible=4 titled=3 rect=2 returned=2"

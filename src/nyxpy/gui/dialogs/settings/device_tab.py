@@ -221,8 +221,13 @@ class DeviceSettingsTab(QWidget):
     def _update_window_debug_label(self, windows) -> None:
         discovery_file = _source_file(self.device_discovery)
         first_title = windows[0].title if windows else "なし"
+        diagnostics = ""
+        if not windows:
+            diagnostics_provider = getattr(self.device_discovery, "window_source_diagnostics", None)
+            if callable(diagnostics_provider):
+                diagnostics = f" / diag: {diagnostics_provider()}"
         self.window_debug_label.setText(
-            f"候補 {len(windows)} 件 / 先頭: {first_title} / discovery: {discovery_file}"
+            f"候補 {len(windows)} 件 / 先頭: {first_title} / discovery: {discovery_file}{diagnostics}"
         )
 
     def refresh_serial_devices(self):

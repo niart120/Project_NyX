@@ -159,6 +159,14 @@ class DeviceDiscoveryService:
         )
         return detected
 
+    def window_source_diagnostics(self) -> str:
+        diagnostics = getattr(self.window_locator, "diagnostics", None)
+        if not callable(diagnostics):
+            return f"locator={type(self.window_locator).__name__} diagnostics=unsupported"
+        result = diagnostics()
+        summary = getattr(result, "summary", None)
+        return summary() if callable(summary) else str(result)
+
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self._find(name, "serial", timeout_sec)
 
