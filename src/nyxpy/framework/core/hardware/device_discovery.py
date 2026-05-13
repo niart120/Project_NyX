@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import platform
 import threading
+import time
 from dataclasses import dataclass
 from typing import Literal
 
@@ -113,40 +114,20 @@ class DeviceDiscoveryService:
     def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
         if timeout_sec < 0:
             raise ValueError("timeout_sec must be greater than or equal to 0")
-        result: tuple[WindowInfo, ...] | None = None
-
-        def worker() -> None:
-            nonlocal result
-            try:
-                result = self.window_locator.list_windows()
-            except Exception as exc:
-                self.logger.technical(
-                    "WARNING",
-                    "Window source discovery failed.",
-                    component="DeviceDiscoveryService",
-                    event="device.discovery_failed",
-                    extra={"device_type": "window"},
-                    exc=exc,
-                )
-                result = ()
-
-        thread = threading.Thread(
-            target=worker,
-            name="nyx-window-discovery",
-            daemon=True,
-        )
-        thread.start()
-        thread.join(timeout_sec)
-        if thread.is_alive():
+        started_at = time.perf_counter()
+        try:
+            detected = self.window_locator.list_windows()
+        except Exception as exc:
             self.logger.technical(
                 "WARNING",
-                "Window source discovery timed out.",
+                "Window source discovery failed.",
                 component="DeviceDiscoveryService",
-                event="device.window_discovery_timeout",
-                extra={"timeout_sec": timeout_sec},
+                event="device.discovery_failed",
+                extra={"device_type": "window"},
+                exc=exc,
             )
             return ()
-        detected = result or ()
+        elapsed_sec = time.perf_counter() - started_at
         self.logger.technical(
             "INFO",
             "Window source discovery completed.",
@@ -155,8 +136,17 @@ class DeviceDiscoveryService:
             extra={
                 "count": len(detected),
                 "titles": [window.title for window in detected[:5]],
+                "elapsed_sec": elapsed_sec,
             },
         )
+        if elapsed_sec > timeout_sec:
+            self.logger.technical(
+                "WARNING",
+                "Window source discovery exceeded timeout budget.",
+                component="DeviceDiscoveryService",
+                event="device.window_discovery_slow",
+                extra={"timeout_sec": timeout_sec, "elapsed_sec": elapsed_sec},
+            )
         return detected
 
     def window_source_diagnostics(self) -> str:

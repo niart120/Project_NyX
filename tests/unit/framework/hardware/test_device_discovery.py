@@ -29,7 +29,11 @@ class Discovery(DeviceDiscoveryService):
 
 
 class WindowLocator:
+    def __init__(self) -> None:
+        self.calls = 0
+
     def list_windows(self) -> tuple[WindowInfo, ...]:
+        self.calls += 1
         return (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),)
 
     def diagnostics(self) -> WindowDiscoveryDiagnostics:
@@ -79,7 +83,8 @@ def test_device_discovery_reports_detection_errors() -> None:
 
 def test_device_discovery_lists_capture_target_windows_separately() -> None:
     discovery = Discovery()
-    discovery.window_locator = WindowLocator()
+    window_locator = WindowLocator()
+    discovery.window_locator = window_locator
 
     windows = discovery.detect_window_sources(timeout_sec=1.0)
 
@@ -87,6 +92,7 @@ def test_device_discovery_lists_capture_target_windows_separately() -> None:
         WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720), 1234),
     )
     assert discovery.capture_names() == []
+    assert window_locator.calls == 1
 
 
 def test_device_discovery_exposes_window_source_diagnostics() -> None:
