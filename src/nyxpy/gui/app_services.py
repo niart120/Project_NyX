@@ -311,20 +311,36 @@ def _normalize_name(value: object) -> str | None:
 
 
 def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
+    source_type = _dotted_get(settings, "capture_source_type", "camera")
+    capture_fps = _dotted_get(settings, "capture_fps")
+    aspect_box_enabled = _dotted_get(settings, "capture_aspect_box_enabled", False)
+    if source_type == "camera":
+        return (
+            "camera",
+            _normalize_name(_dotted_get(settings, "capture_device", "")),
+            capture_fps,
+            aspect_box_enabled,
+        )
+    if source_type == "window":
+        return (
+            "window",
+            _normalize_name(_dotted_get(settings, "capture_window_title", "")),
+            _normalize_name(_dotted_get(settings, "capture_window_identifier", "")),
+            _dotted_get(settings, "capture_window_match_mode", "exact"),
+            _dotted_get(settings, "capture_backend", "auto"),
+            capture_fps,
+            aspect_box_enabled,
+        )
     region = _dotted_get(settings, "capture_region") or {}
     if not isinstance(region, Mapping):
         region = {}
     return (
-        _dotted_get(settings, "capture_source_type", "camera"),
-        _normalize_name(_dotted_get(settings, "capture_device", "")),
-        _normalize_name(_dotted_get(settings, "capture_window_title", "")),
-        _normalize_name(_dotted_get(settings, "capture_window_identifier", "")),
-        _dotted_get(settings, "capture_window_match_mode", "exact"),
+        source_type,
         _dotted_get(settings, "capture_backend", "auto"),
         region.get("left"),
         region.get("top"),
         region.get("width"),
         region.get("height"),
-        _dotted_get(settings, "capture_fps"),
-        _dotted_get(settings, "capture_aspect_box_enabled", False),
+        capture_fps,
+        aspect_box_enabled,
     )

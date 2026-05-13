@@ -45,15 +45,6 @@ def make_services(settings, *, previous_builder_settings=None):
         "camera",
         "Camera1",
         None,
-        None,
-        None,
-        "exact",
-        "auto",
-        None,
-        None,
-        None,
-        None,
-        None,
         False,
     )
     services._pending_settings_apply = False
@@ -98,6 +89,58 @@ def test_app_services_does_not_rebuild_for_unrelated_setting() -> None:
             "capture_source_type": "camera",
             "capture_device": "Camera1",
             "serial_baud": 9600,
+        },
+    )
+
+    outcome = services.apply_settings(is_run_active=False)
+
+    assert outcome.builder_replaced is True
+    assert outcome.frame_source_changed is False
+
+
+def test_app_services_ignores_camera_device_change_while_window_source_is_active() -> None:
+    settings = {
+        "capture_source_type": "window",
+        "capture_device": "Camera2",
+        "capture_window_title": "Viewer",
+        "capture_window_identifier": "",
+        "capture_window_match_mode": "contains",
+        "capture_backend": "mss",
+    }
+    services = make_services(
+        settings,
+        previous_builder_settings={
+            **settings,
+            "capture_device": "Camera1",
+        },
+    )
+    services._active_frame_source_key = (
+        "window",
+        "Viewer",
+        None,
+        "contains",
+        "mss",
+        None,
+        False,
+    )
+
+    outcome = services.apply_settings(is_run_active=False)
+
+    assert outcome.builder_replaced is True
+    assert outcome.frame_source_changed is False
+
+
+def test_app_services_ignores_window_title_change_while_camera_source_is_active() -> None:
+    settings = {
+        "capture_source_type": "camera",
+        "capture_device": "Camera1",
+        "capture_window_title": "Viewer",
+    }
+    services = make_services(
+        settings,
+        previous_builder_settings={
+            **settings,
+            "capture_window_title": "Old Viewer",
         },
     )
 
