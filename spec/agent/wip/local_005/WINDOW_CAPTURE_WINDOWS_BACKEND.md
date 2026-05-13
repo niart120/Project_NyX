@@ -161,13 +161,13 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
 
 ## 6. 実装チェックリスト
 
-- [ ] `windows-capture` の配布・ライセンス検証
-- [ ] optional dependency 方針決定
-- [ ] Windows version / platform guard 実装
-- [ ] `WindowsGraphicsCaptureBackend` 実装
-- [ ] `WindowsGraphicsCaptureSession` 実装
-- [ ] backend selector 追加
-- [ ] mock unit test 作成・パス
+- [x] `windows-capture` の配布・ライセンス検証
+- [x] optional dependency 方針決定
+- [x] Windows version / platform guard 実装
+- [x] `WindowsGraphicsCaptureBackend` 実装
+- [x] `WindowsGraphicsCaptureSession` 実装
+- [x] backend selector 追加
+- [x] mock unit test 作成・パス
 - [ ] Windows 実機テスト作成
-- [ ] `uv run ruff check .` パス
-- [ ] `uv run pytest tests/unit/` パス
+- [x] `uv run ruff check .` パス
+- [x] `uv run pytest tests/unit/` パス

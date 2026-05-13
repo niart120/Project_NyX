@@ -279,11 +279,11 @@ def _backend_for(name: str) -> WindowCaptureBackend:
     if name in ("auto", "mss"):
         return MssWindowCaptureBackend()
     if name == "windows_graphics_capture":
-        raise ConfigurationError(
-            "windows_graphics_capture backend is not implemented in the MVP",
-            code="NYX_CAPTURE_BACKEND_UNAVAILABLE",
-            component="WindowCaptureBackend",
+        from nyxpy.framework.core.hardware.windows_capture_backend import (
+            WindowsGraphicsCaptureBackend,
         )
+
+        return WindowsGraphicsCaptureBackend()
     raise ConfigurationError(
         "invalid capture backend",
         code="NYX_CAPTURE_BACKEND_INVALID",

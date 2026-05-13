@@ -38,6 +38,11 @@ dev = [
 nyx-cli = "nyxpy.cli.run_cli:main"
 nyx-gui = "nyxpy.gui.run_gui:main"
 
+[project.optional-dependencies]
+windows = [
+    "windows-capture>=2.0.0,<3.0.0 ; sys_platform == 'win32'",
+]
+
 [build-system]
 requires = ["hatchling>=1.0"]
 build-backend = "hatchling.build"
