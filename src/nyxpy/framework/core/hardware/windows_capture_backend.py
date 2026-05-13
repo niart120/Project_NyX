@@ -14,7 +14,7 @@ from nyxpy.framework.core.hardware.capture_source import (
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.window_capture import WindowCaptureBackend, WindowCaptureSession
-from nyxpy.framework.core.hardware.window_discovery import WindowLocatorBackend
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo, WindowLocatorBackend
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 type CaptureClassFactory = Callable[[], type]
@@ -78,13 +78,16 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
         self._windows_build = windows_build
         self._lock = threading.Lock()
         self._latest_frame: cv2.typing.MatLike | None = None
+        self._capture: Any | None = None
         self._capture_control: Any | None = None
+        self._window: WindowInfo | None = None
         self._closed = False
 
     def start(self) -> None:
         self._check_platform()
         capture_class = self._capture_class_factory()
         window = self.locator.resolve(self.config)
+        self._window = window
         hwnd = _window_hwnd(self.config.identifier) or _window_hwnd(window.identifier)
         capture = capture_class(
             cursor_capture=False,
@@ -101,6 +104,7 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
             if raw.ndim != 3 or raw.shape[2] < 3:
                 raise RuntimeError("windows-capture returned an invalid frame")
             bgr = cv2.cvtColor(raw, cv2.COLOR_BGRA2BGR) if raw.shape[2] == 4 else raw[:, :, :3]
+            bgr = _crop_to_client_area(bgr, self._window)
             with self._lock:
                 self._latest_frame = bgr.copy()
 
@@ -108,7 +112,13 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
         def on_closed() -> None:
             self._closed = True
 
-        self._capture_control = capture.start_free_threaded()
+        self._capture = capture
+        try:
+            self._capture_control = capture.start_free_threaded()
+        except Exception:
+            self._capture = None
+            self._window = None
+            raise
 
     def latest_frame(self) -> cv2.typing.MatLike:
         if self._closed:
@@ -122,6 +132,8 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
         control = self._capture_control
         self._capture_control = None
         if control is None:
+            self._capture = None
+            self._window = None
             return
         stop = getattr(control, "stop", None)
         if callable(stop):
@@ -129,6 +141,8 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
         wait = getattr(control, "wait", None)
         if callable(wait):
             wait()
+        self._capture = None
+        self._window = None
 
     def _check_platform(self) -> None:
         platform_name = self._platform_name or platform.system()
@@ -177,3 +191,19 @@ def _window_hwnd(value: object) -> int | None:
     except (TypeError, ValueError):
         return None
     return hwnd if hwnd > 0 else None
+
+
+def _crop_to_client_area(frame: cv2.typing.MatLike, window: WindowInfo | None) -> cv2.typing.MatLike:
+    if window is None or window.window_rect is None:
+        return frame
+    if frame.shape[1] == window.rect.width and frame.shape[0] == window.rect.height:
+        return frame
+    x = int(window.rect.left - window.window_rect.left)
+    y = int(window.rect.top - window.window_rect.top)
+    width = int(window.rect.width)
+    height = int(window.rect.height)
+    if x < 0 or y < 0:
+        return frame
+    if frame.shape[1] < x + width or frame.shape[0] < y + height:
+        return frame
+    return frame[y : y + height, x : x + width]

@@ -107,8 +107,56 @@ def test_windows_session_updates_latest_frame_from_callback() -> None:
     assert frame.shape == (1, 1, 3)
     assert frame[0, 0].tolist() == [1, 2, 3]
     assert FakeWindowsCapture.instances[0].kwargs["window_hwnd"] == 100
+    assert session._capture is None
     assert FakeWindowsCapture.instances[0].control.stopped is True
     assert FakeWindowsCapture.instances[0].control.waited is True
+
+
+class FakeWindowFrameWindowsCapture(FakeWindowsCapture):
+    def start_free_threaded(self):
+        bgra = np.arange(4 * 4 * 4, dtype=np.uint8).reshape((4, 4, 4))
+        self.frame_handler(FakeFrame(bgra), self.control)
+        return self.control
+
+
+class WindowFrameLocator(WindowLocatorBackend):
+    def list_windows(self):
+        return (
+            WindowInfo(
+                "Viewer",
+                "100",
+                CaptureRect(1, 1, 2, 2),
+                window_rect=CaptureRect(0, 0, 4, 4),
+            ),
+        )
+
+
+def window_frame_capture_class_factory():
+    return FakeWindowFrameWindowsCapture
+
+
+def test_windows_session_crops_window_frame_to_client_rect() -> None:
+    FakeWindowsCapture.instances.clear()
+    backend = WindowsGraphicsCaptureBackend(
+        capture_class_factory=window_frame_capture_class_factory,
+        platform_name="Windows",
+        windows_build=18362,
+    )
+    session = backend.create_session(
+        WindowCaptureSourceConfig(title_pattern="Viewer", identifier="100"),
+        WindowFrameLocator(),
+    )
+
+    session.start()
+    try:
+        frame = session.latest_frame()
+        assert session._capture is FakeWindowsCapture.instances[0]
+    finally:
+        session.stop()
+
+    raw = np.arange(4 * 4 * 4, dtype=np.uint8).reshape((4, 4, 4))
+    assert frame.shape == (2, 2, 3)
+    assert frame.tolist() == raw[1:3, 1:3, :3].tolist()
 
 
 def test_windows_session_stop_is_idempotent() -> None:

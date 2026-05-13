@@ -109,6 +109,7 @@ class WindowInfo:
     title: str
     identifier: str | int
     rect: CaptureRect
+    window_rect: CaptureRect | None = None
     app_name: str | None = None
 
 
@@ -191,7 +192,7 @@ class WindowCaptureDevice(CaptureDeviceInterface):
 
 MVP は `mss` による「対象ウィンドウの現在位置を矩形として取得する」方式にする。この方式では対象ウィンドウが他のウィンドウに隠れると隠れた後のデスクトップ領域を取得するため、オクルージョン非対応である。Windows では後続ステップで Windows Graphics Capture backend を追加し、隠れているが最小化されていないウィンドウの取得を改善する。
 
-`mss` backend はキャプチャスレッド内で `mss.mss()` を生成し、他スレッドへ共有しない。ウィンドウ列挙は `WindowLocatorBackend`、画素取得は `WindowCaptureBackend` に分け、列挙処理とキャプチャ処理の依存・スレッド制約を混在させない。
+`mss` backend はキャプチャスレッド内で `mss.mss()` を生成し、他スレッドへ共有しない。ウィンドウ列挙は `WindowLocatorBackend`、画素取得は `WindowCaptureBackend` に分け、列挙処理とキャプチャ処理の依存・スレッド制約を混在させない。Windows の `WindowInfo.rect` はクライアント領域の screen 座標とし、必要に応じて外枠込みの `window_rect` も保持する。
 
 ### アスペクトボックス方針
 

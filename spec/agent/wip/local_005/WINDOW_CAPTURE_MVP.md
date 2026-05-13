@@ -22,7 +22,7 @@
 | FrameTransformConfig | 入力フレームへ 16:9 の黒帯を付与するかを表す設定 |
 | FrameTransformer | BGR frame を必要に応じて 16:9 のアスペクトボックスへ整形する純粋ロジック |
 | ScreenRegionCaptureDevice | 固定矩形を `mss` で取得する capture device |
-| WindowCaptureDevice | locator で解決したウィンドウ矩形を `mss` で取得する capture device |
+| WindowCaptureDevice | locator で解決したウィンドウのクライアント領域を `mss` で取得する capture device |
 | CaptureSourceKey | `FrameSourcePortFactory` が共有デバイスをキャッシュするための immutable key |
 
 ### 1.3 背景・問題
@@ -243,7 +243,7 @@ MVP では `capture_backend=auto` を常に `mss` へ解決する。Windows back
 
 `DeviceDiscoveryService.detect()` はカメラ候補とシリアル候補の既存挙動を維持する。キャプチャ対象ウィンドウ候補は `detect_window_sources(timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]` で列挙し、GUI やテストが必要なときだけ呼び出す。通常の `detect()` にウィンドウ列挙を混ぜず、既存のデバイス設定リロードを遅くしない。GUI はこの API の戻り値をプルダウン候補として扱い、framework から GUI へは依存しない。
 
-`WindowCaptureDevice.initialize()` は locator で初回 `WindowInfo` を解決してから session を開始する。対象ウィンドウが消失した場合は以下の状態機械で再解決する。
+`WindowCaptureDevice.initialize()` は locator で初回 `WindowInfo` を解決してから session を開始する。Windows では `WindowInfo.rect` を `GetClientRect` + `ClientToScreen` で得たクライアント領域の screen 座標とし、タイトルバーやウィンドウ枠を `mss` の取得領域に含めない。対象ウィンドウが消失した場合は以下の状態機械で再解決する。
 
 | 状態 | 条件 | `get_frame()` の挙動 |
 |------|------|----------------------|
@@ -305,6 +305,7 @@ MVP では `capture_backend=auto` を常に `mss` へ解決する。Windows back
 | ユニット | `test_command_capture_keeps_content_aspect_after_aspect_box` | 黒帯付与後に `Command.capture()` の 1280x720 resize を通しても内容が歪まない |
 | ユニット | `test_window_title_exact_match` | 完全一致で対象候補を解決する |
 | ユニット | `test_window_title_contains_match_rejects_ambiguous_candidates` | 部分一致が複数候補のとき `ConfigurationError` |
+| ユニット | `test_windows_list_uses_client_rect_in_screen_coordinates` | Windows のウィンドウ候補がクライアント領域の screen 座標を保持する |
 | ユニット | `test_screen_region_capture_device_returns_bgr_copy` | Dummy session の BGRA 入力を BGR copy で返す |
 | ユニット | `test_mss_session_created_in_capture_thread` | `mss.mss()` をキャプチャスレッド内で生成する |
 | ユニット | `test_frame_source_factory_recreates_device_when_key_changes` | source key 変更時に古い device を再利用しない |
