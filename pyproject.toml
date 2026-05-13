@@ -23,6 +23,7 @@ dependencies = [
     "paddleocr>=3.5.0,<3.6.0",
     "chardet>=5.2.0,<6.0.0",
     "numpy>=2.3.5,<2.4.0",
+    "mss>=10.2.0",
 ]
 
 [dependency-groups]
@@ -36,6 +37,11 @@ dev = [
 [project.scripts]
 nyx-cli = "nyxpy.cli.run_cli:main"
 nyx-gui = "nyxpy.gui.run_gui:main"
+
+[project.optional-dependencies]
+windows = [
+    "windows-capture>=2.0.0,<3.0.0 ; sys_platform == 'win32'",
+]
 
 [build-system]
 requires = ["hatchling>=1.0"]

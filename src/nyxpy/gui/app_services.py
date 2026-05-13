@@ -29,10 +29,29 @@ from nyxpy.gui.macro_catalog import MacroCatalog
 class SettingsApplyOutcome:
     changed_keys: frozenset[str]
     builder_replaced: bool
-    capture_device_changed: bool
+    frame_source_changed: bool
     preview_frame_source: FrameSourcePort | None
     manual_controller: ControllerOutputPort | None
     deferred: bool = False
+
+
+FRAME_SOURCE_SETTING_KEYS = frozenset(
+    {
+        "capture_source_type",
+        "capture_device",
+        "capture_window_title",
+        "capture_window_identifier",
+        "capture_window_match_mode",
+        "capture_backend",
+        "capture_region",
+        "capture_region.left",
+        "capture_region.top",
+        "capture_region.width",
+        "capture_region.height",
+        "capture_fps",
+        "capture_aspect_box_enabled",
+    }
+)
 
 
 class GuiAppServices:
@@ -54,7 +73,7 @@ class GuiAppServices:
         self._last_secrets: dict[str, Any] | None = None
         self._builder_settings: dict[str, Any] | None = None
         self._builder_secrets: dict[str, Any] | None = None
-        self._active_capture_name: str | None = None
+        self._active_frame_source_key: tuple[object, ...] | None = None
         self._pending_settings_apply = False
         self._closed = False
 
@@ -101,14 +120,14 @@ class GuiAppServices:
             return SettingsApplyOutcome(
                 changed_keys=frozenset(changed_keys),
                 builder_replaced=False,
-                capture_device_changed=False,
+                frame_source_changed=False,
                 preview_frame_source=None,
                 manual_controller=None,
                 deferred=True,
             )
 
         previous_builder_exists = self.runtime_builder is not None
-        previous_capture_name = self._active_capture_name
+        previous_frame_source_key = self._active_frame_source_key
         preview_frame_source: FrameSourcePort | None = None
         manual_controller: ControllerOutputPort | None = None
         builder_replaced = False
@@ -124,13 +143,15 @@ class GuiAppServices:
         self._builder_settings = current_settings
         self._builder_secrets = current_secrets
         self._pending_settings_apply = False
-        capture_device_changed = previous_builder_exists and _normalize_name(
-            previous_capture_name
-        ) != _normalize_name(self._active_capture_name)
+        frame_source_changed = (
+            previous_builder_exists
+            and previous_frame_source_key != self._active_frame_source_key
+            and bool(FRAME_SOURCE_SETTING_KEYS & builder_changed_keys)
+        )
         return SettingsApplyOutcome(
             changed_keys=frozenset(changed_keys),
             builder_replaced=builder_replaced,
-            capture_device_changed=capture_device_changed,
+            frame_source_changed=frame_source_changed,
             preview_frame_source=preview_frame_source,
             manual_controller=manual_controller,
         )
@@ -188,7 +209,7 @@ class GuiAppServices:
             settings=self.global_settings.data,
             lifetime_allow_dummy=True,
         )
-        self._active_capture_name = self.global_settings.get("capture_device")
+        self._active_frame_source_key = _frame_source_key(self.global_settings.data)
         if previous_builder is not None:
             self._shutdown_builder(previous_builder)
 
@@ -219,10 +240,10 @@ class GuiAppServices:
                 component="GuiAppServices",
                 event="configuration.changed",
             )
-        if "capture_device" in changed_keys:
+        if FRAME_SOURCE_SETTING_KEYS & changed_keys:
             self.logger.user(
                 "INFO",
-                f"キャプチャデバイス設定を更新しました: {self.global_settings.get('capture_device')}",
+                f"キャプチャ入力設定を更新しました: {self.global_settings.get('capture_source_type', 'camera')}",
                 component="GuiAppServices",
                 event="configuration.changed",
             )
@@ -273,11 +294,11 @@ def _flatten_keys(mapping: Mapping[str, Any], prefix: str = "") -> set[str]:
     return keys
 
 
-def _dotted_get(mapping: Mapping[str, Any], key: str) -> Any:
+def _dotted_get(mapping: Mapping[str, Any], key: str, default: Any = None) -> Any:
     value: Any = mapping
     for part in key.split("."):
         if not isinstance(value, Mapping) or part not in value:
-            return None
+            return default
         value = value[part]
     return value
 
@@ -287,3 +308,39 @@ def _normalize_name(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
+    source_type = _dotted_get(settings, "capture_source_type", "camera")
+    capture_fps = _dotted_get(settings, "capture_fps")
+    aspect_box_enabled = _dotted_get(settings, "capture_aspect_box_enabled", False)
+    if source_type == "camera":
+        return (
+            "camera",
+            _normalize_name(_dotted_get(settings, "capture_device", "")),
+            capture_fps,
+            aspect_box_enabled,
+        )
+    if source_type == "window":
+        return (
+            "window",
+            _normalize_name(_dotted_get(settings, "capture_window_title", "")),
+            _normalize_name(_dotted_get(settings, "capture_window_identifier", "")),
+            _dotted_get(settings, "capture_window_match_mode", "exact"),
+            _dotted_get(settings, "capture_backend", "auto"),
+            capture_fps,
+            aspect_box_enabled,
+        )
+    region = _dotted_get(settings, "capture_region") or {}
+    if not isinstance(region, Mapping):
+        region = {}
+    return (
+        source_type,
+        _dotted_get(settings, "capture_backend", "auto"),
+        region.get("left"),
+        region.get("top"),
+        region.get("width"),
+        region.get("height"),
+        capture_fps,
+        aspect_box_enabled,
+    )

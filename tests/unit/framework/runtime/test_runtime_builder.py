@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.io.adapters import NoopNotificationAdapter, NotificationHandlerAdapter
 from nyxpy.framework.core.io.device_factories import (
@@ -90,6 +91,19 @@ class CaptureDevice:
         self.released = True
 
 
+class RecordingFrameFactory:
+    def __init__(self) -> None:
+        self.sources = []
+        self.closed = False
+
+    def create(self, *, source, allow_dummy: bool, timeout_sec: float):
+        self.sources.append(source)
+        return FakeFrameSourcePort()
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def definition(tmp_path: Path) -> MacroDefinition:
     return MacroDefinition(
         id="sample",
@@ -108,12 +122,13 @@ def definition(tmp_path: Path) -> MacroDefinition:
 
 def make_builder(tmp_path: Path, discovery: Discovery, **kwargs):
     notification_handler = kwargs.pop("notification_handler", None)
+    frame_source_factory = kwargs.pop("frame_source_factory", None)
     controller_factory = ControllerOutputPortFactory(
         discovery=discovery,
         protocol=object(),
         serial_factory=SerialDevice,
     )
-    frame_factory = FrameSourcePortFactory(
+    frame_factory = frame_source_factory or FrameSourcePortFactory(
         discovery=discovery,
         logger=FakeLoggerPort(),
         capture_factory=CaptureDevice,
@@ -187,6 +202,57 @@ def test_runtime_builder_reuses_device_instances(tmp_path: Path) -> None:
 
     assert first.controller.serial_device is second.controller.serial_device
     assert first.frame_source.capture_device is second.frame_source.capture_device
+
+
+def test_runtime_builder_passes_capture_source_config_from_settings(tmp_path: Path) -> None:
+    discovery = Discovery(serial_names=("COM1",), capture_names=("Camera1",))
+    frame_factory = RecordingFrameFactory()
+    builder = make_builder(
+        tmp_path,
+        discovery,
+        serial_name="COM1",
+        frame_source_factory=frame_factory,
+        settings={
+            "capture_source_type": "window",
+            "capture_window_title": "Viewer",
+            "capture_window_match_mode": "contains",
+            "capture_backend": "mss",
+            "capture_aspect_box_enabled": True,
+        },
+    )
+
+    builder.build(RuntimeBuildRequest(macro_id="sample"))
+
+    source = frame_factory.sources[-1]
+    assert isinstance(source, WindowCaptureSourceConfig)
+    assert source.title_pattern == "Viewer"
+    assert source.match_mode == "contains"
+    assert source.transform.aspect_box_enabled is True
+
+
+def test_runtime_builder_does_not_override_window_source_with_capture_name(
+    tmp_path: Path,
+) -> None:
+    discovery = Discovery(serial_names=("COM1",), capture_names=("Camera1",))
+    frame_factory = RecordingFrameFactory()
+    builder = make_builder(
+        tmp_path,
+        discovery,
+        serial_name="COM1",
+        capture_name="Camera1",
+        frame_source_factory=frame_factory,
+        settings={
+            "capture_source_type": "window",
+            "capture_window_title": "Viewer",
+            "capture_window_match_mode": "contains",
+            "capture_backend": "mss",
+        },
+    )
+
+    builder.frame_source_for_preview()
+    builder.build(RuntimeBuildRequest(macro_id="sample"))
+
+    assert all(isinstance(source, WindowCaptureSourceConfig) for source in frame_factory.sources)
 
 
 def test_runtime_builder_rejects_legacy_manager_arguments(tmp_path: Path) -> None:

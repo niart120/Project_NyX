@@ -4,7 +4,7 @@ import time
 import numpy as np
 import pytest
 
-from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice
+from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
 
 
 @pytest.mark.realdevice
@@ -15,7 +15,7 @@ def test_continuous_frame_update():
     実際のキャプチャデバイスを起動して、出力映像が変化するようにする必要があります。
     """
     device_index = 0  # 実際のデバイスに合わせる
-    capture_device = AsyncCaptureDevice(device_index=device_index, fps=60.0)  # 60fps
+    capture_device = CameraCaptureDevice(device_index=device_index, fps=60.0)  # 60fps
     try:
         capture_device.initialize()
     except RuntimeError as e:
@@ -43,7 +43,7 @@ def test_multithreaded_get_latest_frame():
     スレッドセーフに動作するかを検証するテスト。
     """
     device_index = 0
-    capture_device = AsyncCaptureDevice(device_index=device_index, fps=10.0)  # 10fps
+    capture_device = CameraCaptureDevice(device_index=device_index, fps=10.0)  # 10fps
     try:
         capture_device.initialize()
     except RuntimeError as e:
@@ -75,7 +75,7 @@ def test_release_idempotence():
     release() が複数回呼び出されても問題ないことを確認するテスト。
     """
     device_index = 0
-    capture_device = AsyncCaptureDevice(device_index=device_index, fps=30.0)
+    capture_device = CameraCaptureDevice(device_index=device_index, fps=30.0)
     try:
         capture_device.initialize()
     except RuntimeError as e:

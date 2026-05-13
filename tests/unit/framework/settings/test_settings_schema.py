@@ -18,6 +18,9 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
     snapshot = store.snapshot()
 
     assert snapshot["serial_baud"] == 9600
+    assert snapshot["capture_source_type"] == "camera"
+    assert snapshot["capture_aspect_box_enabled"] is False
+    assert snapshot["capture_region"] == {}
     assert snapshot["runtime"]["allow_dummy"] is False
     assert isinstance(snapshot, MappingProxyType)
     with pytest.raises(TypeError):

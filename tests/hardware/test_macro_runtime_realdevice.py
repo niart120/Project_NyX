@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from nyxpy.framework.core.api.notification_handler import NotificationHandler
-from nyxpy.framework.core.hardware.capture import AsyncCaptureDevice
+from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
@@ -93,7 +93,7 @@ def test_macro_runtime_runs_with_real_serial_and_capture(tmp_path: Path) -> None
     frame_factory = FrameSourcePortFactory(
         discovery=discovery,
         logger=NullLoggerPort(),
-        capture_factory=AsyncCaptureDevice,
+        capture_factory=CameraCaptureDevice,
     )
     builder = create_device_runtime_builder(
         project_root=tmp_path,

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.hardware.capture import (
-    AsyncCaptureDevice,
+    CameraCaptureDevice,
     DummyCaptureDevice,
 )
 
@@ -33,10 +33,10 @@ class DummyVideoCapture:
         self._is_opened = False
 
 
-# テストケース１: AsyncCaptureDevice の正常な初期化、フレーム取得、クローズ
+# テストケース１: CameraCaptureDevice の正常な初期化、フレーム取得、クローズ
 def test_async_capture_device_initialize_and_get_frame():
     with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
-        device = AsyncCaptureDevice(device_index=5, fps=100.0)
+        device = CameraCaptureDevice(device_index=5, fps=100.0)
         device.initialize()
 
         # 最初のフレームが取得できていることを確認
@@ -76,19 +76,19 @@ def test_async_capture_device_initialize_failure():
         "nyxpy.framework.core.hardware.capture.cv2.VideoCapture",
         new=DummyVideoCaptureNotOpened,
     ):
-        device = AsyncCaptureDevice(device_index=1)
-        with pytest.raises(RuntimeError, match="AsyncCaptureDevice: Device 1 could not be opened."):
+        device = CameraCaptureDevice(device_index=1)
+        with pytest.raises(RuntimeError, match="CameraCaptureDevice: Device 1 could not be opened."):
             device.initialize()
 
 
 # テストケース３: get_latest_frame がフレーム未更新の場合の動作確認
 def test_get_latest_frame_no_update():
     with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
-        device = AsyncCaptureDevice(device_index=2, fps=20.0)
+        device = CameraCaptureDevice(device_index=2, fps=20.0)
         device.initialize()
         # 強制的に latest_frame を None
         device.latest_frame = None
-        with pytest.raises(RuntimeError, match="AsyncCaptureDevice: No frame available yet."):
+        with pytest.raises(RuntimeError, match="CameraCaptureDevice: No frame available yet."):
             device.get_frame()
         device.release()
 

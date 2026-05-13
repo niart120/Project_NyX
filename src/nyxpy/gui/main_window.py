@@ -235,10 +235,10 @@ class MainWindow(QMainWindow):
         if not outcome.builder_replaced:
             return
         try:
-            if outcome.capture_device_changed:
+            if outcome.frame_source_changed:
                 self.preview_pane.pause()
             self.preview_pane.set_frame_source(outcome.preview_frame_source)
-            if outcome.capture_device_changed:
+            if outcome.frame_source_changed:
                 self.preview_pane.resume()
             self.virtual_controller.model.set_controller(outcome.manual_controller)
         except Exception as exc:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import platform
 import threading
+import time
 from dataclasses import dataclass
 from typing import Literal
 
@@ -9,6 +10,10 @@ import cv2
 import serial.tools.list_ports
 from cv2_enumerate_cameras import enumerate_cameras
 
+from nyxpy.framework.core.hardware.window_discovery import (
+    DefaultWindowLocatorBackend,
+    WindowInfo,
+)
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 DUMMY_DEVICE_NAME = "ダミーデバイス"
@@ -40,6 +45,7 @@ class DeviceDiscoveryResult:
 class DeviceDiscoveryService:
     def __init__(self, *, logger: LoggerPort | None = None) -> None:
         self.logger = logger or NullLoggerPort()
+        self.window_locator = DefaultWindowLocatorBackend()
         self._last_result = DeviceDiscoveryResult()
         self._lock = threading.Lock()
 
@@ -104,6 +110,44 @@ class DeviceDiscoveryService:
 
     def capture_names(self) -> list[str]:
         return self.last_result.capture_names()
+
+    def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
+        if timeout_sec < 0:
+            raise ValueError("timeout_sec must be greater than or equal to 0")
+        started_at = time.perf_counter()
+        try:
+            detected = self.window_locator.list_windows()
+        except Exception as exc:
+            self.logger.technical(
+                "WARNING",
+                "Window source discovery failed.",
+                component="DeviceDiscoveryService",
+                event="device.discovery_failed",
+                extra={"device_type": "window"},
+                exc=exc,
+            )
+            return ()
+        elapsed_sec = time.perf_counter() - started_at
+        self.logger.technical(
+            "INFO",
+            "Window source discovery completed.",
+            component="DeviceDiscoveryService",
+            event="device.window_discovery_completed",
+            extra={
+                "count": len(detected),
+                "titles": [window.title for window in detected[:5]],
+                "elapsed_sec": elapsed_sec,
+            },
+        )
+        if elapsed_sec > timeout_sec:
+            self.logger.technical(
+                "WARNING",
+                "Window source discovery exceeded timeout budget.",
+                component="DeviceDiscoveryService",
+                event="device.window_discovery_slow",
+                extra={"timeout_sec": timeout_sec, "elapsed_sec": elapsed_sec},
+            )
+        return detected
 
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self._find(name, "serial", timeout_sec)

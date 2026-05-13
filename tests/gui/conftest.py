@@ -17,6 +17,9 @@ def _no_real_hardware(monkeypatch):
         def capture_names(self):
             return []
 
+        def detect_window_sources(self, timeout_sec=2.0):
+            return ()
+
         def find_serial(self, name, timeout_sec):
             return None
 
