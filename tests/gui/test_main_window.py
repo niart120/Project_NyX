@@ -110,7 +110,7 @@ class FakeServices:
         self.next_apply_outcome = SettingsApplyOutcome(
             changed_keys=frozenset(),
             builder_replaced=False,
-            capture_device_changed=False,
+            frame_source_changed=False,
             preview_frame_source=None,
             manual_controller=None,
         )
@@ -351,7 +351,7 @@ def test_apply_settings_defers_builder_swap_during_run(window: MainWindow, servi
     services.next_apply_outcome = SettingsApplyOutcome(
         changed_keys=frozenset({"capture_device"}),
         builder_replaced=False,
-        capture_device_changed=False,
+        frame_source_changed=False,
         preview_frame_source=None,
         manual_controller=None,
         deferred=True,
@@ -384,7 +384,7 @@ def test_apply_settings_pauses_only_for_active_capture_change(
     services.next_apply_outcome = SettingsApplyOutcome(
         changed_keys=frozenset({"capture_device"}),
         builder_replaced=True,
-        capture_device_changed=True,
+        frame_source_changed=True,
         preview_frame_source=frame_source,
         manual_controller=controller,
     )
@@ -407,7 +407,7 @@ def test_apply_settings_updates_ports_without_pause_when_capture_unchanged(
     services.next_apply_outcome = SettingsApplyOutcome(
         changed_keys=frozenset({"serial_device"}),
         builder_replaced=True,
-        capture_device_changed=False,
+        frame_source_changed=False,
         preview_frame_source=object(),
         manual_controller=object(),
     )
