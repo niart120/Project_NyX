@@ -159,6 +159,52 @@ def test_windows_session_crops_window_frame_to_client_rect() -> None:
     assert frame.tolist() == raw[1:3, 1:3, :3].tolist()
 
 
+class ClientLikeFrameWindowsCapture(FakeWindowsCapture):
+    def start_free_threaded(self):
+        bgra = np.arange(5 * 4 * 4, dtype=np.uint8).reshape((5, 4, 4))
+        self.frame_handler(FakeFrame(bgra), self.control)
+        return self.control
+
+
+class ClientLikeFrameLocator(WindowLocatorBackend):
+    def list_windows(self):
+        return (
+            WindowInfo(
+                "Viewer",
+                "100",
+                CaptureRect(12, 47, 2, 3),
+                window_rect=CaptureRect(0, 0, 24, 50),
+            ),
+        )
+
+
+def client_like_capture_class_factory():
+    return ClientLikeFrameWindowsCapture
+
+
+def test_windows_session_crops_client_like_frame_with_window_offsets() -> None:
+    FakeWindowsCapture.instances.clear()
+    backend = WindowsGraphicsCaptureBackend(
+        capture_class_factory=client_like_capture_class_factory,
+        platform_name="Windows",
+        windows_build=18362,
+    )
+    session = backend.create_session(
+        WindowCaptureSourceConfig(title_pattern="Viewer", identifier="100"),
+        ClientLikeFrameLocator(),
+    )
+
+    session.start()
+    try:
+        frame = session.latest_frame()
+    finally:
+        session.stop()
+
+    raw = np.arange(5 * 4 * 4, dtype=np.uint8).reshape((5, 4, 4))
+    assert frame.shape == (3, 2, 3)
+    assert frame.tolist() == raw[1:4, 1:3, :3].tolist()
+
+
 def test_windows_session_stop_is_idempotent() -> None:
     backend = WindowsGraphicsCaptureBackend(
         capture_class_factory=capture_class_factory,

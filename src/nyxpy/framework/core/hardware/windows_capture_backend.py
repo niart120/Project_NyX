@@ -198,12 +198,14 @@ def _crop_to_client_area(frame: cv2.typing.MatLike, window: WindowInfo | None) -
         return frame
     if frame.shape[1] == window.rect.width and frame.shape[0] == window.rect.height:
         return frame
-    x = int(window.rect.left - window.window_rect.left)
-    y = int(window.rect.top - window.window_rect.top)
     width = int(window.rect.width)
     height = int(window.rect.height)
-    if x < 0 or y < 0:
+    excess_x = int(frame.shape[1] - width)
+    excess_y = int(frame.shape[0] - height)
+    if excess_x < 0 or excess_y < 0:
         return frame
-    if frame.shape[1] < x + width or frame.shape[0] < y + height:
-        return frame
+    preferred_x = int(window.rect.left - window.window_rect.left)
+    preferred_y = int(window.rect.top - window.window_rect.top)
+    x = preferred_x if 0 <= preferred_x <= excess_x else excess_x // 2
+    y = preferred_y if 0 <= preferred_y <= excess_y else excess_y // 2
     return frame[y : y + height, x : x + width]
