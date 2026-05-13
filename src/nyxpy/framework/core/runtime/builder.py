@@ -182,9 +182,12 @@ def create_device_runtime_builder(
         serial_name if serial_name is not None else settings_snapshot.get("serial_device")
     )
     resolved_capture_name = _optional_name(capture_name)
+    capture_source_type = str(settings_snapshot.get("capture_source_type", "camera") or "camera")
     capture_source = capture_source_from_settings(
         settings_snapshot,
-        capture_name_override=resolved_capture_name,
+        capture_name_override=resolved_capture_name
+        if capture_source_type == "camera"
+        else None,
     )
     resolved_baudrate = _optional_int(
         baudrate if baudrate is not None else settings_snapshot.get("serial_baud")

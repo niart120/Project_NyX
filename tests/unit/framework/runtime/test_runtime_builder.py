@@ -230,6 +230,31 @@ def test_runtime_builder_passes_capture_source_config_from_settings(tmp_path: Pa
     assert source.transform.aspect_box_enabled is True
 
 
+def test_runtime_builder_does_not_override_window_source_with_capture_name(
+    tmp_path: Path,
+) -> None:
+    discovery = Discovery(serial_names=("COM1",), capture_names=("Camera1",))
+    frame_factory = RecordingFrameFactory()
+    builder = make_builder(
+        tmp_path,
+        discovery,
+        serial_name="COM1",
+        capture_name="Camera1",
+        frame_source_factory=frame_factory,
+        settings={
+            "capture_source_type": "window",
+            "capture_window_title": "Viewer",
+            "capture_window_match_mode": "contains",
+            "capture_backend": "mss",
+        },
+    )
+
+    builder.frame_source_for_preview()
+    builder.build(RuntimeBuildRequest(macro_id="sample"))
+
+    assert all(isinstance(source, WindowCaptureSourceConfig) for source in frame_factory.sources)
+
+
 def test_runtime_builder_rejects_legacy_manager_arguments(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         create_device_runtime_builder(
