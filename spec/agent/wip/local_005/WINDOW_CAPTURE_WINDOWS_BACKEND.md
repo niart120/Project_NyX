@@ -168,6 +168,6 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
 - [x] `WindowsGraphicsCaptureSession` 実装
 - [x] backend selector 追加
 - [x] mock unit test 作成・パス
-- [ ] Windows 実機テスト作成
+- [x] Windows 実機テスト作成
 - [x] `uv run ruff check .` パス
 - [x] `uv run pytest tests/unit/` パス
