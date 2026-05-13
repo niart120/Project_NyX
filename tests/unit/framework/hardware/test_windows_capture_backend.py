@@ -9,7 +9,7 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 class Locator(WindowLocatorBackend):
     def list_windows(self):
-        return (WindowInfo("Viewer", "100", CaptureRect(0, 0, 2, 2), process_id=10),)
+        return (WindowInfo("Viewer", "100", CaptureRect(0, 0, 2, 2)),)
 
 
 class Control:

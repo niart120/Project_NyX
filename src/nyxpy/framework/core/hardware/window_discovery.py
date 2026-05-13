@@ -14,33 +14,11 @@ class WindowInfo:
     title: str
     identifier: str | int
     rect: CaptureRect
-    process_id: int | None = None
     app_name: str | None = None
 
     @property
     def display_name(self) -> str:
-        pid = f" pid={self.process_id}" if self.process_id is not None else ""
-        return f"{self.title}{pid}"
-
-
-@dataclass(frozen=True)
-class WindowDiscoveryDiagnostics:
-    platform_name: str
-    total_handles: int = 0
-    visible_handles: int = 0
-    titled_handles: int = 0
-    valid_rect_handles: int = 0
-    returned_windows: int = 0
-    error: str = ""
-
-    def summary(self) -> str:
-        if self.error:
-            return f"platform={self.platform_name} error={self.error}"
-        return (
-            f"platform={self.platform_name} total={self.total_handles} "
-            f"visible={self.visible_handles} titled={self.titled_handles} "
-            f"rect={self.valid_rect_handles} returned={self.returned_windows}"
-        )
+        return self.title
 
 
 class WindowLocatorBackend(ABC):
@@ -56,21 +34,7 @@ class DefaultWindowLocatorBackend(WindowLocatorBackend):
     def list_windows(self) -> tuple[WindowInfo, ...]:
         if platform.system() != "Windows":
             return ()
-        windows, _diagnostics = _list_windows_win32()
-        return windows
-
-    def diagnostics(self) -> WindowDiscoveryDiagnostics:
-        platform_name = platform.system()
-        if platform_name != "Windows":
-            return WindowDiscoveryDiagnostics(platform_name=platform_name)
-        try:
-            _windows, diagnostics = _list_windows_win32()
-        except Exception as exc:
-            return WindowDiscoveryDiagnostics(
-                platform_name=platform_name,
-                error=f"{type(exc).__name__}: {exc}",
-            )
-        return diagnostics
+        return _list_windows_win32()
 
 
 def resolve_window(
@@ -80,7 +44,7 @@ def resolve_window(
     if config.identifier not in (None, ""):
         identifier = str(config.identifier)
         for window in windows:
-            if str(window.identifier) == identifier and _pid_matches(window, config.process_id):
+            if str(window.identifier) == identifier:
                 return window
 
     pattern = config.title_pattern.strip()
@@ -102,8 +66,6 @@ def resolve_window(
             component="WindowLocatorBackend",
             details={"match_mode": config.match_mode},
         )
-    if config.process_id is not None:
-        matches = [window for window in matches if window.process_id == config.process_id]
     if not matches:
         raise ConfigurationError(
             "capture window not found",
@@ -125,17 +87,9 @@ def resolve_window(
     return matches[0]
 
 
-def _pid_matches(window: WindowInfo, process_id: int | None) -> bool:
-    return process_id is None or window.process_id == process_id
-
-
-def _list_windows_win32() -> tuple[tuple[WindowInfo, ...], WindowDiscoveryDiagnostics]:
+def _list_windows_win32() -> tuple[WindowInfo, ...]:
     user32 = ctypes.windll.user32
     windows: list[WindowInfo] = []
-    total_handles = 0
-    visible_handles = 0
-    titled_handles = 0
-    valid_rect_handles = 0
 
     enum_windows_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
@@ -148,11 +102,8 @@ def _list_windows_win32() -> tuple[tuple[WindowInfo, ...], WindowDiscoveryDiagno
         ]
 
     def callback(hwnd, _lparam) -> bool:
-        nonlocal total_handles, visible_handles, titled_handles, valid_rect_handles
-        total_handles += 1
         if not user32.IsWindowVisible(hwnd):
             return True
-        visible_handles += 1
         length = user32.GetWindowTextLengthW(hwnd)
         if length <= 0:
             return True
@@ -161,7 +112,6 @@ def _list_windows_win32() -> tuple[tuple[WindowInfo, ...], WindowDiscoveryDiagno
         title = buffer.value.strip()
         if not title:
             return True
-        titled_handles += 1
         rect = Rect()
         if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
             return True
@@ -169,9 +119,6 @@ def _list_windows_win32() -> tuple[tuple[WindowInfo, ...], WindowDiscoveryDiagno
         height = int(rect.bottom - rect.top)
         if width <= 0 or height <= 0:
             return True
-        valid_rect_handles += 1
-        pid = ctypes.c_ulong()
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         windows.append(
             WindowInfo(
                 title=title,
@@ -182,18 +129,9 @@ def _list_windows_win32() -> tuple[tuple[WindowInfo, ...], WindowDiscoveryDiagno
                     width=width,
                     height=height,
                 ),
-                process_id=int(pid.value) if pid.value else None,
             )
         )
         return True
 
     user32.EnumWindows(enum_windows_proc(callback), 0)
-    detected = tuple(windows)
-    return detected, WindowDiscoveryDiagnostics(
-        platform_name="Windows",
-        total_handles=total_handles,
-        visible_handles=visible_handles,
-        titled_handles=titled_handles,
-        valid_rect_handles=valid_rect_handles,
-        returned_windows=len(detected),
-    )
+    return tuple(windows)

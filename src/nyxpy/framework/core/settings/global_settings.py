@@ -36,11 +36,6 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             choices=("exact", "contains"),
         ),
         "capture_window_identifier": SettingField("capture_window_identifier", str, ""),
-        "capture_window_process_id": SettingField(
-            "capture_window_process_id",
-            (int, type(None)),
-            None,
-        ),
         "capture_backend": SettingField(
             "capture_backend",
             str,

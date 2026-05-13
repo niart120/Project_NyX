@@ -166,7 +166,6 @@ class WindowCaptureSourceConfig:
     source_type: Literal["window"] = "window"
     match_mode: Literal["exact", "contains"] = "exact"
     identifier: str | int | None = None
-    process_id: int | None = None
     backend: Literal["auto", "mss"] = "auto"
     fps: float = 30.0
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
@@ -276,7 +275,6 @@ MVP では `capture_backend=auto` を常に `mss` へ解決する。Windows back
 | `capture_window_title` | `str` | `""` | ウィンドウ入力時のタイトルパターン |
 | `capture_window_match_mode` | `str` | `"exact"` | `exact` または `contains` |
 | `capture_window_identifier` | `str` | `""` | 空文字列は `None` に正規化する。Windows handle も永続化時は文字列で保存する |
-| `capture_window_process_id` | `int | None` | `None` | 正の整数のみ採用し、それ以外は `None` |
 | `capture_backend` | `str` | `"auto"` | MVP では `auto` と `mss` のみ |
 | `capture_region` | `dict[str, int]` | `{}` | `left` / `top` / `width` / `height` を必須キーとする |
 | `capture_fps` | `float | None` | `None` | `None` の場合は source type ごとの既定値を使う。カメラ・固定領域は 60、ウィンドウは 30 |

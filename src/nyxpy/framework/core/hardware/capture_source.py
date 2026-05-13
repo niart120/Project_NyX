@@ -51,7 +51,6 @@ class WindowCaptureSourceConfig:
     source_type: Literal["window"] = "window"
     match_mode: WindowMatchMode = "exact"
     identifier: str | int | None = None
-    process_id: int | None = None
     backend: CaptureBackendName = "auto"
     fps: float = 30.0
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
@@ -79,7 +78,6 @@ class CaptureSourceKey:
     fps: float
     region: CaptureRect | None = None
     match_mode: str = ""
-    process_id: int | None = None
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
 
     @classmethod
@@ -101,7 +99,6 @@ class CaptureSourceKey:
                     backend=source.backend,
                     fps=source.fps,
                     match_mode=source.match_mode,
-                    process_id=source.process_id,
                     transform=source.transform,
                 )
             case ScreenRegionCaptureSourceConfig():
@@ -138,12 +135,10 @@ def capture_source_from_settings(
         case "window":
             title = _text(settings.get("capture_window_title", ""))
             identifier = _optional_text(settings.get("capture_window_identifier", ""))
-            process_id = _optional_positive_int(settings.get("capture_window_process_id"))
             return WindowCaptureSourceConfig(
                 title_pattern=title,
                 match_mode=_match_mode(settings.get("capture_window_match_mode", "exact")),
                 identifier=identifier,
-                process_id=process_id,
                 backend=_backend(settings.get("capture_backend", "auto")),
                 fps=_fps(settings.get("capture_fps"), 30.0),
                 transform=_transform(settings),
@@ -205,16 +200,6 @@ def _text(value: object) -> str:
 def _optional_text(value: object) -> str | None:
     text = _text(value)
     return text or None
-
-
-def _optional_positive_int(value: object) -> int | None:
-    if value in (None, ""):
-        return None
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return None
-    return number if number > 0 else None
 
 
 def _fps(value: object, default: float) -> float:

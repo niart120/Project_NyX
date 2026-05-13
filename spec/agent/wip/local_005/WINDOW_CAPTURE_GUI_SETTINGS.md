@@ -113,7 +113,7 @@ class SettingsApplyOutcome:
 |----|--------|------|
 | 入力ソース種別 combo | `capture_source_type` | `camera` / `window` / `screen_region` |
 | カメラ候補 combo | `capture_device` | `camera` 選択時に有効 |
-| ウィンドウ候補 combo | `capture_window_title`, `capture_window_identifier`, `capture_window_process_id` | framework が列挙したキャプチャ対象ウィンドウ候補を表示し、`window` 選択時に有効 |
+| ウィンドウ候補 combo | `capture_window_title`, `capture_window_identifier` | framework が列挙したキャプチャ対象ウィンドウ候補を表示し、`window` 選択時に有効 |
 | backend combo | `capture_backend` | `auto` / `mss` / `windows_graphics_capture` |
 | 領域入力 | `capture_region` | `screen_region` 選択時に有効。`left` / `top` / `width` / `height` の 4 個の `QSpinBox` で入力する |
 | アスペクトボックス checkbox | `capture_aspect_box_enabled` | 有効時は 16:9 になるよう黒帯を中央揃えで追加する |
@@ -121,7 +121,7 @@ class SettingsApplyOutcome:
 
 ### 内部設計
 
-`DeviceSettingsTab.refresh_capture_devices()` はカメラ候補だけを更新する。`refresh_window_sources()` は framework の `DeviceDiscoveryService.detect_window_sources()` を呼び、キャプチャ対象ウィンドウ候補の表示名と識別子を combo item data に保持する。通常の `detect()` にウィンドウ列挙を混ぜず、既存のカメラ・シリアルリロードを遅くしない。ユーザーがウィンドウ候補を選択した場合、タイトルだけでなく識別子と process id も settings へ保存する。GUI は候補を表示するだけで、アクティブウィンドウ判定や OS API への直接アクセスは行わない。
+`DeviceSettingsTab.refresh_capture_devices()` はカメラ候補だけを更新する。`refresh_window_sources()` は framework の `DeviceDiscoveryService.detect_window_sources()` を呼び、キャプチャ対象ウィンドウ候補の表示名と識別子を combo item data に保持する。通常の `detect()` にウィンドウ列挙を混ぜず、既存のカメラ・シリアルリロードを遅くしない。ユーザーがウィンドウ候補を選択した場合、タイトルと識別子を settings へ保存する。GUI は候補を表示するだけで、アクティブウィンドウ判定や OS API への直接アクセスは行わない。
 
 `GuiAppServices.apply_settings()` は以下の keys のいずれかが変更された場合に frame source 変更とみなす。
 
@@ -131,7 +131,6 @@ class SettingsApplyOutcome:
 | `capture_device` |
 | `capture_window_title` |
 | `capture_window_identifier` |
-| `capture_window_process_id` |
 | `capture_window_match_mode` |
 | `capture_backend` |
 | `capture_region` |
@@ -146,7 +145,6 @@ class SettingsApplyOutcome:
 | `capture_device` | `str` | `""` | カメラ候補 |
 | `capture_window_title` | `str` | `""` | ウィンドウ候補のタイトル |
 | `capture_window_identifier` | `str` | `""` | ウィンドウ候補の識別子 |
-| `capture_window_process_id` | `int | None` | `None` | ウィンドウ候補の process id |
 | `capture_window_match_mode` | `str` | `"exact"` | タイトル照合方式 |
 | `capture_backend` | `str` | `"auto"` | backend 選択 |
 | `capture_region` | `dict[str, int]` | `{}` | 固定領域 |
@@ -172,7 +170,7 @@ GUI は設定保存時に値の型を可能な範囲で検証する。実際の 
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
 | GUI | `test_device_settings_tab_shows_capture_source_type` | 入力ソース種別 combo が表示される |
-| GUI | `test_device_settings_tab_applies_window_capture_settings` | ウィンドウ候補の title / identifier / pid を保存する |
+| GUI | `test_device_settings_tab_applies_window_capture_settings` | ウィンドウ候補の title / identifier を保存する |
 | GUI | `test_device_settings_tab_applies_screen_region_settings` | 固定領域の数値を保存する |
 | GUI | `test_device_settings_tab_applies_aspect_box_setting` | アスペクトボックス有効 / 無効を保存する |
 | GUI | `test_device_settings_tab_disables_irrelevant_fields` | source type に応じて不要な入力欄を無効化する |

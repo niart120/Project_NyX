@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import inspect
-
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -58,8 +54,6 @@ class DeviceSettingsTab(QWidget):
 
         window_row = QHBoxLayout()
         self.window_source = QComboBox()
-        self.window_debug_label = QLabel("")
-        self.window_debug_label.setWordWrap(True)
         self.refresh_window_sources()
         refresh_window_btn = QPushButton("リロード")
         refresh_window_btn.setFixedWidth(60)
@@ -67,7 +61,6 @@ class DeviceSettingsTab(QWidget):
         window_row.addWidget(self.window_source)
         window_row.addWidget(refresh_window_btn)
         cap_form.addRow(QLabel("Window:"), window_row)
-        cap_form.addRow(QLabel("Window Debug:"), self.window_debug_label)
 
         self.window_match_mode = QComboBox()
         self.window_match_mode.addItems(["exact", "contains"])
@@ -110,7 +103,7 @@ class DeviceSettingsTab(QWidget):
             self.capture_fps.setCurrentText(str(int(float(current_capture_fps))))
         cap_form.addRow(QLabel("Capture FPS:"), self.capture_fps)
 
-        self.aspect_box_enabled = QCheckBox("16:9 の黒帯を追加する")
+        self.aspect_box_enabled = QCheckBox("レターボックス")
         self.aspect_box_enabled.setChecked(
             bool(self.settings.get("capture_aspect_box_enabled", False))
         )
@@ -198,10 +191,8 @@ class DeviceSettingsTab(QWidget):
                 {
                     "title": window.title,
                     "identifier": str(window.identifier),
-                    "process_id": window.process_id,
                 },
             )
-        self._update_window_debug_label(windows)
         for index in range(self.window_source.count()):
             data = self.window_source.itemData(index) or {}
             if data.get("identifier") == current_identifier or data.get("title") == current_title:
@@ -213,22 +204,9 @@ class DeviceSettingsTab(QWidget):
                 {
                     "title": current_title,
                     "identifier": current_identifier,
-                    "process_id": self.settings.get("capture_window_process_id", None),
                 },
             )
             self.window_source.setCurrentIndex(self.window_source.count() - 1)
-
-    def _update_window_debug_label(self, windows) -> None:
-        discovery_file = _source_file(self.device_discovery)
-        first_title = windows[0].title if windows else "なし"
-        diagnostics = ""
-        if not windows:
-            diagnostics_provider = getattr(self.device_discovery, "window_source_diagnostics", None)
-            if callable(diagnostics_provider):
-                diagnostics = f" / diag: {diagnostics_provider()}"
-        self.window_debug_label.setText(
-            f"候補 {len(windows)} 件 / 先頭: {first_title} / discovery: {discovery_file}{diagnostics}"
-        )
 
     def refresh_serial_devices(self):
         serials = self.device_discovery.detect(timeout_sec=2.0).serial_names()
@@ -244,7 +222,6 @@ class DeviceSettingsTab(QWidget):
         window_data = self.window_source.currentData() or {}
         self.settings.set("capture_window_title", str(window_data.get("title", "")))
         self.settings.set("capture_window_identifier", str(window_data.get("identifier", "")))
-        self.settings.set("capture_window_process_id", window_data.get("process_id"))
         self.settings.set("capture_window_match_mode", self.window_match_mode.currentText())
         self.settings.set("capture_backend", self.capture_backend.currentText())
         self.settings.set(
@@ -284,10 +261,3 @@ class DeviceSettingsTab(QWidget):
         spinbox.setRange(minimum, 100000)
         spinbox.setValue(int(value))
         return spinbox
-
-
-def _source_file(obj: object) -> str:
-    try:
-        return inspect.getfile(type(obj))
-    except TypeError:
-        return type(obj).__module__

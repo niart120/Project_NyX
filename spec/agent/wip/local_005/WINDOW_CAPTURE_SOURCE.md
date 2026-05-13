@@ -109,7 +109,6 @@ class WindowInfo:
     title: str
     identifier: str | int
     rect: CaptureRect
-    process_id: int | None = None
     app_name: str | None = None
 
 
@@ -132,7 +131,6 @@ class WindowCaptureConfig:
     title_pattern: str
     match_mode: Literal["exact", "contains"] = "exact"
     identifier: str | int | None = None
-    process_id: int | None = None
     client_area: bool = True
     fps: float = 30.0
     backend: Literal["auto", "mss", "windows_graphics_capture"] = "auto"
@@ -226,7 +224,7 @@ MVP は `mss` による「対象ウィンドウの現在位置を矩形として
 
 フレームワーク層から GUI へは依存しない。外部ライブラリ依存は backend 実装内へ閉じ込め、import 失敗時は明示的な設定エラーとして扱う。
 
-`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは既存の `detect()` / `capture_devices`、キャプチャ対象ウィンドウ候補は `DeviceDiscoveryService.detect_window_sources()` で扱い、既存の `find_capture()` はカメラ専用として維持する。GUI はこの framework API から取得した `WindowInfo` をプルダウンに表示し、選択結果の title / identifier / process id を settings へ保存する。アクティブウィンドウの推定や GUI 側での OS API 呼び出しは行わない。
+`DeviceDiscoveryResult.capture_devices` にウィンドウ候補を混在させない。カメラは既存の `detect()` / `capture_devices`、キャプチャ対象ウィンドウ候補は `DeviceDiscoveryService.detect_window_sources()` で扱い、既存の `find_capture()` はカメラ専用として維持する。GUI はこの framework API から取得した `WindowInfo` をプルダウンに表示し、選択結果の title / identifier を settings へ保存する。アクティブウィンドウの推定や GUI 側での OS API 呼び出しは行わない。
 
 ### キャッシュキーと lifetime
 
@@ -296,7 +294,6 @@ class WindowCaptureSourceConfig:
     title_pattern: str = ""
     match_mode: Literal["exact", "contains"] = "exact"
     identifier: str | int | None = None
-    process_id: int | None = None
     backend: Literal["auto", "mss", "windows_graphics_capture"] = "auto"
     fps: float = 30.0
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
@@ -344,7 +341,6 @@ class FrameSourcePortFactory:
 | `capture_window_title` | `str` | `""` | ウィンドウ入力時の対象タイトル |
 | `capture_window_match_mode` | `str` | `"exact"` | タイトル照合方式。`exact` または `contains` |
 | `capture_window_identifier` | `str` | `""` | GUI で選択したウィンドウのハンドル等。再解決の第一候補 |
-| `capture_window_process_id` | `int | None` | `None` | タイトル変化時の再解決補助 |
 | `capture_window_client_area` | `bool` | `true` | ウィンドウ装飾を除いたクライアント領域を優先する |
 | `capture_backend` | `str` | `"auto"` | `auto` / `mss` / `windows_graphics_capture` |
 | `capture_region` | `dict[str, int]` | `{}` | 画面領域入力時の `left` / `top` / `width` / `height` |
