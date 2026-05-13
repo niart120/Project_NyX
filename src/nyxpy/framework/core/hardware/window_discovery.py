@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import platform
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -37,6 +38,15 @@ class DefaultWindowLocatorBackend(WindowLocatorBackend):
         if platform.system() != "Windows":
             return ()
         return _list_windows_win32()
+
+    def resolve(self, config: WindowCaptureSourceConfig) -> WindowInfo:
+        if platform.system() == "Windows":
+            hwnd = _window_hwnd(config.identifier)
+            if hwnd is not None:
+                window = _window_info_from_hwnd(hwnd)
+                if window is not None:
+                    return window
+        return super().resolve(config)
 
 
 def resolve_window(
@@ -113,35 +123,62 @@ def _list_windows_win32(user32=None) -> tuple[WindowInfo, ...]:
     enum_windows_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
     def callback(hwnd, _lparam) -> bool:
-        if not user32.IsWindowVisible(hwnd):
-            return True
-        is_iconic = getattr(user32, "IsIconic", None)
-        if callable(is_iconic) and is_iconic(hwnd):
-            return True
-        length = user32.GetWindowTextLengthW(hwnd)
-        if length <= 0:
-            return True
-        buffer = ctypes.create_unicode_buffer(length + 1)
-        user32.GetWindowTextW(hwnd, buffer, length + 1)
-        title = buffer.value.strip()
-        if not title:
-            return True
-        rects = _client_and_window_rect(user32, hwnd)
-        if rects is None:
-            return True
-        client_rect, window_rect = rects
-        windows.append(
-            WindowInfo(
-                title=title,
-                identifier=str(int(hwnd)),
-                rect=client_rect,
-                window_rect=window_rect,
-            )
-        )
+        window = _window_info_from_hwnd(hwnd, user32)
+        if window is not None:
+            windows.append(window)
         return True
 
     user32.EnumWindows(enum_windows_proc(callback), 0)
     return tuple(windows)
+
+
+def _window_info_from_hwnd(hwnd: int, user32=None) -> WindowInfo | None:
+    user32 = user32 or ctypes.windll.user32
+    if not user32.IsWindowVisible(hwnd):
+        return None
+    is_iconic = getattr(user32, "IsIconic", None)
+    if callable(is_iconic) and is_iconic(hwnd):
+        return None
+    process_id = _window_process_id(user32, hwnd)
+    if process_id == os.getpid():
+        return None
+    length = user32.GetWindowTextLengthW(hwnd)
+    if length <= 0:
+        return None
+    buffer = ctypes.create_unicode_buffer(length + 1)
+    user32.GetWindowTextW(hwnd, buffer, length + 1)
+    title = buffer.value.strip()
+    if not title:
+        return None
+    rects = _client_and_window_rect(user32, hwnd)
+    if rects is None:
+        return None
+    client_rect, window_rect = rects
+    return WindowInfo(
+        title=title,
+        identifier=str(int(hwnd)),
+        rect=client_rect,
+        window_rect=window_rect,
+    )
+
+
+def _window_hwnd(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        hwnd = int(str(value), 0)
+    except (TypeError, ValueError):
+        return None
+    return hwnd if hwnd > 0 else None
+
+
+def _window_process_id(user32, hwnd) -> int | None:
+    get_process_id = getattr(user32, "GetWindowThreadProcessId", None)
+    if not callable(get_process_id):
+        return None
+    process_id = ctypes.c_ulong()
+    get_process_id(hwnd, ctypes.byref(process_id))
+    return int(process_id.value) if process_id.value else None
 
 
 def _client_and_window_rect(user32, hwnd) -> tuple[CaptureRect, CaptureRect] | None:

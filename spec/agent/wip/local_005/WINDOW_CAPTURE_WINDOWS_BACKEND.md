@@ -120,7 +120,9 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
 
 ### 内部設計
 
-`WindowsGraphicsCaptureSession.start()` は `WindowLocatorBackend.resolve()` で対象 `WindowInfo` を取得し、handle または window title を使って `windows-capture` の capture object を作成する。`windows-capture` の capture object は callback handler と native capture object を所有するため、session lifetime 中は `WindowsGraphicsCaptureSession` が強参照を保持する。callback で到着した frame は BGRA から BGR へ変換し、外枠込み frame の場合は `WindowInfo.window_rect` と `WindowInfo.rect` の差分でクライアント領域へ crop してから最新フレームとして保存する。
+`WindowsGraphicsCaptureSession.start()` は `WindowLocatorBackend.resolve()` で対象 `WindowInfo` を取得し、handle または window title を使って `windows-capture` の capture object を作成する。Windows handle が保存されている場合、resolver は `EnumWindows` を経由せず対象 handle を直接解決する。これにより GUI の設定反映中に UI thread が `initialize()` を待っている状態でも、worker thread が自プロセスの Qt ウィンドウを列挙してタイトル取得で詰まることを避ける。
+
+`windows-capture` の capture object は callback handler と native capture object を所有するため、session lifetime 中は `WindowsGraphicsCaptureSession` が強参照を保持する。callback で到着した frame は BGRA から BGR へ変換し、外枠込み frame の場合は `WindowInfo.window_rect` と `WindowInfo.rect` の差分でクライアント領域へ crop してから最新フレームとして保存する。
 
 最小化状態は復旧待ち扱いにし、最後のフレームを成功扱いで返さない。対象ウィンドウが閉じられた場合は locator で再解決する。
 
@@ -157,6 +159,8 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
 | ユニット | `test_windows_session_crops_window_frame_to_client_rect` | WGC が外枠込み frame を返した場合にクライアント領域へ crop する |
 | ユニット | `test_windows_session_stop_is_idempotent` | `stop()` の複数回呼び出しが安全 |
 | ユニット | `test_windows_session_re_resolves_closed_window` | 対象 close 後に locator 再解決を行う |
+| ユニット | `test_default_windows_resolve_uses_identifier_without_enumerating` | Windows handle 保存済みの場合に全列挙せず直接解決する |
+| ユニット | `test_windows_list_skips_own_process_windows_before_reading_title` | worker thread から自プロセス window のタイトル取得を行わない |
 | ハードウェア | `test_windows_capture_occluded_window_realdevice` | Windows 実環境で覆われた非最小化ウィンドウを取得する |
 | パフォーマンス | `test_windows_capture_backend_fps` | 1920x1080 相当で 60 FPS 目標を測定する |
 

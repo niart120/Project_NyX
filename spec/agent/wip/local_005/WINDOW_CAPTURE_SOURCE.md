@@ -194,6 +194,8 @@ MVP は `mss` による「対象ウィンドウの現在位置を矩形として
 
 `mss` backend はキャプチャスレッド内で `mss.mss()` を生成し、他スレッドへ共有しない。ウィンドウ列挙は `WindowLocatorBackend`、画素取得は `WindowCaptureBackend` に分け、列挙処理とキャプチャ処理の依存・スレッド制約を混在させない。Windows の `WindowInfo.rect` はクライアント領域の screen 座標とし、必要に応じて外枠込みの `window_rect` も保持する。
 
+Windows では `capture_window_identifier` に window handle が保存されている場合、`DefaultWindowLocatorBackend.resolve()` は `EnumWindows` による全列挙ではなく対象 handle を直接解決する。GUI の設定反映中は UI thread が `WindowCaptureDevice.initialize()` を待つため、worker thread から自プロセスの Qt ウィンドウへタイトル取得メッセージを送るとデッドロックする。全列挙が必要な場合も自プロセスの window handle はタイトル取得前に除外する。
+
 ### アスペクトボックス方針
 
 既定では backend から取得した frame を raw frame として保持し、現行どおり Preview と `Command.capture()` 側で個別にリサイズする。`aspect_box_enabled=true` の入力ソースだけ、raw frame の縦横比を 16:9 にするために黒帯を追加してから `latest_frame` へ保存する。600x720 の入力では高さ 720 を維持し、幅 1280 になるよう左右に 340 px ずつ黒帯を追加する。

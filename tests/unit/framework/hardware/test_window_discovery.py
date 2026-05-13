@@ -1,7 +1,10 @@
+import os
+
 import pytest
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect, WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.window_discovery import (
+    DefaultWindowLocatorBackend,
     WindowInfo,
     _list_windows_win32,
     resolve_window,
@@ -99,3 +102,41 @@ def test_windows_list_uses_client_rect_in_screen_coordinates(monkeypatch) -> Non
             window_rect=CaptureRect(left=100, top=200, width=1300, height=760),
         ),
     )
+
+
+def test_default_windows_resolve_uses_identifier_without_enumerating(monkeypatch) -> None:
+    expected = WindowInfo("Viewer", "100", CaptureRect(10, 20, 640, 480))
+    monkeypatch.setattr("nyxpy.framework.core.hardware.window_discovery.platform.system", lambda: "Windows")
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.window_discovery._window_info_from_hwnd",
+        lambda hwnd: expected if hwnd == 100 else None,
+    )
+    monkeypatch.setattr(
+        DefaultWindowLocatorBackend,
+        "list_windows",
+        lambda self: (_ for _ in ()).throw(AssertionError("list_windows must not be called")),
+    )
+
+    resolved = DefaultWindowLocatorBackend().resolve(
+        WindowCaptureSourceConfig(title_pattern="Missing", identifier="100")
+    )
+
+    assert resolved is expected
+
+
+class OwnProcessUser32(FakeUser32):
+    def GetWindowThreadProcessId(self, hwnd, process_id):
+        process_id._obj.value = os.getpid()
+        return 1
+
+    def GetWindowTextLengthW(self, hwnd):
+        raise AssertionError("own process window text must not be queried from worker thread")
+
+
+def test_windows_list_skips_own_process_windows_before_reading_title(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.window_discovery.ensure_capture_coordinate_space",
+        lambda: None,
+    )
+
+    assert _list_windows_win32(OwnProcessUser32()) == ()
