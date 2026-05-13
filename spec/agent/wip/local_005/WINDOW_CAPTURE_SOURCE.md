@@ -8,7 +8,7 @@
 
 ### 1.1 目的
 
-現行の `cv2.VideoCapture` ベースのカメラ入力に加え、PC 上で表示されているビュアーウィンドウをキャプチャして `FrameSourcePort` へ供給する。フレームワーク層は入力元の違いを `CaptureDeviceInterface` 相当の抽象で隔離し、マクロ・画像処理・通知は従来どおり 1280x720 の OpenCV 互換 BGR フレームを扱う。
+現行の `cv2.VideoCapture` ベースのカメラ入力に加え、PC 上で表示されているビュアーウィンドウをキャプチャして `FrameSourcePort` へ供給する。フレームワーク層は入力元の違いを `CaptureDeviceInterface` 相当の抽象で隔離し、マクロ・画像処理・通知は従来どおり OpenCV 互換の BGR フレームを扱う。
 
 ### 1.2 用語定義
 
@@ -24,10 +24,9 @@
 | ウィンドウロケータ | ウィンドウ列挙と対象ウィンドウ解決だけを担当する実装 |
 | キャプチャバックエンド | OS API または外部ライブラリを用いて実際に画素を取得する実装 |
 | キャプチャセッション | バックエンド固有の初期化済み状態。同期取得・イベント駆動取得の差を吸収する |
-| 正規化フレーム | 入力サイズに関係なく、マクロへ渡す前に 1280x720 へ整形した BGR フレーム |
-| キャンバス合成 | 入力フレームを指定サイズの黒背景キャンバスへ貼り付ける処理 |
-| リサイズポリシー | 入力フレームを拡大・縮小する規則。等倍、縦横比維持、引き伸ばしを区別する |
-| 合成オフセット | キャンバス左上を基準に、入力フレームを貼り付ける x/y 座標 |
+| アスペクトボックス | 入力フレームへ黒帯を追加し、縦横比を 16:9 に整える処理 |
+| ピラーボックス | 横幅が足りない入力に左右の黒帯を追加する処理 |
+| レターボックス | 高さが足りない入力に上下の黒帯を追加する処理 |
 | オクルージョン | 対象ウィンドウが別ウィンドウに隠れている状態 |
 | DPI awareness | Windows の論理座標と物理ピクセル座標のずれを避けるためのプロセス DPI 認識設定 |
 
@@ -37,7 +36,7 @@
 
 ウィンドウキャプチャは OS ごとに制約が異なる。Windows は Windows Graphics Capture によるウィンドウ単位キャプチャが候補になる一方、Linux Wayland は任意ウィンドウの自動キャプチャを意図的に制限している。したがって、単一ライブラリに直接依存せず、バックエンド差し替え可能な設計にする。
 
-既存マクロと画像リソースは 1280x720 のフレームを前提にしている。対象ビュアーによっては 600x720 のように横幅が狭いウィンドウを取得するため、入力フレームをそのまま返すとテンプレート座標・OCR 領域・通知画像の前提が崩れる。入力サイズが 1280x720 でない場合は、設定されたリサイズとオフセットに従って 1280x720 キャンバスへ合成してから `FrameSourcePort` へ渡す。
+既存マクロと画像リソースは、標準の `Command.capture()` が最終的に 1280x720 へリサイズすることを前提にしている。対象ビュアーによっては 600x720 のように横幅が狭いウィンドウを取得するため、入力フレームをそのまま渡すと現行どおり横方向に引き伸ばされる。必要な入力ソースだけ 16:9 のアスペクトボックスを有効化し、左右または上下に黒帯を追加してから既存のリサイズ経路へ渡す。
 
 ### 1.4 期待効果
 
@@ -46,8 +45,8 @@
 | 入力ソース種別 | カメラデバイスのみ | カメラ、ウィンドウ、画面領域を同じ `FrameSourcePort` で扱える |
 | 既存マクロ変更 | カメラ入力前提 | マクロ側の変更なし |
 | フレーム形式 | `numpy.ndarray` / BGR | すべての入力ソースで `numpy.ndarray` / BGR に正規化 |
-| 出力フレームサイズ | カメラ依存で実質 1280x720 前提 | 入力サイズに関係なく既定 1280x720。必要に応じて設定で変更可能 |
-| 特殊ウィンドウ対応 | 600x720 などは未対応 | 600x720 を x/y オフセット付きで 1280x720 キャンバスへ合成可能 |
+| 出力フレームサイズ | `FrameSourcePort` は raw frame、`Command.capture()` が 1280x720 へリサイズ | 既定は raw frame 維持。必要なソースだけ 16:9 黒帯付与を選択可能 |
+| 特殊ウィンドウ対応 | 600x720 は 1280x720 へ横伸びする | アスペクトボックス有効時は 600x720 に左右黒帯を追加し、後段 resize で歪ませない |
 | 実機なしテスト | `DummyCaptureDevice` 中心 | ウィンドウ列挙・矩形計算・色変換を Dummy backend で単体テスト可能 |
 | プレビュー用途の目標 FPS | カメラ設定依存 | 汎用バックエンドで 30 FPS、Windows 専用バックエンドで 60 FPS を目標 |
 
@@ -68,7 +67,7 @@
 | `pyproject.toml` | 変更 | 汎用キャプチャ候補ライブラリを追加する。MVP では `mss` を第一候補とし、OS 専用バックエンドは任意依存として扱う |
 | `src/nyxpy/framework/core/hardware/capture.py` | 変更 | カメラ実装と入力ソース共通抽象を分離し、既存 `AsyncCaptureDevice` の責務を明確化する |
 | `src/nyxpy/framework/core/hardware/window_capture.py` | 新規 | ウィンドウ・画面領域キャプチャデバイスとバックエンド抽象を実装する |
-| `src/nyxpy/framework/core/hardware/frame_transform.py` | 新規 | 入力フレームを 1280x720 キャンバスへ合成する正規化処理を実装する |
+| `src/nyxpy/framework/core/hardware/frame_transform.py` | 新規 | 入力フレームへ 16:9 の黒帯を追加するアスペクトボックス処理を実装する |
 | `src/nyxpy/framework/core/hardware/window_discovery.py` | 新規 | ウィンドウ列挙、タイトル照合、クライアント領域解決を実装する |
 | `src/nyxpy/framework/core/hardware/device_discovery.py` | 変更 | カメラデバイスとウィンドウ候補を区別して検出結果に含める |
 | `src/nyxpy/framework/core/io/device_factories.py` | 変更 | 設定された入力ソース種別に応じてカメラまたはウィンドウキャプチャを生成する |
@@ -124,11 +123,7 @@ class CaptureRect:
 
 @dataclass(frozen=True)
 class FrameTransformConfig:
-    target_width: int = 1280
-    target_height: int = 720
-    resize_policy: Literal["none", "fit", "stretch"] = "none"
-    offset_x: int | None = None
-    offset_y: int | None = None
+    aspect_box_enabled: bool = False
     background_bgr: tuple[int, int, int] = (0, 0, 0)
 
 
@@ -200,21 +195,25 @@ MVP は `mss` による「対象ウィンドウの現在位置を矩形として
 
 `mss` backend はキャプチャスレッド内で `mss.mss()` を生成し、他スレッドへ共有しない。ウィンドウ列挙は `WindowLocatorBackend`、画素取得は `WindowCaptureBackend` に分け、列挙処理とキャプチャ処理の依存・スレッド制約を混在させない。
 
-### フレーム正規化方針
+### アスペクトボックス方針
 
-すべての入力ソースは backend から取得した frame をそのまま返さず、`FrameTransformConfig` に従って正規化してから `latest_frame` へ保存する。既定値は 1280x720 キャンバス、等倍貼り付け、中央配置である。600x720 の入力を 1280x720 に収める場合、既定では `offset_x=340`, `offset_y=0` と同等の中央配置になる。ゲーム画面がビュアー内で左寄せ・右寄せされる場合は明示オフセットで調整する。
+既定では backend から取得した frame を raw frame として保持し、現行どおり Preview と `Command.capture()` 側で個別にリサイズする。`aspect_box_enabled=true` の入力ソースだけ、raw frame の縦横比を 16:9 にするために黒帯を追加してから `latest_frame` へ保存する。600x720 の入力では高さ 720 を維持し、幅 1280 になるよう左右に 340 px ずつ黒帯を追加する。
 
-| ポリシー | 動作 | 用途 |
-|----------|------|------|
-| `none` | 入力サイズを変更せず、キャンバスへ貼り付ける | 600x720 を 1280x720 内の指定位置に置く |
-| `fit` | 縦横比を維持して target 内へ収める | 画面比率が異なる入力を全体表示する |
-| `stretch` | target サイズへ縦横比を無視して伸縮する | 座標系を強制的に 1280x720 へ合わせる |
+16:9 は `Command.capture()` の標準出力 1280x720 と同じ比率であり、アスペクトボックス側だけ比率を変更できる設定は追加しない。比率が二重定義されると、黒帯付与後に `Command.capture()` で再度歪むためである。
 
-キャンバス外へはみ出す領域は切り捨てる。未使用領域は黒で埋める。入力 frame が 1280x720 で、ポリシーが `none` かつオフセットが 0 の場合は余分な変換を行わず copy のみ返す。
+| 入力 | `aspect_box_enabled=false` | `aspect_box_enabled=true` |
+|------|----------------------------|---------------------------|
+| 1280x720 | raw frame を返す | 16:9 のため raw frame を返す |
+| 600x720 | raw frame を返し、`Command.capture()` が横へ伸ばす | 左右黒帯を追加した 1280x720 相当の比率で返す |
+| 800x600 | raw frame を返し、`Command.capture()` が 16:9 へ伸ばす | 上下黒帯を追加して 16:9 にして返す |
+
+黒帯は中央揃え固定、色は黒固定である。位置調整が必要な場合は入力領域を `capture_region` で切り直す。任意 offset 貼り付けは MVP の責務に含めない。
 
 ### 後方互換性
 
 破壊的変更を許容する。`AsyncCaptureDevice` をカメラ専用名へ変更する場合は alias を残さず、`FrameSourcePortFactory`、GUI、テストを同時に更新する。ただし `FrameSourcePort` と `CaptureFrameSourcePort` の API は維持し、マクロ側の呼び出し変更は発生させない。
+
+`capture_aspect_box_enabled` の既定値は `false` とし、16:9 ソースでは現行と同じ frame が後段へ渡る。非 16:9 ソースで `capture_aspect_box_enabled=true` を選んだ場合だけ、現行の単純引き伸ばしから黒帯付きの縦横比維持へ挙動が変わる。この場合、非 16:9 ソースを前提に作ったテンプレート画像や crop 座標は見直しが必要になる。
 
 ### レイヤー構成
 
@@ -264,7 +263,7 @@ Windows ではウィンドウ矩形と画面キャプチャ矩形を物理ピク
 | `get_frame()` のロック保持時間 | フレームコピー時間を除き 5 ms 未満 |
 | 初期化失敗時の検出 | `initialize()` 内で即時例外化 |
 | リソース解放 | `release()` を複数回呼んでも例外なし |
-| 正規化処理 | 1280x720 出力で 30 FPS を阻害しない |
+| アスペクトボックス処理 | 16:9 黒帯付与を有効化しても 30 FPS を阻害しない |
 
 ### 並行性・スレッド安全性
 
@@ -350,11 +349,7 @@ class FrameSourcePortFactory:
 | `capture_backend` | `str` | `"auto"` | `auto` / `mss` / `windows_graphics_capture` |
 | `capture_region` | `dict[str, int]` | `{}` | 画面領域入力時の `left` / `top` / `width` / `height` |
 | `capture_fps` | `float` | source type 依存 | カメラ・画面領域は `60.0`、ウィンドウは `30.0` |
-| `capture_output_width` | `int` | `1280` | 正規化後の出力フレーム幅 |
-| `capture_output_height` | `int` | `720` | 正規化後の出力フレーム高さ |
-| `capture_resize_policy` | `str` | `"none"` | `none` / `fit` / `stretch` |
-| `capture_offset_x` | `int | None` | `None` | キャンバス貼り付け x 座標。`None` は中央配置 |
-| `capture_offset_y` | `int | None` | `None` | キャンバス貼り付け y 座標。`None` は中央配置 |
+| `capture_aspect_box_enabled` | `bool` | `false` | `true` の場合、raw frame に黒帯を追加して 16:9 に整える |
 
 ### エラーハンドリング
 
@@ -385,9 +380,9 @@ class FrameSourcePortFactory:
 
 | Step | 仕様書 | 目的 | 完了条件 |
 |------|--------|------|----------|
-| 1 | `WINDOW_CAPTURE_MVP.md` | framework 側に `mss` ベースの入力ソース、フレーム正規化、settings 接続を実装する | 設定値だけで `window` / `screen_region` を 1280x720 BGR frame として取得できる |
+| 1 | `WINDOW_CAPTURE_MVP.md` | framework 側に `mss` ベースの入力ソース、16:9 アスペクトボックス、settings 接続を実装する | 設定値だけで `window` / `screen_region` を取得でき、必要なソースだけ黒帯付き 16:9 frame として扱える |
 | 2 | `WINDOW_CAPTURE_WINDOWS_BACKEND.md` | Windows Graphics Capture backend を検討・実装する | `capture_backend=windows_graphics_capture` で最小化されていない隠れたウィンドウを取得できる |
-| 3 | `WINDOW_CAPTURE_GUI_SETTINGS.md` | GUI から入力ソース、対象ウィンドウ、領域、正規化設定を編集できるようにする | 設定画面から source 切替と 600x720 等のキャンバス合成設定を保存・反映できる |
+| 3 | `WINDOW_CAPTURE_GUI_SETTINGS.md` | GUI から入力ソース、対象ウィンドウ、領域、アスペクトボックス設定を編集できるようにする | 設定画面から source 切替と 600x720 等の黒帯付与設定を保存・反映できる |
 
 ## 5. テスト方針
 
@@ -404,8 +399,9 @@ class FrameSourcePortFactory:
 | ユニット | `test_mss_backend_creates_mss_instance_inside_capture_thread` | `mss.mss()` をスレッド間共有しない |
 | ユニット | `test_window_capture_re_resolves_window_after_handle_disappears` | ウィンドウ消失時にハンドル、PID、タイトルの順で再解決する |
 | ユニット | `test_window_rect_is_normalized_to_physical_pixels` | DPI スケーリング時に物理ピクセル座標へ正規化する |
-| ユニット | `test_frame_transform_places_600x720_on_1280x720_canvas` | 600x720 入力を指定オフセットで 1280x720 キャンバスへ合成する |
-| ユニット | `test_frame_transform_centers_when_offset_is_none` | offset 未指定時に中央配置する |
+| ユニット | `test_aspect_box_adds_pillarbox_to_600x720` | 600x720 入力へ左右黒帯を追加して 16:9 にする |
+| ユニット | `test_aspect_box_adds_letterbox_to_wide_input` | 横長入力へ上下黒帯を追加して 16:9 にする |
+| ユニット | `test_aspect_box_disabled_keeps_raw_frame` | 無効時は raw frame のサイズを変えない |
 | 結合 | `test_runtime_builder_passes_capture_source_config` | Runtime builder から factory へ入力ソース設定が渡る |
 | GUI | `test_device_settings_tab_applies_window_capture_settings` | 設定画面がウィンドウキャプチャ設定を保存する |
 | ハードウェア | `test_window_capture_device_real_window` | 実ウィンドウを取得できる。`@pytest.mark.realdevice` を付ける |
@@ -417,7 +413,7 @@ class FrameSourcePortFactory:
 - [x] 公開 API の初期案作成
 - [ ] 採用ライブラリの Python 3.12/3.13 インストール検証
 - [ ] `mss` backend のプロトタイプ作成
-- [ ] 1280x720 キャンバス合成とオフセット指定の実装
+- [ ] 16:9 アスペクトボックス設定の実装
 - [ ] Windows Graphics Capture backend の採否判断
 - [ ] 内部実装
 - [ ] 型ヒントの整合性チェック（ruff）
