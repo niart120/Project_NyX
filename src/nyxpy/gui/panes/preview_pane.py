@@ -28,13 +28,16 @@ class PreviewPane(QWidget):
         parent=None,
         preview_fps=30,
         frame_source: FrameSourcePort | None = None,
+        fixed_preview_size: tuple[int, int] = (1280, 720),
     ):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.label = AspectRatioLabel(16, 9)
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setMinimumHeight(100)
-        layout.addWidget(self.label)
+        self._fixed_preview_size = fixed_preview_size
+        self.label.setFixedSize(*fixed_preview_size)
+        layout.addWidget(self.label, alignment=Qt.AlignCenter)
 
         self.capture_device: CaptureDeviceInterface | None = capture_device
         self.frame_source: FrameSourcePort | None = frame_source
@@ -54,6 +57,11 @@ class PreviewPane(QWidget):
     def set_frame_source(self, frame_source: FrameSourcePort | None) -> None:
         self.capture_device = None
         self.frame_source = frame_source
+
+    def set_fixed_preview_size(self, width: int, height: int) -> None:
+        self._fixed_preview_size = (width, height)
+        self.label.setFixedSize(width, height)
+        self.setFixedSize(width, height)
 
     def pause(self) -> None:
         self.timer.stop()
@@ -76,7 +84,12 @@ class PreviewPane(QWidget):
         )
 
         frame = np.ascontiguousarray(frame)
-        resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
+        interpolation = (
+            cv2.INTER_AREA
+            if target_w <= frame.shape[1] and target_h <= frame.shape[0]
+            else cv2.INTER_LINEAR
+        )
+        resized = cv2.resize(frame, (target_w, target_h), interpolation=interpolation)
         image = QImage(resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888)
         pix = QPixmap.fromImage(image)
         pix.setDevicePixelRatio(self.devicePixelRatio())

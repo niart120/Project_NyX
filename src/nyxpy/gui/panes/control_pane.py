@@ -1,7 +1,7 @@
 from enum import Enum
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QGridLayout, QPushButton, QWidget
 
 from nyxpy.gui.widgets.split_button import CustomSplitDropDownButton
 
@@ -15,7 +15,7 @@ class RunUiState(Enum):
 
 class ControlPane(QWidget):
     """
-    Pane for macro control buttons: run, cancel, settings, snapshot.
+        Pane for macro control buttons: run, cancel, settings, snapshot.
     """
 
     run_requested = Signal()
@@ -27,7 +27,9 @@ class ControlPane(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QHBoxLayout(self)
+        self._layout = QGridLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(6)
         # Buttons
 
         # Create run button as a split button with dropdown for "with parameters" option
@@ -35,15 +37,12 @@ class ControlPane(QWidget):
             "実行", [("パラメータ付きで実行", self._on_run_with_params)], self
         )
 
-        self.cancel_btn = QPushButton("キャンセル", self)
+        self.cancel_btn = QPushButton("停止", self)
         self.snapshot_btn = QPushButton("スナップショット", self)
         self.settings_btn = QPushButton("設定", self)
 
-        layout.addWidget(self.run_btn)
-        layout.addWidget(self.cancel_btn)
-        layout.addWidget(self.snapshot_btn)
-        layout.addStretch()
-        layout.addWidget(self.settings_btn)
+        self._compact = False
+        self._arrange_buttons()
 
         # Connect signals
         self.run_btn.main_clicked.connect(self.run_requested)
@@ -68,9 +67,33 @@ class ControlPane(QWidget):
         self.running_changed.emit(state is RunUiState.RUNNING)
         self.update_buttons()
 
+    def set_compact_mode(self, compact: bool) -> None:
+        if self._compact == compact:
+            return
+        self._compact = compact
+        self._arrange_buttons()
+
+    def _arrange_buttons(self) -> None:
+        for widget in (self.run_btn, self.cancel_btn, self.snapshot_btn, self.settings_btn):
+            self._layout.removeWidget(widget)
+        if self._compact:
+            self._layout.addWidget(self.run_btn, 0, 0)
+            self._layout.addWidget(self.cancel_btn, 0, 1)
+            self._layout.addWidget(self.snapshot_btn, 1, 0)
+            self._layout.addWidget(self.settings_btn, 1, 1)
+            return
+        self._layout.addWidget(self.run_btn, 0, 0)
+        self._layout.addWidget(self.cancel_btn, 0, 1)
+        self._layout.addWidget(self.snapshot_btn, 0, 2)
+        self._layout.addWidget(self.settings_btn, 0, 3)
+
     def update_buttons(self):
         running = self._run_state in {RunUiState.RUNNING, RunUiState.CANCELLING}
         self.run_btn.setEnabled(self._selected and not running)
         self.settings_btn.setEnabled(not running)
         self.cancel_btn.setEnabled(self._run_state is RunUiState.RUNNING)
         self.snapshot_btn.setEnabled(not running)
+        if self._run_state is RunUiState.CANCELLING:
+            self.cancel_btn.setText("中断要求中")
+        else:
+            self.cancel_btn.setText("停止")

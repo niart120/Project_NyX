@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QDialog,
@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         self.current_window_size_preset_key = preset_key
         self.current_layout_metrics = layout_metrics_for_key(preset_key)
         self.setFixedSize(preset.window_width, preset.window_height)
+        self._apply_layout_metrics_to_panes()
         action = self.window_size_actions.get(preset_key)
         if action is not None:
             action.setChecked(True)
@@ -118,53 +119,118 @@ class MainWindow(QMainWindow):
 
         central = QWidget()
         main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         self.setCentralWidget(central)
 
-        # Left container: macro browser, controls, and virtual controller
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
+        self.left_container = QWidget()
+        left_layout = QVBoxLayout(self.left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         self.macro_browser = MacroBrowserPane(self.macro_catalog, self)
-        # Give macro_browser vertical stretch so it fills the pane
-        left_layout.addWidget(self.macro_browser, 1)
-
-        # 仮想コントローラーペインを作成
-        self.virtual_controller = VirtualControllerPane(self.logger, self)
-
-        # Control pane and Virtual Controller in lower section
-        lower_section = QVBoxLayout()
-
-        # Control pane at bottom with default stretch
         self.control_pane = ControlPane(self)
-        lower_section.addWidget(self.control_pane)
+        self.macro_explorer_panel = QWidget(self)
+        macro_panel_layout = QVBoxLayout(self.macro_explorer_panel)
+        macro_panel_layout.setContentsMargins(0, 0, 0, 0)
+        macro_panel_layout.addWidget(self.macro_browser, 1)
+        macro_panel_layout.addWidget(self.control_pane, 0)
+        left_layout.addWidget(self.macro_explorer_panel, 0)
 
-        # 仮想コントローラーを下部に追加
-        lower_section.addWidget(self.virtual_controller)
+        self.virtual_controller = VirtualControllerPane(self.logger, self)
+        left_layout.addWidget(self.virtual_controller, 0)
+        main_layout.addWidget(self.left_container)
 
-        left_layout.addLayout(lower_section)
-        main_layout.addWidget(left_container)
-
-        # Right pane: preview and log
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-        # Preview pane replaces direct label
+        self.center_container = QWidget(self)
+        center_layout = QVBoxLayout(self.center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_pane = PreviewPane(
-            parent=self,
+            parent=self.center_container,
             preview_fps=self.global_settings.get("preview_fps", 30),
         )
-        right_layout.addWidget(self.preview_pane, stretch=1)
+        center_layout.addWidget(
+            self.preview_pane,
+            0,
+            Qt.AlignmentFlag.AlignHCenter,
+        )
+        self.preview_tool_log_pane = LogPane(
+            self.logging.dispatcher,
+            self.center_container,
+            title="ツールログ",
+            kind="tool",
+        )
+        center_layout.addWidget(
+            self.preview_tool_log_pane,
+            0,
+            Qt.AlignmentFlag.AlignHCenter,
+        )
+        main_layout.addWidget(self.center_container)
 
-        # Log pane
-        self.log_pane = LogPane(self.logging.dispatcher, self)
-        right_layout.addWidget(self.log_pane, stretch=1)
-
-        # Set stretch for log pane to fill remaining space
-        main_layout.addWidget(right_container, stretch=1)
+        self.log_pane = LogPane(
+            self.logging.dispatcher,
+            self,
+            title="マクロログ",
+            kind="macro",
+        )
+        main_layout.addWidget(self.log_pane)
 
         # status bar
         self.status_label = QLabel("準備中...")
         self.statusBar().addWidget(self.status_label)
+        self.capture_status_label = QLabel(self)
+        self.serial_status_label = QLabel(self)
+        self.statusBar().addPermanentWidget(self.capture_status_label)
+        self.statusBar().addPermanentWidget(self.serial_status_label)
+        self._apply_layout_metrics_to_panes()
+        self._update_connection_status()
+
+    def _apply_layout_metrics_to_panes(self) -> None:
+        if not hasattr(self, "left_container"):
+            return
+        metrics = self.current_layout_metrics
+        preset = window_size_preset_for_key(self.current_window_size_preset_key)
+        surplus = max(0, metrics.horizontal_surplus(preset))
+        self.centralWidget().layout().setContentsMargins(
+            metrics.margin,
+            metrics.margin,
+            metrics.margin,
+            metrics.margin,
+        )
+        self.centralWidget().layout().setSpacing(metrics.gap)
+        self.left_container.setFixedWidth(metrics.left_width)
+        self.left_container.layout().setSpacing(metrics.gap)
+        self.macro_explorer_panel.layout().setSpacing(metrics.gap)
+        self.macro_explorer_panel.setFixedSize(metrics.left_width, metrics.macro_explorer_height)
+        self.macro_browser.setMinimumHeight(
+            min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
+        )
+        self.control_pane.set_compact_mode(self.current_window_size_preset_key == "hd")
+        self.virtual_controller.setFixedSize(metrics.left_width, metrics.controller_height)
+        self.center_container.setFixedSize(
+            metrics.preview_width + surplus,
+            metrics.center_height,
+        )
+        self.center_container.layout().setSpacing(metrics.gap)
+        self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
+        self.preview_tool_log_pane.setFixedSize(
+            metrics.preview_width,
+            metrics.preview_tool_log_height,
+        )
+        self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)
+        self.log_pane.setFixedSize(metrics.macro_log_width, metrics.center_height)
+        self.log_pane.setMinimumSize(metrics.macro_log_min_width, metrics.macro_log_min_height)
+
+    def _update_connection_status(self) -> None:
+        source_type = self.global_settings.get("capture_source_type", "camera")
+        if source_type == "window":
+            capture_name = self.global_settings.get("capture_window_title", "") or "window capture"
+        elif source_type == "screen_region":
+            capture_name = "screen region"
+        else:
+            capture_name = self.global_settings.get("capture_device", "")
+        capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
+        serial_name = self.global_settings.get("serial_device", "")
+        serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
+        self.capture_status_label.setText(capture_status)
+        self.serial_status_label.setText(serial_status)
 
     def setup_connections(self):
         # Connect pane signals fully delegated
@@ -217,6 +283,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("設定変更は実行完了後に反映されます")
             return
         self._apply_runtime_ports(outcome)
+        self._update_connection_status()
 
     def execute_macro_immediate(self):
         """即時実行モード：パラメータ入力なしでマクロを実行する"""
@@ -359,6 +426,7 @@ class MainWindow(QMainWindow):
 
         self.preview_pane.pause()
         self.log_pane.dispose()
+        self.preview_tool_log_pane.dispose()
         self.services.close()
         super().closeEvent(event)
 

@@ -52,6 +52,10 @@ class FakeSettings:
             "gui": {
                 "window_size_preset": "full_hd",
             },
+            "capture_device": "",
+            "capture_source_type": "camera",
+            "capture_window_title": "",
+            "serial_device": "",
         }
 
     def get(self, key: str, default=None):
@@ -268,11 +272,64 @@ def test_run_button_enabled_on_selection(window: MainWindow):
     assert window.control_pane.run_btn.isEnabled()
 
 
-def test_search_filter(window: MainWindow):
-    window.macro_browser.search_box.setText("nomatch")
-    assert window.macro_browser.table.isRowHidden(0)
-    window.macro_browser.search_box.clear()
-    assert not window.macro_browser.table.isRowHidden(0)
+def test_macro_search_is_not_rendered_in_initial_layout(window: MainWindow):
+    assert not hasattr(window.macro_browser, "search_box")
+
+
+def test_connection_status_is_not_rendered_in_macro_explorer(window: MainWindow):
+    macro_panel_text = " ".join(
+        item.text()
+        for item in window.macro_browser.findChildren(type(window.macro_browser.reload_button))
+    )
+    assert "シリアル" not in macro_panel_text
+    assert "映像" not in macro_panel_text
+
+
+def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServices):
+    services.global_settings.set("capture_device", "USB Video Device")
+    services.global_settings.set("serial_device", "COM6")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_status_label.text() == "映像: USB Video Device 接続中"
+    assert w.serial_status_label.text() == "シリアル: COM6 接続中"
+    w.preview_pane.timer.stop()
+
+
+def test_layout_horizontal_surplus_is_preview_margin(window: MainWindow):
+    window.apply_window_size_preset("hd")
+
+    assert window.left_container.maximumWidth() == 260
+    assert window.preview_pane.maximumWidth() == 640
+    assert window.center_container.maximumWidth() == 728
+    assert window.log_pane.maximumWidth() == 260
+
+
+def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
+    window.apply_window_size_preset("full_hd")
+
+    assert window.preview_tool_log_pane.parent() is window.center_container
+    assert window.preview_tool_log_pane.maximumWidth() == 1280
+    assert window.virtual_controller.maximumWidth() == 280
+
+
+def test_macro_explorer_footer_disables_settings_while_running(window: MainWindow):
+    window.control_pane.set_run_state(RunUiState.RUNNING)
+
+    assert not window.control_pane.settings_btn.isEnabled()
+
+
+def test_macro_explorer_footer_disables_snapshot_while_running(window: MainWindow):
+    window.control_pane.set_run_state(RunUiState.RUNNING)
+
+    assert not window.control_pane.snapshot_btn.isEnabled()
+
+
+def test_macro_explorer_footer_wraps_on_hd(window: MainWindow):
+    window.apply_window_size_preset("hd")
+
+    assert window.control_pane._layout.itemAtPosition(1, 0).widget() is window.control_pane.snapshot_btn
 
 
 def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):

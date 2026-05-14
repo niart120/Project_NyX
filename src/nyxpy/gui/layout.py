@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 DEFAULT_WINDOW_SIZE_PRESET_KEY = "full_hd"
 
 

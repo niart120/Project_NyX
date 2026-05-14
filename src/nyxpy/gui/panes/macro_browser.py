@@ -1,12 +1,9 @@
-import os  # 追加
-
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon  # 追加
 from PySide6.QtWidgets import (
-    QHBoxLayout,  # 追加
+    QHBoxLayout,
     QHeaderView,
-    QLineEdit,
-    QPushButton,  # 追加
+    QLabel,
+    QPushButton,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -28,33 +25,24 @@ class MacroBrowserPane(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
-        # --- 検索ボックスとリロードボタンを横並びに配置 ---
-        search_reload_layout = QHBoxLayout()
-        self.search_box = QLineEdit(self)
-        self.search_box.setPlaceholderText("検索…（マクロ名／タグ）")
-        search_reload_layout.addWidget(self.search_box)
-
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("マクロ", self))
+        header_layout.addStretch(1)
         self.reload_button = QPushButton(self)
         self.reload_button.setToolTip("マクロを再読み込み")
-        # アイコンがあれば設定（なければテキスト）
-        icon_path = os.path.join(os.path.dirname(__file__), "../../assets/reload.png")
-        if os.path.exists(icon_path):
-            self.reload_button.setIcon(QIcon(icon_path))
-        else:
-            self.reload_button.setText("リロード")
-        search_reload_layout.addWidget(self.reload_button)
-        layout.addLayout(search_reload_layout)
-        # --- ここまで ---
+        self.reload_button.setText("リロード")
+        header_layout.addWidget(self.reload_button)
+        layout.addLayout(header_layout)
 
-        self.table = QTableWidget(0, 3, self)
-        self.table.setHorizontalHeaderLabels(["マクロ名", "説明文", "タグ"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table = QTableWidget(0, 2, self)
+        self.table.setHorizontalHeaderLabels(["マクロ名", "タグ"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         layout.addWidget(self.table)
 
         self.catalog = catalog
         self.update_macro_table()
 
-        self.search_box.textChanged.connect(self.apply_macro_filter)
         self.reload_button.clicked.connect(self.on_reload_button_clicked)
 
         self.table.selectionModel().selectionChanged.connect(
@@ -74,8 +62,8 @@ class MacroBrowserPane(QWidget):
             name_item.setData(Qt.ItemDataRole.UserRole, macro.id)
             name_item.setToolTip(macro.class_name)
             self.table.setItem(row, 0, name_item)
-            self.table.setItem(row, 1, QTableWidgetItem(macro.description))
-            self.table.setItem(row, 2, QTableWidgetItem(", ".join(macro.tags)))
+            name_item.setToolTip(macro.description or macro.class_name)
+            self.table.setItem(row, 1, QTableWidgetItem(", ".join(macro.tags)))
 
     def selected_macro_id(self) -> str | None:
         row = self.table.currentRow()
@@ -94,10 +82,3 @@ class MacroBrowserPane(QWidget):
         item = self.table.item(row, 0)
         return item.text() if item is not None else None
 
-    def apply_macro_filter(self):
-        keyword = self.search_box.text().lower()
-        for row in range(self.table.rowCount()):
-            name = self.table.item(row, 0).text().lower()
-            tags = self.table.item(row, 2).text().split(", ")
-            match_keyword = (keyword in name) or any(keyword in t.lower() for t in tags)
-            self.table.setRowHidden(row, not (match_keyword))
