@@ -120,7 +120,7 @@ def _list_windows_win32(user32=None) -> tuple[WindowInfo, ...]:
     user32 = user32 or ctypes.windll.user32
     windows: list[WindowInfo] = []
 
-    enum_windows_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    enum_windows_proc = _win32_callback_type(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
     def callback(hwnd, _lparam) -> bool:
         window = _window_info_from_hwnd(hwnd, user32)
@@ -130,6 +130,10 @@ def _list_windows_win32(user32=None) -> tuple[WindowInfo, ...]:
 
     user32.EnumWindows(enum_windows_proc(callback), 0)
     return tuple(windows)
+
+
+def _win32_callback_type(*args):
+    return getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)(*args)
 
 
 def _window_info_from_hwnd(hwnd: int, user32=None) -> WindowInfo | None:
