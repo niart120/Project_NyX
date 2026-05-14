@@ -1,7 +1,7 @@
 # GUI 外観再設計: マクロ一覧パネル詳細仕様
 
 > **文書種別**: 詳細仕様。左列上部のマクロ一覧パネルと操作フッターを定義する。  
-> **親仕様**: `spec\gui\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
+> **親仕様**: `spec\agent\local_006\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
 > **対象モジュール**: `src\nyxpy\gui\panes\macro_browser.py`, `src\nyxpy\gui\panes\control_pane.py`, `tests\gui\`
 
 ## 1. 目的
@@ -13,8 +13,7 @@
 ```text
 マクロ一覧パネル
   ├─ ヘッダー
-  │   ├─ マクロ再読み込み
-  │   └─ ウィンドウサイズプリセット表示
+  │   └─ マクロ再読み込み
   ├─ マクロ一覧
   │   ├─ マクロ名
   │   ├─ タグまたは短い説明
@@ -37,6 +36,7 @@
 | 詳細ペイン | 別仕様で検討する |
 | 一時停止 / 再開 | Runtime 側の要件が固まるまで置かない |
 | 接続 / 再接続ボタン | 設定ダイアログへ統一し、フッターには置かない |
+| ウィンドウサイズプリセット表示 | 表示メニューと設定ダイアログに任せ、マクロ一覧ヘッダーには置かない |
 
 ## 4. 現行との差分
 
@@ -55,7 +55,7 @@
 |------|------|-------------|------------------|------|
 | マクロ未選択 | 無効 | 無効 | 有効 | 有効 |
 | 実行可能 | 有効 | 無効 | 有効 | 有効 |
-| 実行中 | 無効 | 有効 | 方針により有効または無効 | 無効 |
+| 実行中 | 無効 | 有効 | 無効 | 無効 |
 | 中断要求中 | 無効 | 無効 | 無効 | 無効 |
 
 ## 6. テスト
@@ -66,4 +66,6 @@
 | `test_macro_search_is_not_rendered_in_initial_layout` | 初期レイアウトに検索ボックスが出ない |
 | `test_connection_status_is_not_rendered_in_macro_explorer` | 接続状態がマクロ一覧パネルに出ない |
 | `test_macro_explorer_footer_disables_settings_while_running` | 実行中に設定入口が無効化される |
+| `test_macro_explorer_footer_disables_snapshot_while_running` | 実行中にスナップショットが無効化される |
+| `test_macro_explorer_footer_wraps_on_hd` | HD では操作フッターが 2 行に折り返される |
 

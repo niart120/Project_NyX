@@ -1,7 +1,7 @@
 # GUI 外観再設計 実装計画
 
 > **文書種別**: 実装計画。ウィンドウサイズ規定、マクロ一覧パネル、プレビュー/ログ配置を段階的に実装する順序を定義する。  
-> **親仕様**: `spec\gui\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
+> **親仕様**: `spec\agent\local_006\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
 > **詳細仕様**: `WINDOW_SIZE_PRESETS.md`, `MACRO_EXPLORER_PANEL.md`, `PREVIEW_AND_LOG_LAYOUT.md`
 
 ## 1. 実装方針
@@ -14,7 +14,7 @@
 |----------|------|------|----------|
 | Phase 1 | レイアウト定義 | `WindowSizePreset` と `LayoutMetrics` を追加する | 4 プリセットと固定プレビューサイズの単体テストが通る |
 | Phase 2 | 保存設定 | `gui.window_size_preset` を `.nyxpy` 設定へ追加する | 未知値 fallback と保存復元を検証できる |
-| Phase 3 | MainWindow | `QSplitter` ベースで左列、中央列、右列、状態バーを組む | FullHD で `280 + 1280 + 320` の基準配置になる |
+| Phase 3 | MainWindow | 固定レイアウトで左列、中央列、右列、状態バーを組む | FullHD で `280 + 1280 + 320` の基準配置になり、余剰幅が中央列余白になる |
 | Phase 4 | マクロ一覧パネル | 検索を外し、一覧主体 + 操作フッターへ整理する | 接続状態がパネルに出ず、実行系操作が下部に固定される |
 | Phase 5 | プレビュー/ログ | プレビュー固定サイズ、右マクロログ、プレビュー下ツールログを適用する | ツールログが仮想コントローラ下へ掛からない |
 | Phase 6 | 回帰 | 既存の実行、停止、設定、プレビュー更新を確認する | GUI テストと関連単体テストが通る |
@@ -39,6 +39,8 @@
 - 仮想コントローラは左列下部で状態バー側に接地する。
 - プレビュー下ツールログは中央列のみに配置し、左列下部へ広げない。
 - 検索/タグ絞り込みは初期実装に含めない。
+- ユーザーが列幅や行高をドラッグ変更できる splitter は初期実装に含めない。
+- 実行中と中断要求中はスナップショットを無効化する。
 
 ## 5. テスト一覧
 
@@ -50,6 +52,8 @@
 | `test_macro_search_is_not_rendered_in_initial_layout` | Phase 4 |
 | `test_connection_status_is_not_rendered_in_macro_explorer` | Phase 4 |
 | `test_status_bar_displays_capture_and_serial_state` | Phase 3 |
+| `test_layout_horizontal_surplus_is_preview_margin` | Phase 3 |
+| `test_macro_explorer_absorbs_vertical_surplus` | Phase 3 |
 | `test_preview_tool_log_does_not_span_under_controller` | Phase 5 |
 | `test_preview_keeps_fixed_16_9_size_for_preset` | Phase 5 |
 

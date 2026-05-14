@@ -1,7 +1,7 @@
 # GUI 外観再設計: プレビューとログ配置詳細仕様
 
 > **文書種別**: 詳細仕様。プレビュー、右マクロログ、プレビュー下ツールログ、仮想コントローラとの位置関係を定義する。  
-> **親仕様**: `spec\gui\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
+> **親仕様**: `spec\agent\local_006\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
 > **対象モジュール**: `src\nyxpy\gui\panes\preview_pane.py`, `src\nyxpy\gui\panes\log_pane.py`, `src\nyxpy\gui\panes\virtual_controller_pane.py`, `tests\gui\`
 
 ## 1. 配置方針
@@ -30,6 +30,8 @@
 
 `PreviewPane` は 16:9 を維持し、表示領域に合わせて引き伸ばさない。余剰領域は余白として扱う。
 
+入力フレームがプレビュー固定サイズより大きい場合は、固定サイズへ縮小表示する。入力フレームが固定サイズより小さい場合は、16:9 を維持して拡大表示する。中央クロップは行わない。
+
 ## 3. ログ種別
 
 | 種別 | 位置 | 目的 |
@@ -38,6 +40,8 @@
 | プレビュー下ツールログ | 中央列のプレビュー直下 | デバッグログ、ツールログ、補助情報 |
 
 マクロログとプレビュー下ツールログは混在させない。初期実装では同じ `LogPane` 系 widget を使ってよいが、表示フィルタや sink 登録は分けられる設計にする。
+
+プレビュー下ツールログの領域は初期状態で表示する。折りたたみは将来拡張とし、初期実装の受け入れ条件には含めない。
 
 ## 4. 状態バー
 
@@ -60,5 +64,6 @@
 | `test_status_bar_displays_capture_and_serial_state` | 接続状態が状態バーに表示される |
 | `test_macro_explorer_does_not_display_connection_state` | マクロ一覧パネルに接続状態が出ない |
 | `test_preview_keeps_fixed_16_9_size_for_preset` | プリセットごとの固定プレビューサイズが守られる |
+| `test_preview_scales_frame_to_fixed_size_without_crop` | 入力フレームを固定表示サイズへクロップなしで拡縮する |
 | `test_macro_log_has_readable_minimum_size` | 右マクロログの最小サイズが保たれる |
 
