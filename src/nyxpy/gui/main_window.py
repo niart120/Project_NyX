@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -19,6 +19,13 @@ from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.app_services import GuiAppServices, SettingsApplyOutcome
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
+from nyxpy.gui.layout import (
+    DEFAULT_WINDOW_SIZE_PRESET_KEY,
+    WINDOW_SIZE_PRESETS,
+    layout_metrics_for_key,
+    normalize_window_size_preset_key,
+    window_size_preset_for_key,
+)
 from nyxpy.gui.panes.control_pane import ControlPane, RunUiState
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
@@ -49,6 +56,19 @@ class MainWindow(QMainWindow):
         self.macro_catalog = self.services.macro_catalog
         self.run_handle: RunHandle | None = None
         self.last_run_result: RunResult | None = None
+        self.window_size_actions: dict[str, QAction] = {}
+        self.window_size_action_group: QActionGroup | None = None
+        self.current_window_size_preset_key = normalize_window_size_preset_key(
+            self.global_settings.get(
+                "gui.window_size_preset",
+                DEFAULT_WINDOW_SIZE_PRESET_KEY,
+            )
+        )
+        if (
+            self.global_settings.get("gui.window_size_preset")
+            != self.current_window_size_preset_key
+        ):
+            self.global_settings.set("gui.window_size_preset", self.current_window_size_preset_key)
         self._run_poll_timer = QTimer(self)
         self._run_poll_timer.timeout.connect(self._poll_run_handle)
         self.setup_ui()
@@ -59,15 +79,42 @@ class MainWindow(QMainWindow):
         self.setup_connections()  # Setup signal connections between UI components
         self.apply_app_settings()
 
-    def setup_ui(self):
-        self.setWindowTitle("NyxPy GUI")
-        self.resize(1280, 720)
-        self.setMinimumSize(800, 400)
-
+    def _build_menu_bar(self) -> None:
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.open_app_settings)
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(settings_action)
+
+        view_menu = self.menuBar().addMenu("表示")
+        self.window_size_action_group = QActionGroup(self)
+        self.window_size_action_group.setExclusive(True)
+        for preset in WINDOW_SIZE_PRESETS:
+            action = QAction(preset.label, self)
+            action.setCheckable(True)
+            action.setData(preset.key)
+            action.triggered.connect(
+                lambda checked=False, key=preset.key: self.apply_window_size_preset(key)
+            )
+            self.window_size_action_group.addAction(action)
+            self.window_size_actions[preset.key] = action
+            view_menu.addAction(action)
+
+    def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
+        preset_key = normalize_window_size_preset_key(key)
+        preset = window_size_preset_for_key(preset_key)
+        self.current_window_size_preset_key = preset_key
+        self.current_layout_metrics = layout_metrics_for_key(preset_key)
+        self.setFixedSize(preset.window_width, preset.window_height)
+        action = self.window_size_actions.get(preset_key)
+        if action is not None:
+            action.setChecked(True)
+        if save and self.global_settings.get("gui.window_size_preset") != preset_key:
+            self.global_settings.set("gui.window_size_preset", preset_key)
+
+    def setup_ui(self):
+        self.setWindowTitle("NyxPy GUI")
+        self._build_menu_bar()
+        self.apply_window_size_preset(self.current_window_size_preset_key, save=False)
 
         central = QWidget()
         main_layout = QHBoxLayout(central)
@@ -161,6 +208,11 @@ class MainWindow(QMainWindow):
         if "preview_fps" in outcome.changed_keys:
             self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)
             self.preview_pane.apply_fps()
+        if "gui.window_size_preset" in outcome.changed_keys:
+            self.apply_window_size_preset(
+                self.global_settings.get("gui.window_size_preset", DEFAULT_WINDOW_SIZE_PRESET_KEY),
+                save=False,
+            )
         if outcome.deferred:
             self.status_label.setText("設定変更は実行完了後に反映されます")
             return

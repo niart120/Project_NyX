@@ -49,6 +49,9 @@ class FakeSettings:
                 "gui_poll_interval_ms": 100,
                 "gui_close_wait_timeout_sec": 1.25,
             },
+            "gui": {
+                "window_size_preset": "full_hd",
+            },
         }
 
     def get(self, key: str, default=None):
@@ -58,6 +61,17 @@ class FakeSettings:
                 return default
             value = value[part]
         return value
+
+    def set(self, key: str, value):
+        current = self.data
+        parts = key.split(".")
+        for part in parts[:-1]:
+            nested = current.get(part)
+            if not isinstance(nested, dict):
+                nested = {}
+                current[part] = nested
+            current = nested
+        current[parts[-1]] = value
 
 
 class FakeSecrets:
@@ -226,6 +240,27 @@ def test_initial_ui_state(window: MainWindow):
     assert not window.control_pane.run_btn.isEnabled()
     assert not window.control_pane.cancel_btn.isEnabled()
     assert window.control_pane.snapshot_btn.isEnabled()
+
+
+def test_main_window_applies_saved_window_size_preset(qtbot, services: FakeServices):
+    services.global_settings.set("gui.window_size_preset", "hd")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.current_window_size_preset_key == "hd"
+    assert w.minimumWidth() == 1280
+    assert w.maximumWidth() == 1280
+    assert w.minimumHeight() == 720
+    assert w.maximumHeight() == 720
+    w.preview_pane.timer.stop()
+
+
+def test_window_size_menu_updates_settings(window: MainWindow, services: FakeServices):
+    window.window_size_actions["wqhd"].trigger()
+
+    assert services.global_settings.get("gui.window_size_preset") == "wqhd"
+    assert window.current_window_size_preset_key == "wqhd"
 
 
 def test_run_button_enabled_on_selection(window: MainWindow):
