@@ -1,3 +1,4 @@
+import ctypes
 import os
 
 import pytest
@@ -102,6 +103,18 @@ def test_windows_list_uses_client_rect_in_screen_coordinates(monkeypatch) -> Non
             window_rect=CaptureRect(left=100, top=200, width=1300, height=760),
         ),
     )
+
+
+def test_windows_list_works_without_windows_callback_type(monkeypatch) -> None:
+    monkeypatch.delattr(ctypes, "WINFUNCTYPE", raising=False)
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.window_discovery.ensure_capture_coordinate_space",
+        lambda: None,
+    )
+
+    detected = _list_windows_win32(FakeUser32())
+
+    assert detected[0].identifier == "100"
 
 
 def test_default_windows_resolve_uses_identifier_without_enumerating(monkeypatch) -> None:
