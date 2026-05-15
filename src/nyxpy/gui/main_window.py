@@ -65,8 +65,15 @@ class _VirtualControllerPanel(QWidget):
         self._last_controller_size = size
         self.controller.apply_layout_size(width, body_height)
 
-    def resizeEvent(self, event) -> None:
+    def relayout_to_current_geometry(self) -> None:
         self.apply_layout_size(self.width(), self.height() - PANE_TITLE_HEIGHT)
+
+    def showEvent(self, event) -> None:
+        QTimer.singleShot(0, self.relayout_to_current_geometry)
+        super().showEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        self.relayout_to_current_geometry()
         super().resizeEvent(event)
 
 
@@ -267,6 +274,7 @@ class MainWindow(QMainWindow):
         )
         self.virtual_controller_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.virtual_controller_panel.apply_layout_size(left_width, metrics.preview_tool_log_height)
+        QTimer.singleShot(0, self.virtual_controller_panel.relayout_to_current_geometry)
         self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
         self.preview_tool_log_pane.setFixedWidth(metrics.preview_width)
         self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)

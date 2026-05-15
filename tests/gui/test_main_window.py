@@ -379,6 +379,26 @@ def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindo
     assert window.virtual_controller.btn_a.width() == 14
 
 
+def test_virtual_controller_relayouts_after_initial_geometry(qtbot, services: FakeServices):
+    services.global_settings.set("gui.window_size_preset", "full_hd")
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+    try:
+        w.show()
+
+        qtbot.waitUntil(
+            lambda: (
+                w.virtual_controller.maximumHeight()
+                == w.virtual_controller_panel.height() - w.controller_title_label.height()
+            ),
+            timeout=1000,
+        )
+
+        assert w.virtual_controller.maximumWidth() == w.virtual_controller_panel.width()
+    finally:
+        w.preview_pane.timer.stop()
+
+
 def test_macro_explorer_footer_disables_settings_while_running(window: MainWindow):
     window.control_pane.set_run_state(RunUiState.RUNNING)
 
