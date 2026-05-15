@@ -82,7 +82,7 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 | `wqhd` | `360x320` | `1.28` | `36x36` | `82x82` | `93x93` | `11px` |
 | `four_k` | `420x360` | `1.50` | `42x42` | `96x96` | `108x108` | `13px` |
 
-キャンバスサイズは既存の `left_width` と `controller_height` を使用する。部品はキャンバス内に収め、キャンバス外へはみ出さない。FullHD の余剰高さは nested layout の行間ではなく、キャンバス外周余白として扱う。
+キャンバスサイズは左・中央 grid の row 1 セル実寸を使用する。部品はキャンバス内に収め、キャンバス外へはみ出さない。プリセットの `controller_initial_height` は初期表示の目安であり、実表示では row 1 の高さに追従する。
 
 ### 基準座標
 
@@ -108,7 +108,7 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 | `dpad` | `(38, 158, 72, 72)` |
 | `right_stick` | `(174, 162, 64, 64)` |
 
-`AnalogStick` と `DPad` は、描画座標、中心座標、最大移動距離、dead zone を固定値ではなく自身の `width()` / `height()` から計算する。プリセット切替時は cached position を新しい中心へ戻す。HD / FullHD のボタンラベルは従来より 1 point 大きくし、最小プリセットでも `L3` / `R3` 等を読み取れるようにする。
+`AnalogStick` と `DPad` は、描画座標、中心座標、最大移動距離、dead zone を固定値ではなく自身の `width()` / `height()` から計算する。プリセット切替時は cached position を新しい中心へ戻す。HD / FullHD のボタンラベルは従来より 1 point 大きくし、最小プリセットでも `LS` / `RS` 等を読み取れるようにする。
 
 ### メインフロー
 
@@ -116,7 +116,7 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 - `MainWindow.apply_window_size_preset()` が `LayoutMetrics` を取得する。
 
 **Step 1**: 仮想コントローラメトリクス適用
-- `VirtualControllerPane.apply_layout_size(width, height)` を呼び出し、キャンバスを固定する。
+- 外側 panel が row 1 の実寸を受け取り、`VirtualControllerPane.apply_layout_size(width, height)` を呼び出す。
 
 **Step 2**: 部品配置
 - `VirtualControllerPane` は基準座標を scale し、各 widget に `setGeometry()` と寸法設定を適用する。

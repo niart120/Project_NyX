@@ -26,7 +26,7 @@ class LayoutMetrics:
     margin: int
     gap: int
     left_width: int
-    controller_height: int
+    controller_initial_height: int
     macro_log_width: int
     preview_tool_log_height: int
     preview_width: int
@@ -92,7 +92,7 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
         margin=8,
         gap=8,
         left_width=260,
-        controller_height=220,
+        controller_initial_height=220,
         macro_log_width=260,
         preview_tool_log_height=120,
         preview_width=640,
@@ -106,7 +106,7 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
         margin=10,
         gap=10,
         left_width=280,
-        controller_height=280,
+        controller_initial_height=280,
         macro_log_width=320,
         preview_tool_log_height=180,
         preview_width=1280,
@@ -120,7 +120,7 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
         margin=12,
         gap=12,
         left_width=360,
-        controller_height=320,
+        controller_initial_height=320,
         macro_log_width=440,
         preview_tool_log_height=240,
         preview_width=1600,
@@ -134,7 +134,7 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
         margin=16,
         gap=16,
         left_width=420,
-        controller_height=360,
+        controller_initial_height=360,
         macro_log_width=560,
         preview_tool_log_height=320,
         preview_width=2560,
@@ -165,4 +165,7 @@ def layout_metrics_for_key(value: object) -> LayoutMetrics:
 def virtual_controller_metrics_for_key(value: object) -> VirtualControllerMetrics:
     preset = window_size_preset_for_key(value)
     metrics = layout_metrics_for_key(value)
-    return VirtualControllerMetrics(metrics.allocated_left_width(preset), metrics.controller_height)
+    return VirtualControllerMetrics(
+        metrics.allocated_left_width(preset),
+        metrics.controller_initial_height,
+    )

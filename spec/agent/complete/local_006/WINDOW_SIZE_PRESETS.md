@@ -23,18 +23,18 @@
 
 ## 3. レイアウトメトリクス
 
-| key | margin | gap | left_width | controller_height | preview | macro_log_width | preview_tool_log_height | horizontal_surplus |
+| key | margin | gap | left_width | controller_initial_height | preview | macro_log_width | preview_tool_log_height | horizontal_surplus |
 |-----|--------|-----|------------|-------------------|---------|-----------------|-------------------------|--------------------|
 | `hd` | `8` | `8` | `260` | `220` | `640x360` | `260` | `120` | `88` |
 | `full_hd` | `10` | `10` | `280` | `280` | `1280x720` | `320` | `180` | `260` |
 | `wqhd` | `12` | `12` | `360` | `320` | `1600x900` | `440` | `240` | `108` |
 | `four_k` | `16` | `16` | `420` | `360` | `2560x1440` | `560` | `320` | `236` |
 
-左列は「マクロ一覧パネル + 仮想コントローラ」で構成する。仮想コントローラは状態バー側に接地し、プレビュー下ツールログは中央列の直下にだけ置く。
+左・中央エリアは 2x2 grid で構成する。row 0 は「マクロ一覧パネル + プレビュー」、row 1 は「仮想コントローラ + プレビュー下ツールログ」とする。仮想コントローラは row 1 の実寸に追従し、`controller_initial_height` はプリセット適用直後の初期目安として扱う。
 
 `horizontal_surplus` は `window_width - (margin * 2 + left_width + preview_width + macro_log_width + gap * 2)` で算出する。余剰幅はプレビュー周囲の空白ではなく、左列と右マクロログへ半分ずつ加算する。プレビュー固定サイズは変更しない。
 
-縦方向はプレビュー高さを基準にする。左列では `macro_explorer_height = preview_height` とし、マクロ一覧パネルをその高さに固定して、仮想コントローラ見出しの上端をプレビュー下ツールログ見出しと揃える。中央列では `center_height = preview_height + gap + preview_tool_log_height` を最小高として扱い、プレビュー下ツールログが余剰高さを吸収する。
+縦方向はプレビュー高さを基準にする。左・中央 grid の row 0 では `macro_explorer_height = preview_height` とし、マクロ一覧パネルをその高さに固定する。row 1 では仮想コントローラ見出しの上端をプレビュー下ツールログ見出しと揃え、仮想コントローラ本体とプレビュー下ツールログが余剰高さを吸収する。
 
 ## 4. 保存設定
 

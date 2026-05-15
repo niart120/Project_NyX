@@ -4,10 +4,12 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -34,6 +36,38 @@ from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
+
+
+class _VirtualControllerPanel(QWidget):
+    def __init__(self, logger, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.title_label = QLabel("コントローラー", self)
+        apply_pane_title_font(self.title_label)
+        layout.addWidget(self.title_label, 0)
+        self.controller = VirtualControllerPane(logger, self)
+        layout.addWidget(
+            self.controller,
+            1,
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+        )
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self._last_controller_size: tuple[int, int] | None = None
+
+    def apply_layout_size(self, width: int, body_height: int) -> None:
+        width = max(1, width)
+        body_height = max(1, body_height)
+        size = (width, body_height)
+        if self._last_controller_size == size:
+            return
+        self._last_controller_size = size
+        self.controller.apply_layout_size(width, body_height)
+
+    def resizeEvent(self, event) -> None:
+        self.apply_layout_size(self.width(), self.height() - PANE_TITLE_HEIGHT)
+        super().resizeEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -128,9 +162,9 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(0)
         self.setCentralWidget(central)
 
-        self.left_container = QWidget()
-        left_layout = QVBoxLayout(self.left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_center_container = QWidget()
+        left_center_layout = QGridLayout(self.left_center_container)
+        left_center_layout.setContentsMargins(0, 0, 0, 0)
         self.macro_browser = MacroBrowserPane(self.macro_catalog, self)
         self.control_pane = ControlPane(self)
         self.macro_explorer_panel = QWidget(self)
@@ -138,44 +172,39 @@ class MainWindow(QMainWindow):
         macro_panel_layout.setContentsMargins(0, 0, 0, 0)
         macro_panel_layout.addWidget(self.macro_browser, 1)
         macro_panel_layout.addWidget(self.control_pane, 0)
-        left_layout.addWidget(self.macro_explorer_panel, 1)
+        left_center_layout.addWidget(self.macro_explorer_panel, 0, 0)
 
-        self.virtual_controller_panel = QWidget(self)
-        virtual_controller_layout = QVBoxLayout(self.virtual_controller_panel)
-        virtual_controller_layout.setContentsMargins(0, 0, 0, 0)
-        virtual_controller_layout.setSpacing(0)
-        self.controller_title_label = QLabel("コントローラー", self.virtual_controller_panel)
-        apply_pane_title_font(self.controller_title_label)
-        virtual_controller_layout.addWidget(self.controller_title_label, 0)
-        self.virtual_controller = VirtualControllerPane(self.logger, self.virtual_controller_panel)
-        virtual_controller_layout.addWidget(self.virtual_controller, 0)
-        left_layout.addWidget(self.virtual_controller_panel, 0)
-        main_layout.addWidget(self.left_container)
+        self.virtual_controller_panel = _VirtualControllerPanel(
+            self.logger,
+            self.left_center_container,
+        )
+        self.controller_title_label = self.virtual_controller_panel.title_label
+        self.virtual_controller = self.virtual_controller_panel.controller
+        left_center_layout.addWidget(self.virtual_controller_panel, 1, 0)
 
-        self.center_container = QWidget(self)
-        center_layout = QVBoxLayout(self.center_container)
-        center_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_pane = PreviewPane(
-            parent=self.center_container,
+            parent=self.left_center_container,
             preview_fps=self.global_settings.get("preview_fps", 30),
         )
-        center_layout.addWidget(
+        left_center_layout.addWidget(
             self.preview_pane,
             0,
-            Qt.AlignmentFlag.AlignHCenter,
+            1,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
         )
         self.preview_tool_log_pane = LogPane(
             self.logging.dispatcher,
-            self.center_container,
+            self.left_center_container,
             title="ツールログ",
             kind="tool",
         )
-        center_layout.addWidget(
+        left_center_layout.addWidget(
             self.preview_tool_log_pane,
             1,
-            Qt.AlignmentFlag.AlignHCenter,
+            1,
+            Qt.AlignmentFlag.AlignLeft,
         )
-        main_layout.addWidget(self.center_container)
+        main_layout.addWidget(self.left_center_container)
 
         self.log_pane = LogPane(
             self.logging.dispatcher,
@@ -196,12 +225,13 @@ class MainWindow(QMainWindow):
         self._update_connection_status()
 
     def _apply_layout_metrics_to_panes(self) -> None:
-        if not hasattr(self, "left_container"):
+        if not hasattr(self, "left_center_container"):
             return
         metrics = self.current_layout_metrics
         preset = window_size_preset_for_key(self.current_window_size_preset_key)
         left_width = metrics.allocated_left_width(preset)
         macro_log_width = metrics.allocated_macro_log_width(preset)
+        left_center_width = left_width + metrics.gap + metrics.preview_width
         self.centralWidget().layout().setContentsMargins(
             metrics.margin,
             0,
@@ -209,22 +239,34 @@ class MainWindow(QMainWindow):
             0,
         )
         self.centralWidget().layout().setSpacing(metrics.gap)
-        self.left_container.setFixedWidth(left_width)
-        self.left_container.setMinimumHeight(metrics.center_height)
-        self.left_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
-        self.left_container.layout().setSpacing(metrics.gap)
+        self.left_center_container.setFixedWidth(left_center_width)
+        self.left_center_container.setMinimumHeight(metrics.center_height)
+        self.left_center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        left_center_layout = self.left_center_container.layout()
+        left_center_layout.setSpacing(metrics.gap)
+        left_center_layout.setColumnMinimumWidth(0, left_width)
+        left_center_layout.setColumnMinimumWidth(1, metrics.preview_width)
+        left_center_layout.setColumnStretch(0, 0)
+        left_center_layout.setColumnStretch(1, 0)
+        left_center_layout.setRowMinimumHeight(0, metrics.preview_height)
+        left_center_layout.setRowMinimumHeight(1, metrics.preview_tool_log_min_height)
+        left_center_layout.setRowStretch(0, 0)
+        left_center_layout.setRowStretch(1, 1)
         self.macro_explorer_panel.layout().setSpacing(metrics.gap)
         self.macro_explorer_panel.setFixedSize(left_width, metrics.macro_explorer_height)
-        self.macro_browser.setMinimumHeight(
-            min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
+        macro_browser_available_height = max(
+            0,
+            metrics.macro_explorer_height - metrics.gap - self.control_pane.sizeHint().height(),
         )
-        self.virtual_controller.apply_layout_size(left_width, metrics.controller_height)
+        self.macro_browser.setMinimumHeight(
+            min(metrics.macro_explorer_min_height, macro_browser_available_height)
+        )
         self.virtual_controller_panel.setFixedWidth(left_width)
-        self.virtual_controller_panel.setFixedHeight(PANE_TITLE_HEIGHT + metrics.controller_height)
-        self.center_container.setFixedWidth(metrics.preview_width)
-        self.center_container.setMinimumHeight(metrics.center_height)
-        self.center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
-        self.center_container.layout().setSpacing(metrics.gap)
+        self.virtual_controller_panel.setMinimumHeight(
+            PANE_TITLE_HEIGHT + metrics.preview_tool_log_min_height
+        )
+        self.virtual_controller_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.virtual_controller_panel.apply_layout_size(left_width, metrics.preview_tool_log_height)
         self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
         self.preview_tool_log_pane.setFixedWidth(metrics.preview_width)
         self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)

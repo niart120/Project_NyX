@@ -300,9 +300,10 @@ def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServi
 def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
     window.apply_window_size_preset("hd")
 
-    assert window.left_container.maximumWidth() == 304
+    assert window.left_center_container.maximumWidth() == 952
+    assert window.left_center_container.layout().columnMinimumWidth(0) == 304
+    assert window.left_center_container.layout().columnMinimumWidth(1) == 640
     assert window.preview_pane.maximumWidth() == 640
-    assert window.center_container.maximumWidth() == 640
     assert window.log_pane.maximumWidth() == 304
     assert window.centralWidget().layout().spacing() == 8
 
@@ -310,11 +311,14 @@ def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
 def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
     window.apply_window_size_preset("full_hd")
 
-    assert window.preview_tool_log_pane.parent() is window.center_container
+    assert window.preview_tool_log_pane.parent() is window.left_center_container
     assert window.preview_tool_log_pane.maximumWidth() == 1280
     margins = window.preview_tool_log_pane.layout().contentsMargins()
     assert (margins.left(), margins.right()) == (0, 0)
-    assert window.virtual_controller.maximumWidth() == 280
+    assert (
+        window.virtual_controller_panel.maximumHeight()
+        > window.current_layout_metrics.center_height
+    )
 
 
 def test_controller_pane_has_title_label(window: MainWindow):
@@ -338,8 +342,12 @@ def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
     assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (10, 0, 10, 0)
     assert window.macro_explorer_panel.minimumHeight() == window.preview_pane.maximumHeight()
     assert window.macro_explorer_panel.maximumHeight() == window.preview_pane.maximumHeight()
-    assert window.virtual_controller_panel.y() == window.preview_tool_log_pane.y()
-    assert window.left_container.maximumHeight() > window.current_layout_metrics.center_height
+    grid = window.left_center_container.layout()
+    assert grid.itemAtPosition(1, 0).widget() is window.virtual_controller_panel
+    assert grid.itemAtPosition(1, 1).widget() is window.preview_tool_log_pane
+    assert (
+        window.left_center_container.maximumHeight() > window.current_layout_metrics.center_height
+    )
     assert (
         window.preview_tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
     )
@@ -358,14 +366,17 @@ def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindo
     window.apply_window_size_preset("four_k")
 
     assert window.virtual_controller.maximumWidth() == 538
-    assert window.virtual_controller.maximumHeight() == 360
-    assert window.virtual_controller.btn_a.width() == 42
+    assert window.virtual_controller.maximumHeight() == 320
+    assert window.virtual_controller.btn_a.width() == 37
+    window.virtual_controller_panel.apply_layout_size(538, 420)
+    assert window.virtual_controller.maximumHeight() == 420
+    assert window.virtual_controller.btn_a.width() > 37
 
     window.apply_window_size_preset("hd")
 
     assert window.virtual_controller.maximumWidth() == 304
-    assert window.virtual_controller.maximumHeight() == 220
-    assert window.virtual_controller.btn_a.width() == 26
+    assert window.virtual_controller.maximumHeight() == 120
+    assert window.virtual_controller.btn_a.width() == 14
 
 
 def test_macro_explorer_footer_disables_settings_while_running(window: MainWindow):
