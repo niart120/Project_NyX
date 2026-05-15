@@ -191,7 +191,8 @@ class MainWindow(QMainWindow):
             return
         metrics = self.current_layout_metrics
         preset = window_size_preset_for_key(self.current_window_size_preset_key)
-        surplus = max(0, metrics.horizontal_surplus(preset))
+        left_width = metrics.allocated_left_width(preset)
+        macro_log_width = metrics.allocated_macro_log_width(preset)
         self.centralWidget().layout().setContentsMargins(
             metrics.margin,
             metrics.margin,
@@ -199,20 +200,20 @@ class MainWindow(QMainWindow):
             metrics.margin,
         )
         self.centralWidget().layout().setSpacing(metrics.gap)
-        self.left_container.setFixedWidth(metrics.left_width)
+        self.left_container.setFixedWidth(left_width)
         self.left_container.setMinimumHeight(metrics.center_height)
         self.left_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.left_container.layout().setSpacing(metrics.gap)
         self.macro_explorer_panel.layout().setSpacing(metrics.gap)
-        self.macro_explorer_panel.setFixedWidth(metrics.left_width)
+        self.macro_explorer_panel.setFixedWidth(left_width)
         self.macro_explorer_panel.setMinimumHeight(metrics.macro_explorer_height)
         self.macro_explorer_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.macro_browser.setMinimumHeight(
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
         self.control_pane.set_compact_mode(self.current_window_size_preset_key == "hd")
-        self.virtual_controller.apply_layout_size(metrics.left_width, metrics.controller_height)
-        self.center_container.setFixedWidth(metrics.preview_width + surplus)
+        self.virtual_controller.apply_layout_size(left_width, metrics.controller_height)
+        self.center_container.setFixedWidth(metrics.preview_width)
         self.center_container.setMinimumHeight(metrics.center_height)
         self.center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.center_container.layout().setSpacing(metrics.gap)
@@ -220,7 +221,7 @@ class MainWindow(QMainWindow):
         self.preview_tool_log_pane.setFixedWidth(metrics.preview_width)
         self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)
         self.preview_tool_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
-        self.log_pane.setFixedWidth(metrics.macro_log_width)
+        self.log_pane.setFixedWidth(macro_log_width)
         self.log_pane.setMinimumSize(metrics.macro_log_min_width, metrics.macro_log_min_height)
         self.log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
 

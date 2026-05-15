@@ -57,6 +57,14 @@ class LayoutMetrics:
             + self.gap * 2
         )
 
+    def allocated_left_width(self, preset: WindowSizePreset) -> int:
+        surplus = max(0, self.horizontal_surplus(preset))
+        return self.left_width + surplus // 2
+
+    def allocated_macro_log_width(self, preset: WindowSizePreset) -> int:
+        surplus = max(0, self.horizontal_surplus(preset))
+        return self.macro_log_width + surplus - surplus // 2
+
 
 @dataclass(frozen=True)
 class VirtualControllerMetrics:
@@ -155,5 +163,6 @@ def layout_metrics_for_key(value: object) -> LayoutMetrics:
 
 
 def virtual_controller_metrics_for_key(value: object) -> VirtualControllerMetrics:
+    preset = window_size_preset_for_key(value)
     metrics = layout_metrics_for_key(value)
-    return VirtualControllerMetrics(metrics.left_width, metrics.controller_height)
+    return VirtualControllerMetrics(metrics.allocated_left_width(preset), metrics.controller_height)

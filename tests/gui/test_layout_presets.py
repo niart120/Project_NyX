@@ -33,15 +33,18 @@ def test_preview_sizes_use_standard_16_9_dimensions() -> None:
         assert width * 9 == height * 16
 
 
-def test_layout_horizontal_surplus_is_preview_margin() -> None:
+def test_layout_horizontal_surplus_is_side_panel_width() -> None:
     assert {
-        preset.key: layout_metrics_for_key(preset.key).horizontal_surplus(preset)
+        preset.key: (
+            layout_metrics_for_key(preset.key).allocated_left_width(preset),
+            layout_metrics_for_key(preset.key).allocated_macro_log_width(preset),
+        )
         for preset in WINDOW_SIZE_PRESETS
     } == {
-        "hd": 88,
-        "full_hd": 0,
-        "wqhd": 112,
-        "four_k": 236,
+        "hd": (304, 304),
+        "full_hd": (280, 320),
+        "wqhd": (416, 496),
+        "four_k": (538, 678),
     }
 
 
@@ -60,8 +63,8 @@ def test_virtual_controller_metrics_use_left_column_size() -> None:
         )
         for preset in WINDOW_SIZE_PRESETS
     ] == [
-        ("hd", 260, 220),
+        ("hd", 304, 220),
         ("full_hd", 280, 280),
-        ("wqhd", 360, 320),
-        ("four_k", 420, 360),
+        ("wqhd", 416, 320),
+        ("four_k", 538, 360),
     ]

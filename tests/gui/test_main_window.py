@@ -297,13 +297,14 @@ def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServi
     w.preview_pane.timer.stop()
 
 
-def test_layout_horizontal_surplus_is_preview_margin(window: MainWindow):
+def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
     window.apply_window_size_preset("hd")
 
-    assert window.left_container.maximumWidth() == 260
+    assert window.left_container.maximumWidth() == 304
     assert window.preview_pane.maximumWidth() == 640
-    assert window.center_container.maximumWidth() == 728
-    assert window.log_pane.maximumWidth() == 260
+    assert window.center_container.maximumWidth() == 640
+    assert window.log_pane.maximumWidth() == 304
+    assert window.centralWidget().layout().spacing() == 8
 
 
 def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
@@ -336,13 +337,13 @@ def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
 def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindow):
     window.apply_window_size_preset("four_k")
 
-    assert window.virtual_controller.maximumWidth() == 420
+    assert window.virtual_controller.maximumWidth() == 538
     assert window.virtual_controller.maximumHeight() == 360
     assert window.virtual_controller.btn_a.width() == 42
 
     window.apply_window_size_preset("hd")
 
-    assert window.virtual_controller.maximumWidth() == 260
+    assert window.virtual_controller.maximumWidth() == 304
     assert window.virtual_controller.maximumHeight() == 220
     assert window.virtual_controller.btn_a.width() == 26
 
