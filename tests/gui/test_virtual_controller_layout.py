@@ -75,10 +75,28 @@ def test_virtual_controller_layout_does_not_stretch_rows_vertically(qtbot) -> No
     pane.apply_layout_size(280, 280)
 
     assert pane.btn_zl.y() < pane.btn_minus.y()
-    assert pane.btn_minus.y() < pane.btn_x.y()
-    assert pane.btn_x.y() < pane.btn_b.y()
+    assert pane.btn_minus.y() < pane.left_stick.y()
+    assert pane.left_stick.y() < pane.dpad.y()
     assert pane.btn_b.y() < pane.btn_rs.y()
     assert pane.btn_rs.geometry().bottom() < pane.height()
+
+
+def test_virtual_controller_uses_two_rows_for_main_controls(qtbot) -> None:
+    pane = VirtualControllerPane(NullLoggerPort())
+    qtbot.addWidget(pane)
+
+    pane.apply_layout_size(280, 280)
+
+    left_stick_center_y = pane.left_stick.geometry().center().y()
+    abxy_center_y = pane.btn_y.geometry().united(pane.btn_a.geometry()).center().y()
+    dpad_center_y = pane.dpad.geometry().center().y()
+    right_stick_center_y = pane.right_stick.geometry().center().y()
+
+    assert abs(left_stick_center_y - abxy_center_y) <= 16
+    assert abs(dpad_center_y - right_stick_center_y) <= 16
+    assert dpad_center_y > left_stick_center_y
+    assert pane.btn_y.x() > pane.left_stick.geometry().right()
+    assert pane.right_stick.x() > pane.dpad.geometry().right()
 
 
 def test_virtual_controller_layout_is_idempotent_across_preset_switches(qtbot) -> None:
