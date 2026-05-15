@@ -32,6 +32,8 @@ from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 
+_UNBOUNDED_WIDGET_HEIGHT = 16777215
+
 
 class MainWindow(QMainWindow):
     def __init__(
@@ -135,7 +137,7 @@ class MainWindow(QMainWindow):
         macro_panel_layout.setContentsMargins(0, 0, 0, 0)
         macro_panel_layout.addWidget(self.macro_browser, 1)
         macro_panel_layout.addWidget(self.control_pane, 0)
-        left_layout.addWidget(self.macro_explorer_panel, 0)
+        left_layout.addWidget(self.macro_explorer_panel, 1)
 
         self.virtual_controller = VirtualControllerPane(self.logger, self)
         left_layout.addWidget(self.virtual_controller, 0)
@@ -161,7 +163,7 @@ class MainWindow(QMainWindow):
         )
         center_layout.addWidget(
             self.preview_tool_log_pane,
-            0,
+            1,
             Qt.AlignmentFlag.AlignHCenter,
         )
         main_layout.addWidget(self.center_container)
@@ -198,27 +200,29 @@ class MainWindow(QMainWindow):
         )
         self.centralWidget().layout().setSpacing(metrics.gap)
         self.left_container.setFixedWidth(metrics.left_width)
+        self.left_container.setMinimumHeight(metrics.center_height)
+        self.left_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.left_container.layout().setSpacing(metrics.gap)
         self.macro_explorer_panel.layout().setSpacing(metrics.gap)
-        self.macro_explorer_panel.setFixedSize(metrics.left_width, metrics.macro_explorer_height)
+        self.macro_explorer_panel.setFixedWidth(metrics.left_width)
+        self.macro_explorer_panel.setMinimumHeight(metrics.macro_explorer_height)
+        self.macro_explorer_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.macro_browser.setMinimumHeight(
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
         self.control_pane.set_compact_mode(self.current_window_size_preset_key == "hd")
         self.virtual_controller.apply_layout_size(metrics.left_width, metrics.controller_height)
-        self.center_container.setFixedSize(
-            metrics.preview_width + surplus,
-            metrics.center_height,
-        )
+        self.center_container.setFixedWidth(metrics.preview_width + surplus)
+        self.center_container.setMinimumHeight(metrics.center_height)
+        self.center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.center_container.layout().setSpacing(metrics.gap)
         self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
-        self.preview_tool_log_pane.setFixedSize(
-            metrics.preview_width,
-            metrics.preview_tool_log_height,
-        )
+        self.preview_tool_log_pane.setFixedWidth(metrics.preview_width)
         self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)
-        self.log_pane.setFixedSize(metrics.macro_log_width, metrics.center_height)
+        self.preview_tool_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.log_pane.setFixedWidth(metrics.macro_log_width)
         self.log_pane.setMinimumSize(metrics.macro_log_min_width, metrics.macro_log_min_height)
+        self.log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
 
     def _update_connection_status(self) -> None:
         source_type = self.global_settings.get("capture_source_type", "camera")

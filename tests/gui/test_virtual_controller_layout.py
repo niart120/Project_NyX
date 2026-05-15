@@ -77,8 +77,8 @@ def test_virtual_controller_layout_does_not_stretch_rows_vertically(qtbot) -> No
     assert pane.btn_zl.y() < pane.btn_minus.y()
     assert pane.btn_minus.y() < pane.left_stick.y()
     assert pane.left_stick.y() < pane.dpad.y()
-    assert pane.btn_b.y() < pane.btn_rs.y()
-    assert pane.btn_rs.geometry().bottom() < pane.height()
+    assert pane.btn_b.y() < pane.right_stick.y()
+    assert pane.right_stick.geometry().bottom() < pane.height()
 
 
 def test_virtual_controller_uses_two_rows_for_main_controls(qtbot) -> None:
@@ -97,6 +97,28 @@ def test_virtual_controller_uses_two_rows_for_main_controls(qtbot) -> None:
     assert dpad_center_y > left_stick_center_y
     assert pane.btn_y.x() > pane.left_stick.geometry().right()
     assert pane.right_stick.x() > pane.dpad.geometry().right()
+
+
+def test_virtual_controller_places_l3_r3_on_trigger_row(qtbot) -> None:
+    pane = VirtualControllerPane(NullLoggerPort())
+    qtbot.addWidget(pane)
+
+    pane.apply_layout_size(280, 280)
+
+    trigger_row = [
+        pane.btn_zl,
+        pane.btn_l,
+        pane.btn_ls,
+        pane.btn_rs,
+        pane.btn_r,
+        pane.btn_zr,
+    ]
+
+    assert [button.text() for button in trigger_row] == ["ZL", "L", "L3", "R3", "R", "ZR"]
+    assert [button.x() for button in trigger_row] == sorted(button.x() for button in trigger_row)
+    assert (
+        max(button.y() for button in trigger_row) - min(button.y() for button in trigger_row) <= 1
+    )
 
 
 def test_virtual_controller_layout_is_idempotent_across_preset_switches(qtbot) -> None:

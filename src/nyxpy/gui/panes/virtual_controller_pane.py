@@ -25,23 +25,23 @@ _BASE_WIDTH = 280
 _BASE_HEIGHT = 240
 
 _BASE_RECTS: dict[str, _WidgetRect] = {
-    "btn_zl": _WidgetRect(16, 4, 34, 22),
-    "btn_l": _WidgetRect(76, 4, 34, 22),
-    "btn_r": _WidgetRect(168, 4, 34, 22),
-    "btn_zr": _WidgetRect(228, 4, 34, 22),
+    "btn_zl": _WidgetRect(8, 4, 34, 22),
+    "btn_l": _WidgetRect(52, 4, 34, 22),
+    "btn_ls": _WidgetRect(96, 4, 34, 22),
+    "btn_rs": _WidgetRect(150, 4, 34, 22),
+    "btn_r": _WidgetRect(194, 4, 34, 22),
+    "btn_zr": _WidgetRect(238, 4, 34, 22),
     "btn_minus": _WidgetRect(56, 38, 30, 24),
     "btn_capture": _WidgetRect(92, 38, 30, 24),
     "btn_home": _WidgetRect(158, 38, 30, 24),
     "btn_plus": _WidgetRect(194, 38, 30, 24),
     "left_stick": _WidgetRect(20, 74, 64, 64),
-    "btn_ls": _WidgetRect(37, 138, 30, 20),
     "btn_x": _WidgetRect(204, 64, 28, 28),
     "btn_y": _WidgetRect(174, 94, 28, 28),
     "btn_a": _WidgetRect(234, 94, 28, 28),
     "btn_b": _WidgetRect(204, 124, 28, 28),
     "dpad": _WidgetRect(38, 158, 72, 72),
     "right_stick": _WidgetRect(194, 160, 64, 64),
-    "btn_rs": _WidgetRect(211, 224, 30, 16),
 }
 
 
@@ -62,7 +62,7 @@ class VirtualControllerPane(QWidget):
         self.btn_minus = ControllerButton("-", self, Button.MINUS)
         self.btn_capture = ControllerButton("📷", self, Button.CAP)
         self.left_stick = AnalogStick(self, is_left=True)
-        self.btn_ls = ControllerButton("LS", self, Button.LS, is_rectangular=True)
+        self.btn_ls = ControllerButton("L3", self, Button.LS, is_rectangular=True)
         self.dpad = DPad(self)
 
         self.btn_r = ControllerButton("R", self, Button.R, is_rectangular=True)
@@ -74,7 +74,7 @@ class VirtualControllerPane(QWidget):
         self.btn_a = ControllerButton("A", self, Button.A)
         self.btn_b = ControllerButton("B", self, Button.B)
         self.right_stick = AnalogStick(self, is_left=False)
-        self.btn_rs = ControllerButton("RS", self, Button.RS, is_rectangular=True)
+        self.btn_rs = ControllerButton("R3", self, Button.RS, is_rectangular=True)
 
     def _connect_buttons(self) -> None:
         for btn in [

@@ -314,6 +314,25 @@ def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
     assert window.virtual_controller.maximumWidth() == 280
 
 
+def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
+    window.apply_window_size_preset("full_hd")
+
+    assert window.left_container.maximumHeight() > window.current_layout_metrics.center_height
+    assert window.macro_explorer_panel.maximumHeight() > window.current_layout_metrics.center_height
+    assert (
+        window.preview_tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    )
+    assert window.log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    assert (
+        window.macro_explorer_panel.minimumHeight()
+        == window.current_layout_metrics.macro_explorer_height
+    )
+    assert (
+        window.preview_tool_log_pane.minimumHeight()
+        == window.current_layout_metrics.preview_tool_log_min_height
+    )
+
+
 def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindow):
     window.apply_window_size_preset("four_k")
 

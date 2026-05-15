@@ -86,27 +86,27 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 
 ### 基準座標
 
-主要操作部は横一列に詰め込まない。実際のゲームパッドに近い関係として、上段に `LStick` と `ABXY`、下段に `D-Pad` と `RStick` を置く。横幅 `280` の FullHD 基準でも D-Pad と ABXY が近接しすぎないよう、左右の操作クラスタを段で分ける。
+主要操作部は横一列に詰め込まない。実際のゲームパッドに近い関係として、上段に `LStick` と `ABXY`、下段に `D-Pad` と `RStick` を置く。横幅 `280` の FullHD 基準でも D-Pad と ABXY が近接しすぎないよう、左右の操作クラスタを段で分ける。スティック押し込みは `LS` / `RS` より `L3` / `R3` の表示名にし、上段のトリガー列へ `ZL, L, L3, R3, R, ZR` の順で置く。
 
 | 部品 | 基準矩形 `(x, y, w, h)` |
 |------|--------------------------|
-| `btn_zl` | `(16, 4, 34, 22)` |
-| `btn_l` | `(76, 4, 34, 22)` |
-| `btn_r` | `(168, 4, 34, 22)` |
-| `btn_zr` | `(228, 4, 34, 22)` |
+| `btn_zl` | `(8, 4, 34, 22)` |
+| `btn_l` | `(52, 4, 34, 22)` |
+| `btn_ls` | `(96, 4, 34, 22)` |
+| `btn_rs` | `(150, 4, 34, 22)` |
+| `btn_r` | `(194, 4, 34, 22)` |
+| `btn_zr` | `(238, 4, 34, 22)` |
 | `btn_minus` | `(56, 38, 30, 24)` |
 | `btn_capture` | `(92, 38, 30, 24)` |
 | `btn_home` | `(158, 38, 30, 24)` |
 | `btn_plus` | `(194, 38, 30, 24)` |
 | `left_stick` | `(20, 74, 64, 64)` |
-| `btn_ls` | `(37, 138, 30, 20)` |
 | `btn_x` | `(204, 64, 28, 28)` |
 | `btn_y` | `(174, 94, 28, 28)` |
 | `btn_a` | `(234, 94, 28, 28)` |
 | `btn_b` | `(204, 124, 28, 28)` |
 | `dpad` | `(38, 158, 72, 72)` |
 | `right_stick` | `(194, 160, 64, 64)` |
-| `btn_rs` | `(211, 224, 30, 16)` |
 
 `AnalogStick` と `DPad` は、描画座標、中心座標、最大移動距離、dead zone を固定値ではなく自身の `width()` / `height()` から計算する。プリセット切替時は cached position を新しい中心へ戻す。
 
@@ -156,6 +156,7 @@ def configure_size(
 | GUI | `test_virtual_controller_button_sizes_scale_by_preset` | HD / FullHD / 4K でボタンと文字サイズが段階的に変わる |
 | GUI | `test_virtual_controller_layout_does_not_stretch_rows_vertically` | FullHD の `280x280` 領域でもトリガー、システム、主要操作が順序を保つ |
 | GUI | `test_virtual_controller_uses_two_rows_for_main_controls` | `LStick` と `ABXY` が上段、`D-Pad` と `RStick` が下段に並ぶ |
+| GUI | `test_virtual_controller_places_l3_r3_on_trigger_row` | 上段に `ZL, L, L3, R3, R, ZR` の順で並ぶ |
 | GUI | `test_main_window_applies_virtual_controller_preset_metrics` | `MainWindow` のプリセット切替が仮想コントローラへ反映される |
 | GUI | `test_analog_stick_uses_scaled_center_after_resize` | サイズ変更後のスティック中心と最大移動距離が新サイズ基準になる |
 | GUI | `test_dpad_uses_scaled_hit_test_after_resize` | サイズ変更後の十字キー方向判定が新サイズ基準になる |
@@ -167,6 +168,7 @@ def configure_size(
 - [x] `DPad` の可変サイズ対応
 - [x] `ControllerButton` の可変サイズ・文字サイズ対応
 - [x] `VirtualControllerPane` の固定キャンバス配置化
+- [x] `L3` / `R3` をトリガー列へ移動
 - [x] `MainWindow` からプリセットメトリクスを適用
 - [x] GUI レイアウト回帰テスト作成・パス
 - [x] 全体リント・テスト通過
