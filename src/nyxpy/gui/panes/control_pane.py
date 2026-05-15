@@ -27,10 +27,10 @@ class ControlPane(QWidget):
     snapshot_requested = Signal()
     running_changed = Signal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, horizontal_margin: int = 0):
         super().__init__(parent)
         self._layout = QGridLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setContentsMargins(horizontal_margin, 0, horizontal_margin, 0)
         self._layout.setSpacing(6)
         self._layout.setColumnStretch(0, 1)
         self._layout.setColumnStretch(1, 1)

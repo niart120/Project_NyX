@@ -12,6 +12,7 @@ from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.app_services import SettingsApplyOutcome
+from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
 from nyxpy.gui.main_window import MainWindow
 from nyxpy.gui.panes.control_pane import RunUiState
 
@@ -323,6 +324,7 @@ def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
 
 def test_controller_pane_has_title_label(window: MainWindow):
     assert window.controller_title_label.text() == "コントローラー"
+    assert window.controller_title_label.indent() == LEFT_PANE_CONTENT_MARGIN
     assert window.controller_title_label.font().bold()
     assert window.macro_browser.title_label.font().bold()
     assert window.preview_tool_log_pane.title_label.font().bold()
@@ -333,6 +335,22 @@ def test_controller_pane_has_title_label(window: MainWindow):
         window.controller_title_label.height() == window.preview_tool_log_pane.title_label.height()
     )
     assert window.controller_title_label.height() == window.log_pane.title_label.height()
+
+
+def test_left_column_content_edges_align(window: MainWindow, qtbot):
+    window.show()
+    qtbot.waitUntil(lambda: window.macro_browser.table.width() > 0, timeout=1000)
+
+    assert window.macro_browser.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
+    assert window.control_pane.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
+    assert (
+        window.control_pane.run_btn.geometry().left()
+        == window.macro_browser.table.geometry().left()
+    )
+    assert (
+        window.control_pane.settings_btn.geometry().right()
+        == window.macro_browser.table.geometry().right()
+    )
 
 
 def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):

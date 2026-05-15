@@ -23,6 +23,7 @@ from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.gui.layout import (
     DEFAULT_WINDOW_SIZE_PRESET_KEY,
+    LEFT_PANE_CONTENT_MARGIN,
     WINDOW_SIZE_PRESETS,
     layout_metrics_for_key,
     normalize_window_size_preset_key,
@@ -39,13 +40,20 @@ _UNBOUNDED_WIDGET_HEIGHT = 16777215
 
 
 class _VirtualControllerPanel(QWidget):
-    def __init__(self, logger, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        logger,
+        parent: QWidget | None = None,
+        *,
+        title_indent: int = 0,
+    ) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.title_label = QLabel("コントローラー", self)
         apply_pane_title_font(self.title_label)
+        self.title_label.setIndent(title_indent)
         layout.addWidget(self.title_label, 0)
         self.controller = VirtualControllerPane(logger, self)
         layout.addWidget(
@@ -173,7 +181,10 @@ class MainWindow(QMainWindow):
         left_center_layout = QGridLayout(self.left_center_container)
         left_center_layout.setContentsMargins(0, 0, 0, 0)
         self.macro_browser = MacroBrowserPane(self.macro_catalog, self)
-        self.control_pane = ControlPane(self)
+        self.control_pane = ControlPane(
+            self,
+            horizontal_margin=LEFT_PANE_CONTENT_MARGIN,
+        )
         self.macro_explorer_panel = QWidget(self)
         macro_panel_layout = QVBoxLayout(self.macro_explorer_panel)
         macro_panel_layout.setContentsMargins(0, 0, 0, 0)
@@ -184,6 +195,7 @@ class MainWindow(QMainWindow):
         self.virtual_controller_panel = _VirtualControllerPanel(
             self.logger,
             self.left_center_container,
+            title_indent=LEFT_PANE_CONTENT_MARGIN,
         )
         self.controller_title_label = self.virtual_controller_panel.title_label
         self.virtual_controller = self.virtual_controller_panel.controller

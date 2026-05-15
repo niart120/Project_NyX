@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
 from nyxpy.gui.typography import apply_pane_title_font
 
 
@@ -24,7 +25,12 @@ class MacroBrowserPane(QWidget):
     def __init__(self, catalog, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(
+            LEFT_PANE_CONTENT_MARGIN,
+            LEFT_PANE_CONTENT_MARGIN,
+            LEFT_PANE_CONTENT_MARGIN,
+            LEFT_PANE_CONTENT_MARGIN,
+        )
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         header_layout = QHBoxLayout()

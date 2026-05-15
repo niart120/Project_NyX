@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 DEFAULT_WINDOW_SIZE_PRESET_KEY = "full_hd"
+LEFT_PANE_CONTENT_MARGIN = 5
 
 
 @dataclass(frozen=True)
