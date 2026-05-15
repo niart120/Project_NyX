@@ -512,6 +512,50 @@ def test_apply_settings_updates_ports_without_pause_when_capture_unchanged(
     window.preview_pane.resume.assert_not_called()
 
 
+def test_apply_settings_reports_preview_connection_failure(
+    window: MainWindow, services: FakeServices
+):
+    error = RuntimeError("window capture failed to start")
+    services.next_apply_outcome = SettingsApplyOutcome(
+        changed_keys=frozenset({"capture_window_title"}),
+        builder_replaced=True,
+        frame_source_changed=True,
+        preview_frame_source=None,
+        manual_controller=object(),
+        preview_error=error,
+    )
+    window.preview_pane.pause = MagicMock()
+    window.preview_pane.set_frame_source = MagicMock()
+    window.preview_pane.resume = MagicMock()
+
+    window.apply_app_settings()
+
+    window.preview_pane.pause.assert_called_once_with()
+    window.preview_pane.set_frame_source.assert_called_once_with(None)
+    window.preview_pane.resume.assert_not_called()
+    assert window.capture_status_label.text() == "映像: 接続失敗 (window capture failed to start)"
+
+
+def test_apply_settings_reports_manual_controller_failure(
+    window: MainWindow, services: FakeServices
+):
+    error = RuntimeError("serial device not found")
+    services.next_apply_outcome = SettingsApplyOutcome(
+        changed_keys=frozenset({"serial_device"}),
+        builder_replaced=True,
+        frame_source_changed=False,
+        preview_frame_source=object(),
+        manual_controller=None,
+        manual_controller_error=error,
+    )
+    window.virtual_controller.model.set_controller = MagicMock()
+
+    window.apply_app_settings()
+
+    window.virtual_controller.model.set_controller.assert_called_once_with(None)
+    assert window.serial_status_label.text() == "シリアル: 接続失敗 (serial device not found)"
+
+
 def test_close_cancels_and_waits_with_configured_timeout(
     window: MainWindow, services: FakeServices
 ):

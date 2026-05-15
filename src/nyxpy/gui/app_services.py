@@ -32,6 +32,8 @@ class SettingsApplyOutcome:
     frame_source_changed: bool
     preview_frame_source: FrameSourcePort | None
     manual_controller: ControllerOutputPort | None
+    preview_error: BaseException | None = None
+    manual_controller_error: BaseException | None = None
     deferred: bool = False
 
 
@@ -50,6 +52,20 @@ FRAME_SOURCE_SETTING_KEYS = frozenset(
         "capture_region.height",
         "capture_fps",
         "capture_aspect_box_enabled",
+    }
+)
+
+CONTROLLER_SETTING_KEYS = frozenset(
+    {
+        "serial_device",
+        "serial_baud",
+        "serial_protocol",
+    }
+)
+
+RUNTIME_BUILDER_SETTING_KEYS = FRAME_SOURCE_SETTING_KEYS | CONTROLLER_SETTING_KEYS | frozenset(
+    {
+        "runtime.allow_dummy",
     }
 )
 
@@ -109,8 +125,8 @@ class GuiAppServices:
         if self._last_settings is not None or self._last_secrets is not None:
             self._log_setting_changes(changed_keys)
 
-        builder_changed_keys = _changed_keys(
-            self._builder_settings, current_settings
+        builder_changed_keys = (
+            _changed_keys(self._builder_settings, current_settings) & RUNTIME_BUILDER_SETTING_KEYS
         ) | _changed_keys(self._builder_secrets, current_secrets)
         builder_needs_update = self.runtime_builder is None or bool(builder_changed_keys)
         if builder_needs_update and is_run_active:
@@ -130,13 +146,35 @@ class GuiAppServices:
         previous_frame_source_key = self._active_frame_source_key
         preview_frame_source: FrameSourcePort | None = None
         manual_controller: ControllerOutputPort | None = None
+        preview_error: BaseException | None = None
+        manual_controller_error: BaseException | None = None
         builder_replaced = False
 
         if builder_needs_update:
             self._replace_runtime_builder()
             builder_replaced = True
-            preview_frame_source = self.runtime_builder.frame_source_for_preview()
-            manual_controller = self.runtime_builder.controller_output_for_manual_input()
+            try:
+                preview_frame_source = self.runtime_builder.frame_source_for_preview()
+            except Exception as exc:
+                preview_error = exc
+                self.logger.technical(
+                    "WARNING",
+                    "GUI preview frame source startup failed.",
+                    component="GuiAppServices",
+                    event="configuration.preview_failed",
+                    exc=exc,
+                )
+            try:
+                manual_controller = self.runtime_builder.controller_output_for_manual_input()
+            except Exception as exc:
+                manual_controller_error = exc
+                self.logger.technical(
+                    "WARNING",
+                    "GUI manual controller startup failed.",
+                    component="GuiAppServices",
+                    event="configuration.controller_failed",
+                    exc=exc,
+                )
 
         self._last_settings = current_settings
         self._last_secrets = current_secrets
@@ -154,6 +192,8 @@ class GuiAppServices:
             frame_source_changed=frame_source_changed,
             preview_frame_source=preview_frame_source,
             manual_controller=manual_controller,
+            preview_error=preview_error,
+            manual_controller_error=manual_controller_error,
         )
 
     def flush_deferred_settings(self) -> SettingsApplyOutcome | None:

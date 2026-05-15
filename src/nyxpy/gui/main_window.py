@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         self.macro_catalog = self.services.macro_catalog
         self.run_handle: RunHandle | None = None
         self.last_run_result: RunResult | None = None
+        self.preview_connection_error: BaseException | None = None
+        self.manual_controller_error: BaseException | None = None
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
         self.current_window_size_preset_key = normalize_window_size_preset_key(
@@ -226,9 +228,15 @@ class MainWindow(QMainWindow):
             capture_name = "screen region"
         else:
             capture_name = self.global_settings.get("capture_device", "")
-        capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
+        if self.preview_connection_error is not None:
+            capture_status = f"映像: 接続失敗 ({self.preview_connection_error})"
+        else:
+            capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
         serial_name = self.global_settings.get("serial_device", "")
-        serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
+        if self.manual_controller_error is not None:
+            serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
+        else:
+            serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
         self.capture_status_label.setText(capture_status)
         self.serial_status_label.setText(serial_status)
 
@@ -353,13 +361,19 @@ class MainWindow(QMainWindow):
     def _apply_runtime_ports(self, outcome: SettingsApplyOutcome) -> None:
         if not outcome.builder_replaced:
             return
+        self.preview_connection_error = outcome.preview_error
+        self.manual_controller_error = outcome.manual_controller_error
         try:
-            if outcome.frame_source_changed:
+            if outcome.frame_source_changed or outcome.preview_error is not None:
                 self.preview_pane.pause()
-            self.preview_pane.set_frame_source(outcome.preview_frame_source)
-            if outcome.frame_source_changed:
+            self.preview_pane.set_frame_source(
+                None if outcome.preview_error is not None else outcome.preview_frame_source
+            )
+            if outcome.frame_source_changed and outcome.preview_error is None:
                 self.preview_pane.resume()
-            self.virtual_controller.model.set_controller(outcome.manual_controller)
+            self.virtual_controller.model.set_controller(
+                None if outcome.manual_controller_error is not None else outcome.manual_controller
+            )
         except Exception as exc:
             self.logger.technical(
                 "ERROR",
