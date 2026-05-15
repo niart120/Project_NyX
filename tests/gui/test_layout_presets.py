@@ -37,7 +37,7 @@ def test_layout_horizontal_surplus_is_side_panel_width() -> None:
     assert {
         preset.key: (
             layout_metrics_for_key(preset.key).allocated_left_width(preset),
-            layout_metrics_for_key(preset.key).allocated_macro_log_width(preset),
+            layout_metrics_for_key(preset.key).allocated_tool_log_width(preset),
         )
         for preset in WINDOW_SIZE_PRESETS
     } == {

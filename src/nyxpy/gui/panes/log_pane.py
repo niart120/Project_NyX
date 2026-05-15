@@ -49,7 +49,6 @@ class LogPane(QWidget):
         self.auto_scroll_checkbox.setChecked(True)
         self.debug_checkbox = QCheckBox("デバッグログ表示", self)
         self.debug_checkbox.setChecked(False)
-        self.debug_checkbox.setVisible(kind == "tool")
         self.clear_button = QPushButton("Clear", self)
         control_layout.addWidget(self.auto_scroll_checkbox)
         control_layout.addWidget(self.debug_checkbox)

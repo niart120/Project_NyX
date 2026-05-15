@@ -28,14 +28,14 @@ class LayoutMetrics:
     gap: int
     left_width: int
     controller_initial_height: int
-    macro_log_width: int
-    preview_tool_log_height: int
+    tool_log_width: int
+    bottom_macro_log_height: int
     preview_width: int
     preview_height: int
     macro_explorer_min_height: int
-    macro_log_min_width: int
-    macro_log_min_height: int
-    preview_tool_log_min_height: int
+    tool_log_min_width: int
+    tool_log_min_height: int
+    bottom_macro_log_min_height: int
 
     @property
     def preview_size(self) -> tuple[int, int]:
@@ -43,7 +43,7 @@ class LayoutMetrics:
 
     @property
     def center_height(self) -> int:
-        return self.preview_height + self.gap + self.preview_tool_log_height
+        return self.preview_height + self.gap + self.bottom_macro_log_height
 
     @property
     def macro_explorer_height(self) -> int:
@@ -54,7 +54,7 @@ class LayoutMetrics:
             self.margin * 2
             + self.left_width
             + self.preview_width
-            + self.macro_log_width
+            + self.tool_log_width
             + self.gap * 2
         )
 
@@ -62,9 +62,9 @@ class LayoutMetrics:
         surplus = max(0, self.horizontal_surplus(preset))
         return self.left_width + surplus // 2
 
-    def allocated_macro_log_width(self, preset: WindowSizePreset) -> int:
+    def allocated_tool_log_width(self, preset: WindowSizePreset) -> int:
         surplus = max(0, self.horizontal_surplus(preset))
-        return self.macro_log_width + surplus - surplus // 2
+        return self.tool_log_width + surplus - surplus // 2
 
 
 @dataclass(frozen=True)
@@ -94,56 +94,56 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
         gap=8,
         left_width=260,
         controller_initial_height=220,
-        macro_log_width=260,
-        preview_tool_log_height=120,
+        tool_log_width=260,
+        bottom_macro_log_height=120,
         preview_width=640,
         preview_height=360,
         macro_explorer_min_height=320,
-        macro_log_min_width=240,
-        macro_log_min_height=180,
-        preview_tool_log_min_height=96,
+        tool_log_min_width=240,
+        tool_log_min_height=180,
+        bottom_macro_log_min_height=96,
     ),
     "full_hd": LayoutMetrics(
         margin=10,
         gap=10,
         left_width=280,
         controller_initial_height=280,
-        macro_log_width=320,
-        preview_tool_log_height=180,
+        tool_log_width=320,
+        bottom_macro_log_height=180,
         preview_width=1280,
         preview_height=720,
         macro_explorer_min_height=420,
-        macro_log_min_width=300,
-        macro_log_min_height=280,
-        preview_tool_log_min_height=140,
+        tool_log_min_width=300,
+        tool_log_min_height=280,
+        bottom_macro_log_min_height=140,
     ),
     "wqhd": LayoutMetrics(
         margin=12,
         gap=12,
         left_width=360,
         controller_initial_height=320,
-        macro_log_width=440,
-        preview_tool_log_height=240,
+        tool_log_width=440,
+        bottom_macro_log_height=240,
         preview_width=1600,
         preview_height=900,
         macro_explorer_min_height=520,
-        macro_log_min_width=380,
-        macro_log_min_height=360,
-        preview_tool_log_min_height=180,
+        tool_log_min_width=380,
+        tool_log_min_height=360,
+        bottom_macro_log_min_height=180,
     ),
     "four_k": LayoutMetrics(
         margin=16,
         gap=16,
         left_width=420,
         controller_initial_height=360,
-        macro_log_width=560,
-        preview_tool_log_height=320,
+        tool_log_width=560,
+        bottom_macro_log_height=320,
         preview_width=2560,
         preview_height=1440,
         macro_explorer_min_height=640,
-        macro_log_min_width=480,
-        macro_log_min_height=480,
-        preview_tool_log_min_height=240,
+        tool_log_min_width=480,
+        tool_log_min_height=480,
+        bottom_macro_log_min_height=240,
     ),
 }
 

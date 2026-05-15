@@ -305,16 +305,16 @@ def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
     assert window.left_center_container.layout().columnMinimumWidth(0) == 304
     assert window.left_center_container.layout().columnMinimumWidth(1) == 640
     assert window.preview_pane.maximumWidth() == 640
-    assert window.log_pane.maximumWidth() == 304
+    assert window.tool_log_pane.maximumWidth() == 304
     assert window.centralWidget().layout().spacing() == 8
 
 
-def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
+def test_bottom_macro_log_does_not_span_under_controller(window: MainWindow):
     window.apply_window_size_preset("full_hd")
 
-    assert window.preview_tool_log_pane.parent() is window.left_center_container
-    assert window.preview_tool_log_pane.maximumWidth() == 1280
-    margins = window.preview_tool_log_pane.layout().contentsMargins()
+    assert window.macro_log_pane.parent() is window.left_center_container
+    assert window.macro_log_pane.maximumWidth() == 1280
+    margins = window.macro_log_pane.layout().contentsMargins()
     assert (margins.left(), margins.right()) == (0, 0)
     assert (
         window.virtual_controller_panel.maximumHeight()
@@ -327,14 +327,12 @@ def test_controller_pane_has_title_label(window: MainWindow):
     assert window.controller_title_label.indent() == LEFT_PANE_CONTENT_MARGIN
     assert window.controller_title_label.font().bold()
     assert window.macro_browser.title_label.font().bold()
-    assert window.preview_tool_log_pane.title_label.font().bold()
-    assert window.log_pane.title_label.font().bold()
-    assert window.preview_tool_log_pane.view.font().fixedPitch()
-    assert window.log_pane.view.font().fixedPitch()
-    assert (
-        window.controller_title_label.height() == window.preview_tool_log_pane.title_label.height()
-    )
-    assert window.controller_title_label.height() == window.log_pane.title_label.height()
+    assert window.macro_log_pane.title_label.font().bold()
+    assert window.tool_log_pane.title_label.font().bold()
+    assert window.macro_log_pane.view.font().fixedPitch()
+    assert window.tool_log_pane.view.font().fixedPitch()
+    assert window.controller_title_label.height() == window.macro_log_pane.title_label.height()
+    assert window.controller_title_label.height() == window.tool_log_pane.title_label.height()
 
 
 def test_left_column_content_edges_align(window: MainWindow, qtbot):
@@ -362,21 +360,19 @@ def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
     assert window.macro_explorer_panel.maximumHeight() == window.preview_pane.maximumHeight()
     grid = window.left_center_container.layout()
     assert grid.itemAtPosition(1, 0).widget() is window.virtual_controller_panel
-    assert grid.itemAtPosition(1, 1).widget() is window.preview_tool_log_pane
+    assert grid.itemAtPosition(1, 1).widget() is window.macro_log_pane
     assert (
         window.left_center_container.maximumHeight() > window.current_layout_metrics.center_height
     )
-    assert (
-        window.preview_tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
-    )
-    assert window.log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    assert window.macro_log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    assert window.tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
     assert (
         window.macro_explorer_panel.minimumHeight()
         == window.current_layout_metrics.macro_explorer_height
     )
     assert (
-        window.preview_tool_log_pane.minimumHeight()
-        == window.current_layout_metrics.preview_tool_log_min_height
+        window.macro_log_pane.minimumHeight()
+        == window.current_layout_metrics.bottom_macro_log_min_height
     )
 
 

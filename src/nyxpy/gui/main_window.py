@@ -211,27 +211,27 @@ class MainWindow(QMainWindow):
             1,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
         )
-        self.preview_tool_log_pane = LogPane(
+        self.macro_log_pane = LogPane(
             self.logging.dispatcher,
             self.left_center_container,
-            title="ツールログ",
-            kind="tool",
+            title="マクロログ",
+            kind="macro",
         )
         left_center_layout.addWidget(
-            self.preview_tool_log_pane,
+            self.macro_log_pane,
             1,
             1,
             Qt.AlignmentFlag.AlignLeft,
         )
         main_layout.addWidget(self.left_center_container)
 
-        self.log_pane = LogPane(
+        self.tool_log_pane = LogPane(
             self.logging.dispatcher,
             self,
-            title="マクロログ",
-            kind="macro",
+            title="ツールログ",
+            kind="tool",
         )
-        main_layout.addWidget(self.log_pane)
+        main_layout.addWidget(self.tool_log_pane)
 
         # status bar
         self.status_label = QLabel("準備中...")
@@ -249,7 +249,7 @@ class MainWindow(QMainWindow):
         metrics = self.current_layout_metrics
         preset = window_size_preset_for_key(self.current_window_size_preset_key)
         left_width = metrics.allocated_left_width(preset)
-        macro_log_width = metrics.allocated_macro_log_width(preset)
+        tool_log_width = metrics.allocated_tool_log_width(preset)
         left_center_width = left_width + metrics.gap + metrics.preview_width
         self.centralWidget().layout().setContentsMargins(
             metrics.margin,
@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
         left_center_layout.setColumnStretch(0, 0)
         left_center_layout.setColumnStretch(1, 0)
         left_center_layout.setRowMinimumHeight(0, metrics.preview_height)
-        left_center_layout.setRowMinimumHeight(1, metrics.preview_tool_log_min_height)
+        left_center_layout.setRowMinimumHeight(1, metrics.bottom_macro_log_min_height)
         left_center_layout.setRowStretch(0, 0)
         left_center_layout.setRowStretch(1, 1)
         self.macro_explorer_panel.layout().setSpacing(metrics.gap)
@@ -282,18 +282,18 @@ class MainWindow(QMainWindow):
         )
         self.virtual_controller_panel.setFixedWidth(left_width)
         self.virtual_controller_panel.setMinimumHeight(
-            PANE_TITLE_HEIGHT + metrics.preview_tool_log_min_height
+            PANE_TITLE_HEIGHT + metrics.bottom_macro_log_min_height
         )
         self.virtual_controller_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
-        self.virtual_controller_panel.apply_layout_size(left_width, metrics.preview_tool_log_height)
+        self.virtual_controller_panel.apply_layout_size(left_width, metrics.bottom_macro_log_height)
         QTimer.singleShot(0, self.virtual_controller_panel.relayout_to_current_geometry)
         self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
-        self.preview_tool_log_pane.setFixedWidth(metrics.preview_width)
-        self.preview_tool_log_pane.setMinimumHeight(metrics.preview_tool_log_min_height)
-        self.preview_tool_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
-        self.log_pane.setFixedWidth(macro_log_width)
-        self.log_pane.setMinimumSize(metrics.macro_log_min_width, metrics.macro_log_min_height)
-        self.log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.macro_log_pane.setFixedWidth(metrics.preview_width)
+        self.macro_log_pane.setMinimumHeight(metrics.bottom_macro_log_min_height)
+        self.macro_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.tool_log_pane.setFixedWidth(tool_log_width)
+        self.tool_log_pane.setMinimumSize(metrics.tool_log_min_width, metrics.tool_log_min_height)
+        self.tool_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
 
     def _update_connection_status(self) -> None:
         source_type = self.global_settings.get("capture_source_type", "camera")
@@ -514,8 +514,8 @@ class MainWindow(QMainWindow):
                 )
 
         self.preview_pane.pause()
-        self.log_pane.dispose()
-        self.preview_tool_log_pane.dispose()
+        self.macro_log_pane.dispose()
+        self.tool_log_pane.dispose()
         self.services.close()
         super().closeEvent(event)
 
