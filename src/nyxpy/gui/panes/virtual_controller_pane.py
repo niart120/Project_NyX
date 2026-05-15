@@ -107,9 +107,9 @@ class VirtualControllerPane(QWidget):
         content_height = round(_BASE_HEIGHT * scale)
         offset_x = (width - content_width) // 2
         offset_y = (height - content_height) // 2
-        font_size = max(8, round(9 * scale))
+        font_point_size = max(8, round(9 * scale))
         if scale <= 1.0:
-            font_size += 1
+            font_point_size += 1
 
         for name, base_rect in _BASE_RECTS.items():
             rect = self._scaled_rect(base_rect, scale, offset_x, offset_y, width, height)
@@ -122,7 +122,7 @@ class VirtualControllerPane(QWidget):
                 widget.configure_size(
                     (rect.width(), rect.height()),
                     radius=min(rect.width(), rect.height()) // 2,
-                    font_size=font_size,
+                    font_point_size=font_point_size,
                 )
             widget.setGeometry(rect)
 

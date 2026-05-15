@@ -46,7 +46,7 @@ class LayoutMetrics:
 
     @property
     def macro_explorer_height(self) -> int:
-        return self.center_height - self.gap - self.controller_height
+        return self.preview_height
 
     def horizontal_surplus(self, preset: WindowSizePreset) -> int:
         return preset.window_width - (

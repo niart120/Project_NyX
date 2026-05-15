@@ -56,20 +56,22 @@ def test_virtual_controller_button_sizes_scale_by_preset(qtbot) -> None:
 
     pane.apply_layout_size(304, 220)
     hd_button_size = pane.btn_a.size()
-    hd_style = pane.btn_a.styleSheet()
+    hd_font = pane.btn_a.font()
 
     pane.apply_layout_size(280, 280)
-    full_hd_style = pane.btn_a.styleSheet()
+    full_hd_font = pane.btn_a.font()
 
     pane.apply_layout_size(538, 360)
     four_k_button_size = pane.btn_a.size()
-    four_k_style = pane.btn_a.styleSheet()
+    four_k_font = pane.btn_a.font()
 
     assert hd_button_size.width() < four_k_button_size.width()
     assert hd_button_size.height() < four_k_button_size.height()
-    assert "font-size: 9px" in hd_style
-    assert "font-size: 10px" in full_hd_style
-    assert "font-size: 14px" in four_k_style
+    assert "font-size" not in pane.btn_a.styleSheet()
+    assert hd_font.pointSize() == 9
+    assert full_hd_font.pointSize() == 10
+    assert four_k_font.pointSize() == 14
+    assert hd_font.bold()
 
 
 def test_virtual_controller_layout_does_not_stretch_rows_vertically(qtbot) -> None:

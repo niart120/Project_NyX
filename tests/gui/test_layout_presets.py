@@ -51,7 +51,7 @@ def test_layout_horizontal_surplus_is_side_panel_width() -> None:
 def test_macro_explorer_absorbs_vertical_surplus() -> None:
     full_hd = layout_metrics_for_key("full_hd")
     assert full_hd.center_height == 910
-    assert full_hd.macro_explorer_height == 620
+    assert full_hd.macro_explorer_height == 720
 
 
 def test_virtual_controller_metrics_use_left_column_size() -> None:

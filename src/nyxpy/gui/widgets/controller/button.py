@@ -18,16 +18,20 @@ class ControllerButton(QPushButton):
         super().__init__(text, parent)
         self.button_type = button_type
         self.is_rectangular = is_rectangular
-        self.configure_size(size, radius=radius, font_size=9)
+        self.configure_size(size, radius=radius, font_point_size=9)
 
     def configure_size(
         self,
         size: tuple[int, int],
         *,
         radius: int,
-        font_size: int,
+        font_point_size: int,
     ) -> None:
         self.setFixedSize(size[0], size[1])
+        font = self.font()
+        font.setBold(True)
+        font.setPointSize(font_point_size)
+        self.setFont(font)
         radius_px = min(radius, max(1, min(size) // 2))
         border_radius = min(5, radius_px) if self.is_rectangular else radius_px
         self.setStyleSheet(f"""
@@ -36,8 +40,6 @@ class ControllerButton(QPushButton):
                 color: white;
                 border-radius: {border_radius}px;
                 border: 2px solid #555;
-                font-size: {font_size}px;
-                font-weight: bold;
             }}
             QPushButton:pressed {{
                 background-color: #666;

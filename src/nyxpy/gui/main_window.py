@@ -31,7 +31,7 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
-from nyxpy.gui.typography import apply_pane_title_font
+from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
 
@@ -143,7 +143,7 @@ class MainWindow(QMainWindow):
         self.virtual_controller_panel = QWidget(self)
         virtual_controller_layout = QVBoxLayout(self.virtual_controller_panel)
         virtual_controller_layout.setContentsMargins(0, 0, 0, 0)
-        virtual_controller_layout.setSpacing(4)
+        virtual_controller_layout.setSpacing(0)
         self.controller_title_label = QLabel("コントローラー", self.virtual_controller_panel)
         apply_pane_title_font(self.controller_title_label)
         virtual_controller_layout.addWidget(self.controller_title_label, 0)
@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
         macro_log_width = metrics.allocated_macro_log_width(preset)
         self.centralWidget().layout().setContentsMargins(
             metrics.margin,
-            metrics.margin,
+            0,
             metrics.margin,
             0,
         )
@@ -222,6 +222,7 @@ class MainWindow(QMainWindow):
         )
         self.virtual_controller.apply_layout_size(left_width, metrics.controller_height)
         self.virtual_controller_panel.setFixedWidth(left_width)
+        self.virtual_controller_panel.setFixedHeight(PANE_TITLE_HEIGHT + metrics.controller_height)
         self.center_container.setFixedWidth(metrics.preview_width)
         self.center_container.setMinimumHeight(metrics.center_height)
         self.center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)

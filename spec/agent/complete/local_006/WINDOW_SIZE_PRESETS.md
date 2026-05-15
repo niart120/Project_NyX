@@ -32,9 +32,9 @@
 
 左列は「マクロ一覧パネル + 仮想コントローラ」で構成する。仮想コントローラは状態バー側に接地し、プレビュー下ツールログは中央列の直下にだけ置く。
 
-`horizontal_surplus` は `window_width - (margin * 2 + left_width + preview_width + macro_log_width + gap * 2)` で算出する。余剰幅は中央列の左右余白として扱い、プレビュー固定サイズ、左列幅、マクロログ幅へ自動加算しない。
+`horizontal_surplus` は `window_width - (margin * 2 + left_width + preview_width + macro_log_width + gap * 2)` で算出する。余剰幅はプレビュー周囲の空白ではなく、左列と右マクロログへ半分ずつ加算する。プレビュー固定サイズは変更しない。
 
-縦方向は中央列の高さを基準にする。`center_height = preview_height + gap + preview_tool_log_height` とし、左列では `macro_explorer_height = center_height - gap - controller_height` を計算する。マクロ一覧パネルはこの高さまで伸び、仮想コントローラは左列下端に固定する。
+縦方向はプレビュー高さを基準にする。左列では `macro_explorer_height = preview_height` とし、仮想コントローラ見出しの上端をプレビュー下ツールログ見出しと揃える。中央列では `center_height = preview_height + gap + preview_tool_log_height` を最小高として扱い、プレビュー下ツールログが余剰高さを吸収する。
 
 ## 4. 保存設定
 
