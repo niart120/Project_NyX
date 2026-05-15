@@ -2,7 +2,7 @@
 
 > **文書種別**: 実装計画。ウィンドウサイズ規定、マクロ一覧パネル、プレビュー/ログ配置を段階的に実装する順序を定義する。  
 > **親仕様**: `spec\agent\local_006\WINDOW_SIZE_AND_PANEL_LAYOUT.md`  
-> **詳細仕様**: `WINDOW_SIZE_PRESETS.md`, `MACRO_EXPLORER_PANEL.md`, `PREVIEW_AND_LOG_LAYOUT.md`
+> **詳細仕様**: `WINDOW_SIZE_PRESETS.md`, `MACRO_EXPLORER_PANEL.md`, `PREVIEW_AND_LOG_LAYOUT.md`, `VIRTUAL_CONTROLLER_LAYOUT.md`
 
 ## 1. 実装方針
 
@@ -18,6 +18,7 @@
 | Phase 4 | マクロ一覧パネル | 検索を外し、一覧主体 + 操作フッターへ整理する | 接続状態がパネルに出ず、実行系操作が下部に固定される |
 | Phase 5 | プレビュー/ログ | プレビュー固定サイズ、右マクロログ、プレビュー下ツールログを適用する | ツールログが仮想コントローラ下へ掛からない |
 | Phase 6 | 回帰 | 既存の実行、停止、設定、プレビュー更新を確認する | GUI テストと関連単体テストが通る |
+| Phase 7 | 仮想コントローラ | プリセット別固定キャンバスと部品サイズを適用する | FullHD `280x280` でも部品が上下に散らばらず、全プリセットでキャンバス内に収まる |
 
 ## 3. 想定変更ファイル
 
@@ -29,6 +30,8 @@
 | `src\nyxpy\gui\panes\control_pane.py` | 操作フッター化、接続状態表示の削除 |
 | `src\nyxpy\gui\panes\preview_pane.py` | 固定 16:9 サイズの適用 |
 | `src\nyxpy\gui\panes\log_pane.py` | マクロログとプレビュー下ツールログの表示分離 |
+| `src\nyxpy\gui\panes\virtual_controller_pane.py` | プリセット別固定キャンバス配置 |
+| `src\nyxpy\gui\widgets\controller\*.py` | 仮想コントローラ部品の段階サイズ対応 |
 | `tests\gui\` | 各 pane と MainWindow のレイアウト検証 |
 
 ## 4. 実装上の注意
@@ -41,6 +44,7 @@
 - 検索/タグ絞り込みは初期実装に含めない。
 - ユーザーが列幅や行高をドラッグ変更できる splitter は初期実装に含めない。
 - 実行中と中断要求中はスナップショットを無効化する。
+- 仮想コントローラは nested layout の余白分配に依存させず、プリセット別固定キャンバスへ配置する。
 
 ## 5. テスト一覧
 
@@ -56,4 +60,7 @@
 | `test_macro_explorer_absorbs_vertical_surplus` | Phase 3 |
 | `test_preview_tool_log_does_not_span_under_controller` | Phase 5 |
 | `test_preview_keeps_fixed_16_9_size_for_preset` | Phase 5 |
+| `test_virtual_controller_preset_sizes_keep_children_inside_canvas` | Phase 7 |
+| `test_virtual_controller_button_sizes_scale_by_preset` | Phase 7 |
+| `test_main_window_applies_virtual_controller_preset_metrics` | Phase 7 |
 

@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
         self.control_pane.set_compact_mode(self.current_window_size_preset_key == "hd")
-        self.virtual_controller.setFixedSize(metrics.left_width, metrics.controller_height)
+        self.virtual_controller.apply_layout_size(metrics.left_width, metrics.controller_height)
         self.center_container.setFixedSize(
             metrics.preview_width + surplus,
             metrics.center_height,

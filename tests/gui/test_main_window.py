@@ -314,6 +314,20 @@ def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
     assert window.virtual_controller.maximumWidth() == 280
 
 
+def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindow):
+    window.apply_window_size_preset("four_k")
+
+    assert window.virtual_controller.maximumWidth() == 420
+    assert window.virtual_controller.maximumHeight() == 360
+    assert window.virtual_controller.btn_a.width() == 42
+
+    window.apply_window_size_preset("hd")
+
+    assert window.virtual_controller.maximumWidth() == 260
+    assert window.virtual_controller.maximumHeight() == 220
+    assert window.virtual_controller.btn_a.width() == 26
+
+
 def test_macro_explorer_footer_disables_settings_while_running(window: MainWindow):
     window.control_pane.set_run_state(RunUiState.RUNNING)
 

@@ -58,6 +58,18 @@ class LayoutMetrics:
         )
 
 
+@dataclass(frozen=True)
+class VirtualControllerMetrics:
+    width: int
+    height: int
+    base_width: int = 280
+    base_height: int = 240
+
+    @property
+    def scale(self) -> float:
+        return min(self.width / self.base_width, self.height / self.base_height)
+
+
 WINDOW_SIZE_PRESETS: tuple[WindowSizePreset, ...] = (
     WindowSizePreset("hd", "HD", 1280, 720, 640, 360),
     WindowSizePreset("full_hd", "FullHD", 1920, 1080, 1280, 720),
@@ -140,3 +152,8 @@ def window_size_preset_for_key(value: object) -> WindowSizePreset:
 
 def layout_metrics_for_key(value: object) -> LayoutMetrics:
     return LAYOUT_METRICS_BY_PRESET[normalize_window_size_preset_key(value)]
+
+
+def virtual_controller_metrics_for_key(value: object) -> VirtualControllerMetrics:
+    metrics = layout_metrics_for_key(value)
+    return VirtualControllerMetrics(metrics.left_width, metrics.controller_height)

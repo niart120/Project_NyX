@@ -3,6 +3,7 @@ from nyxpy.gui.layout import (
     WINDOW_SIZE_PRESETS,
     layout_metrics_for_key,
     normalize_window_size_preset_key,
+    virtual_controller_metrics_for_key,
 )
 
 
@@ -48,3 +49,19 @@ def test_macro_explorer_absorbs_vertical_surplus() -> None:
     full_hd = layout_metrics_for_key("full_hd")
     assert full_hd.center_height == 910
     assert full_hd.macro_explorer_height == 620
+
+
+def test_virtual_controller_metrics_use_left_column_size() -> None:
+    assert [
+        (
+            preset.key,
+            virtual_controller_metrics_for_key(preset.key).width,
+            virtual_controller_metrics_for_key(preset.key).height,
+        )
+        for preset in WINDOW_SIZE_PRESETS
+    ] == [
+        ("hd", 260, 220),
+        ("full_hd", 280, 280),
+        ("wqhd", 360, 320),
+        ("four_k", 420, 360),
+    ]
