@@ -1,9 +1,11 @@
 from enum import Enum
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QGridLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
 
 from nyxpy.gui.widgets.split_button import CustomSplitDropDownButton
+
+_CONTROL_BUTTON_HEIGHT = 34
 
 
 class RunUiState(Enum):
@@ -30,6 +32,8 @@ class ControlPane(QWidget):
         self._layout = QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(6)
+        self._layout.setColumnStretch(0, 1)
+        self._layout.setColumnStretch(1, 1)
         # Buttons
 
         # Create run button as a split button with dropdown for "with parameters" option
@@ -41,7 +45,7 @@ class ControlPane(QWidget):
         self.snapshot_btn = QPushButton("スナップショット", self)
         self.settings_btn = QPushButton("設定", self)
 
-        self._compact = False
+        self._configure_button_sizes()
         self._arrange_buttons()
 
         # Connect signals
@@ -67,25 +71,20 @@ class ControlPane(QWidget):
         self.running_changed.emit(state is RunUiState.RUNNING)
         self.update_buttons()
 
-    def set_compact_mode(self, compact: bool) -> None:
-        if self._compact == compact:
-            return
-        self._compact = compact
-        self._arrange_buttons()
-
     def _arrange_buttons(self) -> None:
         for widget in (self.run_btn, self.cancel_btn, self.snapshot_btn, self.settings_btn):
             self._layout.removeWidget(widget)
-        if self._compact:
-            self._layout.addWidget(self.run_btn, 0, 0)
-            self._layout.addWidget(self.cancel_btn, 0, 1)
-            self._layout.addWidget(self.snapshot_btn, 1, 0)
-            self._layout.addWidget(self.settings_btn, 1, 1)
-            return
         self._layout.addWidget(self.run_btn, 0, 0)
         self._layout.addWidget(self.cancel_btn, 0, 1)
-        self._layout.addWidget(self.snapshot_btn, 0, 2)
-        self._layout.addWidget(self.settings_btn, 0, 3)
+        self._layout.addWidget(self.snapshot_btn, 1, 0)
+        self._layout.addWidget(self.settings_btn, 1, 1)
+
+    def _configure_button_sizes(self) -> None:
+        for button in (self.run_btn, self.cancel_btn, self.snapshot_btn, self.settings_btn):
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            button.setFixedHeight(_CONTROL_BUTTON_HEIGHT)
+        self.run_btn.mainButton.setFixedHeight(_CONTROL_BUTTON_HEIGHT)
+        self.run_btn.dropdownButton.setFixedHeight(_CONTROL_BUTTON_HEIGHT)
 
     def update_buttons(self):
         running = self._run_state in {RunUiState.RUNNING, RunUiState.CANCELLING}

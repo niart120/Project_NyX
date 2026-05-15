@@ -360,13 +360,37 @@ def test_macro_explorer_footer_disables_snapshot_while_running(window: MainWindo
     assert not window.control_pane.snapshot_btn.isEnabled()
 
 
-def test_macro_explorer_footer_wraps_on_hd(window: MainWindow):
-    window.apply_window_size_preset("hd")
+@pytest.mark.parametrize("preset_key", ["hd", "full_hd", "wqhd", "four_k"])
+def test_macro_explorer_footer_uses_2x2_grid_for_all_presets(window: MainWindow, preset_key: str):
+    window.apply_window_size_preset(preset_key)
 
+    assert window.control_pane._layout.itemAtPosition(0, 0).widget() is window.control_pane.run_btn
+    assert (
+        window.control_pane._layout.itemAtPosition(0, 1).widget() is window.control_pane.cancel_btn
+    )
     assert (
         window.control_pane._layout.itemAtPosition(1, 0).widget()
         is window.control_pane.snapshot_btn
     )
+    assert (
+        window.control_pane._layout.itemAtPosition(1, 1).widget()
+        is window.control_pane.settings_btn
+    )
+    assert window.control_pane._layout.itemAtPosition(0, 2) is None
+
+
+def test_macro_explorer_footer_unifies_control_button_height(window: MainWindow):
+    buttons = [
+        window.control_pane.run_btn,
+        window.control_pane.cancel_btn,
+        window.control_pane.snapshot_btn,
+        window.control_pane.settings_btn,
+    ]
+
+    assert {button.minimumHeight() for button in buttons} == {34}
+    assert {button.maximumHeight() for button in buttons} == {34}
+    assert window.control_pane.run_btn.mainButton.maximumHeight() == 34
+    assert window.control_pane.run_btn.dropdownButton.maximumHeight() == 34
 
 
 def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):

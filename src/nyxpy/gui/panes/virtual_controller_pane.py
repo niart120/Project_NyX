@@ -41,7 +41,7 @@ _BASE_RECTS: dict[str, _WidgetRect] = {
     "btn_a": _WidgetRect(234, 94, 28, 28),
     "btn_b": _WidgetRect(204, 124, 28, 28),
     "dpad": _WidgetRect(38, 158, 72, 72),
-    "right_stick": _WidgetRect(194, 160, 64, 64),
+    "right_stick": _WidgetRect(174, 162, 64, 64),
 }
 
 

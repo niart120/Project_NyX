@@ -211,7 +211,6 @@ class MainWindow(QMainWindow):
         self.macro_browser.setMinimumHeight(
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
-        self.control_pane.set_compact_mode(self.current_window_size_preset_key == "hd")
         self.virtual_controller.apply_layout_size(left_width, metrics.controller_height)
         self.center_container.setFixedWidth(metrics.preview_width)
         self.center_container.setMinimumHeight(metrics.center_height)

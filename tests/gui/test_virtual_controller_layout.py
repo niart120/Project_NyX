@@ -93,10 +93,11 @@ def test_virtual_controller_uses_two_rows_for_main_controls(qtbot) -> None:
     right_stick_center_y = pane.right_stick.geometry().center().y()
 
     assert abs(left_stick_center_y - abxy_center_y) <= 16
-    assert abs(dpad_center_y - right_stick_center_y) <= 16
+    assert dpad_center_y == right_stick_center_y
     assert dpad_center_y > left_stick_center_y
     assert pane.btn_y.x() > pane.left_stick.geometry().right()
     assert pane.right_stick.x() > pane.dpad.geometry().right()
+    assert pane.width() - pane.right_stick.geometry().right() >= 40
 
 
 def test_virtual_controller_places_l3_r3_on_trigger_row(qtbot) -> None:

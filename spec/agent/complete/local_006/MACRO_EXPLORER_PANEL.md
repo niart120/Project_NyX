@@ -45,7 +45,7 @@
 | 検索ボックス | `MacroBrowserPane` 上部にある | 初期実装では削除 |
 | 再読み込み | 検索行に同居 | ヘッダー右側へ移動 |
 | マクロ一覧 | `マクロ名` / `説明文` / `タグ` の 3 列 | 一覧を主役にし、HD では説明文を省略 |
-| 実行 | `ControlPane` に横並び | 操作フッター先頭に固定 |
+| 実行 | `ControlPane` に横並び | 操作フッター左上に固定し、他の操作ボタンと高さを揃える |
 | 停止 | `キャンセル` 表示 | 実行状態に応じて `停止` / `中断要求中` を明確にする |
 | 設定 | `ControlPane` の右端 | 操作フッター末尾に固定 |
 
@@ -67,5 +67,6 @@
 | `test_connection_status_is_not_rendered_in_macro_explorer` | 接続状態がマクロ一覧パネルに出ない |
 | `test_macro_explorer_footer_disables_settings_while_running` | 実行中に設定入口が無効化される |
 | `test_macro_explorer_footer_disables_snapshot_while_running` | 実行中にスナップショットが無効化される |
-| `test_macro_explorer_footer_wraps_on_hd` | HD では操作フッターが 2 行に折り返される |
+| `test_macro_explorer_footer_uses_2x2_grid_for_all_presets` | 全プリセットで操作フッターが 2x2 配置になる |
+| `test_macro_explorer_footer_unifies_control_button_height` | split button の実行と他の操作ボタンの高さが揃う |
 
