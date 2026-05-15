@@ -62,7 +62,7 @@ class VirtualControllerPane(QWidget):
         self.btn_minus = ControllerButton("-", self, Button.MINUS)
         self.btn_capture = ControllerButton("📷", self, Button.CAP)
         self.left_stick = AnalogStick(self, is_left=True)
-        self.btn_ls = ControllerButton("L3", self, Button.LS, is_rectangular=True)
+        self.btn_ls = ControllerButton("LS", self, Button.LS, is_rectangular=True)
         self.dpad = DPad(self)
 
         self.btn_r = ControllerButton("R", self, Button.R, is_rectangular=True)
@@ -74,7 +74,7 @@ class VirtualControllerPane(QWidget):
         self.btn_a = ControllerButton("A", self, Button.A)
         self.btn_b = ControllerButton("B", self, Button.B)
         self.right_stick = AnalogStick(self, is_left=False)
-        self.btn_rs = ControllerButton("R3", self, Button.RS, is_rectangular=True)
+        self.btn_rs = ControllerButton("RS", self, Button.RS, is_rectangular=True)
 
     def _connect_buttons(self) -> None:
         for btn in [

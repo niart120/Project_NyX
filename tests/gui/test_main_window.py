@@ -337,9 +337,9 @@ def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
     margins = window.centralWidget().layout().contentsMargins()
     assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (10, 0, 10, 0)
     assert window.macro_explorer_panel.minimumHeight() == window.preview_pane.maximumHeight()
+    assert window.macro_explorer_panel.maximumHeight() == window.preview_pane.maximumHeight()
     assert window.virtual_controller_panel.y() == window.preview_tool_log_pane.y()
     assert window.left_container.maximumHeight() > window.current_layout_metrics.center_height
-    assert window.macro_explorer_panel.maximumHeight() > window.current_layout_metrics.center_height
     assert (
         window.preview_tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
     )

@@ -106,7 +106,7 @@ def test_virtual_controller_uses_two_rows_for_main_controls(qtbot) -> None:
     assert pane.width() - pane.right_stick.geometry().right() >= 40
 
 
-def test_virtual_controller_places_l3_r3_on_trigger_row(qtbot) -> None:
+def test_virtual_controller_places_ls_rs_on_trigger_row(qtbot) -> None:
     pane = VirtualControllerPane(NullLoggerPort())
     qtbot.addWidget(pane)
 
@@ -121,7 +121,7 @@ def test_virtual_controller_places_l3_r3_on_trigger_row(qtbot) -> None:
         pane.btn_zr,
     ]
 
-    assert [button.text() for button in trigger_row] == ["ZL", "L", "L3", "R3", "R", "ZR"]
+    assert [button.text() for button in trigger_row] == ["ZL", "L", "LS", "RS", "R", "ZR"]
     assert [button.x() for button in trigger_row] == sorted(button.x() for button in trigger_row)
     assert (
         max(button.y() for button in trigger_row) - min(button.y() for button in trigger_row) <= 1

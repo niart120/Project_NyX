@@ -34,7 +34,7 @@
 
 `horizontal_surplus` は `window_width - (margin * 2 + left_width + preview_width + macro_log_width + gap * 2)` で算出する。余剰幅はプレビュー周囲の空白ではなく、左列と右マクロログへ半分ずつ加算する。プレビュー固定サイズは変更しない。
 
-縦方向はプレビュー高さを基準にする。左列では `macro_explorer_height = preview_height` とし、仮想コントローラ見出しの上端をプレビュー下ツールログ見出しと揃える。中央列では `center_height = preview_height + gap + preview_tool_log_height` を最小高として扱い、プレビュー下ツールログが余剰高さを吸収する。
+縦方向はプレビュー高さを基準にする。左列では `macro_explorer_height = preview_height` とし、マクロ一覧パネルをその高さに固定して、仮想コントローラ見出しの上端をプレビュー下ツールログ見出しと揃える。中央列では `center_height = preview_height + gap + preview_tool_log_height` を最小高として扱い、プレビュー下ツールログが余剰高さを吸収する。
 
 ## 4. 保存設定
 

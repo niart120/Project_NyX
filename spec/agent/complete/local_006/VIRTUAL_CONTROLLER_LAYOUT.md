@@ -86,7 +86,7 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 
 ### 基準座標
 
-主要操作部は横一列に詰め込まない。実際のゲームパッドに近い関係として、上段に `LStick` と `ABXY`、下段に `D-Pad` と `RStick` を置く。横幅 `280` の FullHD 基準でも D-Pad と ABXY が近接しすぎないよう、左右の操作クラスタを段で分ける。スティック押し込みは `LS` / `RS` より `L3` / `R3` の表示名にし、上段のトリガー列へ `ZL, L, L3, R3, R, ZR` の順で置く。
+主要操作部は横一列に詰め込まない。実際のゲームパッドに近い関係として、上段に `LStick` と `ABXY`、下段に `D-Pad` と `RStick` を置く。横幅 `280` の FullHD 基準でも D-Pad と ABXY が近接しすぎないよう、左右の操作クラスタを段で分ける。スティック押し込みは `LS` / `RS` の表示名にし、上段のトリガー列へ `ZL, L, LS, RS, R, ZR` の順で置く。
 
 | 部品 | 基準矩形 `(x, y, w, h)` |
 |------|--------------------------|
@@ -156,7 +156,7 @@ def configure_size(
 | GUI | `test_virtual_controller_button_sizes_scale_by_preset` | HD / FullHD の文字サイズを 1 point 上げ、4K では従来どおり段階的に大きくする |
 | GUI | `test_virtual_controller_layout_does_not_stretch_rows_vertically` | FullHD の `280x280` 領域でもトリガー、システム、主要操作が順序を保つ |
 | GUI | `test_virtual_controller_uses_two_rows_for_main_controls` | `LStick` と `ABXY` が上段、`D-Pad` と `RStick` が下段に並び、下段の中心軸が揃う |
-| GUI | `test_virtual_controller_places_l3_r3_on_trigger_row` | 上段に `ZL, L, L3, R3, R, ZR` の順で並ぶ |
+| GUI | `test_virtual_controller_places_ls_rs_on_trigger_row` | 上段に `ZL, L, LS, RS, R, ZR` の順で並ぶ |
 | GUI | `test_main_window_applies_virtual_controller_preset_metrics` | `MainWindow` のプリセット切替が仮想コントローラへ反映される |
 | GUI | `test_analog_stick_uses_scaled_center_after_resize` | サイズ変更後のスティック中心と最大移動距離が新サイズ基準になる |
 | GUI | `test_dpad_uses_scaled_hit_test_after_resize` | サイズ変更後の十字キー方向判定が新サイズ基準になる |
@@ -168,7 +168,7 @@ def configure_size(
 - [x] `DPad` の可変サイズ対応
 - [x] `ControllerButton` の可変サイズ・文字サイズ対応
 - [x] `VirtualControllerPane` の固定キャンバス配置化
-- [x] `L3` / `R3` をトリガー列へ移動
+- [x] `LS` / `RS` をトリガー列へ移動
 - [x] `MainWindow` からプリセットメトリクスを適用
 - [x] GUI レイアウト回帰テスト作成・パス
 - [x] 全体リント・テスト通過

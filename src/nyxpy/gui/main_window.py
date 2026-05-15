@@ -214,9 +214,7 @@ class MainWindow(QMainWindow):
         self.left_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         self.left_container.layout().setSpacing(metrics.gap)
         self.macro_explorer_panel.layout().setSpacing(metrics.gap)
-        self.macro_explorer_panel.setFixedWidth(left_width)
-        self.macro_explorer_panel.setMinimumHeight(metrics.macro_explorer_height)
-        self.macro_explorer_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.macro_explorer_panel.setFixedSize(left_width, metrics.macro_explorer_height)
         self.macro_browser.setMinimumHeight(
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
