@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nyxpy.gui.typography import apply_pane_title_font
+
 
 class MacroBrowserPane(QWidget):
     """
@@ -26,7 +28,9 @@ class MacroBrowserPane(QWidget):
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         header_layout = QHBoxLayout()
-        header_layout.addWidget(QLabel("マクロ", self))
+        self.title_label = QLabel("マクロ", self)
+        apply_pane_title_font(self.title_label)
+        header_layout.addWidget(self.title_label)
         header_layout.addStretch(1)
         self.reload_button = QPushButton(self)
         self.reload_button.setToolTip("マクロを再読み込み")

@@ -108,7 +108,7 @@ GUI 層内の変更に閉じる。framework 層、macro 層、実行時の `Comm
 | `dpad` | `(38, 158, 72, 72)` |
 | `right_stick` | `(174, 162, 64, 64)` |
 
-`AnalogStick` と `DPad` は、描画座標、中心座標、最大移動距離、dead zone を固定値ではなく自身の `width()` / `height()` から計算する。プリセット切替時は cached position を新しい中心へ戻す。
+`AnalogStick` と `DPad` は、描画座標、中心座標、最大移動距離、dead zone を固定値ではなく自身の `width()` / `height()` から計算する。プリセット切替時は cached position を新しい中心へ戻す。HD / FullHD のボタンラベルは従来より 1px 大きくし、最小プリセットでも `L3` / `R3` 等を読み取れるようにする。
 
 ### メインフロー
 
@@ -153,7 +153,7 @@ def configure_size(
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
 | GUI | `test_virtual_controller_preset_sizes_keep_children_inside_canvas` | 全プリセットで部品がキャンバス外へ出ない |
-| GUI | `test_virtual_controller_button_sizes_scale_by_preset` | HD / FullHD / 4K でボタンと文字サイズが段階的に変わる |
+| GUI | `test_virtual_controller_button_sizes_scale_by_preset` | HD / FullHD の文字サイズを 1px 上げ、4K では従来どおり段階的に大きくする |
 | GUI | `test_virtual_controller_layout_does_not_stretch_rows_vertically` | FullHD の `280x280` 領域でもトリガー、システム、主要操作が順序を保つ |
 | GUI | `test_virtual_controller_uses_two_rows_for_main_controls` | `LStick` と `ABXY` が上段、`D-Pad` と `RStick` が下段に並び、下段の中心軸が揃う |
 | GUI | `test_virtual_controller_places_l3_r3_on_trigger_row` | 上段に `ZL, L, L3, R3, R, ZR` の順で並ぶ |

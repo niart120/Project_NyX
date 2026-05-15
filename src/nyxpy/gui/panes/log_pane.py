@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from nyxpy.framework.core.logger import LogSinkDispatcher, TechnicalLog, UserEvent
 from nyxpy.gui.log_sink import GuiLogSink, connect_technical_event, connect_user_event
+from nyxpy.gui.typography import apply_pane_title_font, log_view_font
 
 
 class LogPane(QWidget):
@@ -38,8 +39,12 @@ class LogPane(QWidget):
         )
 
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         control_layout = QHBoxLayout()
-        control_layout.addWidget(QLabel(title, self))
+        control_layout.setContentsMargins(0, 0, 0, 0)
+        self.title_label = QLabel(title, self)
+        apply_pane_title_font(self.title_label)
+        control_layout.addWidget(self.title_label)
         self.auto_scroll_checkbox = QCheckBox("自動スクロール", self)
         self.auto_scroll_checkbox.setChecked(True)
         self.debug_checkbox = QCheckBox("デバッグログ表示", self)
@@ -54,6 +59,7 @@ class LogPane(QWidget):
 
         self.view = QPlainTextEdit(self)
         self.view.setReadOnly(True)
+        self.view.setFont(log_view_font())
         self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.view.setMinimumWidth(0)
         self.setMinimumWidth(0)

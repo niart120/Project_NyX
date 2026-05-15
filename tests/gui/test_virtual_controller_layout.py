@@ -54,17 +54,21 @@ def test_virtual_controller_button_sizes_scale_by_preset(qtbot) -> None:
     pane = VirtualControllerPane(NullLoggerPort())
     qtbot.addWidget(pane)
 
-    pane.apply_layout_size(260, 220)
+    pane.apply_layout_size(304, 220)
     hd_button_size = pane.btn_a.size()
     hd_style = pane.btn_a.styleSheet()
 
-    pane.apply_layout_size(420, 360)
+    pane.apply_layout_size(280, 280)
+    full_hd_style = pane.btn_a.styleSheet()
+
+    pane.apply_layout_size(538, 360)
     four_k_button_size = pane.btn_a.size()
     four_k_style = pane.btn_a.styleSheet()
 
     assert hd_button_size.width() < four_k_button_size.width()
     assert hd_button_size.height() < four_k_button_size.height()
-    assert "font-size: 8px" in hd_style
+    assert "font-size: 9px" in hd_style
+    assert "font-size: 10px" in full_hd_style
     assert "font-size: 14px" in four_k_style
 
 

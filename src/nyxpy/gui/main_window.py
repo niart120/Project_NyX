@@ -31,6 +31,7 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
+from nyxpy.gui.typography import apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
 
@@ -139,8 +140,16 @@ class MainWindow(QMainWindow):
         macro_panel_layout.addWidget(self.control_pane, 0)
         left_layout.addWidget(self.macro_explorer_panel, 1)
 
-        self.virtual_controller = VirtualControllerPane(self.logger, self)
-        left_layout.addWidget(self.virtual_controller, 0)
+        self.virtual_controller_panel = QWidget(self)
+        virtual_controller_layout = QVBoxLayout(self.virtual_controller_panel)
+        virtual_controller_layout.setContentsMargins(0, 0, 0, 0)
+        virtual_controller_layout.setSpacing(4)
+        self.controller_title_label = QLabel("コントローラー", self.virtual_controller_panel)
+        apply_pane_title_font(self.controller_title_label)
+        virtual_controller_layout.addWidget(self.controller_title_label, 0)
+        self.virtual_controller = VirtualControllerPane(self.logger, self.virtual_controller_panel)
+        virtual_controller_layout.addWidget(self.virtual_controller, 0)
+        left_layout.addWidget(self.virtual_controller_panel, 0)
         main_layout.addWidget(self.left_container)
 
         self.center_container = QWidget(self)
@@ -197,7 +206,7 @@ class MainWindow(QMainWindow):
             metrics.margin,
             metrics.margin,
             metrics.margin,
-            metrics.margin,
+            0,
         )
         self.centralWidget().layout().setSpacing(metrics.gap)
         self.left_container.setFixedWidth(left_width)
@@ -212,6 +221,7 @@ class MainWindow(QMainWindow):
             min(metrics.macro_explorer_min_height, metrics.macro_explorer_height)
         )
         self.virtual_controller.apply_layout_size(left_width, metrics.controller_height)
+        self.virtual_controller_panel.setFixedWidth(left_width)
         self.center_container.setFixedWidth(metrics.preview_width)
         self.center_container.setMinimumHeight(metrics.center_height)
         self.center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)

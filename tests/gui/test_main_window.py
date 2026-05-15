@@ -312,12 +312,26 @@ def test_preview_tool_log_does_not_span_under_controller(window: MainWindow):
 
     assert window.preview_tool_log_pane.parent() is window.center_container
     assert window.preview_tool_log_pane.maximumWidth() == 1280
+    margins = window.preview_tool_log_pane.layout().contentsMargins()
+    assert (margins.left(), margins.right()) == (0, 0)
     assert window.virtual_controller.maximumWidth() == 280
+
+
+def test_controller_pane_has_title_label(window: MainWindow):
+    assert window.controller_title_label.text() == "コントローラー"
+    assert window.controller_title_label.font().bold()
+    assert window.macro_browser.title_label.font().bold()
+    assert window.preview_tool_log_pane.title_label.font().bold()
+    assert window.log_pane.title_label.font().bold()
+    assert window.preview_tool_log_pane.view.font().fixedPitch()
+    assert window.log_pane.view.font().fixedPitch()
 
 
 def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
     window.apply_window_size_preset("full_hd")
 
+    margins = window.centralWidget().layout().contentsMargins()
+    assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (10, 10, 10, 0)
     assert window.left_container.maximumHeight() > window.current_layout_metrics.center_height
     assert window.macro_explorer_panel.maximumHeight() > window.current_layout_metrics.center_height
     assert (
