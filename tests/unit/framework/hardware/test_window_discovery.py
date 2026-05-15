@@ -119,7 +119,9 @@ def test_windows_list_works_without_windows_callback_type(monkeypatch) -> None:
 
 def test_default_windows_resolve_uses_identifier_without_enumerating(monkeypatch) -> None:
     expected = WindowInfo("Viewer", "100", CaptureRect(10, 20, 640, 480))
-    monkeypatch.setattr("nyxpy.framework.core.hardware.window_discovery.platform.system", lambda: "Windows")
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.window_discovery.platform.system", lambda: "Windows"
+    )
     monkeypatch.setattr(
         "nyxpy.framework.core.hardware.window_discovery._window_info_from_hwnd",
         lambda hwnd: expected if hwnd == 100 else None,

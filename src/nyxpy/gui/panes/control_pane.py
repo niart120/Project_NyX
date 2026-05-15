@@ -15,7 +15,7 @@ class RunUiState(Enum):
 
 class ControlPane(QWidget):
     """
-        Pane for macro control buttons: run, cancel, settings, snapshot.
+    Pane for macro control buttons: run, cancel, settings, snapshot.
     """
 
     run_requested = Signal()

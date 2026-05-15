@@ -81,4 +81,3 @@ class MacroBrowserPane(QWidget):
             return None
         item = self.table.item(row, 0)
         return item.text() if item is not None else None
-

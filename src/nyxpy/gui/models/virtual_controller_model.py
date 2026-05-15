@@ -114,4 +114,3 @@ class VirtualControllerModel(QObject):
                 exc=e,
             )
             raise
-

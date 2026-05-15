@@ -75,8 +75,6 @@ def test_device_discovery_lists_capture_target_windows_separately() -> None:
 
     windows = discovery.detect_window_sources(timeout_sec=1.0)
 
-    assert windows == (
-        WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720)),
-    )
+    assert windows == (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720)),)
     assert discovery.capture_names() == []
     assert window_locator.calls == 1

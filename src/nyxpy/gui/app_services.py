@@ -63,10 +63,14 @@ CONTROLLER_SETTING_KEYS = frozenset(
     }
 )
 
-RUNTIME_BUILDER_SETTING_KEYS = FRAME_SOURCE_SETTING_KEYS | CONTROLLER_SETTING_KEYS | frozenset(
-    {
-        "runtime.allow_dummy",
-    }
+RUNTIME_BUILDER_SETTING_KEYS = (
+    FRAME_SOURCE_SETTING_KEYS
+    | CONTROLLER_SETTING_KEYS
+    | frozenset(
+        {
+            "runtime.allow_dummy",
+        }
+    )
 )
 
 

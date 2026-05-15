@@ -26,7 +26,10 @@ def test_application_code_does_not_import_removed_apis() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name in REMOVED_IMPORTS or alias.name.rsplit(".", 1)[-1] in REMOVED_NAMES:
+                    if (
+                        alias.name in REMOVED_IMPORTS
+                        or alias.name.rsplit(".", 1)[-1] in REMOVED_NAMES
+                    ):
                         violations.append(f"{path}: import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""

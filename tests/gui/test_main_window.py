@@ -362,7 +362,10 @@ def test_macro_explorer_footer_disables_snapshot_while_running(window: MainWindo
 def test_macro_explorer_footer_wraps_on_hd(window: MainWindow):
     window.apply_window_size_preset("hd")
 
-    assert window.control_pane._layout.itemAtPosition(1, 0).widget() is window.control_pane.snapshot_btn
+    assert (
+        window.control_pane._layout.itemAtPosition(1, 0).widget()
+        is window.control_pane.snapshot_btn
+    )
 
 
 def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):

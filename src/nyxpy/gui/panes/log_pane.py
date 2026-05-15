@@ -110,4 +110,6 @@ class LogPane(QWidget):
 
 
 def _is_macro_user_event(event: UserEvent) -> bool:
-    return event.macro_id is not None or event.run_id is not None or event.event.startswith("macro.")
+    return (
+        event.macro_id is not None or event.run_id is not None or event.event.startswith("macro.")
+    )

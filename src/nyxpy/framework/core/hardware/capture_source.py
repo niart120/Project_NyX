@@ -95,7 +95,9 @@ class CaptureSourceKey:
                 identifier = source.identifier
                 return cls(
                     source_type="window",
-                    identifier=str(identifier if identifier not in (None, "") else source.title_pattern),
+                    identifier=str(
+                        identifier if identifier not in (None, "") else source.title_pattern
+                    ),
                     backend=source.backend,
                     fps=source.fps,
                     match_mode=source.match_mode,

@@ -193,7 +193,9 @@ def _window_hwnd(value: object) -> int | None:
     return hwnd if hwnd > 0 else None
 
 
-def _crop_to_client_area(frame: cv2.typing.MatLike, window: WindowInfo | None) -> cv2.typing.MatLike:
+def _crop_to_client_area(
+    frame: cv2.typing.MatLike, window: WindowInfo | None
+) -> cv2.typing.MatLike:
     if window is None or window.window_rect is None:
         return frame
     if frame.shape[1] == window.rect.width and frame.shape[0] == window.rect.height:
