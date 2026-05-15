@@ -34,7 +34,7 @@ class NotificationHandler:
                     event="notification.failed",
                     extra={"notifier": type(notifier).__name__},
                     exc=exc,
-            )
+                )
 
 
 class NotificationSettings(Protocol):

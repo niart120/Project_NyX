@@ -13,26 +13,39 @@ class AnalogStick(QWidget):
     def __init__(self, parent: QWidget | None = None, is_left: bool = True) -> None:
         super().__init__(parent)
         self.is_left = is_left
-        self.setFixedSize(60, 60)
-        self.position = QPointF(30, 30)  # 中央位置
+        self._diameter = 60
+        self.position = self._center()
         self.dragging = False
         self.setMouseTracking(True)
 
         # スティックの色
         self.stick_color = QColor(0, 120, 215) if is_left else QColor(215, 0, 0)
+        self.set_diameter(self._diameter)
+
+    def set_diameter(self, diameter: int) -> None:
+        self._diameter = diameter
+        self.setFixedSize(diameter, diameter)
+        self.position = self._center()
+        self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # ベース円の描画
-        base_rect = QRectF(5, 5, 50, 50)
+        diameter = min(self.width(), self.height())
+        inset = diameter * 5 / 60
+        base_rect = QRectF(inset, inset, diameter - inset * 2, diameter - inset * 2)
         painter.setPen(QPen(QColor(80, 80, 80), 2))
         painter.setBrush(QBrush(QColor(50, 50, 50)))
         painter.drawEllipse(base_rect)
 
-        # スティックの描画
-        stick_rect = QRectF(self.position.x() - 10, self.position.y() - 10, 20, 20)
+        stick_radius = diameter * 10 / 60
+        stick_rect = QRectF(
+            self.position.x() - stick_radius,
+            self.position.y() - stick_radius,
+            stick_radius * 2,
+            stick_radius * 2,
+        )
         painter.setPen(QPen(QColor(100, 100, 100), 2))
         painter.setBrush(QBrush(self.stick_color))
         painter.drawEllipse(stick_rect)
@@ -49,21 +62,17 @@ class AnalogStick(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton and self.dragging:
             self.dragging = False
-            # スティックを中央に戻す
-            self.position = QPointF(30, 30)
+            self.position = self._center()
             self.update()
             self.valueChanged.emit(0.0, 0.0)  # 角度0、強さ0を送信
 
     def updateStickPosition(self, pos: QPointF) -> None:
-        # スティック範囲内に収める
-        center = QPointF(30, 30)
+        center = self._center()
         vector = QPointF(pos.x() - center.x(), pos.y() - center.y())
 
-        # 距離を計算
         distance = math.sqrt(vector.x() * vector.x() + vector.y() * vector.y())
-        max_distance = 20.0
+        max_distance = self._max_distance()
 
-        # 最大範囲に制限
         if distance > max_distance:
             vector = vector * (max_distance / distance)
 
@@ -80,3 +89,9 @@ class AnalogStick(QWidget):
             self.valueChanged.emit(0.0, 0.0)
 
         self.update()
+
+    def _center(self) -> QPointF:
+        return QPointF(self.width() / 2, self.height() / 2)
+
+    def _max_distance(self) -> float:
+        return min(self.width(), self.height()) / 3

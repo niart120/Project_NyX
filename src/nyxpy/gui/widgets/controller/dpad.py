@@ -1,6 +1,6 @@
 import math
 
-from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -22,36 +22,52 @@ class DPad(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFixedSize(70, 70)
+        self.set_diameter(70)
         self.current_direction: Hat = Hat.CENTER
         self.pressed: bool = False
+
+    def set_diameter(self, diameter: int) -> None:
+        self.setFixedSize(diameter, diameter)
+        self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        unit = min(self.width(), self.height()) / 70
 
         # 基本の十字形を描画
         painter.setPen(QPen(QColor(80, 80, 80), 2))
         painter.setBrush(QBrush(QColor(60, 60, 60)))
 
-        # 中央円
-        painter.drawEllipse(27, 27, 16, 16)
+        painter.drawEllipse(QRectF(27 * unit, 27 * unit, 16 * unit, 16 * unit))
 
-        # 上方向
         up_path = QPainterPath()
-        up_path.addRoundedRect(27, 5, 16, 25, 5, 5)
+        up_path.addRoundedRect(
+            QRectF(27 * unit, 5 * unit, 16 * unit, 25 * unit),
+            5 * unit,
+            5 * unit,
+        )
 
-        # 右方向
         right_path = QPainterPath()
-        right_path.addRoundedRect(40, 27, 25, 16, 5, 5)
+        right_path.addRoundedRect(
+            QRectF(40 * unit, 27 * unit, 25 * unit, 16 * unit),
+            5 * unit,
+            5 * unit,
+        )
 
-        # 下方向
         down_path = QPainterPath()
-        down_path.addRoundedRect(27, 40, 16, 25, 5, 5)
+        down_path.addRoundedRect(
+            QRectF(27 * unit, 40 * unit, 16 * unit, 25 * unit),
+            5 * unit,
+            5 * unit,
+        )
 
-        # 左方向
         left_path = QPainterPath()
-        left_path.addRoundedRect(5, 27, 25, 16, 5, 5)
+        left_path.addRoundedRect(
+            QRectF(5 * unit, 27 * unit, 25 * unit, 16 * unit),
+            5 * unit,
+            5 * unit,
+        )
 
         # 押されている方向の色を変更
         if self.current_direction != Hat.CENTER:
@@ -102,11 +118,12 @@ class DPad(QWidget):
             self.directionChanged.emit(Hat.CENTER)
 
     def updateDirection(self, pos: QPointF) -> None:
-        center_x, center_y = 35, 35
+        center_x = self.width() / 2
+        center_y = self.height() / 2
         x, y = pos.x() - center_x, pos.y() - center_y
 
-        # 押された位置に基づいて方向を判定
-        if abs(x) < 8 and abs(y) < 8:  # 中央エリア
+        dead_zone = min(self.width(), self.height()) * 8 / 70
+        if abs(x) < dead_zone and abs(y) < dead_zone:
             direction = Hat.CENTER
         else:
             angle = math.atan2(y, x)

@@ -12,6 +12,7 @@ from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.app_services import SettingsApplyOutcome
+from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
 from nyxpy.gui.main_window import MainWindow
 from nyxpy.gui.panes.control_pane import RunUiState
 
@@ -49,6 +50,13 @@ class FakeSettings:
                 "gui_poll_interval_ms": 100,
                 "gui_close_wait_timeout_sec": 1.25,
             },
+            "gui": {
+                "window_size_preset": "full_hd",
+            },
+            "capture_device": "",
+            "capture_source_type": "camera",
+            "capture_window_title": "",
+            "serial_device": "",
         }
 
     def get(self, key: str, default=None):
@@ -58,6 +66,17 @@ class FakeSettings:
                 return default
             value = value[part]
         return value
+
+    def set(self, key: str, value):
+        current = self.data
+        parts = key.split(".")
+        for part in parts[:-1]:
+            nested = current.get(part)
+            if not isinstance(nested, dict):
+                nested = {}
+                current[part] = nested
+            current = nested
+        current[parts[-1]] = value
 
 
 class FakeSecrets:
@@ -228,16 +247,215 @@ def test_initial_ui_state(window: MainWindow):
     assert window.control_pane.snapshot_btn.isEnabled()
 
 
+def test_main_window_applies_saved_window_size_preset(qtbot, services: FakeServices):
+    services.global_settings.set("gui.window_size_preset", "hd")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.current_window_size_preset_key == "hd"
+    assert w.minimumWidth() == 1280
+    assert w.maximumWidth() == 1280
+    assert w.minimumHeight() == 720
+    assert w.maximumHeight() == 720
+    w.preview_pane.timer.stop()
+
+
+def test_window_size_menu_updates_settings(window: MainWindow, services: FakeServices):
+    window.window_size_actions["wqhd"].trigger()
+
+    assert services.global_settings.get("gui.window_size_preset") == "wqhd"
+    assert window.current_window_size_preset_key == "wqhd"
+
+
 def test_run_button_enabled_on_selection(window: MainWindow):
     window.macro_browser.table.selectRow(0)
     assert window.control_pane.run_btn.isEnabled()
 
 
-def test_search_filter(window: MainWindow):
-    window.macro_browser.search_box.setText("nomatch")
-    assert window.macro_browser.table.isRowHidden(0)
-    window.macro_browser.search_box.clear()
-    assert not window.macro_browser.table.isRowHidden(0)
+def test_macro_search_is_not_rendered_in_initial_layout(window: MainWindow):
+    assert not hasattr(window.macro_browser, "search_box")
+
+
+def test_connection_status_is_not_rendered_in_macro_explorer(window: MainWindow):
+    macro_panel_text = " ".join(
+        item.text()
+        for item in window.macro_browser.findChildren(type(window.macro_browser.reload_button))
+    )
+    assert "シリアル" not in macro_panel_text
+    assert "映像" not in macro_panel_text
+
+
+def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServices):
+    services.global_settings.set("capture_device", "USB Video Device")
+    services.global_settings.set("serial_device", "COM6")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_status_label.text() == "映像: USB Video Device 接続中"
+    assert w.serial_status_label.text() == "シリアル: COM6 接続中"
+    w.preview_pane.timer.stop()
+
+
+def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
+    window.apply_window_size_preset("hd")
+
+    assert window.left_center_container.maximumWidth() == 952
+    assert window.left_center_container.layout().columnMinimumWidth(0) == 304
+    assert window.left_center_container.layout().columnMinimumWidth(1) == 640
+    assert window.preview_pane.maximumWidth() == 640
+    assert window.tool_log_pane.maximumWidth() == 304
+    assert window.centralWidget().layout().spacing() == 8
+
+
+def test_bottom_macro_log_does_not_span_under_controller(window: MainWindow):
+    window.apply_window_size_preset("full_hd")
+
+    assert window.macro_log_pane.parent() is window.left_center_container
+    assert window.macro_log_pane.maximumWidth() == 1280
+    margins = window.macro_log_pane.layout().contentsMargins()
+    assert (margins.left(), margins.right()) == (0, 0)
+    assert (
+        window.virtual_controller_panel.maximumHeight()
+        > window.current_layout_metrics.center_height
+    )
+
+
+def test_controller_pane_has_title_label(window: MainWindow):
+    assert window.controller_title_label.text() == "コントローラー"
+    assert window.controller_title_label.indent() == LEFT_PANE_CONTENT_MARGIN
+    assert window.controller_title_label.font().bold()
+    assert window.macro_browser.title_label.font().bold()
+    assert window.macro_log_pane.title_label.font().bold()
+    assert window.tool_log_pane.title_label.font().bold()
+    assert window.macro_log_pane.view.font().fixedPitch()
+    assert window.tool_log_pane.view.font().fixedPitch()
+    assert window.controller_title_label.height() == window.macro_log_pane.title_label.height()
+    assert window.controller_title_label.height() == window.tool_log_pane.title_label.height()
+
+
+def test_left_column_content_edges_align(window: MainWindow, qtbot):
+    window.show()
+    qtbot.waitUntil(lambda: window.macro_browser.table.width() > 0, timeout=1000)
+
+    assert window.macro_browser.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
+    assert window.control_pane.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
+    assert (
+        window.control_pane.run_btn.geometry().left()
+        == window.macro_browser.table.geometry().left()
+    )
+    assert (
+        window.control_pane.settings_btn.geometry().right()
+        == window.macro_browser.table.geometry().right()
+    )
+
+
+def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):
+    window.apply_window_size_preset("full_hd")
+
+    margins = window.centralWidget().layout().contentsMargins()
+    assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (10, 0, 10, 0)
+    assert window.macro_explorer_panel.minimumHeight() == window.preview_pane.maximumHeight()
+    assert window.macro_explorer_panel.maximumHeight() == window.preview_pane.maximumHeight()
+    grid = window.left_center_container.layout()
+    assert grid.itemAtPosition(1, 0).widget() is window.virtual_controller_panel
+    assert grid.itemAtPosition(1, 1).widget() is window.macro_log_pane
+    assert (
+        window.left_center_container.maximumHeight() > window.current_layout_metrics.center_height
+    )
+    assert window.macro_log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    assert window.tool_log_pane.maximumHeight() > window.current_layout_metrics.center_height
+    assert (
+        window.macro_explorer_panel.minimumHeight()
+        == window.current_layout_metrics.macro_explorer_height
+    )
+    assert (
+        window.macro_log_pane.minimumHeight()
+        == window.current_layout_metrics.bottom_macro_log_min_height
+    )
+
+
+def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindow):
+    window.apply_window_size_preset("four_k")
+
+    assert window.virtual_controller.maximumWidth() == 538
+    assert window.virtual_controller.maximumHeight() == 320
+    assert window.virtual_controller.btn_a.width() == 37
+    window.virtual_controller_panel.apply_layout_size(538, 420)
+    assert window.virtual_controller.maximumHeight() == 420
+    assert window.virtual_controller.btn_a.width() > 37
+
+    window.apply_window_size_preset("hd")
+
+    assert window.virtual_controller.maximumWidth() == 304
+    assert window.virtual_controller.maximumHeight() == 120
+    assert window.virtual_controller.btn_a.width() == 14
+
+
+def test_virtual_controller_relayouts_after_initial_geometry(qtbot, services: FakeServices):
+    services.global_settings.set("gui.window_size_preset", "full_hd")
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+    try:
+        w.show()
+
+        qtbot.waitUntil(
+            lambda: (
+                w.virtual_controller.maximumHeight()
+                == w.virtual_controller_panel.height() - w.controller_title_label.height()
+            ),
+            timeout=1000,
+        )
+
+        assert w.virtual_controller.maximumWidth() == w.virtual_controller_panel.width()
+    finally:
+        w.preview_pane.timer.stop()
+
+
+def test_macro_explorer_footer_disables_settings_while_running(window: MainWindow):
+    window.control_pane.set_run_state(RunUiState.RUNNING)
+
+    assert not window.control_pane.settings_btn.isEnabled()
+
+
+def test_macro_explorer_footer_disables_snapshot_while_running(window: MainWindow):
+    window.control_pane.set_run_state(RunUiState.RUNNING)
+
+    assert not window.control_pane.snapshot_btn.isEnabled()
+
+
+@pytest.mark.parametrize("preset_key", ["hd", "full_hd", "wqhd", "four_k"])
+def test_macro_explorer_footer_uses_2x2_grid_for_all_presets(window: MainWindow, preset_key: str):
+    window.apply_window_size_preset(preset_key)
+
+    assert window.control_pane._layout.itemAtPosition(0, 0).widget() is window.control_pane.run_btn
+    assert (
+        window.control_pane._layout.itemAtPosition(0, 1).widget() is window.control_pane.cancel_btn
+    )
+    assert (
+        window.control_pane._layout.itemAtPosition(1, 0).widget()
+        is window.control_pane.snapshot_btn
+    )
+    assert (
+        window.control_pane._layout.itemAtPosition(1, 1).widget()
+        is window.control_pane.settings_btn
+    )
+    assert window.control_pane._layout.itemAtPosition(0, 2) is None
+
+
+def test_macro_explorer_footer_unifies_control_button_height(window: MainWindow):
+    buttons = [
+        window.control_pane.run_btn,
+        window.control_pane.cancel_btn,
+        window.control_pane.snapshot_btn,
+        window.control_pane.settings_btn,
+    ]
+
+    assert {button.minimumHeight() for button in buttons} == {34}
+    assert {button.maximumHeight() for button in buttons} == {34}
+    assert window.control_pane.run_btn.mainButton.maximumHeight() == 34
+    assert window.control_pane.run_btn.dropdownButton.maximumHeight() == 34
 
 
 def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):
@@ -372,7 +590,7 @@ def test_apply_settings_logs_apply_exception(window: MainWindow, services: FakeS
 
     window.apply_app_settings()
 
-    assert window.status_label.text() == "設定を反映できません"
+    assert window.status_label.text() == "設定を反映できません: settings failed"
     assert services.logger.technical_events[-1][3] == "configuration.apply_failed"
 
 
@@ -418,6 +636,50 @@ def test_apply_settings_updates_ports_without_pause_when_capture_unchanged(
 
     window.preview_pane.pause.assert_not_called()
     window.preview_pane.resume.assert_not_called()
+
+
+def test_apply_settings_reports_preview_connection_failure(
+    window: MainWindow, services: FakeServices
+):
+    error = RuntimeError("window capture failed to start")
+    services.next_apply_outcome = SettingsApplyOutcome(
+        changed_keys=frozenset({"capture_window_title"}),
+        builder_replaced=True,
+        frame_source_changed=True,
+        preview_frame_source=None,
+        manual_controller=object(),
+        preview_error=error,
+    )
+    window.preview_pane.pause = MagicMock()
+    window.preview_pane.set_frame_source = MagicMock()
+    window.preview_pane.resume = MagicMock()
+
+    window.apply_app_settings()
+
+    window.preview_pane.pause.assert_called_once_with()
+    window.preview_pane.set_frame_source.assert_called_once_with(None)
+    window.preview_pane.resume.assert_not_called()
+    assert window.capture_status_label.text() == "映像: 接続失敗 (window capture failed to start)"
+
+
+def test_apply_settings_reports_manual_controller_failure(
+    window: MainWindow, services: FakeServices
+):
+    error = RuntimeError("serial device not found")
+    services.next_apply_outcome = SettingsApplyOutcome(
+        changed_keys=frozenset({"serial_device"}),
+        builder_replaced=True,
+        frame_source_changed=False,
+        preview_frame_source=object(),
+        manual_controller=None,
+        manual_controller_error=error,
+    )
+    window.virtual_controller.model.set_controller = MagicMock()
+
+    window.apply_app_settings()
+
+    window.virtual_controller.model.set_controller.assert_called_once_with(None)
+    assert window.serial_status_label.text() == "シリアル: 接続失敗 (serial device not found)"
 
 
 def test_close_cancels_and_waits_with_configured_timeout(

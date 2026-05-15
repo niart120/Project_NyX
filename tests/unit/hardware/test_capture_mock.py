@@ -77,7 +77,9 @@ def test_async_capture_device_initialize_failure():
         new=DummyVideoCaptureNotOpened,
     ):
         device = CameraCaptureDevice(device_index=1)
-        with pytest.raises(RuntimeError, match="CameraCaptureDevice: Device 1 could not be opened."):
+        with pytest.raises(
+            RuntimeError, match="CameraCaptureDevice: Device 1 could not be opened."
+        ):
             device.initialize()
 
 

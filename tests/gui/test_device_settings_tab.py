@@ -63,7 +63,9 @@ def test_device_settings_tab_shows_capture_source_type(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    assert [tab.capture_source_type.itemText(i) for i in range(tab.capture_source_type.count())] == [
+    assert [
+        tab.capture_source_type.itemText(i) for i in range(tab.capture_source_type.count())
+    ] == [
         "camera",
         "window",
         "screen_region",

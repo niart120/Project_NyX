@@ -17,36 +17,32 @@ class ControllerButton(QPushButton):
     ) -> None:
         super().__init__(text, parent)
         self.button_type = button_type
-        self.setFixedSize(size[0], size[1])
+        self.is_rectangular = is_rectangular
+        self.configure_size(size, radius=radius, font_point_size=9)
 
-        # 四角形か円形かによってスタイルを変更
-        if is_rectangular:
-            self.setStyleSheet("""        
-                QPushButton {{
-                    background-color: #444;
-                    color: white;
-                    border-radius: 5px;
-                    border: 2px solid #555;
-                    font-size: 9px;
-                    font-weight: bold;
-                }}
-                QPushButton:pressed {{
-                    background-color: #666;
-                    border: 2px solid #888;
-                }}
-            """)
-        else:
-            self.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: #444;
-                    color: white;
-                    border-radius: {radius}px;
-                    border: 2px solid #555;
-                    font-size: 9px;
-                    font-weight: bold;
-                }}
-                QPushButton:pressed {{
-                    background-color: #666;
-                    border: 2px solid #888;
-                }}
-            """)
+    def configure_size(
+        self,
+        size: tuple[int, int],
+        *,
+        radius: int,
+        font_point_size: int,
+    ) -> None:
+        self.setFixedSize(size[0], size[1])
+        font = self.font()
+        font.setBold(True)
+        font.setPointSize(font_point_size)
+        self.setFont(font)
+        radius_px = min(radius, max(1, min(size) // 2))
+        border_radius = min(5, radius_px) if self.is_rectangular else radius_px
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #444;
+                color: white;
+                border-radius: {border_radius}px;
+                border: 2px solid #555;
+            }}
+            QPushButton:pressed {{
+                background-color: #666;
+                border: 2px solid #888;
+            }}
+        """)

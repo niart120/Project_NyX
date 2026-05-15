@@ -125,8 +125,13 @@ class MacroRuntimeBuilder:
 
     def frame_source_for_preview(self) -> FrameSourcePort | None:
         if self._preview_frame_source is None and self._preview_frame_source_factory is not None:
-            self._preview_frame_source = self._preview_frame_source_factory()
-            self._preview_frame_source.initialize()
+            frame_source = self._preview_frame_source_factory()
+            try:
+                frame_source.initialize()
+            except Exception:
+                frame_source.close()
+                raise
+            self._preview_frame_source = frame_source
         return self._preview_frame_source
 
     def controller_output_for_manual_input(self) -> ControllerOutputPort | None:
@@ -185,9 +190,7 @@ def create_device_runtime_builder(
     capture_source_type = str(settings_snapshot.get("capture_source_type", "camera") or "camera")
     capture_source = capture_source_from_settings(
         settings_snapshot,
-        capture_name_override=resolved_capture_name
-        if capture_source_type == "camera"
-        else None,
+        capture_name_override=resolved_capture_name if capture_source_type == "camera" else None,
     )
     resolved_baudrate = _optional_int(
         baudrate if baudrate is not None else settings_snapshot.get("serial_baud")

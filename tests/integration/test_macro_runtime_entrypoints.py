@@ -31,9 +31,8 @@ def test_gui_cli_runtime_builder_paths_do_not_resolve_devices_directly() -> None
     from nyxpy.gui.main_window import MainWindow
 
     cli_source = inspect.getsource(create_runtime_builder)
-    gui_source = (
-        inspect.getsource(GuiAppServices._replace_runtime_builder)
-        + inspect.getsource(MainWindow._start_macro)
+    gui_source = inspect.getsource(GuiAppServices._replace_runtime_builder) + inspect.getsource(
+        MainWindow._start_macro
     )
 
     assert "get_active_device" not in cli_source

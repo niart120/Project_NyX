@@ -65,7 +65,9 @@ class DeviceSettingsTab(QWidget):
 
         self.window_match_mode = QComboBox()
         self.window_match_mode.addItems(["exact", "contains"])
-        self.window_match_mode.setCurrentText(self.settings.get("capture_window_match_mode", "exact"))
+        self.window_match_mode.setCurrentText(
+            self.settings.get("capture_window_match_mode", "exact")
+        )
         cap_form.addRow(QLabel("Window Match:"), self.window_match_mode)
 
         self.capture_backend = QComboBox()
@@ -75,8 +77,12 @@ class DeviceSettingsTab(QWidget):
 
         region_row = QHBoxLayout()
         region = self.settings.get("capture_region", {})
-        self.region_left = self._region_spinbox(region.get("left", 0) if isinstance(region, dict) else 0)
-        self.region_top = self._region_spinbox(region.get("top", 0) if isinstance(region, dict) else 0)
+        self.region_left = self._region_spinbox(
+            region.get("left", 0) if isinstance(region, dict) else 0
+        )
+        self.region_top = self._region_spinbox(
+            region.get("top", 0) if isinstance(region, dict) else 0
+        )
         self.region_width = self._region_spinbox(
             region.get("width", 1280) if isinstance(region, dict) else 1280,
             minimum=1,

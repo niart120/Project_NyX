@@ -65,6 +65,7 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             "INFO",
             choices=("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
         ),
+        "gui.window_size_preset": SettingField("gui.window_size_preset", str, "full_hd"),
     }
 )
 

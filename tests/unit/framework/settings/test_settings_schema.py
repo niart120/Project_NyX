@@ -22,6 +22,7 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
     assert snapshot["capture_aspect_box_enabled"] is False
     assert snapshot["capture_region"] == {}
     assert snapshot["runtime"]["allow_dummy"] is False
+    assert snapshot["gui"]["window_size_preset"] == "full_hd"
     assert isinstance(snapshot, MappingProxyType)
     with pytest.raises(TypeError):
         snapshot["serial_baud"] = 115200

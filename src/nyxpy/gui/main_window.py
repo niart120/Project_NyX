@@ -1,13 +1,15 @@
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -19,11 +21,68 @@ from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.app_services import GuiAppServices, SettingsApplyOutcome
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
+from nyxpy.gui.layout import (
+    DEFAULT_WINDOW_SIZE_PRESET_KEY,
+    LEFT_PANE_CONTENT_MARGIN,
+    WINDOW_SIZE_PRESETS,
+    layout_metrics_for_key,
+    normalize_window_size_preset_key,
+    window_size_preset_for_key,
+)
 from nyxpy.gui.panes.control_pane import ControlPane, RunUiState
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
+from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
+
+_UNBOUNDED_WIDGET_HEIGHT = 16777215
+
+
+class _VirtualControllerPanel(QWidget):
+    def __init__(
+        self,
+        logger,
+        parent: QWidget | None = None,
+        *,
+        title_indent: int = 0,
+    ) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.title_label = QLabel("コントローラー", self)
+        apply_pane_title_font(self.title_label)
+        self.title_label.setIndent(title_indent)
+        layout.addWidget(self.title_label, 0)
+        self.controller = VirtualControllerPane(logger, self)
+        layout.addWidget(
+            self.controller,
+            1,
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+        )
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self._last_controller_size: tuple[int, int] | None = None
+
+    def apply_layout_size(self, width: int, body_height: int) -> None:
+        width = max(1, width)
+        body_height = max(1, body_height)
+        size = (width, body_height)
+        if self._last_controller_size == size:
+            return
+        self._last_controller_size = size
+        self.controller.apply_layout_size(width, body_height)
+
+    def relayout_to_current_geometry(self) -> None:
+        self.apply_layout_size(self.width(), self.height() - PANE_TITLE_HEIGHT)
+
+    def showEvent(self, event) -> None:
+        QTimer.singleShot(0, self.relayout_to_current_geometry)
+        super().showEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        self.relayout_to_current_geometry()
+        super().resizeEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -49,6 +108,21 @@ class MainWindow(QMainWindow):
         self.macro_catalog = self.services.macro_catalog
         self.run_handle: RunHandle | None = None
         self.last_run_result: RunResult | None = None
+        self.preview_connection_error: BaseException | None = None
+        self.manual_controller_error: BaseException | None = None
+        self.window_size_actions: dict[str, QAction] = {}
+        self.window_size_action_group: QActionGroup | None = None
+        self.current_window_size_preset_key = normalize_window_size_preset_key(
+            self.global_settings.get(
+                "gui.window_size_preset",
+                DEFAULT_WINDOW_SIZE_PRESET_KEY,
+            )
+        )
+        if (
+            self.global_settings.get("gui.window_size_preset")
+            != self.current_window_size_preset_key
+        ):
+            self.global_settings.set("gui.window_size_preset", self.current_window_size_preset_key)
         self._run_poll_timer = QTimer(self)
         self._run_poll_timer.timeout.connect(self._poll_run_handle)
         self.setup_ui()
@@ -59,65 +133,187 @@ class MainWindow(QMainWindow):
         self.setup_connections()  # Setup signal connections between UI components
         self.apply_app_settings()
 
-    def setup_ui(self):
-        self.setWindowTitle("NyxPy GUI")
-        self.resize(1280, 720)
-        self.setMinimumSize(800, 400)
-
+    def _build_menu_bar(self) -> None:
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.open_app_settings)
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(settings_action)
 
+        view_menu = self.menuBar().addMenu("表示")
+        self.window_size_action_group = QActionGroup(self)
+        self.window_size_action_group.setExclusive(True)
+        for preset in WINDOW_SIZE_PRESETS:
+            action = QAction(preset.label, self)
+            action.setCheckable(True)
+            action.setData(preset.key)
+            action.triggered.connect(
+                lambda checked=False, key=preset.key: self.apply_window_size_preset(key)
+            )
+            self.window_size_action_group.addAction(action)
+            self.window_size_actions[preset.key] = action
+            view_menu.addAction(action)
+
+    def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
+        preset_key = normalize_window_size_preset_key(key)
+        preset = window_size_preset_for_key(preset_key)
+        self.current_window_size_preset_key = preset_key
+        self.current_layout_metrics = layout_metrics_for_key(preset_key)
+        self.setFixedSize(preset.window_width, preset.window_height)
+        self._apply_layout_metrics_to_panes()
+        action = self.window_size_actions.get(preset_key)
+        if action is not None:
+            action.setChecked(True)
+        if save and self.global_settings.get("gui.window_size_preset") != preset_key:
+            self.global_settings.set("gui.window_size_preset", preset_key)
+
+    def setup_ui(self):
+        self.setWindowTitle("NyxPy GUI")
+        self._build_menu_bar()
+        self.apply_window_size_preset(self.current_window_size_preset_key, save=False)
+
         central = QWidget()
         main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         self.setCentralWidget(central)
 
-        # Left container: macro browser, controls, and virtual controller
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
+        self.left_center_container = QWidget()
+        left_center_layout = QGridLayout(self.left_center_container)
+        left_center_layout.setContentsMargins(0, 0, 0, 0)
         self.macro_browser = MacroBrowserPane(self.macro_catalog, self)
-        # Give macro_browser vertical stretch so it fills the pane
-        left_layout.addWidget(self.macro_browser, 1)
+        self.control_pane = ControlPane(
+            self,
+            horizontal_margin=LEFT_PANE_CONTENT_MARGIN,
+        )
+        self.macro_explorer_panel = QWidget(self)
+        macro_panel_layout = QVBoxLayout(self.macro_explorer_panel)
+        macro_panel_layout.setContentsMargins(0, 0, 0, 0)
+        macro_panel_layout.addWidget(self.macro_browser, 1)
+        macro_panel_layout.addWidget(self.control_pane, 0)
+        left_center_layout.addWidget(self.macro_explorer_panel, 0, 0)
 
-        # 仮想コントローラーペインを作成
-        self.virtual_controller = VirtualControllerPane(self.logger, self)
+        self.virtual_controller_panel = _VirtualControllerPanel(
+            self.logger,
+            self.left_center_container,
+            title_indent=LEFT_PANE_CONTENT_MARGIN,
+        )
+        self.controller_title_label = self.virtual_controller_panel.title_label
+        self.virtual_controller = self.virtual_controller_panel.controller
+        left_center_layout.addWidget(self.virtual_controller_panel, 1, 0)
 
-        # Control pane and Virtual Controller in lower section
-        lower_section = QVBoxLayout()
-
-        # Control pane at bottom with default stretch
-        self.control_pane = ControlPane(self)
-        lower_section.addWidget(self.control_pane)
-
-        # 仮想コントローラーを下部に追加
-        lower_section.addWidget(self.virtual_controller)
-
-        left_layout.addLayout(lower_section)
-        main_layout.addWidget(left_container)
-
-        # Right pane: preview and log
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-        # Preview pane replaces direct label
         self.preview_pane = PreviewPane(
-            parent=self,
+            parent=self.left_center_container,
             preview_fps=self.global_settings.get("preview_fps", 30),
         )
-        right_layout.addWidget(self.preview_pane, stretch=1)
+        left_center_layout.addWidget(
+            self.preview_pane,
+            0,
+            1,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+        )
+        self.macro_log_pane = LogPane(
+            self.logging.dispatcher,
+            self.left_center_container,
+            title="マクロログ",
+            kind="macro",
+        )
+        left_center_layout.addWidget(
+            self.macro_log_pane,
+            1,
+            1,
+            Qt.AlignmentFlag.AlignLeft,
+        )
+        main_layout.addWidget(self.left_center_container)
 
-        # Log pane
-        self.log_pane = LogPane(self.logging.dispatcher, self)
-        right_layout.addWidget(self.log_pane, stretch=1)
-
-        # Set stretch for log pane to fill remaining space
-        main_layout.addWidget(right_container, stretch=1)
+        self.tool_log_pane = LogPane(
+            self.logging.dispatcher,
+            self,
+            title="ツールログ",
+            kind="tool",
+        )
+        main_layout.addWidget(self.tool_log_pane)
 
         # status bar
         self.status_label = QLabel("準備中...")
         self.statusBar().addWidget(self.status_label)
+        self.capture_status_label = QLabel(self)
+        self.serial_status_label = QLabel(self)
+        self.statusBar().addPermanentWidget(self.capture_status_label)
+        self.statusBar().addPermanentWidget(self.serial_status_label)
+        self._apply_layout_metrics_to_panes()
+        self._update_connection_status()
+
+    def _apply_layout_metrics_to_panes(self) -> None:
+        if not hasattr(self, "left_center_container"):
+            return
+        metrics = self.current_layout_metrics
+        preset = window_size_preset_for_key(self.current_window_size_preset_key)
+        left_width = metrics.allocated_left_width(preset)
+        tool_log_width = metrics.allocated_tool_log_width(preset)
+        left_center_width = left_width + metrics.gap + metrics.preview_width
+        self.centralWidget().layout().setContentsMargins(
+            metrics.margin,
+            0,
+            metrics.margin,
+            0,
+        )
+        self.centralWidget().layout().setSpacing(metrics.gap)
+        self.left_center_container.setFixedWidth(left_center_width)
+        self.left_center_container.setMinimumHeight(metrics.center_height)
+        self.left_center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        left_center_layout = self.left_center_container.layout()
+        left_center_layout.setSpacing(metrics.gap)
+        left_center_layout.setColumnMinimumWidth(0, left_width)
+        left_center_layout.setColumnMinimumWidth(1, metrics.preview_width)
+        left_center_layout.setColumnStretch(0, 0)
+        left_center_layout.setColumnStretch(1, 0)
+        left_center_layout.setRowMinimumHeight(0, metrics.preview_height)
+        left_center_layout.setRowMinimumHeight(1, metrics.bottom_macro_log_min_height)
+        left_center_layout.setRowStretch(0, 0)
+        left_center_layout.setRowStretch(1, 1)
+        self.macro_explorer_panel.layout().setSpacing(metrics.gap)
+        self.macro_explorer_panel.setFixedSize(left_width, metrics.macro_explorer_height)
+        macro_browser_available_height = max(
+            0,
+            metrics.macro_explorer_height - metrics.gap - self.control_pane.sizeHint().height(),
+        )
+        self.macro_browser.setMinimumHeight(
+            min(metrics.macro_explorer_min_height, macro_browser_available_height)
+        )
+        self.virtual_controller_panel.setFixedWidth(left_width)
+        self.virtual_controller_panel.setMinimumHeight(
+            PANE_TITLE_HEIGHT + metrics.bottom_macro_log_min_height
+        )
+        self.virtual_controller_panel.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.virtual_controller_panel.apply_layout_size(left_width, metrics.bottom_macro_log_height)
+        QTimer.singleShot(0, self.virtual_controller_panel.relayout_to_current_geometry)
+        self.preview_pane.set_fixed_preview_size(metrics.preview_width, metrics.preview_height)
+        self.macro_log_pane.setFixedWidth(metrics.preview_width)
+        self.macro_log_pane.setMinimumHeight(metrics.bottom_macro_log_min_height)
+        self.macro_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+        self.tool_log_pane.setFixedWidth(tool_log_width)
+        self.tool_log_pane.setMinimumSize(metrics.tool_log_min_width, metrics.tool_log_min_height)
+        self.tool_log_pane.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
+
+    def _update_connection_status(self) -> None:
+        source_type = self.global_settings.get("capture_source_type", "camera")
+        if source_type == "window":
+            capture_name = self.global_settings.get("capture_window_title", "") or "window capture"
+        elif source_type == "screen_region":
+            capture_name = "screen region"
+        else:
+            capture_name = self.global_settings.get("capture_device", "")
+        if self.preview_connection_error is not None:
+            capture_status = f"映像: 接続失敗 ({self.preview_connection_error})"
+        else:
+            capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
+        serial_name = self.global_settings.get("serial_device", "")
+        if self.manual_controller_error is not None:
+            serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
+        else:
+            serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
+        self.capture_status_label.setText(capture_status)
+        self.serial_status_label.setText(serial_status)
 
     def setup_connections(self):
         # Connect pane signals fully delegated
@@ -156,15 +352,21 @@ class MainWindow(QMainWindow):
                 event="configuration.apply_failed",
                 exc=exc,
             )
-            self.status_label.setText("設定を反映できません")
+            self.status_label.setText(f"設定を反映できません: {exc}")
             return
         if "preview_fps" in outcome.changed_keys:
             self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)
             self.preview_pane.apply_fps()
+        if "gui.window_size_preset" in outcome.changed_keys:
+            self.apply_window_size_preset(
+                self.global_settings.get("gui.window_size_preset", DEFAULT_WINDOW_SIZE_PRESET_KEY),
+                save=False,
+            )
         if outcome.deferred:
             self.status_label.setText("設定変更は実行完了後に反映されます")
             return
         self._apply_runtime_ports(outcome)
+        self._update_connection_status()
 
     def execute_macro_immediate(self):
         """即時実行モード：パラメータ入力なしでマクロを実行する"""
@@ -234,13 +436,19 @@ class MainWindow(QMainWindow):
     def _apply_runtime_ports(self, outcome: SettingsApplyOutcome) -> None:
         if not outcome.builder_replaced:
             return
+        self.preview_connection_error = outcome.preview_error
+        self.manual_controller_error = outcome.manual_controller_error
         try:
-            if outcome.frame_source_changed:
+            if outcome.frame_source_changed or outcome.preview_error is not None:
                 self.preview_pane.pause()
-            self.preview_pane.set_frame_source(outcome.preview_frame_source)
-            if outcome.frame_source_changed:
+            self.preview_pane.set_frame_source(
+                None if outcome.preview_error is not None else outcome.preview_frame_source
+            )
+            if outcome.frame_source_changed and outcome.preview_error is None:
                 self.preview_pane.resume()
-            self.virtual_controller.model.set_controller(outcome.manual_controller)
+            self.virtual_controller.model.set_controller(
+                None if outcome.manual_controller_error is not None else outcome.manual_controller
+            )
         except Exception as exc:
             self.logger.technical(
                 "ERROR",
@@ -306,7 +514,8 @@ class MainWindow(QMainWindow):
                 )
 
         self.preview_pane.pause()
-        self.log_pane.dispose()
+        self.macro_log_pane.dispose()
+        self.tool_log_pane.dispose()
         self.services.close()
         super().closeEvent(event)
 

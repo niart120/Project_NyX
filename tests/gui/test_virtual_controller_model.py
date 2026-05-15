@@ -53,9 +53,9 @@ def test_set_controller_replaces_controller_output_port() -> None:
 
 
 def test_virtual_controller_model_has_no_event_bus_dependency() -> None:
-    source = (
-        Path("src") / "nyxpy" / "gui" / "models" / "virtual_controller_model.py"
-    ).read_text(encoding="utf-8")
+    source = (Path("src") / "nyxpy" / "gui" / "models" / "virtual_controller_model.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "EventBus" not in source
     assert "EventType" not in source

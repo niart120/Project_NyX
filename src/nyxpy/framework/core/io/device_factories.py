@@ -159,7 +159,11 @@ class FrameSourcePortFactory:
             raise _device_not_found("capture", device_name, self.discovery.capture_names())
         device = self._devices.get(cache_key)
         if device is None:
-            kwargs = {"device_index": int(info.identifier), "fps": source.fps, "logger": self.logger}
+            kwargs = {
+                "device_index": int(info.identifier),
+                "fps": source.fps,
+                "logger": self.logger,
+            }
             if info.api_pref is not None:
                 kwargs["api_pref"] = info.api_pref
             device = _SharedCaptureDevice(
@@ -225,7 +229,9 @@ class FrameSourcePortFactory:
         if errors:
             raise ExceptionGroup("FrameSourcePortFactory close failed", errors)
 
-    def _dummy_capture(self, cache_key: CaptureSourceKey, source: CameraCaptureSourceConfig) -> object:
+    def _dummy_capture(
+        self, cache_key: CaptureSourceKey, source: CameraCaptureSourceConfig
+    ) -> object:
         device = self._devices.get(cache_key)
         if device is None:
             device = _SharedCaptureDevice(
