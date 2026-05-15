@@ -125,8 +125,13 @@ class MacroRuntimeBuilder:
 
     def frame_source_for_preview(self) -> FrameSourcePort | None:
         if self._preview_frame_source is None and self._preview_frame_source_factory is not None:
-            self._preview_frame_source = self._preview_frame_source_factory()
-            self._preview_frame_source.initialize()
+            frame_source = self._preview_frame_source_factory()
+            try:
+                frame_source.initialize()
+            except Exception:
+                frame_source.close()
+                raise
+            self._preview_frame_source = frame_source
         return self._preview_frame_source
 
     def controller_output_for_manual_input(self) -> ControllerOutputPort | None:

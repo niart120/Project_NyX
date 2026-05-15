@@ -299,3 +299,39 @@ def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path
 
     assert preview_source.closed is True
     assert manual_controller.closed is True
+
+
+def test_runtime_builder_does_not_cache_failed_preview_source(tmp_path: Path) -> None:
+    registry = Registry(definition(tmp_path))
+
+    class FailingFrameSourcePort(FakeFrameSourcePort):
+        def initialize(self) -> None:
+            raise RuntimeError("preview failed")
+
+    first_preview_source = FailingFrameSourcePort()
+    second_preview_source = FakeFrameSourcePort()
+    preview_sources = iter((first_preview_source, second_preview_source))
+    builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id: FakeRunArtifactStore(
+            tmp_path / "runs" / run_id / "outputs",
+            macro_id=definition.id,
+            run_id=run_id,
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+        preview_frame_source_factory=lambda: next(preview_sources),
+    )
+
+    with pytest.raises(RuntimeError, match="preview failed"):
+        builder.frame_source_for_preview()
+
+    assert first_preview_source.closed is True
+    assert builder.frame_source_for_preview() is second_preview_source
+    assert second_preview_source.initialized is True

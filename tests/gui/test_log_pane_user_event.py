@@ -50,6 +50,25 @@ def test_gui_log_sink_removed_on_close(qtbot) -> None:
     assert "after close" not in pane.view.toPlainText()
 
 
+def test_gui_log_sink_dispatcher_close_stops_sink(qtbot) -> None:
+    dispatcher = LogSinkDispatcher(LogSanitizer())
+    pane = LogPane(dispatcher)
+    qtbot.addWidget(pane)
+
+    dispatcher.close()
+    dispatcher.emit_user(
+        UserEvent(
+            timestamp=datetime.now(),
+            level=LogLevel.INFO,
+            component="test",
+            event="macro.message",
+            message="after dispatcher close",
+        )
+    )
+
+    assert "after dispatcher close" not in pane.view.toPlainText()
+
+
 def test_debug_log_is_separated_from_macro_log(qtbot) -> None:
     dispatcher = LogSinkDispatcher(LogSanitizer())
     macro_pane = LogPane(dispatcher, kind="macro")

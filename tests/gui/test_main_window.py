@@ -464,7 +464,7 @@ def test_apply_settings_logs_apply_exception(window: MainWindow, services: FakeS
 
     window.apply_app_settings()
 
-    assert window.status_label.text() == "設定を反映できません"
+    assert window.status_label.text() == "設定を反映できません: settings failed"
     assert services.logger.technical_events[-1][3] == "configuration.apply_failed"
 
 

@@ -269,7 +269,7 @@ class MainWindow(QMainWindow):
                 event="configuration.apply_failed",
                 exc=exc,
             )
-            self.status_label.setText("設定を反映できません")
+            self.status_label.setText(f"設定を反映できません: {exc}")
             return
         if "preview_fps" in outcome.changed_keys:
             self.preview_pane.preview_fps = self.global_settings.get("preview_fps", 30)

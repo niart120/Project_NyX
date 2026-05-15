@@ -32,6 +32,12 @@ class GuiLogSink(QObject):
     def stop(self) -> None:
         self._stopped = True
 
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.stop()
+
 
 def connect_technical_event(sink: GuiLogSink, slot) -> None:
     sink.technical_event.connect(slot, Qt.ConnectionType.QueuedConnection)
