@@ -8,8 +8,11 @@ from macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
 from macros.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
 from macros.nsmb_sort_or_splode.recognizer import (
     BombColor,
+    DetectedBomb,
     build_drag_path,
+    classify_bombs,
     find_bombs,
+    measure_color_features,
     paint_ignored_rects,
     touch_rect_to_cropped_hd_rect,
 )
@@ -81,6 +84,10 @@ def test_config_accepts_default_settings() -> None:
     assert cfg.black_goal_touch == TouchPoint(296, 122)
     assert cfg.mask_fill_bgr == (0, 255, 0)
     assert cfg.notify_on_finish is False
+    assert cfg.template_score_margin == 0.08
+    assert cfg.red_min_ratio == 0.20
+    assert cfg.black_min_dark_ratio == 0.35
+    assert cfg.black_max_red_ratio == 0.10
 
 
 def test_config_rejects_invalid_touch_goal() -> None:
@@ -123,7 +130,6 @@ def test_find_bombs_returns_best_match() -> None:
         template,
         color=BombColor.BLACK,
         threshold=0.95,
-        min_score_margin=0.0,
         duplicate_suppression_radius=18,
     )
 
@@ -141,7 +147,6 @@ def test_find_bombs_rejects_low_score() -> None:
         template,
         color=BombColor.BLACK,
         threshold=0.95,
-        min_score_margin=0.0,
         duplicate_suppression_radius=18,
     )
 
@@ -152,6 +157,88 @@ def test_build_drag_path_includes_start_and_goal() -> None:
     path = build_drag_path(TouchPoint(10, 20), TouchPoint(20, 40), steps=2)
 
     assert path == (TouchPoint(10, 20), TouchPoint(15, 30), TouchPoint(20, 40))
+
+
+def test_measure_color_features_separates_red_and_black_templates() -> None:
+    red_template = _load_template("red_bob_omb.png")
+    black_template = _load_template("black_bob_omb.png")
+
+    red_features = measure_color_features(red_template, 17, 21, 28)
+    black_features = measure_color_features(black_template, 16, 20, 28)
+
+    assert red_features.red_ratio >= 0.20
+    assert black_features.dark_ratio >= 0.35
+    assert black_features.red_ratio <= 0.10
+
+
+def test_classify_bombs_uses_hsv_gate_for_same_position_candidates() -> None:
+    black_template = _load_template("black_bob_omb.png")
+    frame = np.zeros((120, 120, 3), dtype=np.uint8)
+    frame[40 : 40 + black_template.shape[0], 30 : 30 + black_template.shape[1]] = black_template
+    center_x, center_y = _template_center(30, 40, black_template)
+    red_false_positive = _detected_bomb(
+        BombColor.RED,
+        score=0.90,
+        cropped_x=center_x,
+        cropped_y=center_y,
+    )
+    black_candidate = _detected_bomb(
+        BombColor.BLACK,
+        score=0.86,
+        cropped_x=center_x,
+        cropped_y=center_y,
+    )
+
+    classified = classify_bombs(
+        frame,
+        [red_false_positive],
+        [black_candidate],
+        red_threshold=0.83,
+        black_threshold=0.83,
+        duplicate_suppression_radius=18,
+        template_score_margin=0.08,
+        color_sample_size=28,
+        red_min_ratio=0.20,
+        black_min_dark_ratio=0.35,
+        black_max_red_ratio=0.10,
+    )
+
+    assert [bomb.color for bomb in classified] == [BombColor.BLACK]
+    assert classified[0].red_score == 0.90
+    assert classified[0].black_score == 0.86
+
+
+def test_classify_bombs_keeps_nearby_opposite_colors_outside_radius() -> None:
+    red_template = _load_template("red_bob_omb.png")
+    black_template = _load_template("black_bob_omb.png")
+    frame = np.zeros((160, 180, 3), dtype=np.uint8)
+    frame[40 : 40 + red_template.shape[0], 30 : 30 + red_template.shape[1]] = red_template
+    frame[40 : 40 + black_template.shape[0], 90 : 90 + black_template.shape[1]] = black_template
+    red_x, red_y = _template_center(30, 40, red_template)
+    black_x, black_y = _template_center(90, 40, black_template)
+    red_candidate = _detected_bomb(BombColor.RED, score=0.95, cropped_x=red_x, cropped_y=red_y)
+    black_candidate = _detected_bomb(
+        BombColor.BLACK,
+        score=0.95,
+        cropped_x=black_x,
+        cropped_y=black_y,
+    )
+
+    classified = classify_bombs(
+        frame,
+        [red_candidate],
+        [black_candidate],
+        red_threshold=0.83,
+        black_threshold=0.83,
+        duplicate_suppression_radius=18,
+        template_score_margin=0.08,
+        color_sample_size=28,
+        red_min_ratio=0.20,
+        black_min_dark_ratio=0.35,
+        black_max_red_ratio=0.10,
+    )
+
+    assert {bomb.color for bomb in classified} == {BombColor.RED, BombColor.BLACK}
 
 
 def test_macro_sends_touch_drag_for_detected_bomb() -> None:
@@ -185,13 +272,48 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
     assert any(event[0] == "notify" for event in cmd.events)
 
 
-def test_macro_alternates_red_and_black_detection() -> None:
+def test_macro_detects_red_and_black_on_same_frame() -> None:
+    images = _template_images()
     frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    cmd = FakeCommand(frame, _template_images())
+    bottom = THREEDS_HD_BOTTOM_SCREEN
+    red_template = images["templates/red_bob_omb.png"]
+    black_template = images["templates/black_bob_omb.png"]
+    frame[
+        bottom.y + 40 : bottom.y + 40 + red_template.shape[0],
+        bottom.x + 30 : bottom.x + 30 + red_template.shape[1],
+    ] = red_template
+    frame[
+        bottom.y + 120 : bottom.y + 120 + black_template.shape[0],
+        bottom.x + 140 : bottom.x + 140 + black_template.shape[1],
+    ] = black_template
+    cmd = FakeCommand(frame, images)
     macro = NsmbSortOrSplodeMacro()
-    macro.initialize(cmd, {"scan_interval_seconds": 0, "min_score_margin": 0})
+    macro.initialize(cmd, {"scan_interval_seconds": 0})
 
-    macro.run_iteration(cmd)
-    macro.run_iteration(cmd)
+    bomb = macro.run_iteration(cmd)
 
-    assert macro._next_color is BombColor.RED
+    assert bomb is not None
+    assert bomb.color in {BombColor.RED, BombColor.BLACK}
+
+
+def _detected_bomb(
+    color: BombColor,
+    *,
+    score: float,
+    cropped_x: int,
+    cropped_y: int,
+) -> DetectedBomb:
+    return DetectedBomb(
+        color=color,
+        score=score,
+        hd_center_x=THREEDS_HD_BOTTOM_SCREEN.x + cropped_x,
+        hd_center_y=THREEDS_HD_BOTTOM_SCREEN.y + cropped_y,
+        touch_x=round(cropped_x * 320 / THREEDS_HD_BOTTOM_SCREEN.width),
+        touch_y=round(cropped_y * 240 / THREEDS_HD_BOTTOM_SCREEN.height),
+        width=32,
+        height=42,
+    )
+
+
+def _template_center(x: int, y: int, template: np.ndarray) -> tuple[int, int]:
+    return x + template.shape[1] // 2, y + template.shape[0] // 2

@@ -11,7 +11,11 @@ mask_fill_bgr = [0, 255, 0]
 match_method = "TM_CCOEFF_NORMED"
 red_match_threshold = 0.83
 black_match_threshold = 0.83
-min_score_margin = 0.0
+template_score_margin = 0.08
+color_sample_size = 28
+red_min_ratio = 0.20
+black_min_dark_ratio = 0.35
+black_max_red_ratio = 0.10
 duplicate_suppression_radius = 18
 
 drag_steps = 4
