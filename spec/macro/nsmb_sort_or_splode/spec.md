@@ -53,7 +53,7 @@ touch_x = floor((hd_x - 400 + 0.5) * 320 / 480)
 touch_y = floor((hd_y - 360 + 0.5) * 240 / 360)
 ```
 
-検出したテンプレート矩形の中心をタッチ座標へ変換し、`duplicate_suppression_radius` 内の赤・黒候補を同一位置の候補として束ねる。同一位置の候補はテンプレートスコア差と HSV 色特徴で最終色を決め、色に対応する投入先へ直線補間でドラッグする。
+検出したテンプレート矩形の中心をタッチ座標へ変換し、`duplicate_suppression_radius` 内の赤・黒候補を同一位置の候補として束ねる。同一位置の候補はテンプレートスコア差と HSV 色特徴で仮分類する。`verify_before_goal = true` の場合は、仮分類が赤なら左下、黒なら右下のステージ座標へいったん置き、再キャプチャ後にステージ近傍の候補を再分類してから最終投入先へ運ぶ。
 
 ```text
 path_i = start + (goal - start) * i / drag_steps
@@ -72,6 +72,8 @@ path_i = start + (goal - start) * i / drag_steps
 | 黒陣地除外領域 | `(745, 468, 122, 147)` | `(230, 72, 82, 98)` | 黒陣地内の再検出防止 |
 | 赤投入先 | `(475, 543)` | `(50, 122)` | 赤いボムへいのドラッグ終点 |
 | 黒投入先 | `(805, 543)` | `(270, 122)` | 黒いボムへいのドラッグ終点 |
+| 赤ステージ座標 | `(496, 660)` | `(64, 200)` | 赤仮分類時の再検知用一時置き場 |
+| 黒ステージ座標 | `(784, 660)` | `(256, 200)` | 黒仮分類時の再検知用一時置き場 |
 
 検出対象外領域は設定値の矩形として持つ。矩形はタッチ座標で指定し、`touch_point_to_3ds_hd_capture()` と `THREEDS_HD_BOTTOM_SCREEN` により下画面切り出し後の `480x360` 座標へ変換してから `cv2.rectangle()` で BGR `(0, 255, 0)` に塗りつぶす。
 
@@ -81,7 +83,7 @@ path_i = start + (goal - start) * i / drag_steps
 |------|--------|
 | 検出周期 | 50 ms ごとに赤 / 黒を各 1 回照合 |
 | 1 回の画像処理 | 下画面切り出し、マスク適用、赤黒テンプレート照合、HSV 分類を 40 ms 未満で完了 |
-| ドラッグ時間 | 1 個あたり `0.18` 秒以内を既定値にする |
+| ドラッグ時間 | ステージ経由時は 1 個あたり `0.25` 秒前後を既定値にする |
 | 検出対象 | 陣地領域を除く下画面実領域 |
 | 誤投入抑制 | しきい値未満、またはスコア差と色特徴が一致しない場合はタッチ操作しない |
 
@@ -102,8 +104,10 @@ path_i = start + (goal - start) * i / drag_steps
 |------|------|----------|
 | `WAITING` | 次の検出周期まで待機 | 周期到達で `CAPTURING` |
 | `CAPTURING` | `Command.capture()` でフレーム取得 | 取得成功で `DETECTING`、失敗で停止 |
-| `DETECTING` | 赤黒テンプレートを照合し、HSV 色特徴で分類 | 採用候補ありで `DRAGGING`、なしで `WAITING` |
-| `DRAGGING` | 検出中心から投入先へドラッグ | `touch_up()` 完了で `POST_DROP_WAIT` |
+| `DETECTING` | 赤黒テンプレートを照合し、HSV 色特徴で仮分類 | 採用候補ありで `STAGING` または `DRAGGING`、なしで `WAITING` |
+| `STAGING` | 仮分類色に対応するステージ座標へドラッグ | `touch_up()` 完了で `VERIFYING` |
+| `VERIFYING` | 再キャプチャしてステージ近傍の候補を再分類 | 候補 1 個で `DRAGGING`、候補 0 個または複数で `WAITING` |
+| `DRAGGING` | 再検知中心から投入先へドラッグ | `touch_up()` 完了で `POST_DROP_WAIT` |
 | `POST_DROP_WAIT` | 短時間待機して次色へ切替 | 待機完了で `WAITING` |
 | `STOPPED` | マクロ終了 | ユーザー中断、最大仕分け数到達、致命的エラー |
 
@@ -142,6 +146,11 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 | `black_min_dark_ratio` | `float` | `0.35` | 黒判定に必要な暗色画素比率 |
 | `black_max_red_ratio` | `float` | `0.10` | 黒判定時に許容する赤系画素比率の上限 |
 | `duplicate_suppression_radius` | `int` | `18` | 同一ボムへい候補をまとめる半径。単位はタッチ座標 px |
+| `verify_before_goal` | `bool` | `True` | 最終投入前にステージ座標へ置いて再検知する |
+| `red_staging_touch` | `list[int]` | `[64, 200]` | 赤仮分類時の再検知用ステージ座標 |
+| `black_staging_touch` | `list[int]` | `[256, 200]` | 黒仮分類時の再検知用ステージ座標 |
+| `staging_wait_seconds` | `float` | `0.05` | ステージに置いた後、再キャプチャ前に待つ時間 |
+| `staging_verification_radius` | `int` | `24` | ステージ座標近傍の再検知候補を探す半径。単位はタッチ座標 px |
 | `drag_steps` | `int` | `4` | 1 回のドラッグで送信する中間点数 |
 | `drag_duration_seconds` | `float` | `0.10` | 1 回のドラッグ総時間 |
 | `red_goal_touch` | `list[int]` | `[24, 122]` | 赤いボムへいの投入先タッチ座標 |
@@ -171,6 +180,11 @@ red_min_ratio = 0.20
 black_min_dark_ratio = 0.35
 black_max_red_ratio = 0.10
 duplicate_suppression_radius = 18
+verify_before_goal = true
+red_staging_touch = [64, 200]
+black_staging_touch = [256, 200]
+staging_wait_seconds = 0.05
+staging_verification_radius = 24
 
 drag_steps = 4
 drag_duration_seconds = 0.10
@@ -232,6 +246,11 @@ class NsmbSortOrSplodeConfig:
     black_min_dark_ratio: float
     black_max_red_ratio: float
     duplicate_suppression_radius: int
+    verify_before_goal: bool
+    red_staging_touch: TouchPoint
+    black_staging_touch: TouchPoint
+    staging_wait_seconds: float
+    staging_verification_radius: int
     drag_steps: int
     drag_duration_seconds: float
     red_goal_touch: TouchPoint
@@ -341,18 +360,26 @@ def build_drag_path(
 - どちらの色ゲートも通る、またはどちらも通らない候補は操作しない。
 
 **Step 4**: ドラッグ  
-- 検出中心をタッチ座標へ変換する。
-- 色に応じて `red_goal_touch` または `black_goal_touch` を選ぶ。
+- `verify_before_goal = false` の場合は、色に応じて `red_goal_touch` または `black_goal_touch` を選ぶ。
+- `verify_before_goal = true` の場合は、仮分類が赤なら `red_staging_touch`、黒なら `black_staging_touch` へいったんドラッグする。
 - `build_drag_path()` で経路を作り、各点で `cmd.touch_down(x, y)` を送る。
 - 点間待機は `drag_duration_seconds / drag_steps` 秒とし、最終地点でも同じ時間だけ保持してから離す。
 - 最後に必ず `cmd.touch_up()` を送る。
 
-**Step 5**: 後処理  
+**Step 5**: ステージ再検知  
+- `verify_before_goal = true` の場合、`staging_wait_seconds` だけ待ってから再キャプチャする。
+- 再キャプチャしたフレームで Step 3 と同じ検出・分類を行う。
+- ステージ座標から `staging_verification_radius` 内の候補が 1 個だけなら、その候補の色を最終色として採用する。
+- ステージ座標近傍の候補が 0 個または 2 個以上の場合は警告ログを出し、誤投入を避けるため最終投入を行わない。
+- 最終投入のドラッグ開始点はステージ座標ではなく、再検知した `DetectedBomb.touch_point` とする。
+
+**Step 6**: 最終投入と後処理  
+- 最終色に応じて `red_goal_touch` または `black_goal_touch` へドラッグする。
 - `post_drop_wait_seconds` だけ待機する。
 - `sorted_count` を加算する。
 - `save_debug_frames = true` の場合、検出矩形とドラッグ先を描画した画像を artifacts に保存する。
 
-**Step 6**: 終了判定  
+**Step 7**: 終了判定  
 - `max_sorted_count > 0` かつ `sorted_count >= max_sorted_count` なら終了する。
 - ユーザー中断時は `Command` のキャンセル処理に従い停止する。
 - 終了時に `notify_on_finish = true` なら仕分け数を通知する。
@@ -361,6 +388,7 @@ def build_drag_path(
 
 - 候補が矩形マスク除外領域にある場合は操作しない。
 - 投入先座標がタッチ範囲外の場合は初期化時に `ValueError` とする。
+- ステージ座標が矩形マスク除外領域内にある場合は初期化時に `ValueError` とする。
 - `touch_down()` 後に例外が発生した場合でも、`finally` で `touch_up()` を送る。
 - 認識できないフレームや設定不備を正常終了扱いにしない。ログへ理由を出し、例外として停止する。
 
@@ -370,6 +398,7 @@ def build_drag_path(
 |------------|----------|----------|
 | ユニット | `test_config_accepts_default_settings` | 既定 TOML から `NsmbSortOrSplodeConfig` を生成できる |
 | ユニット | `test_config_rejects_invalid_touch_goal` | 範囲外の投入先座標を `ValueError` にする |
+| ユニット | `test_config_rejects_staging_point_inside_ignored_rect` | ステージ座標が除外矩形内にある設定を `ValueError` にする |
 | ユニット | `test_paint_ignored_rects_uses_green_bgr` | 除外矩形が BGR `(0, 255, 0)` で塗りつぶされる |
 | ユニット | `test_paint_ignored_rects_converts_touch_rects` | 赤 / 黒陣地矩形が下画面切り出し後座標へ変換される |
 | ユニット | `test_hd_center_to_touch_point_uses_3ds_constants` | HD 座標からタッチ座標への変換が 3DS 画面仕様と一致する |
@@ -381,6 +410,8 @@ def build_drag_path(
 | ユニット | `test_build_drag_path_includes_start_and_goal` | ドラッグ経路が開始点と終点を含み、点数が設定通りになる |
 | ユニット | `test_macro_detects_red_and_black_on_same_frame` | fake `Command` で赤 / 黒候補を同一フレームから検出できる |
 | ユニット | `test_macro_sends_touch_drag_for_detected_bomb` | 検出時に `touch_down()` 群と `touch_up()` が送信される |
+| ユニット | `test_macro_uses_verified_color_after_staging` | ステージ再検知後の色で最終投入先を選ぶ |
+| ユニット | `test_macro_skips_goal_when_staging_verification_is_ambiguous` | ステージ近傍の候補が複数ある場合は最終投入しない |
 | ユニット | `test_macro_touches_up_when_drag_fails` | ドラッグ中の例外でも `touch_up()` が送信される |
 | パフォーマンス | `test_nsmb_sort_or_splode_classified_detection_perf` | マスク適用、赤黒テンプレート照合、HSV 分類が 40 ms 未満で完了する |
 | 実機 | `test_nsmb_sort_or_splode_realdevice` | 3DS 実機または DS 互換環境で赤 / 黒の仕分けが成功する |

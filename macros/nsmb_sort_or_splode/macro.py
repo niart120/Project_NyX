@@ -1,4 +1,7 @@
+from math import hypot
+
 import cv2
+import numpy as np
 
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN, TouchPoint
 from nyxpy.framework.core.macro.base import MacroBase
@@ -45,12 +48,49 @@ class NsmbSortOrSplodeMacro(MacroBase):
         pass
 
     def run_iteration(self, cmd: Command) -> DetectedBomb | None:
+        frame = self._capture_bottom(cmd)
+        masked, candidates = self._detect_candidates(frame)
+        if not candidates:
+            return None
+
+        bomb = candidates[0]
+        if self._cfg.verify_before_goal:
+            staging = self._staging_for(bomb.color)
+            self._drag(cmd, bomb.touch_point, staging)
+            if self._cfg.staging_wait_seconds > 0:
+                cmd.wait(self._cfg.staging_wait_seconds)
+
+            verification_frame = self._capture_bottom(cmd)
+            masked, verification_candidates = self._detect_candidates(verification_frame)
+            verified = self._select_staged_candidate(cmd, verification_candidates, staging)
+            if verified is None:
+                if self._cfg.post_drop_wait_seconds > 0:
+                    cmd.wait(self._cfg.post_drop_wait_seconds)
+                return None
+            bomb = verified
+
+        goal = self._goal_for(bomb.color)
+        self._drag(cmd, bomb.touch_point, goal)
+        self._sorted_count += 1
+        if self._cfg.save_debug_frames:
+            self._save_debug_frame(cmd, masked, bomb, goal)
+        if self._cfg.post_drop_wait_seconds > 0:
+            cmd.wait(self._cfg.post_drop_wait_seconds)
+        if self._cfg.max_sorted_count > 0 and self._sorted_count >= self._cfg.max_sorted_count:
+            self._finished = True
+            if self._cfg.notify_on_finish:
+                cmd.notify(f"Sort or 'Splode: {self._sorted_count} 個仕分けて終了")
+        return bomb
+
+    def _capture_bottom(self, cmd: Command) -> np.ndarray:
         frame = cmd.capture(crop_region=THREEDS_HD_BOTTOM_SCREEN.tuple)
         if frame is None:
             raise RuntimeError("capture failed")
         if frame.shape[:2] != (THREEDS_HD_BOTTOM_SCREEN.height, THREEDS_HD_BOTTOM_SCREEN.width):
             raise RuntimeError(f"unexpected bottom screen shape: {frame.shape}")
+        return frame
 
+    def _detect_candidates(self, frame: np.ndarray) -> tuple[np.ndarray, list[DetectedBomb]]:
         masked = paint_ignored_rects(
             frame,
             self._cfg.ignore_touch_rects,
@@ -83,24 +123,41 @@ class NsmbSortOrSplodeMacro(MacroBase):
             black_min_dark_ratio=self._cfg.black_min_dark_ratio,
             black_max_red_ratio=self._cfg.black_max_red_ratio,
         )
-        if not candidates:
-            return None
+        return masked, candidates
 
-        bomb = candidates[0]
-        goal = (
-            self._cfg.red_goal_touch if bomb.color is BombColor.RED else self._cfg.black_goal_touch
+    def _select_staged_candidate(
+        self,
+        cmd: Command,
+        candidates: list[DetectedBomb],
+        staging: TouchPoint,
+    ) -> DetectedBomb | None:
+        nearby = [
+            bomb
+            for bomb in candidates
+            if hypot(bomb.touch_x - staging.x, bomb.touch_y - staging.y)
+            <= self._cfg.staging_verification_radius
+        ]
+        if not nearby:
+            cmd.log(
+                f"staging verification failed: no candidate near {staging}",
+                level="WARNING",
+            )
+            return None
+        if len(nearby) > 1:
+            cmd.log(
+                f"staging verification failed: {len(nearby)} candidates near {staging}",
+                level="WARNING",
+            )
+            return None
+        return nearby[0]
+
+    def _staging_for(self, color: BombColor) -> TouchPoint:
+        return (
+            self._cfg.red_staging_touch if color is BombColor.RED else self._cfg.black_staging_touch
         )
-        self._drag(cmd, bomb.touch_point, goal)
-        self._sorted_count += 1
-        if self._cfg.save_debug_frames:
-            self._save_debug_frame(cmd, masked, bomb, goal)
-        if self._cfg.post_drop_wait_seconds > 0:
-            cmd.wait(self._cfg.post_drop_wait_seconds)
-        if self._cfg.max_sorted_count > 0 and self._sorted_count >= self._cfg.max_sorted_count:
-            self._finished = True
-            if self._cfg.notify_on_finish:
-                cmd.notify(f"Sort or 'Splode: {self._sorted_count} 個仕分けて終了")
-        return bomb
+
+    def _goal_for(self, color: BombColor) -> TouchPoint:
+        return self._cfg.red_goal_touch if color is BombColor.RED else self._cfg.black_goal_touch
 
     def _drag(self, cmd: Command, start: TouchPoint, goal: TouchPoint) -> None:
         path = build_drag_path(start, goal, steps=self._cfg.drag_steps)
