@@ -134,8 +134,8 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 | `black_template_path` | `str` | `"templates/black_bob_omb.png"` | 黒いボムへいのテンプレートパス |
 | `mask_fill_bgr` | `list[int]` | `[0, 255, 0]` | 除外矩形を塗りつぶす BGR 色 |
 | `match_method` | `str` | `"TM_CCOEFF_NORMED"` | OpenCV のテンプレートマッチング方式 |
-| `red_match_threshold` | `float` | `0.80` | 赤テンプレートの採用しきい値 |
-| `black_match_threshold` | `float` | `0.82` | 黒テンプレートの採用しきい値 |
+| `red_match_threshold` | `float` | `0.83` | 赤テンプレートの採用しきい値 |
+| `black_match_threshold` | `float` | `0.83` | 黒テンプレートの採用しきい値 |
 | `min_score_margin` | `float` | `0.0` | 最高スコアが `threshold + min_score_margin` 未満なら操作しない |
 | `duplicate_suppression_radius` | `int` | `18` | 同一ボムへい候補をまとめる半径。単位はタッチ座標 px |
 | `drag_steps` | `int` | `4` | 1 回のドラッグで送信する中間点数 |
@@ -159,8 +159,8 @@ black_template_path = "templates/black_bob_omb.png"
 mask_fill_bgr = [0, 255, 0]
 
 match_method = "TM_CCOEFF_NORMED"
-red_match_threshold = 0.80
-black_match_threshold = 0.82
+red_match_threshold = 0.83
+black_match_threshold = 0.83
 min_score_margin = 0.0
 duplicate_suppression_radius = 18
 

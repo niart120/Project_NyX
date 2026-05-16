@@ -9,8 +9,8 @@ black_template_path = "templates/black_bob_omb.png"
 mask_fill_bgr = [0, 255, 0]
 
 match_method = "TM_CCOEFF_NORMED"
-red_match_threshold = 0.80
-black_match_threshold = 0.82
+red_match_threshold = 0.83
+black_match_threshold = 0.83
 min_score_margin = 0.0
 duplicate_suppression_radius = 18
 

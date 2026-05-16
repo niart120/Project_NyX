@@ -32,8 +32,8 @@ class NsmbSortOrSplodeConfig:
     black_template_path: Path = Path("templates/black_bob_omb.png")
     mask_fill_bgr: tuple[int, int, int] = (0, 255, 0)
     match_method: str = "TM_CCOEFF_NORMED"
-    red_match_threshold: float = 0.80
-    black_match_threshold: float = 0.82
+    red_match_threshold: float = 0.83
+    black_match_threshold: float = 0.83
     min_score_margin: float = 0.0
     duplicate_suppression_radius: int = 18
     drag_steps: int = 4
