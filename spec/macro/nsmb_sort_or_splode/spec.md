@@ -34,13 +34,10 @@
 | `macros/nsmb_sort_or_splode/config.py` | 新規 | 設定 dataclass と入力検証 |
 | `macros/nsmb_sort_or_splode/recognizer.py` | 新規 | テンプレートマッチング、矩形マスク適用、座標変換 |
 | `macros/nsmb_sort_or_splode/macro.py` | 新規 | メインマクロ。キャプチャ、検出周期制御、タッチドラッグを担当 |
-| `static/nsmb_sort_or_splode/settings.toml` | 新規 | 既定設定 |
-| `static/nsmb_sort_or_splode/templates/red_bob_omb.png` | 新規 | 赤いボムへいの検出テンプレート |
-| `static/nsmb_sort_or_splode/templates/black_bob_omb.png` | 新規 | 黒いボムへいの検出テンプレート |
-| `tests/unit/macros/nsmb_sort_or_splode/test_config.py` | 新規 | 設定検証の単体テスト |
-| `tests/unit/macros/nsmb_sort_or_splode/test_recognizer.py` | 新規 | 矩形マスク適用、座標変換、テンプレート検出の単体テスト |
-| `tests/unit/macros/nsmb_sort_or_splode/test_macro.py` | 新規 | fake `Command` による検出周期とタッチ操作の単体テスト |
-| `tests/hardware/test_nsmb_sort_or_splode_realdevice.py` | 新規 | 実機動作確認用テスト。`@pytest.mark.realdevice` を付与 |
+| `resources/nsmb_sort_or_splode/settings.toml` | 新規 | 既定設定 |
+| `resources/nsmb_sort_or_splode/assets/templates/red_bob_omb.png` | 新規 | 赤いボムへいの検出テンプレート |
+| `resources/nsmb_sort_or_splode/assets/templates/black_bob_omb.png` | 新規 | 黒いボムへいの検出テンプレート |
+| `tests/unit/macro/test_nsmb_sort_or_splode.py` | 新規 | 設定、認識、マクロ実行の単体テスト |
 
 ## 3. 設計方針
 
@@ -85,7 +82,7 @@ path_i = start + (goal - start) * i / drag_steps
 | 1 回の画像処理 | 下画面切り出し、マスク適用、テンプレートマッチングを 80 ms 未満で完了 |
 | ドラッグ時間 | 1 個あたり `0.18` 秒以内を既定値にする |
 | 検出対象 | 陣地領域を除く下画面実領域 |
-| 誤投入抑制 | しきい値未満、または複数候補のスコア差が小さい場合はタッチ操作しない |
+| 誤投入抑制 | しきい値未満、またはしきい値からのスコア余裕が小さい場合はタッチ操作しない |
 
 ### レイヤー構成
 
@@ -94,7 +91,7 @@ path_i = start + (goal - start) * i / drag_steps
 | 設定 | `config.py` | TOML / args 由来の値を frozen dataclass に変換し、範囲検証する |
 | 認識 | `recognizer.py` | `numpy.ndarray` とテンプレート画像から検出候補を返す純粋関数群 |
 | 実行 | `macro.py` | `Command.capture()`、`Command.touch_down()`、`Command.touch_up()`、ログ、通知を扱う |
-| リソース | `static/nsmb_sort_or_splode/` | テンプレートと既定設定を保持する |
+| リソース | `resources/nsmb_sort_or_splode/` | テンプレートと既定設定を保持する |
 
 画像認識と座標計算は `Command` に依存しない純粋関数として実装する。副作用は `macro.py` の `run()` とタッチドラッグ関数に集約する。
 
@@ -139,7 +136,7 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 | `match_method` | `str` | `"TM_CCOEFF_NORMED"` | OpenCV のテンプレートマッチング方式 |
 | `red_match_threshold` | `float` | `0.82` | 赤テンプレートの採用しきい値 |
 | `black_match_threshold` | `float` | `0.82` | 黒テンプレートの採用しきい値 |
-| `min_score_margin` | `float` | `0.05` | 1 位と 2 位のスコア差がこれ未満なら操作しない |
+| `min_score_margin` | `float` | `0.05` | 最高スコアが `threshold + min_score_margin` 未満なら操作しない |
 | `duplicate_suppression_radius` | `int` | `18` | 同一ボムへい候補をまとめる半径。単位はタッチ座標 px |
 | `drag_steps` | `int` | `8` | 1 回のドラッグで送信する中間点数 |
 | `drag_duration_seconds` | `float` | `0.18` | 1 回のドラッグ総時間 |
@@ -152,7 +149,7 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 ### リソース形式
 
 ```toml
-# static/nsmb_sort_or_splode/settings.toml
+# resources/nsmb_sort_or_splode/settings.toml
 scan_interval_seconds = 0.10
 post_drop_wait_seconds = 0.02
 max_sorted_count = 0
@@ -299,7 +296,7 @@ def build_drag_path(
 - `active_color` に対応するテンプレートだけを照合する。
 - `paint_ignored_rects()` で陣地領域を BGR `(0, 255, 0)` に塗りつぶしたフレームを照合する。
 - 最高スコアが色別しきい値未満の場合は操作しない。
-- 最高スコアと 2 位の差が `min_score_margin` 未満の場合は、誤投入回避のため操作しない。
+- 最高スコアが `threshold + min_score_margin` 未満の場合は、誤投入回避のため操作しない。
 
 **Step 4**: ドラッグ  
 - 検出中心をタッチ座標へ変換する。
@@ -336,7 +333,7 @@ def build_drag_path(
 | ユニット | `test_hd_center_to_touch_point_uses_3ds_constants` | HD 座標からタッチ座標への変換が 3DS 画面仕様と一致する |
 | ユニット | `test_find_bombs_returns_best_match` | 合成画像に置いたテンプレート候補をスコア降順で返す |
 | ユニット | `test_find_bombs_rejects_low_score` | しきい値未満の候補を返さない |
-| ユニット | `test_find_bombs_rejects_ambiguous_score_margin` | 1 位と 2 位の差が小さい候補では操作対象を返さない |
+| ユニット | `test_find_bombs_rejects_low_confidence_margin` | しきい値からの余裕が小さい候補を返さない |
 | ユニット | `test_build_drag_path_includes_start_and_goal` | ドラッグ経路が開始点と終点を含み、点数が設定通りになる |
 | ユニット | `test_macro_alternates_red_and_black_detection` | fake `Command` で赤 / 黒の照合順が 100 ms 周期で交互になる |
 | ユニット | `test_macro_sends_touch_drag_for_detected_bomb` | 検出時に `touch_down()` 群と `touch_up()` が送信される |
@@ -346,11 +343,11 @@ def build_drag_path(
 ## 6. 実装チェックリスト
 
 - [x] spec.md 作成
-- [ ] settings.toml 作成
+- [x] settings.toml 作成
 - [x] 暫定テンプレート画像作成
-- [ ] config.py 実装
-- [ ] recognizer.py 実装
-- [ ] macro.py 実装
-- [ ] 共通部品の抽出・既存部品の再利用確認
-- [ ] ユニットテスト作成・パス
+- [x] config.py 実装
+- [x] recognizer.py 実装
+- [x] macro.py 実装
+- [x] 共通部品の抽出・既存部品の再利用確認
+- [x] ユニットテスト作成・パス
 - [ ] 実機動作確認

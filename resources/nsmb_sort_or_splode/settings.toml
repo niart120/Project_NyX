@@ -1,0 +1,27 @@
+# NSMB Sort or 'Splode マクロ設定ファイル
+
+scan_interval_seconds = 0.10
+post_drop_wait_seconds = 0.02
+max_sorted_count = 0
+
+red_template_path = "templates/red_bob_omb.png"
+black_template_path = "templates/black_bob_omb.png"
+mask_fill_bgr = [0, 255, 0]
+
+match_method = "TM_CCOEFF_NORMED"
+red_match_threshold = 0.82
+black_match_threshold = 0.82
+min_score_margin = 0.05
+duplicate_suppression_radius = 18
+
+drag_steps = 8
+drag_duration_seconds = 0.18
+red_goal_touch = [50, 122]
+black_goal_touch = [270, 122]
+ignore_touch_rects = [
+  [9, 70, 82, 100],
+  [230, 72, 82, 98],
+]
+
+save_debug_frames = false
+notify_on_finish = true
