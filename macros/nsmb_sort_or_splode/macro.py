@@ -5,7 +5,14 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 from .config import NsmbSortOrSplodeConfig
-from .recognizer import BombColor, DetectedBomb, build_drag_path, find_bombs, paint_ignored_rects
+from .recognizer import (
+    BombColor,
+    DetectedBomb,
+    build_drag_path,
+    classify_bombs,
+    find_bombs,
+    paint_ignored_rects,
+)
 
 
 class NsmbSortOrSplodeMacro(MacroBase):
@@ -19,7 +26,6 @@ class NsmbSortOrSplodeMacro(MacroBase):
         self._cfg = NsmbSortOrSplodeConfig.from_args(args)
         self._red_template = cmd.load_img(self._cfg.red_template_path)
         self._black_template = cmd.load_img(self._cfg.black_template_path)
-        self._next_color = BombColor.RED
         self._sorted_count = 0
         self._finished = False
         cmd.log(
@@ -39,9 +45,6 @@ class NsmbSortOrSplodeMacro(MacroBase):
         pass
 
     def run_iteration(self, cmd: Command) -> DetectedBomb | None:
-        color = self._next_color
-        self._next_color = BombColor.BLACK if color is BombColor.RED else BombColor.RED
-
         frame = cmd.capture(crop_region=THREEDS_HD_BOTTOM_SCREEN.tuple)
         if frame is None:
             raise RuntimeError("capture failed")
@@ -53,25 +56,40 @@ class NsmbSortOrSplodeMacro(MacroBase):
             self._cfg.ignore_touch_rects,
             fill_bgr=self._cfg.mask_fill_bgr,
         )
-        template = self._red_template if color is BombColor.RED else self._black_template
-        threshold = (
-            self._cfg.red_match_threshold
-            if color is BombColor.RED
-            else self._cfg.black_match_threshold
-        )
-        candidates = find_bombs(
+        red_candidates = find_bombs(
             masked,
-            template,
-            color=color,
-            threshold=threshold,
-            min_score_margin=self._cfg.min_score_margin,
+            self._red_template,
+            color=BombColor.RED,
+            threshold=self._cfg.red_match_threshold,
             duplicate_suppression_radius=self._cfg.duplicate_suppression_radius,
+        )
+        black_candidates = find_bombs(
+            masked,
+            self._black_template,
+            color=BombColor.BLACK,
+            threshold=self._cfg.black_match_threshold,
+            duplicate_suppression_radius=self._cfg.duplicate_suppression_radius,
+        )
+        candidates = classify_bombs(
+            frame,
+            red_candidates,
+            black_candidates,
+            red_threshold=self._cfg.red_match_threshold,
+            black_threshold=self._cfg.black_match_threshold,
+            duplicate_suppression_radius=self._cfg.duplicate_suppression_radius,
+            template_score_margin=self._cfg.template_score_margin,
+            color_sample_size=self._cfg.color_sample_size,
+            red_min_ratio=self._cfg.red_min_ratio,
+            black_min_dark_ratio=self._cfg.black_min_dark_ratio,
+            black_max_red_ratio=self._cfg.black_max_red_ratio,
         )
         if not candidates:
             return None
 
         bomb = candidates[0]
-        goal = self._cfg.red_goal_touch if color is BombColor.RED else self._cfg.black_goal_touch
+        goal = (
+            self._cfg.red_goal_touch if bomb.color is BombColor.RED else self._cfg.black_goal_touch
+        )
         self._drag(cmd, bomb.touch_point, goal)
         self._sorted_count += 1
         if self._cfg.save_debug_frames:
@@ -89,7 +107,7 @@ class NsmbSortOrSplodeMacro(MacroBase):
         wait_per_step = self._cfg.drag_duration_seconds / self._cfg.drag_steps
         touch_started = False
         try:
-            for index, point in enumerate(path):
+            for point in path:
                 cmd.touch_down(point.x, point.y)
                 touch_started = True
                 if wait_per_step > 0:

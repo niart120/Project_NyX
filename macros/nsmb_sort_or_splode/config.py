@@ -34,7 +34,11 @@ class NsmbSortOrSplodeConfig:
     match_method: str = "TM_CCOEFF_NORMED"
     red_match_threshold: float = 0.83
     black_match_threshold: float = 0.83
-    min_score_margin: float = 0.0
+    template_score_margin: float = 0.08
+    color_sample_size: int = 28
+    red_min_ratio: float = 0.20
+    black_min_dark_ratio: float = 0.35
+    black_max_red_ratio: float = 0.10
     duplicate_suppression_radius: int = 18
     drag_steps: int = 4
     drag_duration_seconds: float = 0.10
@@ -76,7 +80,23 @@ class NsmbSortOrSplodeConfig:
                 "black_match_threshold",
                 defaults.black_match_threshold,
             ),
-            min_score_margin=_get_float(args, "min_score_margin", defaults.min_score_margin),
+            template_score_margin=_get_float(
+                args,
+                "template_score_margin",
+                defaults.template_score_margin,
+            ),
+            color_sample_size=_get_int(args, "color_sample_size", defaults.color_sample_size),
+            red_min_ratio=_get_float(args, "red_min_ratio", defaults.red_min_ratio),
+            black_min_dark_ratio=_get_float(
+                args,
+                "black_min_dark_ratio",
+                defaults.black_min_dark_ratio,
+            ),
+            black_max_red_ratio=_get_float(
+                args,
+                "black_max_red_ratio",
+                defaults.black_max_red_ratio,
+            ),
             duplicate_suppression_radius=_get_int(
                 args,
                 "duplicate_suppression_radius",
@@ -112,8 +132,13 @@ class NsmbSortOrSplodeConfig:
             raise ValueError("Only TM_CCOEFF_NORMED is supported")
         _validate_threshold("red_match_threshold", self.red_match_threshold)
         _validate_threshold("black_match_threshold", self.black_match_threshold)
-        if self.min_score_margin < 0:
-            raise ValueError("min_score_margin must be greater than or equal to 0")
+        if self.template_score_margin < 0:
+            raise ValueError("template_score_margin must be greater than or equal to 0")
+        if self.color_sample_size < 1:
+            raise ValueError("color_sample_size must be greater than 0")
+        _validate_threshold("red_min_ratio", self.red_min_ratio)
+        _validate_threshold("black_min_dark_ratio", self.black_min_dark_ratio)
+        _validate_threshold("black_max_red_ratio", self.black_max_red_ratio)
         if self.duplicate_suppression_radius < 0:
             raise ValueError("duplicate_suppression_radius must be greater than or equal to 0")
         if self.drag_steps < 1:
