@@ -25,27 +25,27 @@ class TouchRect:
 
 @dataclass(frozen=True, slots=True)
 class NsmbSortOrSplodeConfig:
-    scan_interval_seconds: float = 0.10
+    scan_interval_seconds: float = 0.05
     post_drop_wait_seconds: float = 0.02
     max_sorted_count: int = 0
     red_template_path: Path = Path("templates/red_bob_omb.png")
     black_template_path: Path = Path("templates/black_bob_omb.png")
     mask_fill_bgr: tuple[int, int, int] = (0, 255, 0)
     match_method: str = "TM_CCOEFF_NORMED"
-    red_match_threshold: float = 0.82
+    red_match_threshold: float = 0.80
     black_match_threshold: float = 0.82
-    min_score_margin: float = 0.05
+    min_score_margin: float = 0.0
     duplicate_suppression_radius: int = 18
-    drag_steps: int = 8
-    drag_duration_seconds: float = 0.18
-    red_goal_touch: TouchPoint = TouchPoint(50, 122)
-    black_goal_touch: TouchPoint = TouchPoint(270, 122)
+    drag_steps: int = 4
+    drag_duration_seconds: float = 0.10
+    red_goal_touch: TouchPoint = TouchPoint(24, 122)
+    black_goal_touch: TouchPoint = TouchPoint(296, 122)
     ignore_touch_rects: tuple[TouchRect, ...] = (
         TouchRect(9, 70, 82, 100),
         TouchRect(230, 72, 82, 98),
     )
     save_debug_frames: bool = False
-    notify_on_finish: bool = True
+    notify_on_finish: bool = False
 
     @classmethod
     def from_args(cls, args: dict) -> Self:

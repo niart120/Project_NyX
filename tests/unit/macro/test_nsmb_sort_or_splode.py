@@ -77,9 +77,10 @@ def _template_images() -> dict[str, np.ndarray]:
 def test_config_accepts_default_settings() -> None:
     cfg = NsmbSortOrSplodeConfig.from_args({})
 
-    assert cfg.red_goal_touch == TouchPoint(50, 122)
-    assert cfg.black_goal_touch == TouchPoint(270, 122)
+    assert cfg.red_goal_touch == TouchPoint(24, 122)
+    assert cfg.black_goal_touch == TouchPoint(296, 122)
     assert cfg.mask_fill_bgr == (0, 255, 0)
+    assert cfg.notify_on_finish is False
 
 
 def test_config_rejects_invalid_touch_goal() -> None:
@@ -154,9 +155,15 @@ def test_build_drag_path_includes_start_and_goal() -> None:
 
 
 def test_macro_sends_touch_drag_for_detected_bomb() -> None:
-    frame = cv2.imread(str(ROOT / "snapshots" / "20260516_200318.png"), cv2.IMREAD_COLOR)
-    assert frame is not None
-    cmd = FakeCommand(frame, _template_images())
+    images = _template_images()
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    bottom = THREEDS_HD_BOTTOM_SCREEN
+    template = images["templates/red_bob_omb.png"]
+    frame[
+        bottom.y + 40 : bottom.y + 40 + template.shape[0],
+        bottom.x + 30 : bottom.x + 30 + template.shape[1],
+    ] = template
+    cmd = FakeCommand(frame, images)
     macro = NsmbSortOrSplodeMacro()
     macro.initialize(
         cmd,
@@ -164,8 +171,8 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
             "scan_interval_seconds": 0,
             "post_drop_wait_seconds": 0,
             "max_sorted_count": 1,
-            "min_score_margin": 0,
             "red_match_threshold": 0.95,
+            "notify_on_finish": True,
         },
     )
 

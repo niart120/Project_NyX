@@ -92,7 +92,7 @@ class NsmbSortOrSplodeMacro(MacroBase):
             for index, point in enumerate(path):
                 cmd.touch_down(point.x, point.y)
                 touch_started = True
-                if wait_per_step > 0 and index < len(path) - 1:
+                if wait_per_step > 0:
                     cmd.wait(wait_per_step)
         finally:
             if touch_started:

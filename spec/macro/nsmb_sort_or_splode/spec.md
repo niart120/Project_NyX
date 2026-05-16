@@ -43,7 +43,7 @@
 
 ### アルゴリズム概要
 
-下画面実領域だけを切り出し、赤テンプレートと黒テンプレートを `scan_interval_seconds = 0.10` 秒ごとに交互に照合する。照合前に赤陣地・黒陣地・スコア表示などの矩形を `cv2.rectangle(frame, pt1, pt2, (0, 255, 0), thickness=-1)` で塗りつぶし、ボムへいの投入先や誤検出源をテンプレートマッチングから除外する。
+下画面実領域だけを切り出し、赤テンプレートと黒テンプレートを `scan_interval_seconds = 0.05` 秒ごとに交互に照合する。照合前に赤陣地・黒陣地・スコア表示などの矩形を `cv2.rectangle(frame, pt1, pt2, (0, 255, 0), thickness=-1)` で塗りつぶし、ボムへいの投入先や誤検出源をテンプレートマッチングから除外する。
 
 座標変換は 3DS 画面座標仕様に従う。実装では `THREEDS_HD_BOTTOM_SCREEN`、`ScreenPoint`、`ScreenRect`、`TouchPoint`、`hd_capture_point_to_3ds_touch()`、`touch_point_to_3ds_hd_capture()`、`validate_3ds_touch_point()` を使い、手書きの座標補正を増やさない。3DS HD キャプチャ座標 `(hd_x, hd_y)` からタッチ座標 `(touch_x, touch_y)` への変換式は確認用に以下で表せる。
 
@@ -78,7 +78,7 @@ path_i = start + (goal - start) * i / drag_steps
 
 | 指標 | 目標値 |
 |------|--------|
-| 検出周期 | 100 ms ごとに赤 / 黒を交互に 1 回照合 |
+| 検出周期 | 50 ms ごとに赤 / 黒を交互に 1 回照合 |
 | 1 回の画像処理 | 下画面切り出し、マスク適用、テンプレートマッチングを 80 ms 未満で完了 |
 | ドラッグ時間 | 1 個あたり `0.18` 秒以内を既定値にする |
 | 検出対象 | 陣地領域を除く下画面実領域 |
@@ -127,30 +127,30 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `scan_interval_seconds` | `float` | `0.10` | テンプレート照合周期。赤 / 黒を交互に照合する |
+| `scan_interval_seconds` | `float` | `0.05` | テンプレート照合周期。赤 / 黒を交互に照合する |
 | `post_drop_wait_seconds` | `float` | `0.02` | ドラッグ完了後の短期待機 |
 | `max_sorted_count` | `int` | `0` | 仕分け数の上限。`0` は無制限 |
 | `red_template_path` | `str` | `"templates/red_bob_omb.png"` | 赤いボムへいのテンプレートパス |
 | `black_template_path` | `str` | `"templates/black_bob_omb.png"` | 黒いボムへいのテンプレートパス |
 | `mask_fill_bgr` | `list[int]` | `[0, 255, 0]` | 除外矩形を塗りつぶす BGR 色 |
 | `match_method` | `str` | `"TM_CCOEFF_NORMED"` | OpenCV のテンプレートマッチング方式 |
-| `red_match_threshold` | `float` | `0.82` | 赤テンプレートの採用しきい値 |
+| `red_match_threshold` | `float` | `0.80` | 赤テンプレートの採用しきい値 |
 | `black_match_threshold` | `float` | `0.82` | 黒テンプレートの採用しきい値 |
-| `min_score_margin` | `float` | `0.05` | 最高スコアが `threshold + min_score_margin` 未満なら操作しない |
+| `min_score_margin` | `float` | `0.0` | 最高スコアが `threshold + min_score_margin` 未満なら操作しない |
 | `duplicate_suppression_radius` | `int` | `18` | 同一ボムへい候補をまとめる半径。単位はタッチ座標 px |
-| `drag_steps` | `int` | `8` | 1 回のドラッグで送信する中間点数 |
-| `drag_duration_seconds` | `float` | `0.18` | 1 回のドラッグ総時間 |
-| `red_goal_touch` | `list[int]` | `[50, 122]` | 赤いボムへいの投入先タッチ座標 |
-| `black_goal_touch` | `list[int]` | `[270, 122]` | 黒いボムへいの投入先タッチ座標 |
+| `drag_steps` | `int` | `4` | 1 回のドラッグで送信する中間点数 |
+| `drag_duration_seconds` | `float` | `0.10` | 1 回のドラッグ総時間 |
+| `red_goal_touch` | `list[int]` | `[24, 122]` | 赤いボムへいの投入先タッチ座標 |
+| `black_goal_touch` | `list[int]` | `[296, 122]` | 黒いボムへいの投入先タッチ座標 |
 | `ignore_touch_rects` | `list[list[int]]` | `[[9, 70, 82, 100], [230, 72, 82, 98]]` | テンプレート照合から除外する矩形。単位はタッチ座標 |
 | `save_debug_frames` | `bool` | `False` | 検出結果のデバッグ画像を artifacts に保存する |
-| `notify_on_finish` | `bool` | `True` | 上限到達または中断時に通知する |
+| `notify_on_finish` | `bool` | `False` | 上限到達または中断時に通知する |
 
 ### リソース形式
 
 ```toml
 # resources/nsmb_sort_or_splode/settings.toml
-scan_interval_seconds = 0.10
+scan_interval_seconds = 0.05
 post_drop_wait_seconds = 0.02
 max_sorted_count = 0
 
@@ -159,22 +159,22 @@ black_template_path = "templates/black_bob_omb.png"
 mask_fill_bgr = [0, 255, 0]
 
 match_method = "TM_CCOEFF_NORMED"
-red_match_threshold = 0.82
+red_match_threshold = 0.80
 black_match_threshold = 0.82
-min_score_margin = 0.05
+min_score_margin = 0.0
 duplicate_suppression_radius = 18
 
-drag_steps = 8
-drag_duration_seconds = 0.18
-red_goal_touch = [50, 122]
-black_goal_touch = [270, 122]
+drag_steps = 4
+drag_duration_seconds = 0.10
+red_goal_touch = [24, 122]
+black_goal_touch = [296, 122]
 ignore_touch_rects = [
   [9, 70, 82, 100],
   [230, 72, 82, 98],
 ]
 
 save_debug_frames = false
-notify_on_finish = true
+notify_on_finish = false
 ```
 
 テンプレート画像は下画面切り出し後の `480x360` スケールに合わせる。初期テンプレートは `snapshots/20260516_200318.png` から暫定的に切り出した画像であり、実機の照明・拡大率・キャプチャ条件で認識が不安定な場合は同名ファイルを上書きする。検出マスク画像は置かず、除外矩形を OpenCV で直接塗りつぶす。
@@ -284,7 +284,7 @@ def build_drag_path(
 - 下画面実領域、投入先、除外矩形がタッチ座標範囲内であることを検証する。
 
 **Step 1**: 検出ループ開始  
-- タイミング: `scan_interval_seconds = 0.10` 秒。
+- タイミング: `scan_interval_seconds = 0.05` 秒。
 - `active_color` の初期値は `red` とし、各周期で `red -> black -> red` の順に切り替える。
 
 **Step 2**: 画面取得  
@@ -302,7 +302,7 @@ def build_drag_path(
 - 検出中心をタッチ座標へ変換する。
 - 色に応じて `red_goal_touch` または `black_goal_touch` を選ぶ。
 - `build_drag_path()` で経路を作り、各点で `cmd.touch_down(x, y)` を送る。
-- 点間待機は `drag_duration_seconds / drag_steps` 秒とする。
+- 点間待機は `drag_duration_seconds / drag_steps` 秒とし、最終地点でも同じ時間だけ保持してから離す。
 - 最後に必ず `cmd.touch_up()` を送る。
 
 **Step 5**: 後処理  
@@ -335,9 +335,10 @@ def build_drag_path(
 | ユニット | `test_find_bombs_rejects_low_score` | しきい値未満の候補を返さない |
 | ユニット | `test_find_bombs_rejects_low_confidence_margin` | しきい値からの余裕が小さい候補を返さない |
 | ユニット | `test_build_drag_path_includes_start_and_goal` | ドラッグ経路が開始点と終点を含み、点数が設定通りになる |
-| ユニット | `test_macro_alternates_red_and_black_detection` | fake `Command` で赤 / 黒の照合順が 100 ms 周期で交互になる |
+| ユニット | `test_macro_alternates_red_and_black_detection` | fake `Command` で赤 / 黒の照合順が交互になる |
 | ユニット | `test_macro_sends_touch_drag_for_detected_bomb` | 検出時に `touch_down()` 群と `touch_up()` が送信される |
 | ユニット | `test_macro_touches_up_when_drag_fails` | ドラッグ中の例外でも `touch_up()` が送信される |
+| パフォーマンス | `test_nsmb_sort_or_splode_single_color_detection_perf` | マスク適用と単色テンプレート照合が 30 ms 未満で完了する |
 | 実機 | `test_nsmb_sort_or_splode_realdevice` | 3DS 実機または DS 互換環境で赤 / 黒の仕分けが成功する |
 
 ## 6. 実装チェックリスト
