@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from math import ceil, floor, hypot
+from math import ceil, floor
 
 import cv2
 import numpy as np
@@ -94,7 +94,7 @@ def find_bombs(
         return []
 
     result = cv2.matchTemplate(frame_bgr, template_bgr, cv2.TM_CCOEFF_NORMED)
-    ys, xs = np.where(result >= threshold)
+    ys, xs = _local_maxima(result, threshold)
     candidates = [
         _candidate_from_match(
             color,
@@ -132,6 +132,7 @@ def classify_bombs(
         reverse=True,
     )
     consumed = [False] * len(candidates)
+    duplicate_suppression_radius_sq = duplicate_suppression_radius * duplicate_suppression_radius
     for index, anchor in enumerate(candidates):
         if consumed[index]:
             continue
@@ -139,7 +140,7 @@ def classify_bombs(
             group_index
             for group_index, candidate in enumerate(candidates)
             if not consumed[group_index]
-            and _touch_distance(anchor, candidate) <= duplicate_suppression_radius
+            and _touch_distance_sq(anchor, candidate) <= duplicate_suppression_radius_sq
         ]
         for group_index in group_indices:
             consumed[group_index] = True
@@ -284,13 +285,10 @@ def _suppress_duplicates(
     candidates: list[DetectedBomb],
     duplicate_suppression_radius: int,
 ) -> list[DetectedBomb]:
+    min_distance_sq = duplicate_suppression_radius * duplicate_suppression_radius
     selected: list[DetectedBomb] = []
     for candidate in candidates:
-        if all(
-            hypot(candidate.touch_x - item.touch_x, candidate.touch_y - item.touch_y)
-            > duplicate_suppression_radius
-            for item in selected
-        ):
+        if all(_touch_distance_sq(candidate, item) > min_distance_sq for item in selected):
             selected.append(candidate)
     return selected
 
@@ -302,5 +300,15 @@ def _best_color_candidate(candidates: list[DetectedBomb], color: BombColor) -> D
     return max(same_color, key=lambda item: item.score)
 
 
-def _touch_distance(first: DetectedBomb, second: DetectedBomb) -> float:
-    return hypot(first.touch_x - second.touch_x, first.touch_y - second.touch_y)
+def _touch_distance_sq(first: DetectedBomb, second: DetectedBomb) -> int:
+    dx = first.touch_x - second.touch_x
+    dy = first.touch_y - second.touch_y
+    return dx * dx + dy * dy
+
+
+def _local_maxima(result: np.ndarray, threshold: float) -> tuple[np.ndarray, np.ndarray]:
+    above_threshold = result >= threshold
+    if not bool(above_threshold.any()):
+        return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
+    dilated = cv2.dilate(result, np.ones((3, 3), dtype=np.uint8))
+    return np.where(above_threshold & (result == dilated))
