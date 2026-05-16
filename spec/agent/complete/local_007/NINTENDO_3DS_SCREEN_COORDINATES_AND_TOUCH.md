@@ -480,22 +480,22 @@ GUI のピラーボックス操作は例外にせず、`try_*` 関数で `None` 
 
 - [x] 仕様初期決定の反映
 - [x] `Command.capture()` の 1280x720 アスペクトボックス座標前提を反映
-- [ ] 公開 API のシグネチャ確定
-- [ ] 3DS 画面領域定数の追加
-- [ ] 3DS HD キャプチャ座標定数の追加
-- [ ] プリセット別プレビュー座標変換の追加
-- [ ] 座標変換補助関数の追加
-- [ ] 3DS タッチ座標範囲の `0..319`, `0..239` 統一
-- [ ] PreviewPane のフレーム縦横比維持と座標変換
-- [ ] PreviewPane のタッチ signal 追加
-- [ ] ControllerOutputPort のタッチ対応 capability 追加
-- [ ] VirtualControllerModel のタッチ送信 API 追加
-- [ ] `タッチパネル` checkbox と `gui.preview_touch_enabled` の追加
-- [ ] checkbox 未チェック時の preview touch no-op 化
-- [ ] MainWindow の signal 接続と非対応時 no-op / ステータス表示
-- [ ] ユニットテスト作成・パス
-- [ ] GUI テスト作成・パス
-- [ ] 統合テスト作成・パス
-- [ ] 型ヒントの整合性チェック（ruff）
-- [ ] 既存テストが破壊されないことの確認
-- [ ] ドキュメントコメント（公開 API のみ）
+- [x] 公開 API のシグネチャ確定
+- [x] 3DS 画面領域定数の追加
+- [x] 3DS HD キャプチャ座標定数の追加
+- [x] プリセット別プレビュー座標変換の追加
+- [x] 座標変換補助関数の追加
+- [x] 3DS タッチ座標範囲の `0..319`, `0..239` 統一
+- [x] PreviewPane のフレーム縦横比維持と座標変換
+- [x] PreviewPane のタッチ signal 追加
+- [x] ControllerOutputPort のタッチ対応 capability 追加
+- [x] VirtualControllerModel のタッチ送信 API 追加
+- [x] `タッチパネル` checkbox と `gui.preview_touch_enabled` の追加
+- [x] checkbox 未チェック時の preview touch no-op 化
+- [x] MainWindow の signal 接続と非対応時 no-op / ステータス表示
+- [x] ユニットテスト作成・パス
+- [x] GUI テスト作成・パス
+- [x] 統合テスト作成・パス
+- [x] 型ヒントの整合性チェック（ruff）
+- [x] 既存テストが破壊されないことの確認
+- [x] ドキュメントコメント（公開 API のみ）
