@@ -66,6 +66,7 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             choices=("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
         ),
         "gui.window_size_preset": SettingField("gui.window_size_preset", str, "full_hd"),
+        "gui.preview_touch_enabled": SettingField("gui.preview_touch_enabled", bool, False),
     }
 )
 
