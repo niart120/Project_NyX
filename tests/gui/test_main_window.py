@@ -15,6 +15,7 @@ from nyxpy.gui.app_services import SettingsApplyOutcome
 from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
 from nyxpy.gui.main_window import MainWindow
 from nyxpy.gui.panes.control_pane import RunUiState
+from tests.support.fakes import FakeControllerOutputPort, FakeFullCapabilityController
 
 
 class RecordingLogger:
@@ -52,6 +53,7 @@ class FakeSettings:
             },
             "gui": {
                 "window_size_preset": "full_hd",
+                "preview_touch_enabled": False,
             },
             "capture_device": "",
             "capture_source_type": "camera",
@@ -242,9 +244,105 @@ def test_initial_ui_state(window: MainWindow):
     assert window.macro_browser.table.rowCount() == 1
     assert window.macro_browser.table.item(0, 0).text() == "Dummy Macro"
     assert window.status_label.text() == "準備完了"
+    assert window.touch_panel_checkbox.text() == "タッチパネル"
+    assert not window.touch_panel_checkbox.isChecked()
     assert not window.control_pane.run_btn.isEnabled()
     assert not window.control_pane.cancel_btn.isEnabled()
     assert window.control_pane.snapshot_btn.isEnabled()
+
+
+def test_main_window_wires_preview_touch_to_virtual_controller_model(window: MainWindow) -> None:
+    controller = FakeFullCapabilityController()
+    window.virtual_controller.model.set_controller(controller)
+    window.touch_panel_checkbox.setChecked(True)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    window.preview_pane.touch_move_requested.emit(11, 21)
+    window.preview_pane.touch_up_requested.emit()
+
+    assert controller.events == [
+        ("touch_down", (10, 20)),
+        ("touch_down", (11, 21)),
+        ("touch_up", None),
+    ]
+
+
+def test_main_window_initializes_touch_panel_checkbox_from_settings(
+    qtbot,
+    services: FakeServices,
+) -> None:
+    services.global_settings.set("gui.preview_touch_enabled", True)
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.touch_panel_checkbox.isChecked()
+    w.preview_pane.timer.stop()
+
+
+def test_main_window_saves_touch_panel_checkbox_to_settings(window: MainWindow) -> None:
+    window.status_label.setText("保持")
+
+    window.touch_panel_checkbox.setChecked(True)
+    assert window.global_settings.get("gui.preview_touch_enabled") is True
+    assert window.status_label.text() == "保持"
+
+    window.touch_panel_checkbox.setChecked(False)
+    assert window.global_settings.get("gui.preview_touch_enabled") is False
+    assert window.status_label.text() == "保持"
+
+
+def test_main_window_ignores_preview_touch_when_touch_panel_is_disabled(
+    window: MainWindow,
+) -> None:
+    controller = FakeFullCapabilityController()
+    window.virtual_controller.model.set_controller(controller)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    window.preview_pane.touch_move_requested.emit(11, 21)
+    window.preview_pane.touch_up_requested.emit()
+
+    assert controller.events == []
+    assert window.status_label.text() == "準備完了"
+
+
+def test_main_window_ignores_preview_touch_when_controller_does_not_support_touch(
+    window: MainWindow,
+) -> None:
+    controller = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(controller)
+    window.touch_panel_checkbox.setChecked(True)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    window.preview_pane.touch_move_requested.emit(11, 21)
+    window.preview_pane.touch_up_requested.emit()
+
+    assert controller.events == []
+
+
+def test_main_window_shows_touch_unsupported_status_on_each_preview_press(
+    window: MainWindow,
+) -> None:
+    window.virtual_controller.model.set_controller(FakeControllerOutputPort())
+    window.touch_panel_checkbox.setChecked(True)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    assert window.status_label.text() == "現在のプロトコルは 3DS タッチ入力に対応していません"
+    window.status_label.setText("別メッセージ")
+    window.preview_pane.touch_down_requested.emit(11, 21)
+
+    assert window.status_label.text() == "現在のプロトコルは 3DS タッチ入力に対応していません"
+
+
+def test_main_window_keeps_touch_panel_checkbox_enabled_for_non_touch_protocol(
+    window: MainWindow,
+) -> None:
+    window.virtual_controller.model.set_controller(FakeControllerOutputPort())
+
+    assert window.touch_panel_checkbox.isEnabled()
+    window.touch_panel_checkbox.setChecked(True)
+
+    assert window.touch_panel_checkbox.isChecked()
 
 
 def test_main_window_applies_saved_window_size_preset(qtbot, services: FakeServices):

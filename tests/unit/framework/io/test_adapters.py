@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode
+from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, ThreeDSSerialProtocol
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
     DummyFrameSourcePort,
@@ -45,6 +46,8 @@ class Protocol:
 
 
 class ThreeDSProtocol(Protocol):
+    supports_touch = True
+
     def build_touch_down_command(self, x, y):
         return ("touch_down", x, y)
 
@@ -80,10 +83,15 @@ def test_serial_controller_touch_sends_3ds_frames() -> None:
     serial = SerialDevice()
     port = SerialControllerOutputPort(serial, ThreeDSProtocol())
 
-    port.touch_down(320, 240)
+    port.touch_down(319, 239)
     port.touch_up()
 
-    assert serial.sent == [("touch_down", 320, 240), ("touch_up",)]
+    assert serial.sent == [("touch_down", 319, 239), ("touch_up",)]
+
+
+def test_serial_controller_reports_touch_capability_by_protocol() -> None:
+    assert SerialControllerOutputPort(SerialDevice(), ThreeDSSerialProtocol()).supports_touch
+    assert not SerialControllerOutputPort(SerialDevice(), CH552SerialProtocol()).supports_touch
 
 
 def test_serial_controller_disable_sleep_sends_3ds_command() -> None:
@@ -100,7 +108,7 @@ def test_serial_controller_touch_unsupported_protocol_raises() -> None:
     port = SerialControllerOutputPort(SerialDevice(), Protocol())
 
     with pytest.raises(NotImplementedError, match="touch input"):
-        port.touch_down(320, 240)
+        port.touch_down(319, 239)
     with pytest.raises(NotImplementedError, match="sleep control"):
         port.disable_sleep(True)
 

@@ -50,7 +50,7 @@ def test_3ds_release_specific_button(protocol):
 
 
 def test_3ds_release_all(protocol):
-    protocol.build_press_command((Button.A, LStick.RIGHT, RStick.UP, TouchState.down(320, 240)))
+    protocol.build_press_command((Button.A, LStick.RIGHT, RStick.UP, TouchState.down(319, 239)))
 
     assert protocol.build_release_command(()) == NEUTRAL_FRAME
 
@@ -85,37 +85,37 @@ def test_3ds_c_stick_presets(protocol, stick, expected):
 
 def test_3ds_mixed_input_fixed_frame(protocol):
     assert protocol.build_press_command(
-        (Button.A, Hat.UP, LStick.RIGHT, RStick.UP, TouchState.down(320, 240))
-    ) == bytes([0xA1, 0x18, 0x00, 0xA2, 0xFA, 0x80, 0xA4, 0x00, 0x80, 0xB2, 0x01, 0x01, 0x40, 0xF0])
+        (Button.A, Hat.UP, LStick.RIGHT, RStick.UP, TouchState.down(319, 239))
+    ) == bytes([0xA1, 0x18, 0x00, 0xA2, 0xFA, 0x80, 0xA4, 0x00, 0x80, 0xB2, 0x01, 0x01, 0x3F, 0xEF])
 
 
 def test_3ds_touch_state_keytype(protocol):
-    assert protocol.build_press_command((TouchState.down(320, 240),)) == bytes(
-        [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x01, 0x01, 0x40, 0xF0]
+    assert protocol.build_press_command((TouchState.down(319, 239),)) == bytes(
+        [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x01, 0x01, 0x3F, 0xEF]
     )
 
 
 def test_3ds_touch_state_release(protocol):
-    protocol.build_press_command((Button.A, TouchState.down(320, 240)))
+    protocol.build_press_command((Button.A, TouchState.down(319, 239)))
 
-    assert protocol.build_release_command((TouchState.down(320, 240),)) == bytes(
+    assert protocol.build_release_command((TouchState.down(319, 239),)) == bytes(
         [0xA1, 0x10, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x00, 0x00, 0x00, 0x00]
     )
 
 
 def test_3ds_touch_down(protocol):
-    assert protocol.build_touch_down_command(320, 240) == bytes(
-        [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x01, 0x01, 0x40, 0xF0]
+    assert protocol.build_touch_down_command(319, 239) == bytes(
+        [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x01, 0x01, 0x3F, 0xEF]
     )
 
 
 def test_3ds_touch_up(protocol):
-    protocol.build_touch_down_command(320, 240)
+    protocol.build_touch_down_command(319, 239)
 
     assert protocol.build_touch_up_command() == NEUTRAL_FRAME
 
 
-@pytest.mark.parametrize(("x", "y"), [(-1, 0), (321, 0), (0, -1), (0, 241)])
+@pytest.mark.parametrize(("x", "y"), [(-1, 0), (320, 0), (0, -1), (0, 240)])
 def test_3ds_touch_out_of_range(protocol, x, y):
     with pytest.raises(ValueError):
         protocol.build_touch_down_command(x, y)

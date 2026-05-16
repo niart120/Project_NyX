@@ -15,6 +15,8 @@ from nyxpy.framework.core.constants import (
 
 
 class SerialProtocolInterface(ABC):
+    supports_touch: bool = False
+
     @abstractmethod
     def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー押下操作のコマンドデータを生成する
@@ -332,6 +334,8 @@ class PokeConSerialProtocol(SerialProtocolInterface):
 class ThreeDSSerialProtocol(SerialProtocolInterface):
     """Nintendo 3DS 向け S2/T3 シリアルプロトコル実装。"""
 
+    supports_touch = True
+
     _BUTTON_MASKS: dict[Button, int] = {
         Button.Y: 0x0080,
         Button.B: 0x0020,
@@ -451,10 +455,10 @@ class ThreeDSSerialProtocol(SerialProtocolInterface):
 
     @staticmethod
     def _validate_touch(x: int, y: int) -> None:
-        if not 0 <= x <= 320:
-            raise ValueError("Touch X must be in range 0..320")
-        if not 0 <= y <= 240:
-            raise ValueError("Touch Y must be in range 0..240")
+        if not 0 <= x <= 319:
+            raise ValueError("Touch X must be in range 0..319")
+        if not 0 <= y <= 239:
+            raise ValueError("Touch Y must be in range 0..239")
 
     @staticmethod
     def _convert_slide_axis(value: int) -> int:

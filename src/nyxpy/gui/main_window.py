@@ -3,6 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QGridLayout,
     QHBoxLayout,
@@ -37,6 +38,8 @@ from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
+_TOUCH_UNSUPPORTED_STATUS = "現在のプロトコルは 3DS タッチ入力に対応していません"
+_PREVIEW_TOUCH_ENABLED_SETTING = "gui.preview_touch_enabled"
 
 
 class _VirtualControllerPanel(QWidget):
@@ -51,10 +54,22 @@ class _VirtualControllerPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self.title_label = QLabel("コントローラー", self)
+
+        self.title_bar = QWidget(self)
+        self.title_bar.setFixedHeight(PANE_TITLE_HEIGHT)
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(8)
+        self.title_label = QLabel("コントローラー", self.title_bar)
         apply_pane_title_font(self.title_label)
         self.title_label.setIndent(title_indent)
-        layout.addWidget(self.title_label, 0)
+        self.touch_panel_checkbox = QCheckBox("タッチパネル", self.title_bar)
+        self.touch_panel_checkbox.setFixedHeight(PANE_TITLE_HEIGHT)
+        title_layout.addWidget(self.title_label, 0)
+        title_layout.addWidget(self.touch_panel_checkbox, 0)
+        title_layout.addStretch(1)
+        layout.addWidget(self.title_bar, 0)
+
         self.controller = VirtualControllerPane(logger, self)
         layout.addWidget(
             self.controller,
@@ -110,6 +125,7 @@ class MainWindow(QMainWindow):
         self.last_run_result: RunResult | None = None
         self.preview_connection_error: BaseException | None = None
         self.manual_controller_error: BaseException | None = None
+        self._preview_touch_active = False
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
         self.current_window_size_preset_key = normalize_window_size_preset_key(
@@ -198,6 +214,11 @@ class MainWindow(QMainWindow):
             title_indent=LEFT_PANE_CONTENT_MARGIN,
         )
         self.controller_title_label = self.virtual_controller_panel.title_label
+        self.touch_panel_checkbox = self.virtual_controller_panel.touch_panel_checkbox
+        self._set_preview_touch_enabled(
+            self.global_settings.get(_PREVIEW_TOUCH_ENABLED_SETTING, False),
+            save=False,
+        )
         self.virtual_controller = self.virtual_controller_panel.controller
         left_center_layout.addWidget(self.virtual_controller_panel, 1, 0)
 
@@ -324,10 +345,48 @@ class MainWindow(QMainWindow):
         # Delegate snapshot to PreviewPane and status via signal
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
         self.preview_pane.snapshot_taken.connect(self.status_label.setText)
+        self.preview_pane.touch_down_requested.connect(self._handle_preview_touch_down)
+        self.preview_pane.touch_move_requested.connect(self._handle_preview_touch_move)
+        self.preview_pane.touch_up_requested.connect(self._handle_preview_touch_up)
+        self.touch_panel_checkbox.toggled.connect(self._set_preview_touch_enabled)
         self.control_pane.settings_requested.connect(self.open_app_settings)
 
         # Set status to ready
         self.status_label.setText("準備完了")
+
+    def _set_preview_touch_enabled(self, enabled: bool, *, save: bool = True) -> None:
+        enabled = bool(enabled)
+        if self.touch_panel_checkbox.isChecked() != enabled:
+            self.touch_panel_checkbox.setChecked(enabled)
+        if save and self.global_settings.get(_PREVIEW_TOUCH_ENABLED_SETTING) != enabled:
+            self.global_settings.set(_PREVIEW_TOUCH_ENABLED_SETTING, enabled)
+
+    def _handle_preview_touch_down(self, x: int, y: int) -> None:
+        self._preview_touch_active = False
+        if not self.touch_panel_checkbox.isChecked():
+            return
+        if not self.virtual_controller.model.supports_touch_input():
+            self.status_label.setText(_TOUCH_UNSUPPORTED_STATUS)
+            return
+        self.virtual_controller.model.touch_down(x, y)
+        self._preview_touch_active = True
+
+    def _handle_preview_touch_move(self, x: int, y: int) -> None:
+        if (
+            not self._preview_touch_active
+            or not self.touch_panel_checkbox.isChecked()
+            or not self.virtual_controller.model.supports_touch_input()
+        ):
+            return
+        self.virtual_controller.model.touch_move(x, y)
+
+    def _handle_preview_touch_up(self) -> None:
+        if not self._preview_touch_active:
+            return
+        self._preview_touch_active = False
+        if not self.virtual_controller.model.supports_touch_input():
+            return
+        self.virtual_controller.model.touch_up()
 
     def open_app_settings(self):
         dlg = AppSettingsDialog(
@@ -360,6 +419,11 @@ class MainWindow(QMainWindow):
         if "gui.window_size_preset" in outcome.changed_keys:
             self.apply_window_size_preset(
                 self.global_settings.get("gui.window_size_preset", DEFAULT_WINDOW_SIZE_PRESET_KEY),
+                save=False,
+            )
+        if _PREVIEW_TOUCH_ENABLED_SETTING in outcome.changed_keys:
+            self._set_preview_touch_enabled(
+                self.global_settings.get(_PREVIEW_TOUCH_ENABLED_SETTING, False),
                 save=False,
             )
         if outcome.deferred:

@@ -30,6 +30,9 @@ class VirtualControllerModel(QObject):
         """コントローラー出力 Port を設定"""
         self.controller = controller
 
+    def supports_touch_input(self) -> bool:
+        return self.controller is not None and self.controller.supports_touch
+
     def button_press(self, button: Button) -> None:
         """ボタンが押されたときの処理"""
         self.pressed_buttons.add(button)
@@ -84,6 +87,39 @@ class VirtualControllerModel(QObject):
             if previous_stick != RStick.CENTER:
                 self.send_release_command((previous_stick,))
             self.current_r_stick = RStick.CENTER
+
+    def touch_down(self, x: int, y: int) -> None:
+        if not self.supports_touch_input():
+            return
+        try:
+            self.controller.touch_down(x, y)
+        except Exception as e:
+            self.logger.technical(
+                "ERROR",
+                "タッチ押下コマンド送信エラー",
+                component="VirtualController",
+                event="controller.touch_down_failed",
+                exc=e,
+            )
+            raise
+
+    def touch_move(self, x: int, y: int) -> None:
+        self.touch_down(x, y)
+
+    def touch_up(self) -> None:
+        if not self.supports_touch_input():
+            return
+        try:
+            self.controller.touch_up()
+        except Exception as e:
+            self.logger.technical(
+                "ERROR",
+                "タッチ解放コマンド送信エラー",
+                component="VirtualController",
+                event="controller.touch_up_failed",
+                exc=e,
+            )
+            raise
 
     def send_release_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
         if self.controller is None:

@@ -45,6 +45,10 @@ class ControllerOutputPort(ABC):
     @abstractmethod
     def close(self) -> None: ...
 
+    @property
+    def supports_touch(self) -> bool:
+        return False
+
     def touch_down(self, x: int, y: int) -> None:
         raise NotImplementedError("Current controller output does not support touch input.")
 

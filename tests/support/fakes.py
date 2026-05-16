@@ -63,6 +63,10 @@ class FakeControllerOutputPort(ControllerOutputPort):
 
 
 class FakeFullCapabilityController(FakeControllerOutputPort):
+    @property
+    def supports_touch(self) -> bool:
+        return True
+
     def touch_down(self, x: int, y: int) -> None:
         self.events.append(("touch_down", (x, y)))
 
