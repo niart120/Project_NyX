@@ -40,6 +40,7 @@ class FakeCommand:
         return image
 
     def capture(self, crop_region=None, grayscale: bool = False):
+        self.events.append(("capture", self.capture_index))
         frame = self.frames[min(self.capture_index, len(self.frames) - 1)].copy()
         self.capture_index += 1
         if crop_region is not None:
@@ -286,7 +287,7 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
     touch_down_points = _touch_down_points(cmd.events)
     assert (cfg.red_staging_touch.x, cfg.red_staging_touch.y) in touch_down_points
     assert (cfg.red_goal_touch.x, cfg.red_goal_touch.y) in touch_down_points
-    assert ("touch_up", None) in cmd.events
+    assert _event_names(cmd.events).count("touch_up") == 1
     assert any(event[0] == "notify" for event in cmd.events)
 
 
@@ -323,8 +324,11 @@ def test_macro_uses_verified_color_after_staging() -> None:
     assert bomb is not None
     assert bomb.color is BombColor.RED
     assert touch_down_points[4] == (cfg.black_staging_touch.x, cfg.black_staging_touch.y)
-    assert touch_down_points[5] == (verified_touch.x, verified_touch.y)
+    assert touch_down_points[5] == (cfg.black_staging_touch.x, cfg.black_staging_touch.y)
     assert touch_down_points[-1] == (cfg.red_goal_touch.x, cfg.red_goal_touch.y)
+    events = _event_names(cmd.events)
+    capture_indices = [index for index, name in enumerate(events) if name == "capture"]
+    assert capture_indices[-1] < events.index("touch_up")
 
 
 def test_macro_skips_goal_when_staging_verification_is_ambiguous() -> None:
@@ -364,6 +368,9 @@ def test_macro_skips_goal_when_staging_verification_is_ambiguous() -> None:
     assert bomb is None
     assert touch_down_points[-1] == (cfg.red_staging_touch.x, cfg.red_staging_touch.y)
     assert (cfg.red_goal_touch.x, cfg.red_goal_touch.y) not in touch_down_points
+    events = _event_names(cmd.events)
+    capture_indices = [index for index, name in enumerate(events) if name == "capture"]
+    assert capture_indices[-1] < events.index("touch_up")
     assert any(event[0] == "log" and event[1][0] == "WARNING" for event in cmd.events)
 
 
@@ -425,6 +432,10 @@ def _place_template_at_touch(
 
 def _touch_down_points(events: list[tuple[str, object]]) -> list[tuple[int, int]]:
     return [payload for name, payload in events if name == "touch_down"]
+
+
+def _event_names(events: list[tuple[str, object]]) -> list[str]:
+    return [name for name, _ in events]
 
 
 def _template_center(x: int, y: int, template: np.ndarray) -> tuple[int, int]:

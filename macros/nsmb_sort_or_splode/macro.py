@@ -55,22 +55,17 @@ class NsmbSortOrSplodeMacro(MacroBase):
 
         bomb = candidates[0]
         if self._cfg.verify_before_goal:
-            staging = self._staging_for(bomb.color)
-            self._drag(cmd, bomb.touch_point, staging)
-            if self._cfg.staging_wait_seconds > 0:
-                cmd.wait(self._cfg.staging_wait_seconds)
-
-            verification_frame = self._capture_bottom(cmd)
-            masked, verification_candidates = self._detect_candidates(verification_frame)
-            verified = self._select_staged_candidate(cmd, verification_candidates, staging)
+            verified, verification_masked = self._verify_while_holding(cmd, bomb)
             if verified is None:
                 if self._cfg.post_drop_wait_seconds > 0:
                     cmd.wait(self._cfg.post_drop_wait_seconds)
                 return None
             bomb = verified
+            masked = verification_masked
 
         goal = self._goal_for(bomb.color)
-        self._drag(cmd, bomb.touch_point, goal)
+        if not self._cfg.verify_before_goal:
+            self._drag(cmd, bomb.touch_point, goal)
         self._sorted_count += 1
         if self._cfg.save_debug_frames:
             self._save_debug_frame(cmd, masked, bomb, goal)
@@ -125,6 +120,35 @@ class NsmbSortOrSplodeMacro(MacroBase):
         )
         return masked, candidates
 
+    def _verify_while_holding(
+        self,
+        cmd: Command,
+        bomb: DetectedBomb,
+    ) -> tuple[DetectedBomb | None, np.ndarray]:
+        staging = self._staging_for(bomb.color)
+        verification_masked: np.ndarray | None = None
+        verified: DetectedBomb | None = None
+        touch_started = [False]
+        try:
+            self._send_drag_path(cmd, bomb.touch_point, staging, touch_started)
+            if self._cfg.staging_wait_seconds > 0:
+                cmd.wait(self._cfg.staging_wait_seconds)
+
+            verification_frame = self._capture_bottom(cmd)
+            verification_masked, verification_candidates = self._detect_candidates(
+                verification_frame
+            )
+            verified = self._select_staged_candidate(cmd, verification_candidates, staging)
+            if verified is not None:
+                self._send_drag_path(cmd, staging, self._goal_for(verified.color), touch_started)
+        finally:
+            if touch_started[0]:
+                cmd.touch_up()
+
+        if verification_masked is None:
+            raise RuntimeError("staging verification did not capture a frame")
+        return verified, verification_masked
+
     def _select_staged_candidate(
         self,
         cmd: Command,
@@ -160,18 +184,27 @@ class NsmbSortOrSplodeMacro(MacroBase):
         return self._cfg.red_goal_touch if color is BombColor.RED else self._cfg.black_goal_touch
 
     def _drag(self, cmd: Command, start: TouchPoint, goal: TouchPoint) -> None:
+        touch_started = [False]
+        try:
+            self._send_drag_path(cmd, start, goal, touch_started)
+        finally:
+            if touch_started[0]:
+                cmd.touch_up()
+
+    def _send_drag_path(
+        self,
+        cmd: Command,
+        start: TouchPoint,
+        goal: TouchPoint,
+        touch_started: list[bool],
+    ) -> None:
         path = build_drag_path(start, goal, steps=self._cfg.drag_steps)
         wait_per_step = self._cfg.drag_duration_seconds / self._cfg.drag_steps
-        touch_started = False
-        try:
-            for point in path:
-                cmd.touch_down(point.x, point.y)
-                touch_started = True
-                if wait_per_step > 0:
-                    cmd.wait(wait_per_step)
-        finally:
-            if touch_started:
-                cmd.touch_up()
+        for point in path:
+            cmd.touch_down(point.x, point.y)
+            touch_started[0] = True
+            if wait_per_step > 0:
+                cmd.wait(wait_per_step)
 
     def _save_debug_frame(
         self,

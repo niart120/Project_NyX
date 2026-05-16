@@ -53,7 +53,7 @@ touch_x = floor((hd_x - 400 + 0.5) * 320 / 480)
 touch_y = floor((hd_y - 360 + 0.5) * 240 / 360)
 ```
 
-検出したテンプレート矩形の中心をタッチ座標へ変換し、`duplicate_suppression_radius` 内の赤・黒候補を同一位置の候補として束ねる。同一位置の候補はテンプレートスコア差と HSV 色特徴で仮分類する。`verify_before_goal = true` の場合は、仮分類が赤なら左下、黒なら右下のステージ座標へいったん置き、再キャプチャ後にステージ近傍の候補を再分類してから最終投入先へ運ぶ。
+検出したテンプレート矩形の中心をタッチ座標へ変換し、`duplicate_suppression_radius` 内の赤・黒候補を同一位置の候補として束ねる。同一位置の候補はテンプレートスコア差と HSV 色特徴で仮分類する。`verify_before_goal = true` の場合は、仮分類が赤なら左下、黒なら右下のステージ座標へ押下したまま移動し、押下を保持した状態で再キャプチャしてステージ近傍の候補を再分類してから最終投入先へ運ぶ。
 
 ```text
 path_i = start + (goal - start) * i / drag_steps
@@ -105,9 +105,9 @@ path_i = start + (goal - start) * i / drag_steps
 | `WAITING` | 次の検出周期まで待機 | 周期到達で `CAPTURING` |
 | `CAPTURING` | `Command.capture()` でフレーム取得 | 取得成功で `DETECTING`、失敗で停止 |
 | `DETECTING` | 赤黒テンプレートを照合し、HSV 色特徴で仮分類 | 採用候補ありで `STAGING` または `DRAGGING`、なしで `WAITING` |
-| `STAGING` | 仮分類色に対応するステージ座標へドラッグ | `touch_up()` 完了で `VERIFYING` |
+| `STAGING` | 仮分類色に対応するステージ座標へ押下したままドラッグ | ステージ到達で `VERIFYING` |
 | `VERIFYING` | 再キャプチャしてステージ近傍の候補を再分類 | 候補 1 個で `DRAGGING`、候補 0 個または複数で `WAITING` |
-| `DRAGGING` | 再検知中心から投入先へドラッグ | `touch_up()` 完了で `POST_DROP_WAIT` |
+| `DRAGGING` | ステージ座標から投入先へ押下したままドラッグ | `touch_up()` 完了で `POST_DROP_WAIT` |
 | `POST_DROP_WAIT` | 短時間待機して次色へ切替 | 待機完了で `WAITING` |
 | `STOPPED` | マクロ終了 | ユーザー中断、最大仕分け数到達、致命的エラー |
 
@@ -146,7 +146,7 @@ macros/nsmb_sort_or_splode/ -> macros/other/*      # 禁止
 | `black_min_dark_ratio` | `float` | `0.35` | 黒判定に必要な暗色画素比率 |
 | `black_max_red_ratio` | `float` | `0.10` | 黒判定時に許容する赤系画素比率の上限 |
 | `duplicate_suppression_radius` | `int` | `18` | 同一ボムへい候補をまとめる半径。単位はタッチ座標 px |
-| `verify_before_goal` | `bool` | `True` | 最終投入前にステージ座標へ置いて再検知する |
+| `verify_before_goal` | `bool` | `True` | 最終投入前にステージ座標で押下保持のまま再検知する |
 | `red_staging_touch` | `list[int]` | `[64, 200]` | 赤仮分類時の再検知用ステージ座標 |
 | `black_staging_touch` | `list[int]` | `[256, 200]` | 黒仮分類時の再検知用ステージ座標 |
 | `staging_wait_seconds` | `float` | `0.05` | ステージに置いた後、再キャプチャ前に待つ時間 |
@@ -361,20 +361,21 @@ def build_drag_path(
 
 **Step 4**: ドラッグ  
 - `verify_before_goal = false` の場合は、色に応じて `red_goal_touch` または `black_goal_touch` を選ぶ。
-- `verify_before_goal = true` の場合は、仮分類が赤なら `red_staging_touch`、黒なら `black_staging_touch` へいったんドラッグする。
+- `verify_before_goal = true` の場合は、仮分類が赤なら `red_staging_touch`、黒なら `black_staging_touch` へ押下したままドラッグする。
 - `build_drag_path()` で経路を作り、各点で `cmd.touch_down(x, y)` を送る。
-- 点間待機は `drag_duration_seconds / drag_steps` 秒とし、最終地点でも同じ時間だけ保持してから離す。
-- 最後に必ず `cmd.touch_up()` を送る。
+- 点間待機は `drag_duration_seconds / drag_steps` 秒とする。
+- `verify_before_goal = false` の場合は、投入先到達後に `cmd.touch_up()` を送る。
 
 **Step 5**: ステージ再検知  
-- `verify_before_goal = true` の場合、`staging_wait_seconds` だけ待ってから再キャプチャする。
+- `verify_before_goal = true` の場合、ステージ座標で押下を保持したまま `staging_wait_seconds` だけ待ってから再キャプチャする。
 - 再キャプチャしたフレームで Step 3 と同じ検出・分類を行う。
 - ステージ座標から `staging_verification_radius` 内の候補が 1 個だけなら、その候補の色を最終色として採用する。
-- ステージ座標近傍の候補が 0 個または 2 個以上の場合は警告ログを出し、誤投入を避けるため最終投入を行わない。
-- 最終投入のドラッグ開始点はステージ座標ではなく、再検知した `DetectedBomb.touch_point` とする。
+- ステージ座標近傍の候補が 0 個または 2 個以上の場合は警告ログを出し、`cmd.touch_up()` してから最終投入を行わない。
+- 最終投入のドラッグ開始点は、現在の押下位置であるステージ座標とする。
 
 **Step 6**: 最終投入と後処理  
 - 最終色に応じて `red_goal_touch` または `black_goal_touch` へドラッグする。
+- 投入先到達後に必ず `cmd.touch_up()` を送る。
 - `post_drop_wait_seconds` だけ待機する。
 - `sorted_count` を加算する。
 - `save_debug_frames = true` の場合、検出矩形とドラッグ先を描画した画像を artifacts に保存する。
