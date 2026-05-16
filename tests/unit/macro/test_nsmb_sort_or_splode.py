@@ -22,16 +22,11 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class FakeCommand:
-    def __init__(
-        self,
-        frame: np.ndarray | list[np.ndarray],
-        images: dict[str, np.ndarray],
-    ) -> None:
-        self.frames = [frame] if isinstance(frame, np.ndarray) else frame
+    def __init__(self, frame: np.ndarray, images: dict[str, np.ndarray]) -> None:
+        self.frame = frame
         self.images = images
         self.events: list[tuple[str, object]] = []
         self.saved_images: dict[str, np.ndarray] = {}
-        self.capture_index = 0
 
     def load_img(self, filename, grayscale: bool = False):
         image = self.images[str(filename).replace("\\", "/")].copy()
@@ -40,9 +35,7 @@ class FakeCommand:
         return image
 
     def capture(self, crop_region=None, grayscale: bool = False):
-        self.events.append(("capture", self.capture_index))
-        frame = self.frames[min(self.capture_index, len(self.frames) - 1)].copy()
-        self.capture_index += 1
+        frame = self.frame.copy()
         if crop_region is not None:
             x, y, w, h = crop_region
             frame = frame[y : y + h, x : x + w]
@@ -95,11 +88,6 @@ def test_config_accepts_default_settings() -> None:
     assert cfg.red_min_ratio == 0.20
     assert cfg.black_min_dark_ratio == 0.35
     assert cfg.black_max_red_ratio == 0.10
-    assert cfg.verify_before_goal is True
-    assert cfg.red_staging_touch == TouchPoint(64, 200)
-    assert cfg.black_staging_touch == TouchPoint(256, 200)
-    assert cfg.staging_wait_seconds == 0.05
-    assert cfg.staging_verification_radius == 24
 
 
 def test_config_rejects_invalid_touch_goal() -> None:
@@ -110,11 +98,6 @@ def test_config_rejects_invalid_touch_goal() -> None:
 def test_config_rejects_invalid_ignore_rect_extent() -> None:
     with pytest.raises(ValueError, match="width"):
         NsmbSortOrSplodeConfig.from_args({"ignore_touch_rects": [[300, 0, 30, 10]]})
-
-
-def test_config_rejects_staging_point_inside_ignored_rect() -> None:
-    with pytest.raises(ValueError, match="red_staging_touch"):
-        NsmbSortOrSplodeConfig.from_args({"red_staging_touch": [20, 80]})
 
 
 def test_touch_rect_to_cropped_hd_rect_uses_3ds_scale() -> None:
@@ -260,20 +243,20 @@ def test_classify_bombs_keeps_nearby_opposite_colors_outside_radius() -> None:
 
 def test_macro_sends_touch_drag_for_detected_bomb() -> None:
     images = _template_images()
-    cfg = NsmbSortOrSplodeConfig.from_args({"staging_wait_seconds": 0})
-    initial_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    verification_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    bottom = THREEDS_HD_BOTTOM_SCREEN
     template = images["templates/red_bob_omb.png"]
-    _place_template_at_touch(initial_frame, template, TouchPoint(60, 40))
-    _place_template_at_touch(verification_frame, template, cfg.red_staging_touch)
-    cmd = FakeCommand([initial_frame, verification_frame], images)
+    frame[
+        bottom.y + 40 : bottom.y + 40 + template.shape[0],
+        bottom.x + 30 : bottom.x + 30 + template.shape[1],
+    ] = template
+    cmd = FakeCommand(frame, images)
     macro = NsmbSortOrSplodeMacro()
     macro.initialize(
         cmd,
         {
             "scan_interval_seconds": 0,
             "post_drop_wait_seconds": 0,
-            "staging_wait_seconds": 0,
             "max_sorted_count": 1,
             "red_match_threshold": 0.95,
             "notify_on_finish": True,
@@ -284,94 +267,9 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
 
     assert bomb is not None
     assert bomb.color is BombColor.RED
-    touch_down_points = _touch_down_points(cmd.events)
-    assert (cfg.red_staging_touch.x, cfg.red_staging_touch.y) in touch_down_points
-    assert (cfg.red_goal_touch.x, cfg.red_goal_touch.y) in touch_down_points
-    assert _event_names(cmd.events).count("touch_up") == 1
+    assert any(event[0] == "touch_down" for event in cmd.events)
+    assert ("touch_up", None) in cmd.events
     assert any(event[0] == "notify" for event in cmd.events)
-
-
-def test_macro_uses_verified_color_after_staging() -> None:
-    images = _template_images()
-    cfg = NsmbSortOrSplodeConfig.from_args({"staging_wait_seconds": 0})
-    initial_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    verification_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    verified_touch = TouchPoint(252, 198)
-    _place_template_at_touch(
-        initial_frame,
-        images["templates/black_bob_omb.png"],
-        TouchPoint(220, 40),
-    )
-    _place_template_at_touch(
-        verification_frame,
-        images["templates/red_bob_omb.png"],
-        verified_touch,
-    )
-    cmd = FakeCommand([initial_frame, verification_frame], images)
-    macro = NsmbSortOrSplodeMacro()
-    macro.initialize(
-        cmd,
-        {
-            "scan_interval_seconds": 0,
-            "post_drop_wait_seconds": 0,
-            "staging_wait_seconds": 0,
-        },
-    )
-
-    bomb = macro.run_iteration(cmd)
-
-    touch_down_points = _touch_down_points(cmd.events)
-    assert bomb is not None
-    assert bomb.color is BombColor.RED
-    assert touch_down_points[4] == (cfg.black_staging_touch.x, cfg.black_staging_touch.y)
-    assert touch_down_points[5] == (cfg.black_staging_touch.x, cfg.black_staging_touch.y)
-    assert touch_down_points[-1] == (cfg.red_goal_touch.x, cfg.red_goal_touch.y)
-    events = _event_names(cmd.events)
-    capture_indices = [index for index, name in enumerate(events) if name == "capture"]
-    assert capture_indices[-1] < events.index("touch_up")
-
-
-def test_macro_skips_goal_when_staging_verification_is_ambiguous() -> None:
-    images = _template_images()
-    cfg = NsmbSortOrSplodeConfig.from_args({"staging_wait_seconds": 0})
-    initial_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    verification_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    _place_template_at_touch(
-        initial_frame,
-        images["templates/red_bob_omb.png"],
-        TouchPoint(60, 40),
-    )
-    _place_template_at_touch(
-        verification_frame,
-        images["templates/red_bob_omb.png"],
-        TouchPoint(44, 200),
-    )
-    _place_template_at_touch(
-        verification_frame,
-        images["templates/black_bob_omb.png"],
-        TouchPoint(84, 200),
-    )
-    cmd = FakeCommand([initial_frame, verification_frame], images)
-    macro = NsmbSortOrSplodeMacro()
-    macro.initialize(
-        cmd,
-        {
-            "scan_interval_seconds": 0,
-            "post_drop_wait_seconds": 0,
-            "staging_wait_seconds": 0,
-        },
-    )
-
-    bomb = macro.run_iteration(cmd)
-
-    touch_down_points = _touch_down_points(cmd.events)
-    assert bomb is None
-    assert touch_down_points[-1] == (cfg.red_staging_touch.x, cfg.red_staging_touch.y)
-    assert (cfg.red_goal_touch.x, cfg.red_goal_touch.y) not in touch_down_points
-    events = _event_names(cmd.events)
-    capture_indices = [index for index, name in enumerate(events) if name == "capture"]
-    assert capture_indices[-1] < events.index("touch_up")
-    assert any(event[0] == "log" and event[1][0] == "WARNING" for event in cmd.events)
 
 
 def test_macro_detects_red_and_black_on_same_frame() -> None:
@@ -390,7 +288,7 @@ def test_macro_detects_red_and_black_on_same_frame() -> None:
     ] = black_template
     cmd = FakeCommand(frame, images)
     macro = NsmbSortOrSplodeMacro()
-    macro.initialize(cmd, {"scan_interval_seconds": 0, "verify_before_goal": False})
+    macro.initialize(cmd, {"scan_interval_seconds": 0})
 
     bomb = macro.run_iteration(cmd)
 
@@ -415,27 +313,6 @@ def _detected_bomb(
         width=32,
         height=42,
     )
-
-
-def _place_template_at_touch(
-    frame: np.ndarray,
-    template: np.ndarray,
-    touch: TouchPoint,
-) -> None:
-    bottom = THREEDS_HD_BOTTOM_SCREEN
-    center_x = bottom.x + round(touch.x * bottom.width / 320)
-    center_y = bottom.y + round(touch.y * bottom.height / 240)
-    x0 = center_x - template.shape[1] // 2
-    y0 = center_y - template.shape[0] // 2
-    frame[y0 : y0 + template.shape[0], x0 : x0 + template.shape[1]] = template
-
-
-def _touch_down_points(events: list[tuple[str, object]]) -> list[tuple[int, int]]:
-    return [payload for name, payload in events if name == "touch_down"]
-
-
-def _event_names(events: list[tuple[str, object]]) -> list[str]:
-    return [name for name, _ in events]
 
 
 def _template_center(x: int, y: int, template: np.ndarray) -> tuple[int, int]:

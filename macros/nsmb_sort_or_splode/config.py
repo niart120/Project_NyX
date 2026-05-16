@@ -40,11 +40,6 @@ class NsmbSortOrSplodeConfig:
     black_min_dark_ratio: float = 0.35
     black_max_red_ratio: float = 0.10
     duplicate_suppression_radius: int = 18
-    verify_before_goal: bool = True
-    red_staging_touch: TouchPoint = TouchPoint(64, 200)
-    black_staging_touch: TouchPoint = TouchPoint(256, 200)
-    staging_wait_seconds: float = 0.05
-    staging_verification_radius: int = 24
     drag_steps: int = 4
     drag_duration_seconds: float = 0.10
     red_goal_touch: TouchPoint = TouchPoint(24, 122)
@@ -107,27 +102,6 @@ class NsmbSortOrSplodeConfig:
                 "duplicate_suppression_radius",
                 defaults.duplicate_suppression_radius,
             ),
-            verify_before_goal=_get_bool(
-                args,
-                "verify_before_goal",
-                defaults.verify_before_goal,
-            ),
-            red_staging_touch=_parse_touch_point(
-                args.get("red_staging_touch", defaults.red_staging_touch)
-            ),
-            black_staging_touch=_parse_touch_point(
-                args.get("black_staging_touch", defaults.black_staging_touch)
-            ),
-            staging_wait_seconds=_get_float(
-                args,
-                "staging_wait_seconds",
-                defaults.staging_wait_seconds,
-            ),
-            staging_verification_radius=_get_int(
-                args,
-                "staging_verification_radius",
-                defaults.staging_verification_radius,
-            ),
             drag_steps=_get_int(args, "drag_steps", defaults.drag_steps),
             drag_duration_seconds=_get_float(
                 args,
@@ -167,24 +141,12 @@ class NsmbSortOrSplodeConfig:
         _validate_threshold("black_max_red_ratio", self.black_max_red_ratio)
         if self.duplicate_suppression_radius < 0:
             raise ValueError("duplicate_suppression_radius must be greater than or equal to 0")
-        validate_3ds_touch_point(self.red_staging_touch)
-        validate_3ds_touch_point(self.black_staging_touch)
-        if self.staging_wait_seconds < 0:
-            raise ValueError("staging_wait_seconds must be greater than or equal to 0")
-        if self.staging_verification_radius < 0:
-            raise ValueError("staging_verification_radius must be greater than or equal to 0")
         if self.drag_steps < 1:
             raise ValueError("drag_steps must be greater than 0")
         if self.drag_duration_seconds < 0:
             raise ValueError("drag_duration_seconds must be greater than or equal to 0")
         validate_3ds_touch_point(self.red_goal_touch)
         validate_3ds_touch_point(self.black_goal_touch)
-        _validate_not_ignored("red_staging_touch", self.red_staging_touch, self.ignore_touch_rects)
-        _validate_not_ignored(
-            "black_staging_touch",
-            self.black_staging_touch,
-            self.ignore_touch_rects,
-        )
 
 
 def _get_float(args: dict, name: str, default: float) -> float:
@@ -193,19 +155,6 @@ def _get_float(args: dict, name: str, default: float) -> float:
 
 def _get_int(args: dict, name: str, default: int) -> int:
     return int(args.get(name, default))
-
-
-def _get_bool(args: dict, name: str, default: bool) -> bool:
-    value = args.get(name, default)
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes", "on"}:
-            return True
-        if normalized in {"false", "0", "no", "off"}:
-            return False
-    return bool(value)
 
 
 def _validate_threshold(name: str, value: float) -> None:
@@ -244,13 +193,3 @@ def _parse_touch_rects(value: object) -> tuple[TouchRect, ...]:
             raise ValueError("ignore_touch_rects entries must be 4-item lists")
         rects.append(TouchRect(*(int(v) for v in item)))
     return tuple(rects)
-
-
-def _validate_not_ignored(
-    name: str,
-    point: TouchPoint,
-    ignore_touch_rects: tuple[TouchRect, ...],
-) -> None:
-    for rect in ignore_touch_rects:
-        if rect.x <= point.x < rect.x + rect.width and rect.y <= point.y < rect.y + rect.height:
-            raise ValueError(f"{name} must not be inside ignore_touch_rects")

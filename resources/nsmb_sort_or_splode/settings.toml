@@ -17,11 +17,6 @@ red_min_ratio = 0.20
 black_min_dark_ratio = 0.35
 black_max_red_ratio = 0.10
 duplicate_suppression_radius = 18
-verify_before_goal = true
-red_staging_touch = [64, 200]
-black_staging_touch = [256, 200]
-staging_wait_seconds = 0.05
-staging_verification_radius = 24
 
 drag_steps = 4
 drag_duration_seconds = 0.10
