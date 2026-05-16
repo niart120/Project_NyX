@@ -2,7 +2,11 @@ from pathlib import Path
 
 from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
-from tests.support.fakes import FakeControllerOutputPort, FakeLoggerPort
+from tests.support.fakes import (
+    FakeControllerOutputPort,
+    FakeFullCapabilityController,
+    FakeLoggerPort,
+)
 
 
 def test_button_operations_use_controller_output_port() -> None:
@@ -50,6 +54,40 @@ def test_set_controller_replaces_controller_output_port() -> None:
 
     assert first.events == []
     assert second.events == [("press", (Button.X,))]
+
+
+def test_virtual_controller_model_reports_touch_support() -> None:
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=FakeControllerOutputPort())
+    assert not model.supports_touch_input()
+
+    model.set_controller(FakeFullCapabilityController())
+
+    assert model.supports_touch_input()
+
+
+def test_virtual_controller_model_sends_touch_events() -> None:
+    controller = FakeFullCapabilityController()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+
+    model.touch_down(10, 20)
+    model.touch_move(11, 21)
+    model.touch_up()
+
+    assert controller.events == [
+        ("touch_down", (10, 20)),
+        ("touch_down", (11, 21)),
+        ("touch_up", None),
+    ]
+
+
+def test_virtual_controller_model_ignores_touch_when_unsupported() -> None:
+    controller = FakeControllerOutputPort()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+
+    model.touch_down(10, 20)
+    model.touch_up()
+
+    assert controller.events == []
 
 
 def test_virtual_controller_model_has_no_event_bus_dependency() -> None:

@@ -15,6 +15,7 @@ from nyxpy.gui.app_services import SettingsApplyOutcome
 from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
 from nyxpy.gui.main_window import MainWindow
 from nyxpy.gui.panes.control_pane import RunUiState
+from tests.support.fakes import FakeControllerOutputPort, FakeFullCapabilityController
 
 
 class RecordingLogger:
@@ -245,6 +246,47 @@ def test_initial_ui_state(window: MainWindow):
     assert not window.control_pane.run_btn.isEnabled()
     assert not window.control_pane.cancel_btn.isEnabled()
     assert window.control_pane.snapshot_btn.isEnabled()
+
+
+def test_main_window_wires_preview_touch_to_virtual_controller_model(window: MainWindow) -> None:
+    controller = FakeFullCapabilityController()
+    window.virtual_controller.model.set_controller(controller)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    window.preview_pane.touch_move_requested.emit(11, 21)
+    window.preview_pane.touch_up_requested.emit()
+
+    assert controller.events == [
+        ("touch_down", (10, 20)),
+        ("touch_down", (11, 21)),
+        ("touch_up", None),
+    ]
+
+
+def test_main_window_ignores_preview_touch_when_controller_does_not_support_touch(
+    window: MainWindow,
+) -> None:
+    controller = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(controller)
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    window.preview_pane.touch_move_requested.emit(11, 21)
+    window.preview_pane.touch_up_requested.emit()
+
+    assert controller.events == []
+
+
+def test_main_window_shows_touch_unsupported_status_on_each_preview_press(
+    window: MainWindow,
+) -> None:
+    window.virtual_controller.model.set_controller(FakeControllerOutputPort())
+
+    window.preview_pane.touch_down_requested.emit(10, 20)
+    assert window.status_label.text() == "現在のプロトコルは 3DS タッチ入力に対応していません"
+    window.status_label.setText("別メッセージ")
+    window.preview_pane.touch_down_requested.emit(11, 21)
+
+    assert window.status_label.text() == "現在のプロトコルは 3DS タッチ入力に対応していません"
 
 
 def test_main_window_applies_saved_window_size_preset(qtbot, services: FakeServices):

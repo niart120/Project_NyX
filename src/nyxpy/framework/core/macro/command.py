@@ -93,6 +93,8 @@ class Command(ABC):
     ) -> cv2.typing.MatLike:
         """
         キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
+        3DS のアスペクトボックス入力では、3DS 画面本体は (x=340, y=0, width=600, height=720) として扱います。
+        3DS の下画面実領域は (x=400, y=360, width=480, height=360) です。
 
         :param crop_region: (optional) クロップする領域の指定 (x, y, width, height)
         :param grayscale: (optional) グレースケール変換を行うかどうかのフラグ (デフォルト:False)

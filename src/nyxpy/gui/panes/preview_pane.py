@@ -3,10 +3,17 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
+from PySide6.QtGui import QImage, QMouseEvent, QPixmap
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from nyxpy.framework.core.constants import (
+    ScreenPoint,
+    ScreenSize,
+    TouchPoint,
+    preview_point_to_3ds_touch,
+    try_preview_point_to_hd_capture,
+)
 from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
 from nyxpy.framework.core.io.adapters import CaptureFrameSourcePort
 from nyxpy.framework.core.io.ports import FrameSourcePort
@@ -18,6 +25,9 @@ SNAPSHOT_DIR = "snapshots"
 
 class PreviewPane(QWidget):
     snapshot_taken = Signal(str)
+    touch_down_requested = Signal(int, int)
+    touch_move_requested = Signal(int, int)
+    touch_up_requested = Signal()
     """
     Pane for showing camera preview and handling snapshots.
     """
@@ -35,7 +45,12 @@ class PreviewPane(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.label = AspectRatioLabel(16, 9)
         self.label.setAlignment(Qt.AlignCenter)
+        self.label.setMouseTracking(True)
+        self.label.installEventFilter(self)
+        self.setMouseTracking(True)
         self._fixed_preview_size = fixed_preview_size
+        self._touch_active = False
+        self._last_touch_point: TouchPoint | None = None
         self.label.setFixedSize(*fixed_preview_size)
         layout.addWidget(self.label, alignment=Qt.AlignCenter)
 
@@ -62,6 +77,61 @@ class PreviewPane(QWidget):
         self._fixed_preview_size = (width, height)
         self.label.setFixedSize(width, height)
         self.setFixedSize(width, height)
+
+    def preview_widget_point_to_hd_capture_point(self, point: QPoint) -> ScreenPoint | None:
+        return try_preview_point_to_hd_capture(
+            ScreenPoint(point.x(), point.y()),
+            preview_size=ScreenSize(self.label.width(), self.label.height()),
+        )
+
+    def _preview_widget_point_to_touch_point(self, point: QPoint) -> TouchPoint | None:
+        try:
+            return preview_point_to_3ds_touch(
+                ScreenPoint(point.x(), point.y()),
+                preview_size=ScreenSize(self.label.width(), self.label.height()),
+            )
+        except ValueError:
+            return None
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self.label and isinstance(event, QMouseEvent):
+            match event.type():
+                case QEvent.Type.MouseButtonPress:
+                    if event.button() == Qt.MouseButton.LeftButton:
+                        self._handle_touch_press(event.position().toPoint())
+                        return True
+                case QEvent.Type.MouseMove:
+                    self._handle_touch_move(event.position().toPoint())
+                    return self._touch_active
+                case QEvent.Type.MouseButtonRelease:
+                    if event.button() == Qt.MouseButton.LeftButton:
+                        self._handle_touch_release()
+                        return True
+        return super().eventFilter(watched, event)
+
+    def _handle_touch_press(self, point: QPoint) -> None:
+        touch = self._preview_widget_point_to_touch_point(point)
+        if touch is None:
+            return
+        self._touch_active = True
+        self._last_touch_point = touch
+        self.touch_down_requested.emit(touch.x, touch.y)
+
+    def _handle_touch_move(self, point: QPoint) -> None:
+        if not self._touch_active:
+            return
+        touch = self._preview_widget_point_to_touch_point(point)
+        if touch is None or touch == self._last_touch_point:
+            return
+        self._last_touch_point = touch
+        self.touch_move_requested.emit(touch.x, touch.y)
+
+    def _handle_touch_release(self) -> None:
+        if not self._touch_active:
+            return
+        self._touch_active = False
+        self._last_touch_point = None
+        self.touch_up_requested.emit()
 
     def pause(self) -> None:
         self.timer.stop()

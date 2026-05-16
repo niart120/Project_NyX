@@ -34,6 +34,7 @@ def test_controller_output_port_contract_records_basic_operations() -> None:
 def test_controller_output_port_optional_methods_raise_by_default() -> None:
     controller = FakeControllerOutputPort()
 
+    assert not controller.supports_touch
     with pytest.raises(NotImplementedError, match="touch input"):
         controller.touch_down(1, 2)
     with pytest.raises(NotImplementedError, match="touch input"):
@@ -45,6 +46,7 @@ def test_controller_output_port_optional_methods_raise_by_default() -> None:
 def test_full_fake_controller_overrides_optional_methods() -> None:
     controller = FakeFullCapabilityController()
 
+    assert controller.supports_touch
     controller.touch_down(1, 2)
     controller.touch_up()
     controller.disable_sleep(True)

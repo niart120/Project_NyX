@@ -56,7 +56,7 @@ class TouchMacro(MacroBase):
         pass
 
     def run(self, cmd: Command) -> None:
-        cmd.touch(320, 240, dur=0, wait=0)
+        cmd.touch(319, 239, dur=0, wait=0)
 
     def finalize(self, cmd: Command) -> None:
         pass
@@ -116,8 +116,8 @@ def test_3ds_runtime_command_touch_with_fake_serial(tmp_path: Path) -> None:
                 0xB2,
                 0x01,
                 0x01,
-                0x40,
-                0xF0,
+                0x3F,
+                0xEF,
             ]
         ),
         bytes(

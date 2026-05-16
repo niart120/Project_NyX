@@ -37,6 +37,7 @@ from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
+_TOUCH_UNSUPPORTED_STATUS = "現在のプロトコルは 3DS タッチ入力に対応していません"
 
 
 class _VirtualControllerPanel(QWidget):
@@ -324,10 +325,29 @@ class MainWindow(QMainWindow):
         # Delegate snapshot to PreviewPane and status via signal
         self.control_pane.snapshot_requested.connect(self.preview_pane.take_snapshot)
         self.preview_pane.snapshot_taken.connect(self.status_label.setText)
+        self.preview_pane.touch_down_requested.connect(self._handle_preview_touch_down)
+        self.preview_pane.touch_move_requested.connect(self._handle_preview_touch_move)
+        self.preview_pane.touch_up_requested.connect(self._handle_preview_touch_up)
         self.control_pane.settings_requested.connect(self.open_app_settings)
 
         # Set status to ready
         self.status_label.setText("準備完了")
+
+    def _handle_preview_touch_down(self, x: int, y: int) -> None:
+        if not self.virtual_controller.model.supports_touch_input():
+            self.status_label.setText(_TOUCH_UNSUPPORTED_STATUS)
+            return
+        self.virtual_controller.model.touch_down(x, y)
+
+    def _handle_preview_touch_move(self, x: int, y: int) -> None:
+        if not self.virtual_controller.model.supports_touch_input():
+            return
+        self.virtual_controller.model.touch_move(x, y)
+
+    def _handle_preview_touch_up(self) -> None:
+        if not self.virtual_controller.model.supports_touch_input():
+            return
+        self.virtual_controller.model.touch_up()
 
     def open_app_settings(self):
         dlg = AppSettingsDialog(

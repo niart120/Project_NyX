@@ -23,6 +23,10 @@ class SerialControllerOutputPort(ControllerOutputPort):
         self.serial_device = serial_device
         self.protocol = protocol
 
+    @property
+    def supports_touch(self) -> bool:
+        return bool(getattr(self.protocol, "supports_touch", False))
+
     def press(self, keys: tuple[KeyType, ...]) -> None:
         self.serial_device.send(self.protocol.build_press_command(keys))
 
@@ -60,16 +64,14 @@ class SerialControllerOutputPort(ControllerOutputPort):
         self.serial_device.send(self.protocol.build_keytype_command(key, release_op))
 
     def touch_down(self, x: int, y: int) -> None:
-        builder = getattr(self.protocol, "build_touch_down_command", None)
-        if builder is None:
+        if not self.supports_touch:
             raise NotImplementedError("Current serial protocol does not support touch input.")
-        self.serial_device.send(builder(x, y))
+        self.serial_device.send(self.protocol.build_touch_down_command(x, y))
 
     def touch_up(self) -> None:
-        builder = getattr(self.protocol, "build_touch_up_command", None)
-        if builder is None:
+        if not self.supports_touch:
             raise NotImplementedError("Current serial protocol does not support touch input.")
-        self.serial_device.send(builder())
+        self.serial_device.send(self.protocol.build_touch_up_command())
 
     def disable_sleep(self, enabled: bool = True) -> None:
         builder = getattr(self.protocol, "build_disable_sleep_command", None)

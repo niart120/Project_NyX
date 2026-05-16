@@ -3,8 +3,10 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 import pytest
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPixmap
 
+from nyxpy.framework.core.constants import ScreenPoint
 from nyxpy.gui.panes.preview_pane import PreviewPane
 
 
@@ -120,4 +122,41 @@ def test_preview_scales_frame_to_fixed_size_without_crop(qtbot, tmp_cwd):
 
     assert resize.call_args.args[1] == (target_w, target_h)
     assert resize.call_args.kwargs["interpolation"] == cv2.INTER_LINEAR
+    pane.timer.stop()
+
+
+def test_preview_maps_widget_point_to_hd_capture_point(qtbot, tmp_cwd):
+    pane = PreviewPane(fixed_preview_size=(640, 360))
+    qtbot.addWidget(pane)
+
+    assert pane.preview_widget_point_to_hd_capture_point(QPoint(200, 180)) == ScreenPoint(400, 360)
+
+    pane.timer.stop()
+
+
+def test_preview_touch_ignores_pillarbox_press(qtbot, tmp_cwd):
+    pane = PreviewPane(fixed_preview_size=(640, 360))
+    qtbot.addWidget(pane)
+    events = []
+    pane.touch_down_requested.connect(lambda x, y: events.append((x, y)))
+
+    qtbot.mousePress(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(199, 180))
+
+    assert events == []
+    pane.timer.stop()
+
+
+def test_preview_touch_emits_press_move_release_inside_bottom_screen(qtbot, tmp_cwd):
+    pane = PreviewPane(fixed_preview_size=(640, 360))
+    qtbot.addWidget(pane)
+    events = []
+    pane.touch_down_requested.connect(lambda x, y: events.append(("down", x, y)))
+    pane.touch_move_requested.connect(lambda x, y: events.append(("move", x, y)))
+    pane.touch_up_requested.connect(lambda: events.append(("up",)))
+
+    qtbot.mousePress(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(200, 180))
+    qtbot.mouseMove(pane.label, pos=QPoint(439, 359))
+    qtbot.mouseRelease(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(639, 359))
+
+    assert events == [("down", 0, 0), ("move", 319, 239), ("up",)]
     pane.timer.stop()

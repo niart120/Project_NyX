@@ -174,6 +174,7 @@ THREEDS_BOTTOM_PILLARBOXED_AREA = ScreenRect(0, 240, 400, 240)
 THREEDS_FULL_SCREEN = ScreenRect(0, 0, 400, 480)
 
 THREEDS_HD_CAPTURE_SIZE = ScreenSize(1280, 720)
+THREEDS_HD_CANVAS = ScreenRect(0, 0, 1280, 720)
 THREEDS_HD_CONTENT = ScreenRect(340, 0, 600, 720)
 THREEDS_HD_TOP_SCREEN = ScreenRect(340, 0, 600, 360)
 THREEDS_HD_BOTTOM_SCREEN = ScreenRect(400, 360, 480, 360)
@@ -350,7 +351,7 @@ class MainWindow(QMainWindow):
 | タッチ座標 → 正規化座標 | `TouchPoint(x, y)` | `ScreenPoint` | `x+40`, `y+240` |
 | 正規化座標 → HD キャプチャ座標 | `ScreenPoint(x, y)` | `ScreenPoint` | `x=340 + floor(x * 1.5)`, `y=floor(y * 1.5)` |
 | HD キャプチャ座標 → 正規化座標 | `ScreenPoint(x, y)` | `ScreenPoint` | `x=floor((x - 340) / 1.5)`, `y=floor(y / 1.5)` |
-| HD キャプチャ座標 → タッチ座標 | `ScreenPoint(x, y)` | `TouchPoint` | `THREEDS_HD_BOTTOM_SCREEN` 内なら `x=floor((x - 400) / 1.5)`, `y=floor((y - 360) / 1.5)` |
+| HD キャプチャ座標 → タッチ座標 | `ScreenPoint(x, y)` | `TouchPoint` | `THREEDS_HD_BOTTOM_SCREEN` 内の相対位置を `320x240` へ量子化する |
 | タッチ座標 → HD キャプチャ座標 | `TouchPoint(x, y)` | `ScreenPoint` | `x=400 + floor(x * 1.5)`, `y=360 + floor(y * 1.5)` |
 | トリミング済み HD 座標 → HD キャプチャ座標 | `point`, `crop_region` | `ScreenPoint` | `point.x + crop_region.x`, `point.y + crop_region.y` |
 | HD キャプチャ座標 → トリミング済み HD 座標 | `point`, `crop_region` | `ScreenPoint` | `point.x - crop_region.x`, `point.y - crop_region.y` |
@@ -372,6 +373,8 @@ class MainWindow(QMainWindow):
 | 下画面実領域 | `(40, 240, 320, 240)` | `(400, 360, 480, 360)` |
 
 マクロで下画面実領域のみを取得する場合は `crop_region=(400, 360, 480, 360)` を使う。このトリミング済み画像上の `(0, 0)` はタッチ座標 `(0, 0)`、`(479, 359)` はタッチ座標 `(319, 239)` に対応する。上画面の切り出しは `crop_region=(340, 0, 600, 360)`、3DS 画面全体の切り出しは `crop_region=(340, 0, 600, 720)` を使う。
+
+HD キャプチャ座標からタッチ座標への変換も、プレビュー座標と同じ相対位置量子化を使う。`touch_point_to_3ds_hd_capture(TouchPoint(319, 239))` が返す代表点を `hd_capture_point_to_3ds_touch()` に戻すと、再び `TouchPoint(319, 239)` になる。
 
 ### GUI タッチ処理
 
