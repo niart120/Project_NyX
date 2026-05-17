@@ -28,14 +28,16 @@ class LogPane(QWidget):
         *,
         title: str = "ログ",
         kind: str = "macro",
+        initial_level: str = "INFO",
     ):
         super().__init__(parent)
         self.dispatcher = dispatcher
         self.kind = kind
+        self._initial_level = initial_level.upper()
         self.gui_sink = GuiLogSink(self)
         self.gui_sink_id: str | None = self.dispatcher.add_sink(
             self.gui_sink,
-            level=("DEBUG" if self.debug_enabled else "INFO"),
+            level=self._initial_level,
         )
 
         main_layout = QVBoxLayout(self)
@@ -48,7 +50,7 @@ class LogPane(QWidget):
         self.auto_scroll_checkbox = QCheckBox("自動スクロール", self)
         self.auto_scroll_checkbox.setChecked(True)
         self.debug_checkbox = QCheckBox("デバッグログ表示", self)
-        self.debug_checkbox.setChecked(False)
+        self.debug_checkbox.setChecked(self._initial_level == "DEBUG")
         self.clear_button = QPushButton("Clear", self)
         control_layout.addWidget(self.auto_scroll_checkbox)
         control_layout.addWidget(self.debug_checkbox)

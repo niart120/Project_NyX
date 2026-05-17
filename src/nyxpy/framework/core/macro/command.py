@@ -191,23 +191,23 @@ class DefaultCommand(Command):
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
-        self.log(f"Pressing keys: {keys}", level="DEBUG")
+        self._debug_command(f"Pressing keys: {keys}")
         self.context.controller.press(keys)
         if dur > 0:
             self.wait(dur)
-        self.log(f"Releasing keys: {keys}", level="DEBUG")
+        self._debug_command(f"Releasing keys: {keys}")
         self.context.controller.release(keys)
         if wait > 0:
             self.wait(wait)
 
     @check_interrupt
     def hold(self, *keys: KeyType) -> None:
-        self.log(f"Holding keys: {keys}", level="DEBUG")
+        self._debug_command(f"Holding keys: {keys}")
         self.context.controller.hold(keys)
 
     @check_interrupt
     def release(self, *keys: KeyType) -> None:
-        self.log(f"Releasing keys: {keys}", level="DEBUG")
+        self._debug_command(f"Releasing keys: {keys}")
         self.context.controller.release(keys)
 
     @check_interrupt
@@ -219,22 +219,22 @@ class DefaultCommand(Command):
 
     @check_interrupt
     def touch_down(self, x: int, y: int) -> None:
-        self.log(f"Touch down: ({x}, {y})", level="DEBUG")
+        self._debug_command(f"Touch down: ({x}, {y})")
         self.context.controller.touch_down(x, y)
 
     @check_interrupt
     def touch_up(self) -> None:
-        self.log("Touch up", level="DEBUG")
+        self._debug_command("Touch up")
         self.context.controller.touch_up()
 
     @check_interrupt
     def disable_sleep(self, enabled: bool = True) -> None:
-        self.log(f"Disable sleep: {enabled}", level="DEBUG")
+        self._debug_command(f"Disable sleep: {enabled}")
         self.context.controller.disable_sleep(enabled)
 
     @check_interrupt
     def wait(self, wait: float) -> None:
-        self.log(f"Waiting for {wait} seconds", level="DEBUG")
+        self._debug_command(f"Waiting for {wait} seconds")
         cancellation_aware_wait(wait, self.ct)
         self.ct.throw_if_requested()
 
@@ -252,11 +252,15 @@ class DefaultCommand(Command):
             event="command.log",
         )
 
+    def _debug_command(self, message: str) -> None:
+        if self.context.options.command_debug_enabled:
+            self.log(message, level="DEBUG")
+
     @check_interrupt
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
     ) -> cv2.typing.MatLike:
-        self.log("Capturing screen...", level="DEBUG")
+        self._debug_command("Capturing screen...")
         capture_data = self.context.frame_source.latest_frame()
         if capture_data is None:
             self.log("Capture failed", level="ERROR")
@@ -270,22 +274,22 @@ class DefaultCommand(Command):
             frame = frame[y : y + h, x : x + w]
         if grayscale:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        self.log("Capture successful", level="DEBUG")
+        self._debug_command("Capture successful")
         return frame
 
     @check_interrupt
     def save_img(self, filename, image) -> None:
-        self.log(f"Saving image to {filename}", level="DEBUG")
+        self._debug_command(f"Saving image to {filename}")
         self.context.artifacts.save_image(filename, image)
 
     @check_interrupt
     def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
-        self.log(f"Loading image from {filename}", level="DEBUG")
+        self._debug_command(f"Loading image from {filename}")
         return self.context.resources.load_image(filename, grayscale=grayscale)
 
     @check_interrupt
     def keyboard(self, text: str) -> None:
-        self.log(f"Sending keyboard text input: {text}", level="DEBUG")
+        self._debug_command(f"Sending keyboard text input: {text}")
         text = validate_keyboard_text(text)
         self.context.controller.keyboard(text)
 
@@ -295,7 +299,7 @@ class DefaultCommand(Command):
             self.log("Empty key specified for keytype", level="WARNING")
             return
 
-        self.log(f"Sending keyboard key input: {key}", level="DEBUG")
+        self._debug_command(f"Sending keyboard key input: {key}")
 
         self.context.controller.type_key(key)
 

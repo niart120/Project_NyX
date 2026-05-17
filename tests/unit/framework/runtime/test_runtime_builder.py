@@ -26,14 +26,15 @@ from tests.support.fakes import (
 
 
 class Registry:
-    def __init__(self, definition: MacroDefinition) -> None:
+    def __init__(self, definition: MacroDefinition, settings: dict | None = None) -> None:
         self.definition = definition
+        self.settings = settings or {}
 
     def resolve(self, name_or_id: str) -> MacroDefinition:
         return self.definition
 
     def get_settings(self, definition: MacroDefinition) -> dict:
-        return {}
+        return dict(self.settings)
 
 
 class Discovery:
@@ -123,6 +124,7 @@ def definition(tmp_path: Path) -> MacroDefinition:
 def make_builder(tmp_path: Path, discovery: Discovery, **kwargs):
     notification_handler = kwargs.pop("notification_handler", None)
     frame_source_factory = kwargs.pop("frame_source_factory", None)
+    macro_settings = kwargs.pop("macro_settings", None)
     controller_factory = ControllerOutputPortFactory(
         discovery=discovery,
         protocol=object(),
@@ -135,7 +137,7 @@ def make_builder(tmp_path: Path, discovery: Discovery, **kwargs):
     )
     return create_device_runtime_builder(
         project_root=tmp_path,
-        registry=Registry(definition(tmp_path)),
+        registry=Registry(definition(tmp_path), macro_settings),
         device_discovery=discovery,
         controller_output_factory=controller_factory,
         frame_source_factory=frame_factory,
@@ -160,6 +162,31 @@ def test_runtime_builder_allows_dummy_when_explicit(tmp_path: Path) -> None:
 
     assert context.options.allow_dummy is True
     assert isinstance(context.notifications, NoopNotificationAdapter)
+
+
+def test_runtime_builder_uses_global_command_debug_setting(tmp_path: Path) -> None:
+    builder = make_builder(
+        tmp_path,
+        Discovery(),
+        settings={"logging": {"command_debug_enabled": True}},
+    )
+
+    context = builder.build(RuntimeBuildRequest(macro_id="sample", allow_dummy=True))
+
+    assert context.options.command_debug_enabled is True
+
+
+def test_runtime_builder_allows_macro_command_debug_override(tmp_path: Path) -> None:
+    builder = make_builder(
+        tmp_path,
+        Discovery(),
+        settings={"logging": {"command_debug_enabled": False}},
+        macro_settings={"logging": {"command_debug_enabled": True}},
+    )
+
+    context = builder.build(RuntimeBuildRequest(macro_id="sample", allow_dummy=True))
+
+    assert context.options.command_debug_enabled is True
 
 
 def test_runtime_builder_wraps_notification_handler(tmp_path: Path) -> None:

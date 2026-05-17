@@ -84,21 +84,6 @@ class DefaultLogger:
             extra=self.sanitizer.sanitize_extra_for_user(extra),
         )
         self.dispatcher.emit_user(user_event)
-        technical_log = TechnicalLog(
-            LogEvent(
-                timestamp=timestamp,
-                level=log_level,
-                component=component,
-                event=event,
-                message=self.sanitizer.mask_text(message),
-                run_id=user_event.run_id,
-                macro_id=user_event.macro_id,
-                extra=self.sanitizer.sanitize_extra_for_technical(extra),
-            ),
-            include_traceback=False,
-        )
-        self._emit_backend(technical_log)
-        self.dispatcher.emit_technical(technical_log)
 
     def _emit_backend(self, log: TechnicalLog) -> None:
         try:

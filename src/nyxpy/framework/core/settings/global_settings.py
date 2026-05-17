@@ -65,6 +65,15 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             "INFO",
             choices=("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
         ),
+        "logging.file_max_bytes": SettingField("logging.file_max_bytes", int, 10 * 1024 * 1024),
+        "logging.file_backup_count": SettingField("logging.file_backup_count", int, 3),
+        "logging.file_retention_days": SettingField("logging.file_retention_days", int, 14),
+        "logging.run_retention_days": SettingField("logging.run_retention_days", int, 30),
+        "logging.command_debug_enabled": SettingField(
+            "logging.command_debug_enabled",
+            bool,
+            False,
+        ),
         "gui.window_size_preset": SettingField("gui.window_size_preset", str, "full_hd"),
         "gui.preview_touch_enabled": SettingField("gui.preview_touch_enabled", bool, False),
     }

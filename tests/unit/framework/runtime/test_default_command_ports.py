@@ -4,6 +4,7 @@ import pytest
 from nyxpy.framework.core.constants import Button, KeyCode
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroCancelled
+from nyxpy.framework.core.runtime.context import RuntimeOptions
 from tests.support.fake_execution_context import make_fake_execution_context
 from tests.support.fakes import (
     FakeControllerOutputPort,
@@ -31,6 +32,34 @@ def test_default_command_press_delegates_to_controller_port(tmp_path) -> None:
     cmd.press(Button.A, dur=0, wait=0)
 
     assert controller.events == [("press", (Button.A,)), ("release", (Button.A,))]
+
+
+def test_default_command_suppresses_builtin_debug_logs_by_default(tmp_path) -> None:
+    controller = FakeControllerOutputPort()
+    context = make_fake_execution_context(tmp_path, controller=controller)
+    cmd = DefaultCommand(context=context)
+
+    cmd.press(Button.A, dur=0, wait=0)
+    cmd.log("macro debug", level="DEBUG")
+
+    assert [event.message for event in context.logger.user_events] == ["macro debug"]
+
+
+def test_default_command_emits_builtin_debug_logs_when_enabled(tmp_path) -> None:
+    controller = FakeControllerOutputPort()
+    context = make_fake_execution_context(
+        tmp_path,
+        controller=controller,
+        options=RuntimeOptions(command_debug_enabled=True),
+    )
+    cmd = DefaultCommand(context=context)
+
+    cmd.press(Button.A, dur=0, wait=0)
+
+    assert [event.message for event in context.logger.user_events] == [
+        f"Pressing keys: {(Button.A,)}",
+        f"Releasing keys: {(Button.A,)}",
+    ]
 
 
 def test_default_command_capture_resizes_crops_and_grayscales(tmp_path) -> None:

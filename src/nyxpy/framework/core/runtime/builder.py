@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -43,6 +43,7 @@ from nyxpy.framework.core.runtime.context import (
 from nyxpy.framework.core.runtime.handle import RunHandle
 from nyxpy.framework.core.runtime.result import RunResult
 from nyxpy.framework.core.runtime.runtime import MacroRuntime
+from nyxpy.framework.core.settings.schema import dotted_get
 from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 type PortFactory[T] = Callable[[RuntimeBuildRequest, MacroDefinition], T]
@@ -89,6 +90,8 @@ class MacroRuntimeBuilder:
         definition = self.registry.resolve(request.macro_id)
         started_at = datetime.now()
         run_id = uuid4().hex
+        file_args = self.registry.get_settings(definition)
+        exec_args = {**file_args, **dict(request.exec_args or {})}
         run_log_context = RunLogContext(
             run_id=run_id,
             macro_id=definition.id,
@@ -97,8 +100,6 @@ class MacroRuntimeBuilder:
             started_at=started_at,
         )
         logger = self._logger_factory(request, definition).bind_context(run_log_context)
-        file_args = self.registry.get_settings(definition)
-        exec_args = {**file_args, **dict(request.exec_args or {})}
         metadata = dict(request.metadata or {})
         return ExecutionContext(
             run_id=run_id,
@@ -114,7 +115,10 @@ class MacroRuntimeBuilder:
             artifacts=self._artifact_store_factory(request, definition, run_id),
             notifications=self._notification_factory(request, definition),
             logger=logger,
-            options=RuntimeOptions(allow_dummy=self._allow_dummy(request)),
+            options=RuntimeOptions(
+                allow_dummy=self._allow_dummy(request),
+                command_debug_enabled=_command_debug_enabled(self.settings, exec_args, metadata),
+            ),
         )
 
     def run(self, request: RuntimeBuildRequest) -> RunResult:
@@ -262,6 +266,23 @@ def _allow_dummy(settings: dict[str, Any], request: RuntimeBuildRequest) -> bool
     if request.allow_dummy is not None:
         return request.allow_dummy
     return bool(settings.get("runtime.allow_dummy", False))
+
+
+def _command_debug_enabled(
+    settings: Mapping[str, Any],
+    exec_args: Mapping[str, Any],
+    metadata: Mapping[str, Any],
+) -> bool:
+    value = dotted_get(
+        metadata,
+        "logging.command_debug_enabled",
+        dotted_get(
+            exec_args,
+            "logging.command_debug_enabled",
+            dotted_get(settings, "logging.command_debug_enabled", False),
+        ),
+    )
+    return bool(value)
 
 
 def _optional_name(value: object) -> str | None:
