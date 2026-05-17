@@ -2,17 +2,17 @@ import time
 from pathlib import Path
 
 import cv2
-from macro.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig
-from macro.nsmb_sort_or_splode.recognizer import (
+
+from examples.macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig
+from examples.macros.nsmb_sort_or_splode.recognizer import (
     BombColor,
     classify_bombs,
     find_bombs,
     paint_ignored_rects,
 )
-
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 CLASSIFIED_DETECTION_THRESHOLD_S = 0.04
 
 

@@ -14,7 +14,7 @@ import pytest
 # ============================================================
 # LCG32 テスト
 # ============================================================
-from macro.frlg_initial_seed.lcg32 import LCG32
+from examples.macros.frlg_initial_seed.lcg32 import LCG32
 
 
 class TestLCG32:
@@ -96,7 +96,7 @@ class TestLCG32:
 # nature テスト
 # ============================================================
 
-from macro.frlg_initial_seed.nature import (
+from examples.macros.frlg_initial_seed.nature import (
     NATURE_JPN_TO_EN,
     NATURE_NAMES,
     NATURE_TO_ID,
@@ -150,7 +150,7 @@ class TestNature:
 # pokemon_gen テスト
 # ============================================================
 
-from macro.frlg_initial_seed.pokemon_gen import Pokemon, generate_pokemon
+from examples.macros.frlg_initial_seed.pokemon_gen import Pokemon, generate_pokemon
 
 
 class TestPokemonGen:
@@ -220,7 +220,7 @@ class TestPokemonGen:
 # seed_solver テスト
 # ============================================================
 
-from macro.frlg_initial_seed.seed_solver import solve_initial_seed
+from examples.macros.frlg_initial_seed.seed_solver import solve_initial_seed
 
 
 class TestSeedSolver:
@@ -446,7 +446,7 @@ class TestSeedSolver:
 # config テスト
 # ============================================================
 
-from macro.frlg_initial_seed.config import FrlgInitialSeedConfig, Hardware, KeyInput
+from examples.macros.frlg_initial_seed.config import FrlgInitialSeedConfig, Hardware, KeyInput
 
 
 class TestConfig:
@@ -515,7 +515,7 @@ class TestConfig:
 # CSV ヘルパーテスト
 # ============================================================
 
-from macro.frlg_initial_seed.csv_helper import (
+from examples.macros.frlg_initial_seed.csv_helper import (
     CSV_DETAIL_FIELDNAMES,
     CSV_DETAIL_FILENAME,
     CSV_FIELDNAMES,
@@ -527,7 +527,6 @@ from macro.frlg_initial_seed.csv_helper import (
     build_debug_image_dir,
     build_detail_csv_path,
 )
-
 from nyxpy.framework.core.io.resources import LocalRunArtifactStore
 
 
