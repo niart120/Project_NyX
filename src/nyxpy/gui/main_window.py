@@ -58,6 +58,7 @@ class _VirtualControllerPanel(QWidget):
         self.title_bar = QWidget(self)
         self.title_bar.setFixedHeight(PANE_TITLE_HEIGHT)
         title_layout = QHBoxLayout(self.title_bar)
+        self.title_layout = title_layout
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(8)
         self.title_label = QLabel("コントローラー", self.title_bar)
@@ -66,8 +67,8 @@ class _VirtualControllerPanel(QWidget):
         self.touch_panel_checkbox = QCheckBox("タッチパネル", self.title_bar)
         self.touch_panel_checkbox.setFixedHeight(PANE_TITLE_HEIGHT)
         title_layout.addWidget(self.title_label, 0)
-        title_layout.addWidget(self.touch_panel_checkbox, 0)
         title_layout.addStretch(1)
+        title_layout.addWidget(self.touch_panel_checkbox, 0)
         layout.addWidget(self.title_bar, 0)
 
         self.controller = VirtualControllerPane(logger, self)

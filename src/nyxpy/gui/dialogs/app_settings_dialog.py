@@ -20,7 +20,7 @@ class AppSettingsDialog(QDialog):
         device_discovery: DeviceDiscoveryService | None = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("デバイス・通知・ログ設定")
+        self.setWindowTitle("設定")
         self.resize(500, 400)
         self.settings = settings
         self.secrets = secrets

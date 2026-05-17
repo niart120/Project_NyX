@@ -43,10 +43,12 @@ class LogPane(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         control_layout = QHBoxLayout()
+        self.control_layout = control_layout
         control_layout.setContentsMargins(0, 0, 0, 0)
         self.title_label = QLabel(title, self)
         apply_pane_title_font(self.title_label)
         control_layout.addWidget(self.title_label)
+        control_layout.addStretch(1)
         self.auto_scroll_checkbox = QCheckBox("自動スクロール", self)
         self.auto_scroll_checkbox.setChecked(True)
         self.debug_checkbox = QCheckBox("デバッグログ表示", self)
@@ -55,7 +57,6 @@ class LogPane(QWidget):
         control_layout.addWidget(self.auto_scroll_checkbox)
         control_layout.addWidget(self.debug_checkbox)
         control_layout.addWidget(self.clear_button)
-        control_layout.addStretch(1)
         main_layout.addLayout(control_layout)
 
         self.view = QPlainTextEdit(self)

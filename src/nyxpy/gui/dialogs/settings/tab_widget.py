@@ -25,5 +25,5 @@ class SettingsTabWidget(QTabWidget):
         )
         self.notification_tab = NotificationSettingsTab(settings, secrets)
 
-        self.addTab(self.device_tab, "デバイス・一般")
+        self.addTab(self.device_tab, "一般")
         self.addTab(self.notification_tab, "通知・ログ")

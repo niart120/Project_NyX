@@ -433,6 +433,22 @@ def test_controller_pane_has_title_label(window: MainWindow):
     assert window.controller_title_label.height() == window.tool_log_pane.title_label.height()
 
 
+def test_title_bar_actions_are_right_aligned(window: MainWindow):
+    assert window.virtual_controller_panel.title_layout.itemAt(0).widget() is window.controller_title_label
+    assert window.virtual_controller_panel.title_layout.itemAt(1).spacerItem() is not None
+    assert (
+        window.virtual_controller_panel.title_layout.itemAt(2).widget()
+        is window.touch_panel_checkbox
+    )
+
+    for pane in (window.macro_log_pane, window.tool_log_pane):
+        assert pane.control_layout.itemAt(0).widget() is pane.title_label
+        assert pane.control_layout.itemAt(1).spacerItem() is not None
+        assert pane.control_layout.itemAt(2).widget() is pane.auto_scroll_checkbox
+        assert pane.control_layout.itemAt(3).widget() is pane.debug_checkbox
+        assert pane.control_layout.itemAt(4).widget() is pane.clear_button
+
+
 def test_left_column_content_edges_align(window: MainWindow, qtbot):
     window.show()
     qtbot.waitUntil(lambda: window.macro_browser.table.width() > 0, timeout=1000)
