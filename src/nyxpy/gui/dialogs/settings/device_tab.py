@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -15,6 +14,7 @@ from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryServic
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
 
 
 class DeviceSettingsTab(QWidget):
@@ -30,14 +30,14 @@ class DeviceSettingsTab(QWidget):
         self.settings = settings
         self.secrets = secrets
         self.device_discovery = device_discovery or DeviceDiscoveryService()
-        layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
 
         cap_group = QGroupBox("キャプチャ入力")
         cap_group_layout = QVBoxLayout(cap_group)
         cap_form = QFormLayout()
 
         self.capture_source_type = QComboBox()
-        self.capture_source_type.addItems(["camera", "window", "screen_region"])
+        self.capture_source_type.addItems(["camera", "window"])
         self.capture_source_type.setCurrentText(self.settings.get("capture_source_type", "camera"))
         self.capture_source_type.currentTextChanged.connect(self._update_source_field_state)
         cap_form.addRow(QLabel("Source:"), self.capture_source_type)
@@ -50,7 +50,9 @@ class DeviceSettingsTab(QWidget):
         refresh_btn.clicked.connect(self.refresh_capture_devices)
         cap_row.addWidget(self.cap_device)
         cap_row.addWidget(refresh_btn)
-        cap_form.addRow(QLabel("Camera:"), cap_row)
+        self.camera_label = QLabel("Camera:")
+        self.camera_row = _layout_container(cap_row)
+        cap_form.addRow(self.camera_label, self.camera_row)
 
         window_row = QHBoxLayout()
         self.window_source = QComboBox()
@@ -61,45 +63,23 @@ class DeviceSettingsTab(QWidget):
         refresh_window_btn.clicked.connect(self.refresh_window_sources)
         window_row.addWidget(self.window_source)
         window_row.addWidget(refresh_window_btn)
-        cap_form.addRow(QLabel("Window:"), window_row)
+        self.window_label = QLabel("Window:")
+        self.window_row = _layout_container(window_row)
+        cap_form.addRow(self.window_label, self.window_row)
 
         self.window_match_mode = QComboBox()
         self.window_match_mode.addItems(["exact", "contains"])
         self.window_match_mode.setCurrentText(
             self.settings.get("capture_window_match_mode", "exact")
         )
-        cap_form.addRow(QLabel("Window Match:"), self.window_match_mode)
+        self.window_match_label = QLabel("Window Match:")
+        cap_form.addRow(self.window_match_label, self.window_match_mode)
 
         self.capture_backend = QComboBox()
         self.capture_backend.addItems(["auto", "mss", "windows_graphics_capture"])
         self.capture_backend.setCurrentText(self.settings.get("capture_backend", "auto"))
-        cap_form.addRow(QLabel("Backend:"), self.capture_backend)
-
-        region_row = QHBoxLayout()
-        region = self.settings.get("capture_region", {})
-        self.region_left = self._region_spinbox(
-            region.get("left", 0) if isinstance(region, dict) else 0
-        )
-        self.region_top = self._region_spinbox(
-            region.get("top", 0) if isinstance(region, dict) else 0
-        )
-        self.region_width = self._region_spinbox(
-            region.get("width", 1280) if isinstance(region, dict) else 1280,
-            minimum=1,
-        )
-        self.region_height = self._region_spinbox(
-            region.get("height", 720) if isinstance(region, dict) else 720,
-            minimum=1,
-        )
-        for label, widget in (
-            ("L", self.region_left),
-            ("T", self.region_top),
-            ("W", self.region_width),
-            ("H", self.region_height),
-        ):
-            region_row.addWidget(QLabel(label))
-            region_row.addWidget(widget)
-        cap_form.addRow(QLabel("Region:"), region_row)
+        self.backend_label = QLabel("Backend:")
+        cap_form.addRow(self.backend_label, self.capture_backend)
 
         self.capture_fps = QComboBox()
         self.capture_fps.addItem("source default", None)
@@ -171,6 +151,21 @@ class DeviceSettingsTab(QWidget):
         ser_group_layout.addLayout(ser_form)
         layout.addWidget(ser_group)
 
+        appearance_group = QGroupBox("外観", self)
+        appearance_layout = QVBoxLayout(appearance_group)
+        appearance_form = QFormLayout()
+        self.window_size_preset = QComboBox(self)
+        for preset in WINDOW_SIZE_PRESETS:
+            self.window_size_preset.addItem(preset.label, preset.key)
+        current_key = normalize_window_size_preset_key(
+            self.settings.get("gui.window_size_preset", "full_hd")
+        )
+        self.window_size_preset.setCurrentIndex(self.window_size_preset.findData(current_key))
+        appearance_form.addRow(QLabel("ウィンドウサイズ:"), self.window_size_preset)
+        appearance_layout.addLayout(appearance_form)
+        layout.addWidget(appearance_group)
+        layout.addStretch(1)
+
         self._update_source_field_state(self.capture_source_type.currentText())
 
     def _apply_protocol_default_baud(self, protocol_name: str):
@@ -216,12 +211,18 @@ class DeviceSettingsTab(QWidget):
             self.window_source.setCurrentIndex(self.window_source.count() - 1)
 
     def refresh_serial_devices(self):
-        serials = self.device_discovery.detect(timeout_sec=2.0).serial_names()
+        serials = self.device_discovery.detect(timeout_sec=2.0).serial_devices
         self.ser_device.clear()
-        self.ser_device.addItems(serials)
-        current_ser = self.settings.get("serial_device", "")
-        if current_ser in serials:
-            self.ser_device.setCurrentText(current_ser)
+        current_ser = str(self.settings.get("serial_device", "") or "")
+        for device in serials:
+            self.ser_device.addItem(device.display_name, str(device.identifier))
+        for index in range(self.ser_device.count()):
+            if self.ser_device.itemData(index) == current_ser:
+                self.ser_device.setCurrentIndex(index)
+                return
+        if current_ser:
+            self.ser_device.addItem(current_ser, current_ser)
+            self.ser_device.setCurrentIndex(self.ser_device.count() - 1)
 
     def apply(self):
         self.settings.set("capture_source_type", self.capture_source_type.currentText())
@@ -236,40 +237,32 @@ class DeviceSettingsTab(QWidget):
         self.settings.set("capture_window_identifier", selected_identifier)
         self.settings.set("capture_window_match_mode", self.window_match_mode.currentText())
         self.settings.set("capture_backend", self.capture_backend.currentText())
-        self.settings.set(
-            "capture_region",
-            {
-                "left": self.region_left.value(),
-                "top": self.region_top.value(),
-                "width": self.region_width.value(),
-                "height": self.region_height.value(),
-            },
-        )
         self.settings.set("capture_fps", self.capture_fps.currentData())
         self.settings.set("capture_aspect_box_enabled", self.aspect_box_enabled.isChecked())
         self.settings.set("preview_fps", int(self.preview_fps.currentText()))
-        self.settings.set("serial_device", self.ser_device.currentText())
+        self.settings.set(
+            "serial_device",
+            self.ser_device.currentData() or self.ser_device.currentText(),
+        )
         self.settings.set("serial_protocol", self.ser_protocol.currentText())
         self.settings.set("serial_baud", int(self.ser_baud.currentText()))
+        self.settings.set("gui.window_size_preset", self.window_size_preset.currentData())
 
     def _update_source_field_state(self, source_type: str) -> None:
         is_camera = source_type == "camera"
         is_window = source_type == "window"
-        is_region = source_type == "screen_region"
-        self.cap_device.setEnabled(is_camera)
-        self.window_source.setEnabled(is_window)
-        self.window_match_mode.setEnabled(is_window)
-        self.capture_backend.setEnabled(is_window or is_region)
-        for widget in (
-            self.region_left,
-            self.region_top,
-            self.region_width,
-            self.region_height,
-        ):
-            widget.setEnabled(is_region)
+        self.camera_label.setVisible(is_camera)
+        self.camera_row.setVisible(is_camera)
+        self.window_label.setVisible(is_window)
+        self.window_row.setVisible(is_window)
+        self.window_match_label.setVisible(is_window)
+        self.window_match_mode.setVisible(is_window)
+        self.backend_label.setVisible(is_window)
+        self.capture_backend.setVisible(is_window)
 
-    def _region_spinbox(self, value: object, *, minimum: int = -100000) -> QSpinBox:
-        spinbox = QSpinBox()
-        spinbox.setRange(minimum, 100000)
-        spinbox.setValue(int(value))
-        return spinbox
+
+def _layout_container(layout: QHBoxLayout) -> QWidget:
+    container = QWidget()
+    layout.setContentsMargins(0, 0, 0, 0)
+    container.setLayout(layout)
+    return container

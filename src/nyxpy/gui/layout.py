@@ -80,7 +80,7 @@ class VirtualControllerMetrics:
 
 
 WINDOW_SIZE_PRESETS: tuple[WindowSizePreset, ...] = (
-    WindowSizePreset("hd", "HD", 1280, 720, 640, 360),
+    WindowSizePreset("hd", "HD", 1280, 720, 768, 432),
     WindowSizePreset("full_hd", "FullHD", 1920, 1080, 1280, 720),
     WindowSizePreset("wqhd", "WQHD", 2560, 1440, 1600, 900),
     WindowSizePreset("four_k", "4K", 3840, 2160, 2560, 1440),
@@ -92,12 +92,12 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
     "hd": LayoutMetrics(
         margin=8,
         gap=8,
-        left_width=260,
+        left_width=220,
         controller_initial_height=220,
-        tool_log_width=260,
+        tool_log_width=220,
         bottom_macro_log_height=120,
-        preview_width=640,
-        preview_height=360,
+        preview_width=768,
+        preview_height=432,
         macro_explorer_min_height=320,
         tool_log_min_width=240,
         tool_log_min_height=180,

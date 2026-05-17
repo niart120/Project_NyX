@@ -17,7 +17,7 @@ class Discovery(DeviceDiscoveryService):
     def _detect_serial_devices(self) -> list[DeviceInfo]:
         if self.delay:
             time.sleep(self.delay)
-        return [DeviceInfo(kind="serial", name="COM1", identifier="COM1")]
+        return [DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1")]
 
     def _detect_capture_devices(self) -> list[DeviceInfo]:
         if self.delay:
@@ -39,7 +39,8 @@ def test_device_discovery_returns_detected_names_without_dummy() -> None:
 
     result = discovery.detect(timeout_sec=1.0)
 
-    assert result.serial_names() == ["COM1"]
+    assert result.serial_names() == ["USB Serial Device (COM1)"]
+    assert result.serial_devices[0].identifier == "COM1"
     assert result.capture_names() == ["Camera1"]
     assert DUMMY_DEVICE_NAME not in result.serial_names()
     assert DUMMY_DEVICE_NAME not in result.capture_names()
@@ -78,3 +79,14 @@ def test_device_discovery_lists_capture_target_windows_separately() -> None:
     assert windows == (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720)),)
     assert discovery.capture_names() == []
     assert window_locator.calls == 1
+
+
+def test_device_discovery_finds_serial_by_identifier() -> None:
+    discovery = Discovery()
+    discovery.detect(timeout_sec=1.0)
+
+    found = discovery.find_serial("COM1", timeout_sec=0)
+
+    assert found is not None
+    assert found.display_name == "USB Serial Device (COM1)"
+    assert discovery.serial_display_name("COM1") == "USB Serial Device (COM1)"

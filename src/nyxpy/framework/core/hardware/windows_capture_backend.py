@@ -9,10 +9,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from nyxpy.framework.core.hardware.capture_source import (
-    ScreenRegionCaptureSourceConfig,
-    WindowCaptureSourceConfig,
-)
+from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.window_capture import WindowCaptureBackend, WindowCaptureSession
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, WindowLocatorBackend
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -34,15 +31,9 @@ class WindowsGraphicsCaptureBackend(WindowCaptureBackend):
 
     def create_session(
         self,
-        config: WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig,
+        config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
     ) -> WindowCaptureSession:
-        if isinstance(config, ScreenRegionCaptureSourceConfig):
-            raise ConfigurationError(
-                "windows_graphics_capture supports window sources only",
-                code="NYX_CAPTURE_BACKEND_INVALID_SOURCE",
-                component=type(self).__name__,
-            )
         if locator is None:
             raise ConfigurationError(
                 "window locator is required for windows_graphics_capture",

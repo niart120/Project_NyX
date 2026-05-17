@@ -5,11 +5,10 @@ import pytest
 
 from nyxpy.framework.core.hardware.capture_source import (
     CaptureRect,
-    ScreenRegionCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.window_capture import (
-    ScreenRegionCaptureDevice,
+    AutoWindowCaptureBackend,
     WindowCaptureBackend,
     WindowCaptureDevice,
     WindowCaptureSession,
@@ -53,28 +52,6 @@ class FakeLocator(WindowLocatorBackend):
         return (WindowInfo("Viewer", "1", CaptureRect(0, 0, 2, 2)),)
 
 
-def test_screen_region_capture_device_returns_copy() -> None:
-    frame = np.full((2, 2, 3), 7, dtype=np.uint8)
-    session = FakeSession(frame)
-    backend = FakeBackend(session)
-    device = ScreenRegionCaptureDevice(
-        ScreenRegionCaptureSourceConfig(CaptureRect(0, 0, 2, 2), fps=120.0),
-        backend=backend,
-    )
-
-    device.initialize()
-    try:
-        captured = device.get_frame()
-        captured[0, 0] = 255
-    finally:
-        device.release()
-
-    assert np.all(frame == 7)
-    assert session.started is True
-    assert session.stopped is True
-    assert backend.released is True
-
-
 def test_window_capture_device_raises_before_first_frame() -> None:
     device = WindowCaptureDevice(
         WindowCaptureSourceConfig(title_pattern="Viewer", fps=120.0),
@@ -101,3 +78,47 @@ def test_window_capture_device_release_is_idempotent() -> None:
     time.sleep(0.01)
     device.release()
     device.release()
+
+
+def test_auto_backend_fallback_occurs_inside_session_start() -> None:
+    failed = FakeSession(fail=False)
+
+    def fail_start() -> None:
+        failed.started = True
+        raise RuntimeError("wgc unavailable")
+
+    failed.start = fail_start
+    fallback = FakeSession(np.full((2, 2, 3), 9, dtype=np.uint8))
+    backend = AutoWindowCaptureBackend(
+        backend_factories=(
+            ("windows_graphics_capture", lambda: FakeBackend(failed)),
+            ("mss", lambda: FakeBackend(fallback)),
+        ),
+        platform_name="Windows",
+    )
+
+    session = backend.create_session(WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator())
+    session.start()
+    try:
+        assert session.latest_frame()[0, 0].tolist() == [9, 9, 9]
+    finally:
+        session.stop()
+        backend.release()
+
+    assert failed.started is True
+    assert fallback.started is True
+    assert session.chosen_backend == "mss"
+
+
+def test_explicit_backend_does_not_fallback() -> None:
+    failed = FakeSession()
+
+    def fail_start() -> None:
+        raise RuntimeError("explicit failed")
+
+    failed.start = fail_start
+    backend = FakeBackend(failed)
+    session = backend.create_session(WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator())
+
+    with pytest.raises(RuntimeError, match="explicit failed"):
+        session.start()

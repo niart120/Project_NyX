@@ -399,11 +399,11 @@ def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServi
 def test_layout_horizontal_surplus_is_side_panel_width(window: MainWindow):
     window.apply_window_size_preset("hd")
 
-    assert window.left_center_container.maximumWidth() == 952
-    assert window.left_center_container.layout().columnMinimumWidth(0) == 304
-    assert window.left_center_container.layout().columnMinimumWidth(1) == 640
-    assert window.preview_pane.maximumWidth() == 640
-    assert window.tool_log_pane.maximumWidth() == 304
+    assert window.left_center_container.maximumWidth() == 1016
+    assert window.left_center_container.layout().columnMinimumWidth(0) == 240
+    assert window.left_center_container.layout().columnMinimumWidth(1) == 768
+    assert window.preview_pane.maximumWidth() == 768
+    assert window.tool_log_pane.maximumWidth() == 240
     assert window.centralWidget().layout().spacing() == 8
 
 
@@ -486,7 +486,7 @@ def test_main_window_applies_virtual_controller_preset_metrics(window: MainWindo
 
     window.apply_window_size_preset("hd")
 
-    assert window.virtual_controller.maximumWidth() == 304
+    assert window.virtual_controller.maximumWidth() == 240
     assert window.virtual_controller.maximumHeight() == 120
     assert window.virtual_controller.btn_a.width() == 14
 

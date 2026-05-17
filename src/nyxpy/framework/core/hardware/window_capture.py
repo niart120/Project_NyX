@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+import platform
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 
 from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
-from nyxpy.framework.core.hardware.capture_source import (
-    ScreenRegionCaptureSourceConfig,
-    WindowCaptureSourceConfig,
-)
+from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
 from nyxpy.framework.core.hardware.platform_capture import ensure_capture_coordinate_space
 from nyxpy.framework.core.hardware.window_discovery import (
@@ -44,7 +43,7 @@ class WindowCaptureBackend(ABC):
     @abstractmethod
     def create_session(
         self,
-        config: WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig,
+        config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
     ) -> WindowCaptureSession:
         pass
@@ -57,7 +56,7 @@ class WindowCaptureBackend(ABC):
 class MssWindowCaptureBackend(WindowCaptureBackend):
     def create_session(
         self,
-        config: WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig,
+        config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
     ) -> WindowCaptureSession:
         return MssCaptureSession(config=config, locator=locator)
@@ -70,7 +69,7 @@ class MssCaptureSession(WindowCaptureSession):
     def __init__(
         self,
         *,
-        config: WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig,
+        config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
     ) -> None:
         self.config = config
@@ -83,7 +82,7 @@ class MssCaptureSession(WindowCaptureSession):
             import mss
         except ImportError as exc:
             raise ConfigurationError(
-                "mss is required for window or screen-region capture",
+                "mss is required for window capture",
                 code="NYX_CAPTURE_MSS_NOT_INSTALLED",
                 component="MssCaptureSession",
                 cause=exc,
@@ -107,38 +106,121 @@ class MssCaptureSession(WindowCaptureSession):
             self._mss = None
 
     def _monitor(self) -> dict[str, int]:
-        match self.config:
-            case ScreenRegionCaptureSourceConfig():
-                return self.config.region.to_mss_monitor()
-            case WindowCaptureSourceConfig():
-                if self.locator is None:
-                    raise RuntimeError("window locator is required")
-                return self.locator.resolve(self.config).rect.to_mss_monitor()
+        if self.locator is None:
+            raise RuntimeError("window locator is required")
+        return self.locator.resolve(self.config).rect.to_mss_monitor()
 
 
-class ScreenRegionCaptureDevice(CaptureDeviceInterface):
+class AutoWindowCaptureBackend(WindowCaptureBackend):
     def __init__(
         self,
-        config: ScreenRegionCaptureSourceConfig,
         *,
-        backend: WindowCaptureBackend | None = None,
+        backend_factories: tuple[tuple[str, Callable[[], WindowCaptureBackend]], ...] | None = None,
+        platform_name: str | None = None,
         logger: LoggerPort | None = None,
     ) -> None:
-        self._device = _ThreadedSessionCaptureDevice(
+        self.logger = logger or NullLoggerPort()
+        self._sessions: list[AutoWindowCaptureSession] = []
+        self._backend_factories = backend_factories or _auto_backend_factories(platform_name)
+
+    def create_session(
+        self,
+        config: WindowCaptureSourceConfig,
+        locator: WindowLocatorBackend | None,
+    ) -> WindowCaptureSession:
+        session = AutoWindowCaptureSession(
             config=config,
-            locator=None,
-            backend=backend or _backend_for(config.backend),
-            logger=logger,
+            locator=locator,
+            backend_factories=self._backend_factories,
+            logger=self.logger,
         )
-
-    def initialize(self) -> None:
-        self._device.initialize()
-
-    def get_frame(self) -> cv2.typing.MatLike:
-        return self._device.get_frame()
+        self._sessions.append(session)
+        return session
 
     def release(self) -> None:
-        self._device.release()
+        for session in self._sessions:
+            session.release_backends()
+        self._sessions.clear()
+
+
+class AutoWindowCaptureSession(WindowCaptureSession):
+    def __init__(
+        self,
+        *,
+        config: WindowCaptureSourceConfig,
+        locator: WindowLocatorBackend | None,
+        backend_factories: tuple[tuple[str, Callable[[], WindowCaptureBackend]], ...],
+        logger: LoggerPort,
+    ) -> None:
+        self.config = config
+        self.locator = locator
+        self.backend_factories = backend_factories
+        self.logger = logger
+        self._active_session: WindowCaptureSession | None = None
+        self._active_backend: WindowCaptureBackend | None = None
+        self.chosen_backend: str | None = None
+        self._created_backends: list[WindowCaptureBackend] = []
+
+    def start(self) -> None:
+        last_error: Exception | None = None
+        for index, (name, factory) in enumerate(self.backend_factories):
+            backend: WindowCaptureBackend | None = None
+            session: WindowCaptureSession | None = None
+            try:
+                backend = factory()
+                self._created_backends.append(backend)
+                session = backend.create_session(self.config, self.locator)
+                session.start()
+            except Exception as exc:
+                last_error = exc
+                if session is not None:
+                    _stop_session_safely(session, self.logger)
+                if index < len(self.backend_factories) - 1:
+                    self.logger.technical(
+                        "WARNING",
+                        "Window capture backend startup failed; falling back.",
+                        component=type(self).__name__,
+                        event="capture.backend_fallback",
+                        extra={
+                            "from_backend": name,
+                            "to_backend": self.backend_factories[index + 1][0],
+                        },
+                        exc=exc,
+                    )
+                    continue
+                break
+            self._active_backend = backend
+            self._active_session = session
+            self.chosen_backend = name
+            return
+        if last_error is not None:
+            raise last_error
+        raise ConfigurationError(
+            "no window capture backend is available",
+            code="NYX_CAPTURE_BACKEND_UNAVAILABLE",
+            component=type(self).__name__,
+        )
+
+    def latest_frame(self) -> cv2.typing.MatLike:
+        if self._active_session is None:
+            raise RuntimeError("auto window capture session is not started")
+        return self._active_session.latest_frame()
+
+    def stop(self) -> None:
+        if self._active_session is not None:
+            self._active_session.stop()
+            self._active_session = None
+
+    def release_backends(self) -> None:
+        errors: list[Exception] = []
+        for backend in self._created_backends:
+            try:
+                backend.release()
+            except Exception as exc:
+                errors.append(exc)
+        self._created_backends.clear()
+        if errors:
+            raise ExceptionGroup("AutoWindowCaptureBackend release failed", errors)
 
 
 class WindowCaptureDevice(CaptureDeviceInterface):
@@ -153,7 +235,7 @@ class WindowCaptureDevice(CaptureDeviceInterface):
         self._device = _ThreadedSessionCaptureDevice(
             config=config,
             locator=locator or DefaultWindowLocatorBackend(),
-            backend=backend or _backend_for(config.backend),
+            backend=backend or _backend_for(config.backend, logger=logger),
             logger=logger,
         )
 
@@ -171,7 +253,7 @@ class _ThreadedSessionCaptureDevice(CaptureDeviceInterface):
     def __init__(
         self,
         *,
-        config: WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig,
+        config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
         backend: WindowCaptureBackend,
         logger: LoggerPort | None,
@@ -275,8 +357,10 @@ class _ThreadedSessionCaptureDevice(CaptureDeviceInterface):
                 )
 
 
-def _backend_for(name: str) -> WindowCaptureBackend:
-    if name in ("auto", "mss"):
+def _backend_for(name: str, *, logger: LoggerPort | None = None) -> WindowCaptureBackend:
+    if name == "auto":
+        return AutoWindowCaptureBackend(logger=logger)
+    if name == "mss":
         return MssWindowCaptureBackend()
     if name == "windows_graphics_capture":
         from nyxpy.framework.core.hardware.windows_capture_backend import (
@@ -290,3 +374,36 @@ def _backend_for(name: str) -> WindowCaptureBackend:
         component="WindowCaptureBackend",
         details={"backend": name},
     )
+
+
+def _auto_backend_factories(
+    platform_name: str | None = None,
+) -> tuple[tuple[str, Callable[[], WindowCaptureBackend]], ...]:
+    os_name = platform_name or platform.system()
+    if os_name == "Windows":
+        return (
+            ("windows_graphics_capture", _windows_graphics_capture_backend),
+            ("mss", MssWindowCaptureBackend),
+        )
+    return (("mss", MssWindowCaptureBackend),)
+
+
+def _windows_graphics_capture_backend() -> WindowCaptureBackend:
+    from nyxpy.framework.core.hardware.windows_capture_backend import (
+        WindowsGraphicsCaptureBackend,
+    )
+
+    return WindowsGraphicsCaptureBackend()
+
+
+def _stop_session_safely(session: WindowCaptureSession, logger: LoggerPort) -> None:
+    try:
+        session.stop()
+    except Exception as exc:
+        logger.technical(
+            "WARNING",
+            "Window capture session cleanup failed after startup error.",
+            component="AutoWindowCaptureSession",
+            event="resource.cleanup_failed",
+            exc=exc,
+        )

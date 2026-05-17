@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from nyxpy.framework.core.hardware.capture_source import ScreenRegionCaptureSourceConfig
+import pytest
+
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroDefinition
 from nyxpy.framework.core.runtime.builder import create_device_runtime_builder
-from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from tests.support.fakes import (
     FakeControllerOutputPort,
     FakeFrameSourcePort,
@@ -58,27 +59,19 @@ def definition(tmp_path: Path) -> MacroDefinition:
     )
 
 
-def test_runtime_builder_passes_screen_region_capture_source_config(tmp_path: Path) -> None:
+def test_runtime_builder_rejects_removed_screen_region_source(tmp_path: Path) -> None:
     frame_factory = FrameFactory()
-    builder = create_device_runtime_builder(
-        project_root=tmp_path,
-        registry=Registry(definition(tmp_path)),
-        protocol=object(),
-        notification_handler=None,
-        logger=FakeLoggerPort(),
-        controller_output_factory=ControllerFactory(),
-        frame_source_factory=frame_factory,
-        settings={
-            "capture_source_type": "screen_region",
-            "capture_region": {"left": 10, "top": 20, "width": 600, "height": 720},
-            "capture_aspect_box_enabled": True,
-        },
-    )
-
-    builder.build(RuntimeBuildRequest(macro_id="sample"))
-
-    source = frame_factory.sources[-1]
-    assert isinstance(source, ScreenRegionCaptureSourceConfig)
-    assert source.region.left == 10
-    assert source.region.width == 600
-    assert source.transform.aspect_box_enabled is True
+    with pytest.raises(ConfigurationError, match="invalid capture source type"):
+        create_device_runtime_builder(
+            project_root=tmp_path,
+            registry=Registry(definition(tmp_path)),
+            protocol=object(),
+            notification_handler=None,
+            logger=FakeLoggerPort(),
+            controller_output_factory=ControllerFactory(),
+            frame_source_factory=frame_factory,
+            settings={
+                "capture_source_type": "screen_region",
+                "capture_aspect_box_enabled": True,
+            },
+        )

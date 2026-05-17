@@ -45,11 +45,6 @@ FRAME_SOURCE_SETTING_KEYS = frozenset(
         "capture_window_identifier",
         "capture_window_match_mode",
         "capture_backend",
-        "capture_region",
-        "capture_region.left",
-        "capture_region.top",
-        "capture_region.width",
-        "capture_region.height",
         "capture_fps",
         "capture_aspect_box_enabled",
     }
@@ -287,9 +282,15 @@ class GuiAppServices:
 
     def _log_setting_changes(self, changed_keys: set[str]) -> None:
         if {"serial_device", "serial_baud"} & changed_keys:
+            serial_identifier = str(self.global_settings.get("serial_device", "") or "")
+            discovery = getattr(self, "device_discovery", None)
+            display_name = getattr(discovery, "serial_display_name", None)
+            serial_display = (
+                str(display_name(serial_identifier)) if callable(display_name) else serial_identifier
+            )
             self.logger.user(
                 "INFO",
-                f"シリアルデバイス設定を更新しました: {self.global_settings.get('serial_device')} ({self.global_settings.get('serial_baud', 9600)} bps)",
+                f"シリアルデバイス設定を更新しました: {serial_display} ({self.global_settings.get('serial_baud', 9600)} bps)",
                 component="GuiAppServices",
                 event="configuration.changed",
             )
@@ -390,16 +391,9 @@ def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
             capture_fps,
             aspect_box_enabled,
         )
-    region = _dotted_get(settings, "capture_region") or {}
-    if not isinstance(region, Mapping):
-        region = {}
     return (
-        source_type,
-        _dotted_get(settings, "capture_backend", "auto"),
-        region.get("left"),
-        region.get("top"),
-        region.get("width"),
-        region.get("height"),
+        "camera",
+        _normalize_name(_dotted_get(settings, "capture_device", "")),
         capture_fps,
         aspect_box_enabled,
     )

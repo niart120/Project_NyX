@@ -27,6 +27,10 @@ class DeviceInfo:
     identifier: str | int
     api_pref: int | None = None
 
+    @property
+    def display_name(self) -> str:
+        return self.name
+
 
 @dataclass(frozen=True)
 class DeviceDiscoveryResult:
@@ -150,10 +154,43 @@ class DeviceDiscoveryService:
         return detected
 
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self._find(name, "serial", timeout_sec)
+        return self._find_serial_by_identifier(name, timeout_sec)
 
     def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self._find(name, "capture", timeout_sec)
+
+    def serial_display_name(self, identifier: str) -> str:
+        match = next(
+            (
+                device
+                for device in self.last_result.serial_devices
+                if str(device.identifier) == str(identifier)
+            ),
+            None,
+        )
+        return match.display_name if match is not None else identifier
+
+    def _find_serial_by_identifier(self, identifier: str, timeout_sec: float) -> DeviceInfo | None:
+        result = self.last_result
+        match = next(
+            (
+                device
+                for device in result.serial_devices
+                if str(device.identifier) == str(identifier)
+            ),
+            None,
+        )
+        if match is not None:
+            return match
+        result = self.detect(timeout_sec)
+        return next(
+            (
+                device
+                for device in result.serial_devices
+                if str(device.identifier) == str(identifier)
+            ),
+            None,
+        )
 
     def _find(self, name: str, kind: DeviceKind, timeout_sec: float) -> DeviceInfo | None:
         result = self.last_result
@@ -167,7 +204,11 @@ class DeviceDiscoveryService:
 
     def _detect_serial_devices(self) -> list[DeviceInfo]:
         return [
-            DeviceInfo(kind="serial", name=port.device, identifier=port.device)
+            DeviceInfo(
+                kind="serial",
+                name=_serial_display_name(port),
+                identifier=port.device,
+            )
             for port in serial.tools.list_ports.comports()
         ]
 
@@ -218,3 +259,15 @@ class DeviceDiscoveryService:
         finally:
             cv2.setLogLevel(log_level)
         return devices
+
+
+def _serial_display_name(port) -> str:
+    device = str(getattr(port, "device", "") or "")
+    description = str(
+        getattr(port, "description", "")
+        or getattr(port, "name", "")
+        or device
+    ).strip()
+    if not description or description == device:
+        return device
+    return f"{description} ({device})"
