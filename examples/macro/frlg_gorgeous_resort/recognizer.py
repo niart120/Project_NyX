@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-from macros.shared.image_utils import crop_and_pad
 from nyxpy.framework.core.imgproc import ImageProcessor
+
+from ..shared.image_utils import crop_and_pad
 
 if TYPE_CHECKING:
     from nyxpy.framework.core.macro.command import Command

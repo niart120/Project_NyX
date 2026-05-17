@@ -5,9 +5,10 @@ HOME メニュー経由でゲームを終了→再起動する操作を提供す
 
 from __future__ import annotations
 
-from macros.shared.timer import start_timer
 from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.macro.command import Command
+
+from .timer import start_timer
 
 
 def restart_game(cmd: Command) -> float:

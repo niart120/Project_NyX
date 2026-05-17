@@ -2,14 +2,14 @@ import time
 from pathlib import Path
 
 import cv2
-
-from macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig
-from macros.nsmb_sort_or_splode.recognizer import (
+from macro.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig
+from macro.nsmb_sort_or_splode.recognizer import (
     BombColor,
     classify_bombs,
     find_bombs,
     paint_ignored_rects,
 )
+
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,10 +25,22 @@ def _load_image(path: Path):
 def test_nsmb_sort_or_splode_classified_detection_perf() -> None:
     cfg = NsmbSortOrSplodeConfig.from_args({})
     red_template = _load_image(
-        ROOT / "resources" / "nsmb_sort_or_splode" / "assets" / "templates" / "red_bob_omb.png"
+        ROOT
+        / "examples"
+        / "resources"
+        / "nsmb_sort_or_splode"
+        / "assets"
+        / "templates"
+        / "red_bob_omb.png"
     )
     black_template = _load_image(
-        ROOT / "resources" / "nsmb_sort_or_splode" / "assets" / "templates" / "black_bob_omb.png"
+        ROOT
+        / "examples"
+        / "resources"
+        / "nsmb_sort_or_splode"
+        / "assets"
+        / "templates"
+        / "black_bob_omb.png"
     )
     frame = _load_image(ROOT / "spec" / "macro" / "nsmb_sort_or_splode" / "masked_preview.png")
     bottom = THREEDS_HD_BOTTOM_SCREEN

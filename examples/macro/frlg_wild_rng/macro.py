@@ -10,13 +10,13 @@ Switch (720p) 専用。
 
 from __future__ import annotations
 
-from macros.shared.frlg_opening import skip_opening_and_continue
-from macros.shared.game_restart import restart_game
-from macros.shared.timer import consume_timer, start_timer
 from nyxpy.framework.core.constants import Button, LStick
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
+from ..shared.frlg_opening import skip_opening_and_continue
+from ..shared.game_restart import restart_game
+from ..shared.timer import consume_timer, start_timer
 from .config import FrlgWildRngConfig
 
 # ============================================================
@@ -37,6 +37,7 @@ class FrlgWildRngMacro(MacroBase):
 
     description = "FRLG 野生乱数操作マクロ (Switch 720p)"
     tags = ["pokemon", "frlg", "rng", "wild"]
+    settings_path = "resource:settings.toml"
 
     # --------------------------------------------------------
     # ライフサイクル

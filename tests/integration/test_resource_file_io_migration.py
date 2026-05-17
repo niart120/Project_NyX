@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from macro.sample_turbo_a_macro import SampleTurboAMacro
 
-from macros.sample_turbo_a_macro import SampleTurboAMacro
 from nyxpy.framework.core.io.resources import (
     LocalResourceStore,
     LocalRunArtifactStore,

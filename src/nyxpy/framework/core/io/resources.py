@@ -102,7 +102,13 @@ class MacroResourceScope:
         project_root = Path(project_root).resolve()
         macro_id = str(definition.id)
         _validate_resource_identifier(macro_id)
-        assets_roots = [project_root / "resources" / macro_id / "assets"]
+        resources_root = getattr(definition, "resources_root", None)
+        standard_root = (
+            Path(resources_root).resolve()
+            if resources_root is not None
+            else project_root / "resources" / macro_id
+        )
+        assets_roots = [standard_root / "assets"]
         macro_root = (
             Path(definition.macro_root).resolve() if definition.macro_root is not None else None
         )

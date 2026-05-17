@@ -6,8 +6,7 @@
 
 from __future__ import annotations
 
-from frlg_initial_seed.lcg32 import LCG32
-
+from ..frlg_initial_seed.lcg32 import LCG32
 from .species_data import NUM_SPECIES_CODES
 
 # ============================================================

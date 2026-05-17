@@ -13,13 +13,13 @@ from datetime import datetime
 
 import cv2
 
-from macros.shared.ocr_utils import warmup_ocr
-from macros.shared.timer import consume_timer, start_timer
 from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.imgproc import ImageProcessor
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
+from ..shared.ocr_utils import warmup_ocr
+from ..shared.timer import consume_timer, start_timer
 from .frame_sweep import (
     dual_frame_sweep,
     frame_sweep,
@@ -50,6 +50,7 @@ class FrlgIdRngMacro(MacroBase):
 
     description = "FRLG TID乱数調整マクロ (Switch 720p)"
     tags = ["pokemon", "frlg", "rng", "tid"]
+    settings_path = "resource:settings.toml"
 
     # --------------------------------------------------------
     # ライフサイクル

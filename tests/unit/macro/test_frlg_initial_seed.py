@@ -7,22 +7,14 @@ LCG32 / nature / pokemon_gen / seed_solver のテストを提供する。
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
 
 import pytest
 
-# macros/ ディレクトリをインポートパスに追加
-_macros_dir = str(Path(__file__).resolve().parent.parent.parent.parent / "macros")
-if _macros_dir not in sys.path:
-    sys.path.insert(0, _macros_dir)
-
-
 # ============================================================
 # LCG32 テスト
 # ============================================================
-
-from frlg_initial_seed.lcg32 import LCG32
+from macro.frlg_initial_seed.lcg32 import LCG32
 
 
 class TestLCG32:
@@ -104,7 +96,7 @@ class TestLCG32:
 # nature テスト
 # ============================================================
 
-from frlg_initial_seed.nature import (
+from macro.frlg_initial_seed.nature import (
     NATURE_JPN_TO_EN,
     NATURE_NAMES,
     NATURE_TO_ID,
@@ -158,7 +150,7 @@ class TestNature:
 # pokemon_gen テスト
 # ============================================================
 
-from frlg_initial_seed.pokemon_gen import Pokemon, generate_pokemon
+from macro.frlg_initial_seed.pokemon_gen import Pokemon, generate_pokemon
 
 
 class TestPokemonGen:
@@ -228,7 +220,7 @@ class TestPokemonGen:
 # seed_solver テスト
 # ============================================================
 
-from frlg_initial_seed.seed_solver import solve_initial_seed
+from macro.frlg_initial_seed.seed_solver import solve_initial_seed
 
 
 class TestSeedSolver:
@@ -454,7 +446,7 @@ class TestSeedSolver:
 # config テスト
 # ============================================================
 
-from frlg_initial_seed.config import FrlgInitialSeedConfig, Hardware, KeyInput
+from macro.frlg_initial_seed.config import FrlgInitialSeedConfig, Hardware, KeyInput
 
 
 class TestConfig:
@@ -523,7 +515,7 @@ class TestConfig:
 # CSV ヘルパーテスト
 # ============================================================
 
-from frlg_initial_seed.csv_helper import (
+from macro.frlg_initial_seed.csv_helper import (
     CSV_DETAIL_FIELDNAMES,
     CSV_DETAIL_FILENAME,
     CSV_FIELDNAMES,

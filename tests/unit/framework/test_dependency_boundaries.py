@@ -3,7 +3,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[3]
 FRAMEWORK_ROOT = PROJECT_ROOT / "src" / "nyxpy" / "framework"
-MACROS_ROOT = PROJECT_ROOT / "macros"
+PUBLIC_MACROS_ROOT = PROJECT_ROOT / "examples" / "macro"
 
 
 def _imported_modules(path: Path) -> set[str]:
@@ -21,7 +21,9 @@ def test_framework_does_not_depend_on_upper_layers() -> None:
     violations: list[str] = []
     for path in FRAMEWORK_ROOT.rglob("*.py"):
         for module in _imported_modules(path):
-            if module == "macros" or module.startswith(("macros.", "nyxpy.gui", "nyxpy.cli")):
+            if module in {"macro", "macros"} or module.startswith(
+                ("macro.", "macros.", "nyxpy.gui", "nyxpy.cli")
+            ):
                 violations.append(f"{path}: {module}")
 
     assert violations == []
@@ -31,13 +33,13 @@ def test_macros_do_not_import_other_macro_packages() -> None:
     violations: list[str] = []
     macro_names = {
         path.name
-        for path in MACROS_ROOT.iterdir()
+        for path in PUBLIC_MACROS_ROOT.iterdir()
         if path.is_dir() and not path.name.startswith(".") and path.name != "shared"
     }
     for macro_name in macro_names:
-        for path in (MACROS_ROOT / macro_name).rglob("*.py"):
+        for path in (PUBLIC_MACROS_ROOT / macro_name).rglob("*.py"):
             for module in _imported_modules(path):
-                if not module.startswith("macros."):
+                if not module.startswith(("macro.", "macros.")):
                     continue
                 imported_macro = module.split(".", 2)[1]
                 if imported_macro != "shared" and imported_macro != macro_name:

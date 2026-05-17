@@ -92,6 +92,13 @@ class MacroDefinition:
     factory: MacroFactory
     manifest_path: Path | None = None
     entrypoint_kind: str = "convention"
+    resources_root: Path | None = None
+
+
+@dataclass(frozen=True)
+class MacroSearchRoot:
+    macros_dir: Path
+    resources_dir: Path
 
 
 class MacroRegistry:
@@ -99,14 +106,32 @@ class MacroRegistry:
         self,
         project_root: Path | None = None,
         macros_dir: Path | None = None,
+        macro_search_roots: Sequence[MacroSearchRoot] | None = None,
         settings_resolver: MacroSettingsResolver | None = None,
     ) -> None:
         if project_root is None:
             raise ValueError("project_root is required")
         self.project_root = Path(project_root).resolve()
-        self.macros_dir = (
-            Path(macros_dir).resolve() if macros_dir is not None else self.project_root / "macros"
-        )
+        if macro_search_roots is not None and macros_dir is not None:
+            raise ValueError("macros_dir and macro_search_roots cannot be used together")
+        if macro_search_roots is not None:
+            self.macro_search_roots = tuple(
+                MacroSearchRoot(
+                    macros_dir=Path(root.macros_dir).resolve(),
+                    resources_dir=Path(root.resources_dir).resolve(),
+                )
+                for root in macro_search_roots
+            )
+        else:
+            primary_macros_dir = (
+                Path(macros_dir).resolve()
+                if macros_dir is not None
+                else self.project_root / "macros"
+            )
+            self.macro_search_roots = (
+                MacroSearchRoot(primary_macros_dir, self.project_root / "resources"),
+            )
+        self.macros_dir = self.macro_search_roots[0].macros_dir
         self.settings_resolver = settings_resolver or self._create_settings_resolver()
         self._lock = RLock()
         self._definitions: dict[str, MacroDefinition] = {}
@@ -127,21 +152,30 @@ class MacroRegistry:
     def reload(self) -> None:
         from nyxpy.framework.core.macro.entrypoint_loader import EntryPointLoader
 
-        loader = EntryPointLoader(project_root=self.project_root, macros_dir=self.macros_dir)
         definitions: dict[str, MacroDefinition] = {}
         diagnostics: list[MacroLoadDiagnostic] = []
 
-        if self.macros_dir.is_dir():
+        for search_root in self.macro_search_roots:
+            if not search_root.macros_dir.is_dir():
+                continue
+            root_definitions: dict[str, MacroDefinition] = {}
+            loader = EntryPointLoader(
+                project_root=self.project_root,
+                macros_dir=search_root.macros_dir,
+                resources_dir=search_root.resources_dir,
+            )
             manifest_stems = {
-                path.stem for path in self.macros_dir.glob("*.toml") if path.name != "macro.toml"
+                path.stem
+                for path in search_root.macros_dir.glob("*.toml")
+                if path.name != "macro.toml"
             }
-            for entry in sorted(self.macros_dir.iterdir(), key=lambda path: path.name):
+            for entry in sorted(search_root.macros_dir.iterdir(), key=lambda path: path.name):
                 if entry.is_dir():
                     manifest_path = entry / "macro.toml"
                     self._load_entry(
                         loader=loader,
                         source_path=manifest_path if manifest_path.exists() else entry,
-                        definitions=definitions,
+                        definitions=root_definitions,
                         diagnostics=diagnostics,
                         manifest=manifest_path.exists(),
                     )
@@ -149,7 +183,7 @@ class MacroRegistry:
                     self._load_entry(
                         loader=loader,
                         source_path=entry,
-                        definitions=definitions,
+                        definitions=root_definitions,
                         diagnostics=diagnostics,
                         manifest=True,
                     )
@@ -162,10 +196,12 @@ class MacroRegistry:
                     self._load_entry(
                         loader=loader,
                         source_path=entry,
-                        definitions=definitions,
+                        definitions=root_definitions,
                         diagnostics=diagnostics,
                         manifest=False,
                     )
+            for macro_id, definition in root_definitions.items():
+                definitions.setdefault(macro_id, definition)
 
         alias_map, ambiguous_aliases = self._build_alias_maps(definitions)
         with self._lock:

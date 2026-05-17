@@ -10,14 +10,14 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from macros.shared.frlg_opening import skip_opening_and_continue
-from macros.shared.game_restart import restart_game
-from macros.shared.ocr_utils import warmup_ocr
-from macros.shared.timer import consume_timer
 from nyxpy.framework.core.constants import Button, LStick
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
+from ..shared.frlg_opening import skip_opening_and_continue
+from ..shared.game_restart import restart_game
+from ..shared.ocr_utils import warmup_ocr
+from ..shared.timer import consume_timer
 from .config import FrlgInitialSeedConfig
 from .csv_helper import (
     append_csv_artifact,
@@ -75,6 +75,7 @@ class FrlgInitialSeedMacro(MacroBase):
 
     description = "FRLG 初期Seed特定マクロ (Switch 720p)"
     tags = ["pokemon", "frlg", "rng", "seed"]
+    settings_path = "resource:settings.toml"
 
     _MAX_RETRIES: int = 3
     """1 trial あたりの認識リトライ上限"""

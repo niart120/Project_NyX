@@ -5,32 +5,24 @@ species_data / selphy_logic / frame_search / recognizer / config のテストを
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
-
-_macros_dir = str(Path(__file__).resolve().parent.parent.parent.parent / "macros")
-if _macros_dir not in sys.path:
-    sys.path.insert(0, _macros_dir)
-
-from frlg_gorgeous_resort.config import FrlgGorgeousResortConfig
-from frlg_gorgeous_resort.frame_search import (
+from macro.frlg_gorgeous_resort.config import FrlgGorgeousResortConfig
+from macro.frlg_gorgeous_resort.frame_search import (
     AkihoResult,
     find_consecutive_runs,
     search_akiho_frames,
 )
-from frlg_gorgeous_resort.recognizer import (
+from macro.frlg_gorgeous_resort.recognizer import (
     match_item,
     matches_any_target,
 )
-from frlg_gorgeous_resort.selphy_logic import (
+from macro.frlg_gorgeous_resort.selphy_logic import (
     ITEM_TABLE,
     LUXURY_BALL,
     determine_item,
     determine_pokemon,
 )
-from frlg_gorgeous_resort.species_data import (
+from macro.frlg_gorgeous_resort.species_data import (
     DUMMY_CODE_END,
     DUMMY_CODE_START,
     INTERNAL_TO_NAME,
@@ -41,7 +33,7 @@ from frlg_gorgeous_resort.species_data import (
     NUM_SPECIES_CODES,
     is_dummy,
 )
-from frlg_initial_seed.lcg32 import LCG32
+from macro.frlg_initial_seed.lcg32 import LCG32
 
 # ============================================================
 # species_data テスト

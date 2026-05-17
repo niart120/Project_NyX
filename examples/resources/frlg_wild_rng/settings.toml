@@ -1,0 +1,17 @@
+# FRLG 野生乱数操作マクロ設定
+
+frame1 = 2036
+target_advance = 2049
+fps = 60.0
+
+frame1_offset = 7.0
+platform_offset = -148
+user_offset = 0
+rng_multiplier = 2
+
+use_odd_correction = false
+
+use_teachy_tv = false
+teachy_tv_consumption = 0
+teachy_tv_adv_per_frame = 314
+teachy_tv_transition_correction = -12353

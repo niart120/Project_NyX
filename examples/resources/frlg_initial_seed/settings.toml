@@ -1,0 +1,24 @@
+# FRLG 初期Seed特定マクロ設定
+
+language = "JPN"
+rom = "FR"
+edition = "Switch"
+hardware = "Switch"
+fps = 60.0
+
+sound_mode = "モノラル"
+button_mode = "ヘルプ"
+keyinput = "none"
+
+min_frame = 2000
+max_frame = 2180
+trials = 3
+frame2 = 560
+frame1_offset = 0
+frame2_offset = 0
+min_advance = 1335
+max_advance = 1345
+
+base_stats = [106, 90, 130, 90, 154, 110]
+level = 70
+pokemon = "ルギア"
