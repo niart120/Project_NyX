@@ -1,3 +1,5 @@
+from PySide6.QtWidgets import QLabel
+
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
@@ -120,10 +122,13 @@ def test_device_settings_tab_saves_custom_window_title_without_identifier(qtbot)
     assert settings.data["capture_window_match_mode"] == "contains"
 
 
-def test_device_settings_tab_applies_aspect_box_setting(qtbot):
+def test_device_settings_tab_places_letterbox_on_source_row(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
+
+    assert tab.aspect_box_enabled.parent() is tab.source_row
+    assert "Aspect Box:" not in _label_texts(tab.cap_group)
 
     tab.aspect_box_enabled.setChecked(True)
     tab.apply()
@@ -169,3 +174,15 @@ def test_device_settings_tab_updates_window_size_preset(qtbot):
     tab.apply()
 
     assert settings.data["gui.window_size_preset"] == "four_k"
+
+
+def test_device_settings_tab_places_preview_fps_in_appearance_group(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    assert "Preview FPS:" not in _label_texts(tab.cap_group)
+    assert "Preview FPS:" in _label_texts(tab.appearance_group)
+
+
+def _label_texts(widget) -> list[str]:
+    return [label.text() for label in widget.findChildren(QLabel)]

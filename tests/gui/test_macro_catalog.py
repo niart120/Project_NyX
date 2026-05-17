@@ -75,5 +75,7 @@ def test_macro_browser_selection_returns_macro_id(qtbot):
 
     widget.table.selectRow(0)
 
+    assert widget.table.columnCount() == 1
+    assert widget.table.horizontalHeaderItem(0).text() == "マクロ名"
     assert widget.table.item(0, 0).text() == "A Macro"
     assert widget.selected_macro_id() == "macro-a"

@@ -32,15 +32,24 @@ class DeviceSettingsTab(QWidget):
         self.device_discovery = device_discovery or DeviceDiscoveryService()
         layout = QVBoxLayout(self)
 
-        cap_group = QGroupBox("キャプチャ入力")
+        self.cap_group = QGroupBox("キャプチャ入力")
+        cap_group = self.cap_group
         cap_group_layout = QVBoxLayout(cap_group)
         cap_form = QFormLayout()
 
+        source_row = QHBoxLayout()
         self.capture_source_type = QComboBox()
         self.capture_source_type.addItems(["camera", "window"])
         self.capture_source_type.setCurrentText(self.settings.get("capture_source_type", "camera"))
         self.capture_source_type.currentTextChanged.connect(self._update_source_field_state)
-        cap_form.addRow(QLabel("Source:"), self.capture_source_type)
+        source_row.addWidget(self.capture_source_type)
+        self.aspect_box_enabled = QCheckBox("レターボックス")
+        self.aspect_box_enabled.setChecked(
+            bool(self.settings.get("capture_aspect_box_enabled", False))
+        )
+        source_row.addWidget(self.aspect_box_enabled)
+        self.source_row = _layout_container(source_row)
+        cap_form.addRow(QLabel("Source:"), self.source_row)
 
         cap_row = QHBoxLayout()
         self.cap_device = QComboBox()
@@ -90,19 +99,6 @@ class DeviceSettingsTab(QWidget):
             self.capture_fps.setCurrentText(str(int(float(current_capture_fps))))
         cap_form.addRow(QLabel("Capture FPS:"), self.capture_fps)
 
-        self.aspect_box_enabled = QCheckBox("レターボックス")
-        self.aspect_box_enabled.setChecked(
-            bool(self.settings.get("capture_aspect_box_enabled", False))
-        )
-        cap_form.addRow(QLabel("Aspect Box:"), self.aspect_box_enabled)
-
-        fps_options = ["15", "30", "60"]
-        self.preview_fps = QComboBox()
-        self.preview_fps.addItems(fps_options)
-        current_preview_fps = str(self.settings.get("preview_fps", 60))
-        if current_preview_fps in fps_options:
-            self.preview_fps.setCurrentText(current_preview_fps)
-        cap_form.addRow(QLabel("Preview FPS:"), self.preview_fps)
         cap_group_layout.addLayout(cap_form)
         layout.addWidget(cap_group)
 
@@ -151,7 +147,8 @@ class DeviceSettingsTab(QWidget):
         ser_group_layout.addLayout(ser_form)
         layout.addWidget(ser_group)
 
-        appearance_group = QGroupBox("外観", self)
+        self.appearance_group = QGroupBox("外観", self)
+        appearance_group = self.appearance_group
         appearance_layout = QVBoxLayout(appearance_group)
         appearance_form = QFormLayout()
         self.window_size_preset = QComboBox(self)
@@ -162,6 +159,13 @@ class DeviceSettingsTab(QWidget):
         )
         self.window_size_preset.setCurrentIndex(self.window_size_preset.findData(current_key))
         appearance_form.addRow(QLabel("ウィンドウサイズ:"), self.window_size_preset)
+        fps_options = ["15", "30", "60"]
+        self.preview_fps = QComboBox()
+        self.preview_fps.addItems(fps_options)
+        current_preview_fps = str(self.settings.get("preview_fps", 60))
+        if current_preview_fps in fps_options:
+            self.preview_fps.setCurrentText(current_preview_fps)
+        appearance_form.addRow(QLabel("Preview FPS:"), self.preview_fps)
         appearance_layout.addLayout(appearance_form)
         layout.addWidget(appearance_group)
         layout.addStretch(1)

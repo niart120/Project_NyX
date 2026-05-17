@@ -44,10 +44,9 @@ class MacroBrowserPane(QWidget):
         header_layout.addWidget(self.reload_button)
         layout.addLayout(header_layout)
 
-        self.table = QTableWidget(0, 2, self)
-        self.table.setHorizontalHeaderLabels(["マクロ名", "タグ"])
+        self.table = QTableWidget(0, 1, self)
+        self.table.setHorizontalHeaderLabels(["マクロ名"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         layout.addWidget(self.table)
 
         self.catalog = catalog
@@ -70,10 +69,11 @@ class MacroBrowserPane(QWidget):
             self.table.insertRow(row)
             name_item = QTableWidgetItem(macro.display_name)
             name_item.setData(Qt.ItemDataRole.UserRole, macro.id)
-            name_item.setToolTip(macro.class_name)
             self.table.setItem(row, 0, name_item)
-            name_item.setToolTip(macro.description or macro.class_name)
-            self.table.setItem(row, 1, QTableWidgetItem(", ".join(macro.tags)))
+            tooltip_parts = [macro.description or macro.class_name]
+            if macro.tags:
+                tooltip_parts.append(f"タグ: {', '.join(macro.tags)}")
+            name_item.setToolTip("\n".join(tooltip_parts))
 
     def selected_macro_id(self) -> str | None:
         row = self.table.currentRow()
