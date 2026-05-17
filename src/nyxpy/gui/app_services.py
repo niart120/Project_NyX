@@ -69,6 +69,7 @@ RUNTIME_BUILDER_SETTING_KEYS = (
     | frozenset(
         {
             "runtime.allow_dummy",
+            "logging.command_debug_enabled",
         }
     )
 )
@@ -78,13 +79,20 @@ class GuiAppServices:
     def __init__(self, *, project_root: Path) -> None:
         self.project_root = Path(project_root)
         config_dir = self.project_root / ".nyxpy"
+        self.global_settings = GlobalSettings(config_dir=config_dir)
+        self.secrets_settings = SecretsSettings(config_dir=config_dir)
         self.logging = create_default_logging(
             base_dir=self.project_root / "logs",
             console_enabled=False,
+            file_level=str(self.global_settings.get("logging.file_level", "DEBUG")),
+            file_max_bytes=int(
+                self.global_settings.get("logging.file_max_bytes", 10 * 1024 * 1024)
+            ),
+            file_backup_count=int(self.global_settings.get("logging.file_backup_count", 3)),
+            file_retention_days=int(self.global_settings.get("logging.file_retention_days", 14)),
+            run_retention_days=int(self.global_settings.get("logging.run_retention_days", 30)),
         )
         self.logger = self.logging.logger
-        self.global_settings = GlobalSettings(config_dir=config_dir)
-        self.secrets_settings = SecretsSettings(config_dir=config_dir)
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)
@@ -128,6 +136,7 @@ class GuiAppServices:
         )
         if self._last_settings is not None or self._last_secrets is not None:
             self._log_setting_changes(changed_keys)
+            self._apply_logging_settings(changed_keys)
 
         builder_changed_keys = (
             _changed_keys(self._builder_settings, current_settings) & RUNTIME_BUILDER_SETTING_KEYS
@@ -317,6 +326,12 @@ class GuiAppServices:
                 message,
                 component="GuiAppServices",
                 event="configuration.changed",
+            )
+
+    def _apply_logging_settings(self, changed_keys: set[str]) -> None:
+        if "logging.file_level" in changed_keys:
+            self.logging.set_file_level(
+                str(self.global_settings.get("logging.file_level", "DEBUG"))
             )
 
 

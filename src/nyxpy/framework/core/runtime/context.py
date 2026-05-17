@@ -21,6 +21,7 @@ class RuntimeOptions:
     device_detection_timeout_sec: float = 5.0
     frame_ready_timeout_sec: float = 3.0
     release_timeout_sec: float = 2.0
+    command_debug_enabled: bool = False
 
 
 @dataclass(frozen=True)

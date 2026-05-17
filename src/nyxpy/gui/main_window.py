@@ -237,6 +237,7 @@ class MainWindow(QMainWindow):
             self.left_center_container,
             title="マクロログ",
             kind="macro",
+            initial_level=self.global_settings.get("logging.gui_level", "INFO"),
         )
         left_center_layout.addWidget(
             self.macro_log_pane,
@@ -251,6 +252,7 @@ class MainWindow(QMainWindow):
             self,
             title="ツールログ",
             kind="tool",
+            initial_level=self.global_settings.get("logging.gui_level", "INFO"),
         )
         main_layout.addWidget(self.tool_log_pane)
 

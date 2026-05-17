@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
 
@@ -12,6 +11,7 @@ from nyxpy.framework.core.logger.events import (
     level_enabled,
     normalize_level,
 )
+from nyxpy.framework.core.logger.rotation import RotationPolicy, rotate_if_needed
 
 
 class NullLogBackend:
@@ -32,16 +32,20 @@ class JsonlLogBackend:
         *,
         level: str = "DEBUG",
         max_bytes: int = 10 * 1024 * 1024,
+        backup_count: int = 3,
         retention_days: int = 30,
     ) -> None:
         self.path = Path(path)
         self.minimum_level = normalize_level(level)
-        self.max_bytes = max_bytes
-        self.retention_days = retention_days
+        self.rotation = RotationPolicy(
+            max_bytes=max_bytes,
+            backup_count=backup_count,
+            retention_days=retention_days,
+        )
         self._lock = RLock()
         self._closed = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._cleanup_retention()
+        rotate_if_needed(self.path, self.rotation)
 
     def set_level(self, level: str) -> None:
         self.minimum_level = normalize_level(level)
@@ -52,7 +56,7 @@ class JsonlLogBackend:
         with self._lock:
             if self._closed:
                 return
-            self._rotate_if_needed()
+            rotate_if_needed(self.path, self.rotation)
             with self.path.open("a", encoding="utf-8") as file:
                 file.write(json.dumps(_event_to_json(event.event), ensure_ascii=False) + "\n")
 
@@ -62,19 +66,6 @@ class JsonlLogBackend:
     def close(self) -> None:
         with self._lock:
             self._closed = True
-
-    def _rotate_if_needed(self) -> None:
-        if self.path.exists() and self.path.stat().st_size >= self.max_bytes:
-            rotated = self.path.with_suffix(self.path.suffix + ".1")
-            if rotated.exists():
-                rotated.unlink()
-            self.path.replace(rotated)
-
-    def _cleanup_retention(self) -> None:
-        cutoff = datetime.now() - timedelta(days=self.retention_days)
-        for candidate in self.path.parent.glob(self.path.name + "*"):
-            if datetime.fromtimestamp(candidate.stat().st_mtime) < cutoff:
-                candidate.unlink()
 
 
 def _event_to_json(event: LogEvent) -> dict:

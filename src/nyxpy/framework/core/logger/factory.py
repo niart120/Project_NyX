@@ -58,22 +58,42 @@ def create_default_logging(
     console_enabled: bool = True,
     console_level: str = "INFO",
     file_level: str = "DEBUG",
+    file_max_bytes: int = 10 * 1024 * 1024,
+    file_backup_count: int = 3,
+    file_retention_days: int = 14,
+    run_retention_days: int = 30,
     mask_secret_keys: list[str] | None = None,
 ) -> LoggingComponents:
     sanitizer = LogSanitizer(mask_secret_keys)
     dispatcher = LogSinkDispatcher(sanitizer)
-    backend = JsonlLogBackend(Path(base_dir) / "framework.jsonl", level=file_level)
+    backend = JsonlLogBackend(
+        Path(base_dir) / "framework.jsonl",
+        level=file_level,
+        max_bytes=file_max_bytes,
+        backup_count=file_backup_count,
+        retention_days=file_retention_days,
+    )
     logger = DefaultLogger(dispatcher, sanitizer, backend)
     sink_ids: dict[str, str] = {}
 
     if console_enabled:
         sink_ids["console"] = dispatcher.add_sink(ConsoleLogSink(), level=console_level)
     sink_ids["human_file"] = dispatcher.add_sink(
-        TextFileLogSink(Path(base_dir) / "nyxpy.log"),
+        TextFileLogSink(
+            Path(base_dir) / "nyxpy.log",
+            max_bytes=file_max_bytes,
+            backup_count=file_backup_count,
+            retention_days=file_retention_days,
+        ),
         level=file_level,
     )
     sink_ids["run_jsonl"] = dispatcher.add_sink(
-        RunJsonlFileSink(Path(base_dir) / "runs"),
+        RunJsonlFileSink(
+            Path(base_dir) / "runs",
+            max_bytes=file_max_bytes,
+            backup_count=file_backup_count,
+            retention_days=run_retention_days,
+        ),
         level=file_level,
     )
     return LoggingComponents(logger, dispatcher, sanitizer, backend, sink_ids)

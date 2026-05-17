@@ -16,10 +16,12 @@ from nyxpy.framework.core.logger import (
     RunLogContext,
     TechnicalLog,
     TestLogSink,
+    UserEvent,
     create_default_logging,
 )
 from nyxpy.framework.core.logger.backend import NullLogBackend
 from nyxpy.framework.core.logger.ports import LogSink
+from nyxpy.framework.core.logger.sinks import RunJsonlFileSink
 
 
 class FailingSink(LogSink):
@@ -120,6 +122,68 @@ def test_default_logging_uses_framework_jsonl_backend(tmp_path: Path) -> None:
     assert payload["event"] == "macro.started"
     assert payload["run_id"] == "run-1"
     assert payload["macro_id"] == "sample"
+
+
+def test_default_logging_writes_user_events_to_user_sinks_only(tmp_path: Path) -> None:
+    logging = create_default_logging(base_dir=tmp_path, console_enabled=False)
+    logger = logging.logger.bind_context(RunLogContext(run_id="run-1", macro_id="sample"))
+
+    logger.user("INFO", "visible", component="test", event="macro.message")
+    logging.close()
+    run_payload = json.loads(
+        next((tmp_path / "runs").glob("*/*.jsonl")).read_text(encoding="utf-8")
+    )
+
+    assert not (tmp_path / "framework.jsonl").exists()
+    assert "visible" in (tmp_path / "nyxpy.log").read_text(encoding="utf-8")
+    assert run_payload["kind"] == "user"
+    assert run_payload["event"] == "macro.message"
+
+
+def test_jsonl_backend_keeps_bounded_rotated_files(tmp_path: Path) -> None:
+    backend = JsonlLogBackend(
+        tmp_path / "framework.jsonl",
+        max_bytes=1,
+        backup_count=2,
+    )
+
+    for index in range(4):
+        backend.emit_technical(
+            TechnicalLog(
+                LogEvent(
+                    timestamp=datetime.now(),
+                    level=LogLevel.INFO,
+                    component="test",
+                    event="rotation.test",
+                    message=f"message {index}",
+                )
+            )
+        )
+
+    assert (tmp_path / "framework.jsonl").exists()
+    assert (tmp_path / "framework.jsonl.1").exists()
+    assert (tmp_path / "framework.jsonl.2").exists()
+    assert not (tmp_path / "framework.jsonl.3").exists()
+
+
+def test_run_jsonl_sink_rotates_per_run_file(tmp_path: Path) -> None:
+    sink = RunJsonlFileSink(tmp_path, max_bytes=1, backup_count=1)
+
+    for index in range(2):
+        sink.emit_user(
+            UserEvent(
+                timestamp=datetime.now(),
+                level=LogLevel.INFO,
+                component="test",
+                event="macro.message",
+                message=f"message {index}",
+                run_id="run-1",
+                macro_id="sample",
+            )
+        )
+
+    assert next(tmp_path.glob("*/run-1.jsonl")).exists()
+    assert next(tmp_path.glob("*/run-1.jsonl.1")).exists()
 
 
 def test_backend_exception_is_logged_and_dispatch_continues() -> None:
@@ -232,7 +296,7 @@ def test_test_log_sink_records_user_and_technical_events() -> None:
     logger.user("INFO", "hello", component="test", event="macro.message")
 
     assert sink.user_events[0].message == "hello"
-    assert sink.technical_logs[0].event.event == "macro.message"
+    assert sink.technical_logs == []
 
 
 def test_log_serialization_falls_back_to_repr() -> None:

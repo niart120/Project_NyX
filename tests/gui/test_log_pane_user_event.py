@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 
 from nyxpy.framework.core.logger import (
+    DefaultLogger,
     LogEvent,
     LogLevel,
     LogSanitizer,
     LogSinkDispatcher,
+    RunLogContext,
     TechnicalLog,
     UserEvent,
 )
@@ -165,3 +167,20 @@ def test_macro_and_tool_debug_toggles_are_independent(qtbot) -> None:
 
     qtbot.waitUntil(lambda: "shown tool debug" in tool_pane.view.toPlainText())
     assert "shown tool debug" not in macro_pane.view.toPlainText()
+
+
+def test_macro_user_debug_is_not_mirrored_to_tool_log(qtbot) -> None:
+    sanitizer = LogSanitizer()
+    dispatcher = LogSinkDispatcher(sanitizer)
+    logger = DefaultLogger(dispatcher, sanitizer).bind_context(
+        RunLogContext(run_id="run-1", macro_id="sample")
+    )
+    macro_pane = LogPane(dispatcher, kind="macro", initial_level="DEBUG")
+    tool_pane = LogPane(dispatcher, kind="tool", initial_level="DEBUG")
+    qtbot.addWidget(macro_pane)
+    qtbot.addWidget(tool_pane)
+
+    logger.user("DEBUG", "macro debug", component="Macro", event="command.log")
+
+    qtbot.waitUntil(lambda: "macro debug" in macro_pane.view.toPlainText())
+    assert "macro debug" not in tool_pane.view.toPlainText()
