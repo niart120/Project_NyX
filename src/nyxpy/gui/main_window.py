@@ -322,21 +322,28 @@ class MainWindow(QMainWindow):
         source_type = self.global_settings.get("capture_source_type", "camera")
         if source_type == "window":
             capture_name = self.global_settings.get("capture_window_title", "") or "window capture"
-        elif source_type == "screen_region":
-            capture_name = "screen region"
         else:
             capture_name = self.global_settings.get("capture_device", "")
         if self.preview_connection_error is not None:
             capture_status = f"映像: 接続失敗 ({self.preview_connection_error})"
         else:
             capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
-        serial_name = self.global_settings.get("serial_device", "")
+        serial_name = self._serial_display_name(self.global_settings.get("serial_device", ""))
         if self.manual_controller_error is not None:
             serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
         else:
             serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
         self.capture_status_label.setText(capture_status)
         self.serial_status_label.setText(serial_status)
+
+    def _serial_display_name(self, identifier: object) -> str:
+        text = str(identifier or "")
+        if not text:
+            return ""
+        display_name = getattr(self.device_discovery, "serial_display_name", None)
+        if callable(display_name):
+            return str(display_name(text))
+        return text
 
     def setup_connections(self):
         # Connect pane signals fully delegated

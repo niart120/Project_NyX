@@ -8,7 +8,6 @@ from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     CaptureSourceConfig,
     CaptureSourceKey,
-    ScreenRegionCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.device_discovery import (
@@ -20,7 +19,6 @@ from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.serial_comm import DummySerialComm, SerialComm
 from nyxpy.framework.core.hardware.window_capture import (
-    ScreenRegionCaptureDevice,
     WindowCaptureBackend,
     WindowCaptureDevice,
 )
@@ -57,14 +55,14 @@ class ControllerOutputPortFactory:
             if allow_dummy:
                 device_name = DUMMY_DEVICE_NAME
             else:
-                raise _device_not_selected("serial", self.discovery.serial_names())
+                raise _device_not_selected("serial", _serial_device_labels(self.discovery))
         if device_name == DUMMY_DEVICE_NAME:
             if not allow_dummy:
                 raise _dummy_not_allowed("serial")
             return SerialControllerOutputPort(self._dummy_serial(), self.protocol)
         info = self.discovery.find_serial(device_name, timeout_sec)
         if info is None:
-            raise _device_not_found("serial", device_name, self.discovery.serial_names())
+            raise _device_not_found("serial", device_name, _serial_device_labels(self.discovery))
         device = self._devices.get(device_name)
         if device is None:
             device = self.serial_factory(str(info.identifier))
@@ -126,8 +124,6 @@ class FrameSourcePortFactory:
                 )
             case WindowCaptureSourceConfig():
                 return self._create_window_source(source)
-            case ScreenRegionCaptureSourceConfig():
-                return self._create_screen_region_source(source)
 
     def _create_camera_source(
         self,
@@ -189,25 +185,6 @@ class FrameSourcePortFactory:
                 WindowCaptureDevice(
                     source,
                     locator=self.window_locator_factory() if self.window_locator_factory else None,
-                    backend=self.window_backend_factory(source.backend)
-                    if self.window_backend_factory
-                    else None,
-                    logger=self.logger,
-                )
-            )
-            self._devices[cache_key] = device
-        return CaptureFrameSourcePort(device)
-
-    def _create_screen_region_source(
-        self,
-        source: ScreenRegionCaptureSourceConfig,
-    ) -> FrameSourcePort:
-        cache_key = CaptureSourceKey.from_source(source)
-        device = self._devices.get(cache_key)
-        if device is None:
-            device = _SharedCaptureDevice(
-                ScreenRegionCaptureDevice(
-                    source,
                     backend=self.window_backend_factory(source.backend)
                     if self.window_backend_factory
                     else None,
@@ -301,6 +278,19 @@ def _numeric_capture_info(name: str) -> DeviceInfo | None:
     if not name.isdigit():
         return None
     return DeviceInfo(kind="capture", name=name, identifier=int(name))
+
+
+def _serial_device_labels(discovery: DeviceDiscoveryService) -> list[str]:
+    last_result = getattr(discovery, "last_result", None)
+    if last_result is None:
+        names = getattr(discovery, "serial_names", None)
+        return list(names()) if callable(names) else []
+    return [
+        f"{device.display_name} ({device.identifier})"
+        if str(device.identifier) not in device.display_name
+        else device.display_name
+        for device in last_result.serial_devices
+    ]
 
 
 def _device_not_selected(device_type: str, available_devices: list[str]) -> ConfigurationError:

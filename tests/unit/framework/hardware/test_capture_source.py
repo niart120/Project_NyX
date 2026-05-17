@@ -4,7 +4,6 @@ from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     CaptureRect,
     CaptureSourceKey,
-    ScreenRegionCaptureSourceConfig,
     WindowCaptureSourceConfig,
     capture_source_from_settings,
 )
@@ -24,25 +23,16 @@ def test_capture_source_from_settings_uses_source_default_fps() -> None:
             "capture_window_title": "Viewer",
         }
     )
-    region_source = capture_source_from_settings(
-        {
-            "capture_source_type": "screen_region",
-            "capture_region": {"left": 0, "top": 0, "width": 1280, "height": 720},
-        }
-    )
 
     assert isinstance(window_source, WindowCaptureSourceConfig)
     assert window_source.fps == 30.0
-    assert isinstance(region_source, ScreenRegionCaptureSourceConfig)
-    assert region_source.fps == 60.0
 
 
-def test_capture_region_settings_requires_left_top_width_height() -> None:
-    with pytest.raises(ConfigurationError, match="missing required keys"):
+def test_capture_source_from_settings_rejects_removed_screen_region_source() -> None:
+    with pytest.raises(ConfigurationError, match="invalid capture source type"):
         capture_source_from_settings(
             {
                 "capture_source_type": "screen_region",
-                "capture_region": {"left": 0, "top": 0, "width": 1280},
             }
         )
 

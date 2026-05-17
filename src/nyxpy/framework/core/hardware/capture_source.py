@@ -7,7 +7,7 @@ from typing import Literal
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformConfig
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
-CaptureSourceType = Literal["camera", "window", "screen_region"]
+CaptureSourceType = Literal["camera", "window"]
 WindowMatchMode = Literal["exact", "contains"]
 CaptureBackendName = Literal["auto", "mss", "windows_graphics_capture"]
 
@@ -56,18 +56,7 @@ class WindowCaptureSourceConfig:
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
 
 
-@dataclass(frozen=True)
-class ScreenRegionCaptureSourceConfig:
-    region: CaptureRect
-    source_type: Literal["screen_region"] = "screen_region"
-    fps: float = 60.0
-    transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
-    backend: CaptureBackendName = "auto"
-
-
-CaptureSourceConfig = (
-    CameraCaptureSourceConfig | WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig
-)
+CaptureSourceConfig = CameraCaptureSourceConfig | WindowCaptureSourceConfig
 
 
 @dataclass(frozen=True)
@@ -103,15 +92,6 @@ class CaptureSourceKey:
                     match_mode=source.match_mode,
                     transform=source.transform,
                 )
-            case ScreenRegionCaptureSourceConfig():
-                return cls(
-                    source_type="screen_region",
-                    identifier="screen_region",
-                    backend=source.backend,
-                    fps=source.fps,
-                    region=source.region,
-                    transform=source.transform,
-                )
 
 
 def capture_source_from_settings(
@@ -145,13 +125,6 @@ def capture_source_from_settings(
                 fps=_fps(settings.get("capture_fps"), 30.0),
                 transform=_transform(settings),
             )
-        case "screen_region":
-            return ScreenRegionCaptureSourceConfig(
-                region=_region(settings.get("capture_region", {})),
-                backend=_backend(settings.get("capture_backend", "auto")),
-                fps=_fps(settings.get("capture_fps"), 60.0),
-                transform=_transform(settings),
-            )
         case _:
             raise ConfigurationError(
                 "invalid capture source type",
@@ -164,32 +137,6 @@ def capture_source_from_settings(
 def _transform(settings: Mapping[str, object]) -> FrameTransformConfig:
     return FrameTransformConfig(
         aspect_box_enabled=bool(settings.get("capture_aspect_box_enabled", False))
-    )
-
-
-def _region(value: object) -> CaptureRect:
-    if not isinstance(value, Mapping):
-        raise _region_error("capture_region must be a mapping")
-    missing = {"left", "top", "width", "height"} - set(value)
-    if missing:
-        raise _region_error("capture_region is missing required keys", missing=sorted(missing))
-    try:
-        return CaptureRect(
-            left=int(value["left"]),
-            top=int(value["top"]),
-            width=int(value["width"]),
-            height=int(value["height"]),
-        )
-    except (TypeError, ValueError) as exc:
-        raise _region_error("capture_region values must be integers") from exc
-
-
-def _region_error(message: str, **details: object) -> ConfigurationError:
-    return ConfigurationError(
-        message,
-        code="NYX_CAPTURE_REGION_INVALID",
-        component="CaptureSourceConfig",
-        details=dict(details),
     )
 
 

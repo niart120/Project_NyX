@@ -20,7 +20,7 @@ class AppSettingsDialog(QDialog):
         device_discovery: DeviceDiscoveryService | None = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("デバイス・通知・一般設定")
+        self.setWindowTitle("デバイス・通知・ログ設定")
         self.resize(500, 400)
         self.settings = settings
         self.secrets = secrets
@@ -50,7 +50,6 @@ class AppSettingsDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def apply_settings(self):
-        self.tab_widget.general_tab.apply()
         self.tab_widget.device_tab.apply()
         self.tab_widget.notification_tab.apply()
         self.settings_applied.emit()

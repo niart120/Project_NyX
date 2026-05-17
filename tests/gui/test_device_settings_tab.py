@@ -1,4 +1,5 @@
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
+from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.gui.dialogs.settings.device_tab import DeviceSettingsTab
 
@@ -12,13 +13,13 @@ class FakeSettings:
             "capture_window_match_mode": "exact",
             "capture_window_identifier": "",
             "capture_backend": "auto",
-            "capture_region": {},
             "capture_fps": None,
             "capture_aspect_box_enabled": False,
             "preview_fps": 60,
             "serial_device": "COM1",
             "serial_protocol": "CH552",
             "serial_baud": 9600,
+            "gui.window_size_preset": "full_hd",
         }
 
     def get(self, key, default=None):
@@ -31,6 +32,10 @@ class FakeSettings:
 class FakeDiscovery:
     def detect(self, timeout_sec=2.0):
         return self
+
+    @property
+    def serial_devices(self):
+        return (DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1"),)
 
     def capture_names(self):
         return ["Camera1"]
@@ -68,7 +73,6 @@ def test_device_settings_tab_shows_capture_source_type(qtbot):
     ] == [
         "camera",
         "window",
-        "screen_region",
     ]
 
 
@@ -116,26 +120,6 @@ def test_device_settings_tab_saves_custom_window_title_without_identifier(qtbot)
     assert settings.data["capture_window_match_mode"] == "contains"
 
 
-def test_device_settings_tab_applies_screen_region_settings(qtbot):
-    settings = FakeSettings()
-    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
-    qtbot.addWidget(tab)
-
-    tab.capture_source_type.setCurrentText("screen_region")
-    tab.region_left.setValue(11)
-    tab.region_top.setValue(22)
-    tab.region_width.setValue(600)
-    tab.region_height.setValue(720)
-    tab.apply()
-
-    assert settings.data["capture_region"] == {
-        "left": 11,
-        "top": 22,
-        "width": 600,
-        "height": 720,
-    }
-
-
 def test_device_settings_tab_applies_aspect_box_setting(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
@@ -147,16 +131,41 @@ def test_device_settings_tab_applies_aspect_box_setting(qtbot):
     assert settings.data["capture_aspect_box_enabled"] is True
 
 
-def test_device_settings_tab_disables_irrelevant_fields(qtbot):
+def test_device_settings_tab_hides_irrelevant_source_fields(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    tab.capture_source_type.setCurrentText("window")
-    assert not tab.cap_device.isEnabled()
-    assert tab.window_source.isEnabled()
-    assert not tab.region_width.isEnabled()
+    assert not tab.cap_device.isHidden()
+    assert tab.window_row.isHidden()
 
-    tab.capture_source_type.setCurrentText("screen_region")
-    assert not tab.cap_device.isEnabled()
-    assert not tab.window_source.isEnabled()
-    assert tab.region_width.isEnabled()
+    tab.capture_source_type.setCurrentText("window")
+    assert tab.camera_row.isHidden()
+    assert not tab.window_row.isHidden()
+    assert not tab.window_match_mode.isHidden()
+    assert not tab.capture_backend.isHidden()
+
+    tab.capture_source_type.setCurrentText("camera")
+    assert not tab.cap_device.isHidden()
+    assert tab.window_row.isHidden()
+
+
+def test_device_settings_tab_saves_serial_identifier(qtbot):
+    settings = FakeSettings()
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.ser_device.currentText() == "USB Serial Device (COM1)"
+    tab.apply()
+
+    assert settings.data["serial_device"] == "COM1"
+
+
+def test_device_settings_tab_updates_window_size_preset(qtbot):
+    settings = FakeSettings()
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    tab.window_size_preset.setCurrentIndex(tab.window_size_preset.findData("four_k"))
+    tab.apply()
+
+    assert settings.data["gui.window_size_preset"] == "four_k"

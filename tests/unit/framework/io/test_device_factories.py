@@ -2,8 +2,6 @@ import pytest
 
 from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
-    CaptureRect,
-    ScreenRegionCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.device_discovery import DUMMY_DEVICE_NAME, DeviceInfo
@@ -17,7 +15,7 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 class Discovery:
     def __init__(self) -> None:
-        self.serial = DeviceInfo(kind="serial", name="COM1", identifier="COM1")
+        self.serial = DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1")
         self.capture = DeviceInfo(kind="capture", name="Camera1", identifier=1)
 
     def serial_names(self) -> list[str]:
@@ -27,7 +25,7 @@ class Discovery:
         return [self.capture.name]
 
     def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self.serial if name == self.serial.name else None
+        return self.serial if name == self.serial.identifier else None
 
     def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
         return self.capture if name == self.capture.name else None
@@ -160,20 +158,6 @@ def test_frame_source_factory_recreates_device_when_key_changes() -> None:
     assert first.capture_device is not second.capture_device
 
 
-def test_frame_source_factory_creates_screen_region_source() -> None:
-    backend = Backend()
-    factory = FrameSourcePortFactory(
-        discovery=Discovery(),
-        window_backend_factory=lambda _name: backend,
-    )
-
-    source = ScreenRegionCaptureSourceConfig(CaptureRect(0, 0, 1280, 720))
-    first = factory.create(source=source, allow_dummy=False, timeout_sec=0)
-    second = factory.create(source=source, allow_dummy=False, timeout_sec=0)
-
-    assert first.capture_device is second.capture_device
-
-
 def test_frame_source_factory_creates_window_source() -> None:
     backend = Backend()
     factory = FrameSourcePortFactory(
@@ -188,6 +172,19 @@ def test_frame_source_factory_creates_window_source() -> None:
     )
 
     assert port.capture_device is not None
+
+
+def test_controller_factory_uses_serial_identifier() -> None:
+    SerialDevice.instances.clear()
+    factory = ControllerOutputPortFactory(
+        discovery=Discovery(),
+        protocol=Protocol(),
+        serial_factory=SerialDevice,
+    )
+
+    port = factory.create(name="COM1", baudrate=9600, allow_dummy=False, timeout_sec=0)
+
+    assert port.serial_device.port == "COM1"
 
 
 @pytest.mark.parametrize("name", [None, DUMMY_DEVICE_NAME])

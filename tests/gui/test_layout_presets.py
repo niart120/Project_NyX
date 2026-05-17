@@ -23,7 +23,7 @@ def test_unknown_window_size_preset_falls_back_to_fullhd() -> None:
 
 def test_preview_sizes_use_standard_16_9_dimensions() -> None:
     assert [preset.preview_size for preset in WINDOW_SIZE_PRESETS] == [
-        (640, 360),
+        (768, 432),
         (1280, 720),
         (1600, 900),
         (2560, 1440),
@@ -41,7 +41,7 @@ def test_layout_horizontal_surplus_is_side_panel_width() -> None:
         )
         for preset in WINDOW_SIZE_PRESETS
     } == {
-        "hd": (304, 304),
+        "hd": (240, 240),
         "full_hd": (280, 320),
         "wqhd": (416, 496),
         "four_k": (538, 678),
@@ -63,7 +63,7 @@ def test_virtual_controller_metrics_use_left_column_size() -> None:
         )
         for preset in WINDOW_SIZE_PRESETS
     ] == [
-        ("hd", 304, 220),
+        ("hd", 240, 220),
         ("full_hd", 280, 280),
         ("wqhd", 416, 320),
         ("four_k", 538, 360),

@@ -5,7 +5,6 @@ from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
 from .device_tab import DeviceSettingsTab
-from .general_tab import GeneralSettingsTab
 from .notification_tab import NotificationSettingsTab
 
 
@@ -19,7 +18,6 @@ class SettingsTabWidget(QTabWidget):
         device_discovery: DeviceDiscoveryService | None = None,
     ):
         super().__init__(parent)
-        self.general_tab = GeneralSettingsTab(settings, secrets)
         self.device_tab = DeviceSettingsTab(
             settings,
             secrets,
@@ -27,6 +25,5 @@ class SettingsTabWidget(QTabWidget):
         )
         self.notification_tab = NotificationSettingsTab(settings, secrets)
 
-        self.addTab(self.general_tab, "一般")
-        self.addTab(self.device_tab, "デバイス")
-        self.addTab(self.notification_tab, "通知")
+        self.addTab(self.device_tab, "デバイス・一般")
+        self.addTab(self.notification_tab, "通知・ログ")

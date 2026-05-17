@@ -126,10 +126,20 @@ def test_preview_scales_frame_to_fixed_size_without_crop(qtbot, tmp_cwd):
 
 
 def test_preview_maps_widget_point_to_hd_capture_point(qtbot, tmp_cwd):
-    pane = PreviewPane(fixed_preview_size=(640, 360))
+    pane = PreviewPane(fixed_preview_size=(768, 432))
     qtbot.addWidget(pane)
 
-    assert pane.preview_widget_point_to_hd_capture_point(QPoint(200, 180)) == ScreenPoint(400, 360)
+    assert pane.preview_widget_point_to_hd_capture_point(QPoint(240, 216)) == ScreenPoint(400, 360)
+
+    pane.timer.stop()
+
+
+def test_preview_touch_mapping_handles_letterboxed_widget(qtbot, tmp_cwd):
+    pane = PreviewPane(fixed_preview_size=(800, 432))
+    qtbot.addWidget(pane)
+
+    assert pane.preview_widget_point_to_hd_capture_point(QPoint(256, 216)) == ScreenPoint(400, 360)
+    assert pane.preview_widget_point_to_hd_capture_point(QPoint(8, 216)) is None
 
     pane.timer.stop()
 
@@ -146,17 +156,17 @@ def test_preview_touch_ignores_pillarbox_press(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_touch_emits_press_move_release_inside_bottom_screen(qtbot, tmp_cwd):
-    pane = PreviewPane(fixed_preview_size=(640, 360))
+def test_preview_touch_events_use_resized_preview_mapping(qtbot, tmp_cwd):
+    pane = PreviewPane(fixed_preview_size=(768, 432))
     qtbot.addWidget(pane)
     events = []
     pane.touch_down_requested.connect(lambda x, y: events.append(("down", x, y)))
     pane.touch_move_requested.connect(lambda x, y: events.append(("move", x, y)))
     pane.touch_up_requested.connect(lambda: events.append(("up",)))
 
-    qtbot.mousePress(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(200, 180))
-    qtbot.mouseMove(pane.label, pos=QPoint(439, 359))
-    qtbot.mouseRelease(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(639, 359))
+    qtbot.mousePress(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(240, 216))
+    qtbot.mouseMove(pane.label, pos=QPoint(527, 431))
+    qtbot.mouseRelease(pane.label, Qt.MouseButton.LeftButton, pos=QPoint(767, 431))
 
     assert events == [("down", 0, 0), ("move", 319, 239), ("up",)]
     pane.timer.stop()

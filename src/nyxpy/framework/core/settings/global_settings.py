@@ -26,7 +26,7 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             "capture_source_type",
             str,
             "camera",
-            choices=("camera", "window", "screen_region"),
+            choices=("camera", "window"),
         ),
         "capture_window_title": SettingField("capture_window_title", str, ""),
         "capture_window_match_mode": SettingField(
@@ -42,7 +42,6 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             "auto",
             choices=("auto", "mss", "windows_graphics_capture"),
         ),
-        "capture_region": SettingField("capture_region", dict, {}),
         "capture_fps": SettingField("capture_fps", (float, type(None)), None),
         "capture_aspect_box_enabled": SettingField("capture_aspect_box_enabled", bool, False),
         "preview_fps": SettingField("preview_fps", int, 60),
