@@ -220,13 +220,13 @@ Arduino Leonardo (COM7)
 
 ## 6. 完了条件
 
-- HD プリセットでプレビューが `768x432` になる。
-- 既定プリセットは引き続き FullHD で、`1920x1080` / `1280x720` のままである。
-- HD プレビュー拡大後もプレビュークリックと仮想コントローラのタッチ操作が正しい座標へ変換される。
-- 設定ダイアログは「デバイス・一般」「通知・ログ」の 2 タブだけを表示する。
-- GUI に `screen_region` と Region 入力が表示されない。
-- settings schema と factory に `screen_region` 用の生成経路が残らない。
-- `auto` backend は Windows で WGC を先に試し、失敗時のみ mss へ fallback する。
-- シリアルデバイスは GUI 表示名と settings 保存値を分離して扱う。
-- 一時的な互換経路、旧 class、旧 import、旧テスト名が残っていない。
-- `uv run ruff check .` と対象テストが通る。
+- [x] HD プリセットでプレビューが `768x432` になる。
+- [x] 既定プリセットは引き続き FullHD で、`1920x1080` / `1280x720` のままである。
+- [x] HD プレビュー拡大後もプレビュークリックと仮想コントローラのタッチ操作が正しい座標へ変換される。
+- [x] 設定ダイアログは「デバイス・一般」「通知・ログ」の 2 タブだけを表示する。
+- [x] GUI に `screen_region` と Region 入力が表示されない。
+- [x] settings schema と factory に `screen_region` 用の生成経路が残らない。
+- [x] `auto` backend は Windows で WGC を先に試し、失敗時のみ mss へ fallback する。
+- [x] シリアルデバイスは GUI 表示名と settings 保存値を分離して扱う。
+- [x] 一時的な互換経路、旧 class、旧 import、旧テスト名が残っていない。
+- [x] `uv run ruff check .` と対象テストが通る。
