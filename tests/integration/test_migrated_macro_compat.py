@@ -21,7 +21,10 @@ from tests.support.fakes import (
 
 def _clear_macro_modules() -> None:
     for module_name in list(sys.modules):
-        if module_name in {"macro", "macros"} or module_name.startswith(("macro.", "macros.")):
+        if (
+            module_name in {"macro", "macros", "examples.macros"}
+            or module_name.startswith(("macro.", "macros.", "examples.macros."))
+        ):
             del sys.modules[module_name]
 
 
@@ -193,17 +196,15 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
 @pytest.mark.parametrize(
     ("module_name", "class_name"),
     [
-        ("macro.frlg_id_rng.macro", "FrlgIdRngMacro"),
-        ("macro.frlg_initial_seed.macro", "FrlgInitialSeedMacro"),
-        ("macro.frlg_gorgeous_resort.macro", "FrlgGorgeousResortMacro"),
-        ("macro.frlg_wild_rng.macro", "FrlgWildRngMacro"),
+        ("examples.macros.frlg_id_rng.macro", "FrlgIdRngMacro"),
+        ("examples.macros.frlg_initial_seed.macro", "FrlgInitialSeedMacro"),
+        ("examples.macros.frlg_gorgeous_resort.macro", "FrlgGorgeousResortMacro"),
+        ("examples.macros.frlg_wild_rng.macro", "FrlgWildRngMacro"),
     ],
 )
 def test_repository_representative_macros_keep_lifecycle_contract(
-    module_name: str, class_name: str, monkeypatch: pytest.MonkeyPatch
+    module_name: str, class_name: str
 ) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    monkeypatch.syspath_prepend(repo_root)
     _clear_macro_modules()
 
     module = importlib.import_module(module_name)

@@ -30,10 +30,15 @@ src/nyxpy/
   gui/           — PySide6 GUI
   cli/           — CLI エントリポイント
 macros/
-  shared/        — マクロ間共通部品 (timer, image_utils, ocr_utils)
-  {macro_name}/  — マクロパッケージ (macro.py, config.py, recognizer.py 等)
-static/
-  {macro_name}/  — 設定ファイル (settings.toml) ・画像リソース
+  {macro_id}/    — ローカル作業用マクロ。Git 管理外だが pytest 対象
+resources/
+  {macro_id}/    — ローカル作業用リソース。Git 管理外
+examples/
+  macros/        — 公開用マクロ本体
+    shared/      — 公開用マクロ間共通部品
+    {macro_id}/  — 公開用マクロパッケージ
+  resources/     — 公開用マクロの設定ファイル・画像リソース
+  tests/         — 公開用マクロのテスト
 tests/
   unit/          — 単体テスト
   gui/           — GUI テスト (pytest-qt)
@@ -45,9 +50,12 @@ spec/macro/      — マクロ仕様書
 
 **依存方向の制約:**
 ```
-macros/xxx/  →  nyxpy.framework.*   OK
-macros/xxx/  →  macros/shared/*     OK
-macros/xxx/  →  macros/yyy/*        NG (マクロ間の直接依存禁止)
+macros/xxx/           →  nyxpy.framework.*           OK
+macros/xxx/           →  macros/shared/*             OK
+macros/xxx/           →  macros/yyy/*                NG (マクロ間の直接依存禁止)
+examples/macros/xxx/  →  nyxpy.framework.*           OK
+examples/macros/xxx/  →  examples/macros/shared/*    OK
+examples/macros/xxx/  →  examples/macros/yyy/*       NG (マクロ間の直接依存禁止)
 ```
 
 ## コーディング規約

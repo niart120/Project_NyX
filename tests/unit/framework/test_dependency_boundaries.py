@@ -3,7 +3,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[3]
 FRAMEWORK_ROOT = PROJECT_ROOT / "src" / "nyxpy" / "framework"
-PUBLIC_MACROS_ROOT = PROJECT_ROOT / "examples" / "macro"
+PUBLIC_MACROS_ROOT = PROJECT_ROOT / "examples" / "macros"
 
 
 def _imported_modules(path: Path) -> set[str]:

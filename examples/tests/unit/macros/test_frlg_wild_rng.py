@@ -12,7 +12,7 @@ import pytest
 # ============================================================
 # config テスト
 # ============================================================
-from macro.frlg_wild_rng.config import FrlgWildRngConfig
+from examples.macros.frlg_wild_rng.config import FrlgWildRngConfig
 
 
 class TestConfigFromArgsDefaults:
@@ -160,7 +160,7 @@ class TestTeachyTvAdvanceCalculation:
 
     def test_effective_advance_negative_raises(self):
         """teachy_tv_consumption 超過で effective_advance < 0 のとき ValueError"""
-        from macro.frlg_wild_rng.macro import FrlgWildRngMacro
+        from examples.macros.frlg_wild_rng.macro import FrlgWildRngMacro
 
         macro = FrlgWildRngMacro()
         cmd = _make_mock_cmd()
@@ -238,7 +238,7 @@ class TestRestartGameReturnsTimer:
     """restart_game() が float を返し start_timer() 相当の時刻であること"""
 
     def test_returns_float(self):
-        from macro.shared.game_restart import restart_game
+        from examples.macros.shared.game_restart import restart_game
 
         cmd = _make_mock_cmd()
         result = restart_game(cmd)
@@ -246,7 +246,7 @@ class TestRestartGameReturnsTimer:
         assert result > 0
 
     def test_calls_press_five_times(self):
-        from macro.shared.game_restart import restart_game
+        from examples.macros.shared.game_restart import restart_game
 
         cmd = _make_mock_cmd()
         restart_game(cmd)
@@ -257,7 +257,7 @@ class TestSkipOpeningReturnsTimer:
     """skip_opening_and_continue() が float を返し start_timer() 相当の時刻であること"""
 
     def test_returns_float(self):
-        from macro.shared.frlg_opening import skip_opening_and_continue
+        from examples.macros.shared.frlg_opening import skip_opening_and_continue
 
         cmd = _make_mock_cmd()
         result = skip_opening_and_continue(cmd)
@@ -265,7 +265,7 @@ class TestSkipOpeningReturnsTimer:
         assert result > 0
 
     def test_calls_press_three_times(self):
-        from macro.shared.frlg_opening import skip_opening_and_continue
+        from examples.macros.shared.frlg_opening import skip_opening_and_continue
 
         cmd = _make_mock_cmd()
         skip_opening_and_continue(cmd)

@@ -3,9 +3,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
-from macro.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
-from macro.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
-from macro.nsmb_sort_or_splode.recognizer import (
+
+from examples.macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
+from examples.macros.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
+from examples.macros.nsmb_sort_or_splode.recognizer import (
     BombColor,
     DetectedBomb,
     build_drag_path,
@@ -15,10 +16,9 @@ from macro.nsmb_sort_or_splode.recognizer import (
     paint_ignored_rects,
     touch_rect_to_cropped_hd_rect,
 )
-
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN, TouchPoint
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 
 
 class FakeCommand:

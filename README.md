@@ -128,7 +128,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ## 4. マクロ開発
 
-マクロはローカル作業用の `macros\` に配置された Python スクリプトです。`macros\` と `resources\` はディレクトリだけ Git 管理し、中身のマクロ・設定・画像資産は Git 管理外です。ユーザー向けの例は `examples\macro` と `examples\resources` に置きますが、実行時に自動探索される場所ではありません。
+マクロはローカル作業用の `macros\` に配置された Python スクリプトです。本リポジトリでは `macros\` と `resources\` はディレクトリだけ Git 管理対象としており、中身のマクロ・設定・画像資産は Git 管理外です。ユーザー向けの例は `examples\macros` と `examples\resources` に配置してあります。
 
 ### 基本的なマクロ構造
 
@@ -158,7 +158,7 @@ class SampleMacro(MacroBase):
         pass
 ```
 
-軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macro.toml` を追加します。`examples\macro` の例を実行したい場合は、対象ファイルを `macros\` へコピーしてください。
+軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macro.toml` を追加します。`examples\macros` の例を実行したい場合は、対象ファイルを `macros\` へコピーしてください。
 
 ```toml
 [macro]

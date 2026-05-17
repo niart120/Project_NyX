@@ -6,23 +6,24 @@ species_data / selphy_logic / frame_search / recognizer / config のテストを
 from __future__ import annotations
 
 import pytest
-from macro.frlg_gorgeous_resort.config import FrlgGorgeousResortConfig
-from macro.frlg_gorgeous_resort.frame_search import (
+
+from examples.macros.frlg_gorgeous_resort.config import FrlgGorgeousResortConfig
+from examples.macros.frlg_gorgeous_resort.frame_search import (
     AkihoResult,
     find_consecutive_runs,
     search_akiho_frames,
 )
-from macro.frlg_gorgeous_resort.recognizer import (
+from examples.macros.frlg_gorgeous_resort.recognizer import (
     match_item,
     matches_any_target,
 )
-from macro.frlg_gorgeous_resort.selphy_logic import (
+from examples.macros.frlg_gorgeous_resort.selphy_logic import (
     ITEM_TABLE,
     LUXURY_BALL,
     determine_item,
     determine_pokemon,
 )
-from macro.frlg_gorgeous_resort.species_data import (
+from examples.macros.frlg_gorgeous_resort.species_data import (
     DUMMY_CODE_END,
     DUMMY_CODE_START,
     INTERNAL_TO_NAME,
@@ -33,7 +34,7 @@ from macro.frlg_gorgeous_resort.species_data import (
     NUM_SPECIES_CODES,
     is_dummy,
 )
-from macro.frlg_initial_seed.lcg32 import LCG32
+from examples.macros.frlg_initial_seed.lcg32 import LCG32
 
 # ============================================================
 # species_data テスト

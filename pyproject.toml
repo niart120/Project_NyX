@@ -51,7 +51,8 @@ build-backend = "hatchling.build"
 targets.wheel.packages = ["src/nyxpy"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+pythonpath = ["src", "."]
+testpaths = ["tests", "macros", "examples/tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 markers = [
@@ -81,4 +82,5 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
+"examples/tests/**" = ["E402"]
 
