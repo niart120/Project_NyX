@@ -128,7 +128,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ## 4. マクロ開発
 
-マクロは `macros/` フォルダに配置されたPythonスクリプトです。
+マクロはローカル作業用の `macros\` に配置された Python スクリプトです。`macros\` と `resources\` はディレクトリだけ Git 管理し、中身のマクロ・設定・画像資産は Git 管理外です。ユーザー向けの例は `examples\macro` と `examples\resources` に置きますが、実行時に自動探索される場所ではありません。
 
 ### 基本的なマクロ構造
 
@@ -158,13 +158,13 @@ class SampleMacro(MacroBase):
         pass
 ```
 
-軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macros\<macro_id>\macro.toml` を追加します。
+軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macro.toml` を追加します。`examples\macro` の例を実行したい場合は、対象ファイルを `macros\` へコピーしてください。
 
 ```toml
 [macro]
 id = "sample_macro"
 entrypoint = "macros.sample_macro.macro:SampleMacro"
-settings = "project:resources/sample_macro/settings.toml"
+settings = "resource:settings.toml"
 ```
 
 ### 主なコマンド
@@ -191,7 +191,7 @@ settings = "project:resources/sample_macro/settings.toml"
 - `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
 - カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
 
-`cmd.load_img()` は `resources\<macro_id>\assets` または `macros\<macro_id>\assets` からの相対パスを読み込みます。`cmd.save_img()` と `cmd.artifacts.open_output()` は `runs\<run_id>\outputs` へ実行ごとの成果物を保存します。旧 `static\<macro_name>` 配置は標準探索されません。
+`settings = "resource:settings.toml"` は `resources\<macro_id>\settings.toml` を参照します。`cmd.load_img()` は `resources\<macro_id>\assets` またはマクロパッケージ内の `assets` から相対パスを読み込みます。`cmd.save_img()` と `cmd.artifacts.open_output()` は `runs\<run_id>\outputs` へ実行ごとの成果物を保存します。旧 `static\<macro_name>` 配置は標準探索されません。
 
 詳細は `spec\framework\rearchitecture\MACRO_MIGRATION_GUIDE.md` と `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md` を参照してください。
 

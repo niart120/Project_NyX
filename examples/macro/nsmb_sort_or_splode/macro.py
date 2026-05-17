@@ -20,7 +20,7 @@ class NsmbSortOrSplodeMacro(MacroBase):
     display_name = "NSMB Sort or 'Splode"
     description = "NSMB Sort or 'Splode（ボムへいをわけろ）自動仕分けマクロ"
     tags = ["nsmb", "3ds", "touch", "image-recognition"]
-    settings_path = "project:resources/nsmb_sort_or_splode/settings.toml"
+    settings_path = "resource:settings.toml"
 
     def initialize(self, cmd: Command, args: dict) -> None:
         self._cfg = NsmbSortOrSplodeConfig.from_args(args)

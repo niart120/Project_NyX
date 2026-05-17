@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from frlg_initial_seed.lcg32 import LCG32
-
+from ..frlg_initial_seed.lcg32 import LCG32
 from .selphy_logic import (
     ITEM_TABLE,
     LUXURY_BALL,

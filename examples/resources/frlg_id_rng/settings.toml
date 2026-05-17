@@ -1,0 +1,28 @@
+# FRLG TID 乱数調整マクロ設定
+
+region = "JPN"
+tid = 0
+trainer_name = "ナッツァ"
+rival_name = "グリーン"
+default_rival_name = false
+gender = "おとこのこ"
+report_on_match = true
+has_save_data = false
+
+frame1 = 1260.0
+frame2 = 1200.0
+frame3 = 3000.0
+op_frame = 468.0
+fps = 60.0
+
+frame_increment_mode = false
+frame1_min = 1200.0
+frame1_max = 1500.0
+frame2_min = 1200.0
+frame2_max = 1600.0
+
+op_increment_mode = false
+op_frame_min = 382.0
+op_frame_max = 1000.0
+id_tolerance_range = 50
+select_plus = 0

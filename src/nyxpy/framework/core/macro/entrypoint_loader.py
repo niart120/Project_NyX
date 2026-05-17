@@ -19,106 +19,121 @@ from nyxpy.framework.core.macro.registry import (
 
 
 class EntryPointLoader:
-    def __init__(self, project_root: Path, macros_dir: Path) -> None:
+    def __init__(
+        self, project_root: Path, macros_dir: Path, resources_dir: Path | None = None
+    ) -> None:
         self.project_root = Path(project_root).resolve()
         self.macros_dir = Path(macros_dir).resolve()
+        self.resources_dir = (
+            Path(resources_dir).resolve()
+            if resources_dir is not None
+            else self.project_root / "resources"
+        )
         self.import_root = self.macros_dir.parent
         self.module_prefix = self.macros_dir.name
 
     def load_definition(self, manifest_path: Path) -> MacroDefinition:
-        manifest_path = manifest_path.resolve()
         try:
-            manifest = tomlkit.loads(manifest_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            raise MacroLoadError(
-                f"Failed to parse manifest: {exc}",
-                error_type="manifest_parse_error",
-                module_name="",
-            ) from exc
+            self._clear_stale_module(self.module_prefix)
+            manifest_path = manifest_path.resolve()
+            try:
+                manifest = tomlkit.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                raise MacroLoadError(
+                    f"Failed to parse manifest: {exc}",
+                    error_type="manifest_parse_error",
+                    module_name="",
+                ) from exc
 
-        macro_table = manifest.get("macro")
-        if not isinstance(macro_table, dict):
-            raise MacroLoadError(
-                "macro.toml must contain [macro]",
-                error_type="manifest_parse_error",
-                module_name="",
-            )
+            macro_table = manifest.get("macro")
+            if not isinstance(macro_table, dict):
+                raise MacroLoadError(
+                    "macro.toml must contain [macro]",
+                    error_type="manifest_parse_error",
+                    module_name="",
+                )
 
-        entrypoint = macro_table.get("entrypoint")
-        macro_id = str(macro_table.get("id") or self._default_id_for_manifest(manifest_path))
-        if not entrypoint:
-            raise MacroLoadError(
-                "macro.toml [macro].entrypoint is required",
-                error_type="entrypoint_not_found",
+            entrypoint = macro_table.get("entrypoint")
+            macro_id = str(macro_table.get("id") or self._default_id_for_manifest(manifest_path))
+            if not entrypoint:
+                raise MacroLoadError(
+                    "macro.toml [macro].entrypoint is required",
+                    error_type="entrypoint_not_found",
+                    macro_id=macro_id,
+                    module_name="",
+                )
+
+            module_name, class_name = self._parse_entrypoint(str(entrypoint))
+            module = self._import_module(module_name)
+            macro_cls = self._get_macro_class(module, class_name, str(entrypoint), macro_id)
+            return self._definition_from_class(
+                macro_cls=macro_cls,
                 macro_id=macro_id,
-                module_name="",
+                module_name=module_name,
+                macro_root=manifest_path.parent,
+                source_path=Path(inspect.getfile(macro_cls)).resolve(),
+                manifest_path=manifest_path,
+                entrypoint_kind="manifest",
+                settings_path=macro_table.get("settings"),
+                display_name=macro_table.get("display_name"),
+                description=macro_table.get("description"),
+                tags=macro_table.get("tags"),
             )
-
-        module_name, class_name = self._parse_entrypoint(str(entrypoint))
-        module = self._import_module(module_name)
-        macro_cls = self._get_macro_class(module, class_name, str(entrypoint), macro_id)
-        return self._definition_from_class(
-            macro_cls=macro_cls,
-            macro_id=macro_id,
-            module_name=module_name,
-            macro_root=manifest_path.parent,
-            source_path=Path(inspect.getfile(macro_cls)).resolve(),
-            manifest_path=manifest_path,
-            entrypoint_kind="manifest",
-            settings_path=macro_table.get("settings"),
-            display_name=macro_table.get("display_name"),
-            description=macro_table.get("description"),
-            tags=macro_table.get("tags"),
-        )
+        finally:
+            self._clear_stale_module(self.module_prefix)
 
     def load_convention_definition(self, source_path: Path) -> MacroDefinition:
-        source_path = source_path.resolve()
-        if source_path.is_file():
-            module_name = f"{self.module_prefix}.{source_path.stem}"
-            module = self._import_module(module_name)
-            macro_cls = self._single_local_macro_class(module, source_path)
-            macro_root = source_path.parent
-            default_id = source_path.stem
-        elif source_path.is_dir():
-            macro_py = source_path / "macro.py"
-            init_py = source_path / "__init__.py"
-            macro_candidates = self._module_candidates(macro_py) if macro_py.exists() else []
-            init_candidates = self._module_candidates(init_py) if init_py.exists() else []
-            if macro_candidates and init_candidates:
+        try:
+            self._clear_stale_module(self.module_prefix)
+            source_path = source_path.resolve()
+            if source_path.is_file():
+                module_name = f"{self.module_prefix}.{source_path.stem}"
+                module = self._import_module(module_name)
+                macro_cls = self._single_local_macro_class(module, source_path)
+                macro_root = source_path.parent
+                default_id = source_path.stem
+            elif source_path.is_dir():
+                macro_py = source_path / "macro.py"
+                init_py = source_path / "__init__.py"
+                macro_candidates = self._module_candidates(macro_py) if macro_py.exists() else []
+                init_candidates = self._module_candidates(init_py) if init_py.exists() else []
+                if macro_candidates and init_candidates:
+                    raise MacroLoadError(
+                        "Convention discovery found MacroBase classes in both macro.py and __init__.py",
+                        error_type="ambiguous_entrypoint",
+                        module_name=f"{self.module_prefix}.{source_path.name}",
+                    )
+                candidates = macro_candidates or init_candidates
+                if len(candidates) != 1:
+                    raise MacroLoadError(
+                        f"Convention discovery requires exactly one local MacroBase subclass, found {len(candidates)}",
+                        error_type="ambiguous_entrypoint",
+                        module_name=f"{self.module_prefix}.{source_path.name}",
+                    )
+                macro_cls, module_name = candidates[0]
+                macro_root = source_path
+                default_id = source_path.name
+            else:
                 raise MacroLoadError(
-                    "Convention discovery found MacroBase classes in both macro.py and __init__.py",
-                    error_type="ambiguous_entrypoint",
-                    module_name=f"{self.module_prefix}.{source_path.name}",
+                    f"Macro source does not exist: {source_path}",
+                    error_type="entrypoint_not_found",
                 )
-            candidates = macro_candidates or init_candidates
-            if len(candidates) != 1:
-                raise MacroLoadError(
-                    f"Convention discovery requires exactly one local MacroBase subclass, found {len(candidates)}",
-                    error_type="ambiguous_entrypoint",
-                    module_name=f"{self.module_prefix}.{source_path.name}",
-                )
-            macro_cls, module_name = candidates[0]
-            macro_root = source_path
-            default_id = source_path.name
-        else:
-            raise MacroLoadError(
-                f"Macro source does not exist: {source_path}",
-                error_type="entrypoint_not_found",
-            )
 
-        return self._definition_from_class(
-            macro_cls=macro_cls,
-            macro_id=str(getattr(macro_cls, "macro_id", default_id)),
-            module_name=module_name,
-            macro_root=macro_root,
-            source_path=Path(inspect.getfile(macro_cls)).resolve(),
-            manifest_path=None,
-            entrypoint_kind="convention",
-            settings_path=getattr(macro_cls, "settings_path", None),
-            display_name=getattr(macro_cls, "display_name", None),
-            description=getattr(macro_cls, "description", None),
-            tags=getattr(macro_cls, "tags", None),
-        )
+            return self._definition_from_class(
+                macro_cls=macro_cls,
+                macro_id=str(getattr(macro_cls, "macro_id", default_id)),
+                module_name=module_name,
+                macro_root=macro_root,
+                source_path=Path(inspect.getfile(macro_cls)).resolve(),
+                manifest_path=None,
+                entrypoint_kind="convention",
+                settings_path=getattr(macro_cls, "settings_path", None),
+                display_name=getattr(macro_cls, "display_name", None),
+                description=getattr(macro_cls, "description", None),
+                tags=getattr(macro_cls, "tags", None),
+            )
+        finally:
+            self._clear_stale_module(self.module_prefix)
 
     def _module_candidates(self, module_path: Path) -> list[tuple[type[MacroBase], str]]:
         module_name = self._module_name_for_file(module_path)
@@ -215,6 +230,7 @@ class EntryPointLoader:
             factory=ClassMacroFactory(macro_cls),
             manifest_path=manifest_path.resolve() if manifest_path is not None else None,
             entrypoint_kind=entrypoint_kind,
+            resources_root=(self.resources_dir / macro_id).resolve(),
         )
 
     def _description(self, macro_cls: type[MacroBase], explicit_description) -> str:

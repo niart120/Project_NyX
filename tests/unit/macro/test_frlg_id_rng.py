@@ -14,7 +14,7 @@ import pytest
 # ============================================================
 # frame_sweep テスト
 # ============================================================
-from frlg_id_rng.frame_sweep import (
+from macro.frlg_id_rng.frame_sweep import (
     dual_frame_sweep,
     frame_sweep,
     single_value_iterator,
@@ -62,7 +62,7 @@ class TestFrameSweep:
 # keyboard_layout テスト
 # ============================================================
 
-from frlg_id_rng.keyboard_layout import (
+from macro.frlg_id_rng.keyboard_layout import (
     ENG_KEYBOARD,
     JPN_KEYBOARD,
     REGION_KEYBOARDS,
@@ -139,7 +139,7 @@ class TestKeyboardLayout:
 # region_timing テスト
 # ============================================================
 
-from frlg_id_rng.region_timing import REGION_TIMINGS
+from macro.frlg_id_rng.region_timing import REGION_TIMINGS
 
 
 class TestRegionTiming:
@@ -185,8 +185,8 @@ class TestRegionTiming:
 # FrlgIdRngMacro テスト
 # ============================================================
 
-# macros/frlg_id_rng/ パッケージからインポート
-from frlg_id_rng import FrlgIdRngMacro
+# examples/macro/frlg_id_rng/ パッケージからインポート
+from macro.frlg_id_rng import FrlgIdRngMacro
 
 
 def _make_cmd_mock() -> MagicMock:

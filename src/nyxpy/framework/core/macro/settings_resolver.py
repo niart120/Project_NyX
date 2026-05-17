@@ -24,12 +24,23 @@ class MacroSettingsResolver:
 
         path_text = str(path)
         self._validate_portable_path(path_text)
+        if path_text.startswith("resource:"):
+            relative_path = path_text.removeprefix("resource:")
+            self._validate_portable_path(relative_path)
+            resource_root = self._resource_root(definition)
+            return self._source(resource_root / relative_path, resource_root, "resource")
         if path_text.startswith("project:"):
             relative_path = path_text.removeprefix("project:")
             self._validate_portable_path(relative_path)
             return self._source(self.project_root / relative_path, self.project_root, "manifest")
 
         return self._source(definition.macro_root / path_text, definition.macro_root, "manifest")
+
+    def _resource_root(self, definition: MacroDefinition) -> Path:
+        root = definition.resources_root
+        if root is not None:
+            return Path(root).resolve()
+        return (self.project_root / "resources" / definition.id).resolve()
 
     def load(self, definition: MacroDefinition) -> dict[str, Any]:
         source = self.resolve(definition)

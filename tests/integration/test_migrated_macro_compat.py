@@ -21,7 +21,7 @@ from tests.support.fakes import (
 
 def _clear_macro_modules() -> None:
     for module_name in list(sys.modules):
-        if module_name == "macros" or module_name.startswith("macros."):
+        if module_name in {"macro", "macros"} or module_name.startswith(("macro.", "macros.")):
             del sys.modules[module_name]
 
 
@@ -193,10 +193,10 @@ def test_file_settings_and_exec_args_are_merged_with_exec_args_precedence(
 @pytest.mark.parametrize(
     ("module_name", "class_name"),
     [
-        ("macros.frlg_id_rng.macro", "FrlgIdRngMacro"),
-        ("macros.frlg_initial_seed.macro", "FrlgInitialSeedMacro"),
-        ("macros.frlg_gorgeous_resort.macro", "FrlgGorgeousResortMacro"),
-        ("macros.frlg_wild_rng.macro", "FrlgWildRngMacro"),
+        ("macro.frlg_id_rng.macro", "FrlgIdRngMacro"),
+        ("macro.frlg_initial_seed.macro", "FrlgInitialSeedMacro"),
+        ("macro.frlg_gorgeous_resort.macro", "FrlgGorgeousResortMacro"),
+        ("macro.frlg_wild_rng.macro", "FrlgWildRngMacro"),
     ],
 )
 def test_repository_representative_macros_keep_lifecycle_contract(

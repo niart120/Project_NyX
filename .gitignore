@@ -37,6 +37,7 @@ logs/
 *.cache
 .cache/
 .history
+tmp/
 
 # pytest / unittest で生成されるファイル
 htmlcov/
@@ -69,6 +70,10 @@ instance/
 
 # nyxpy関連
 .nyxpy/
+macros/*
+!macros/.gitkeep
+resources/*
+!resources/.gitkeep
 snapshots/
 static/
 

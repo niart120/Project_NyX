@@ -1,0 +1,14 @@
+# FRLG ゴージャスリゾート アキホおねだりマクロ設定
+
+language = "JPN"
+frame1 = 2347
+target_advance = 610
+target_item = "ゴージャスボール"
+target_count = 9999
+target_pokemon = []
+pokedex = []
+fps = 60.0
+
+frame1_offset = 0
+advance_offset = 322
+rng_multiplier = 2

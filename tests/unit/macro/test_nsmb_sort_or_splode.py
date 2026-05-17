@@ -3,10 +3,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
-
-from macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
-from macros.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
-from macros.nsmb_sort_or_splode.recognizer import (
+from macro.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
+from macro.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
+from macro.nsmb_sort_or_splode.recognizer import (
     BombColor,
     DetectedBomb,
     build_drag_path,
@@ -16,6 +15,7 @@ from macros.nsmb_sort_or_splode.recognizer import (
     paint_ignored_rects,
     touch_rect_to_cropped_hd_rect,
 )
+
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN, TouchPoint
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -64,7 +64,7 @@ class FakeCommand:
 
 
 def _load_template(name: str) -> np.ndarray:
-    path = ROOT / "resources" / "nsmb_sort_or_splode" / "assets" / "templates" / name
+    path = ROOT / "examples" / "resources" / "nsmb_sort_or_splode" / "assets" / "templates" / name
     image = cv2.imread(str(path), cv2.IMREAD_COLOR)
     assert image is not None
     return image

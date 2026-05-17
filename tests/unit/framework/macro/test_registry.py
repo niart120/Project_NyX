@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from nyxpy.framework.core.macro.registry import AmbiguousMacroError, MacroRegistry
+from nyxpy.framework.core.macro.registry import AmbiguousMacroError, MacroRegistry, MacroSearchRoot
 from nyxpy.framework.core.settings.exceptions import ConfigurationError
 
 
@@ -320,6 +320,89 @@ def test_explicit_settings_path_resolution(tmp_path: Path) -> None:
         tmp_path / "project_settings.toml"
     )
     assert registry.get_settings(project_definition) == {"value": "project-root"}
+
+
+def test_resource_settings_path_resolution(tmp_path: Path) -> None:
+    macros_dir = _prepare_project(tmp_path)
+    _write_macro_file(
+        macros_dir / "resource_settings.py",
+        "ResourceSettingsMacro",
+        body='settings_path = "resource:settings.toml"',
+    )
+    settings_dir = tmp_path / "resources" / "resource_settings"
+    settings_dir.mkdir(parents=True)
+    (settings_dir / "settings.toml").write_text("value = 'resource-root'\n", encoding="utf-8")
+
+    registry = MacroRegistry(project_root=tmp_path)
+    registry.reload()
+
+    definition = registry.resolve("resource_settings")
+    source = registry.settings_resolver.resolve(definition)
+    assert source.path == settings_dir / "settings.toml"
+    assert source.source == "resource"
+    assert registry.get_settings(definition) == {"value": "resource-root"}
+
+
+def test_default_registry_does_not_load_public_example_macro(tmp_path: Path) -> None:
+    examples_macro_dir = tmp_path / "examples" / "macro"
+    examples_macro_dir.mkdir(parents=True)
+    (examples_macro_dir / "__init__.py").write_text("", encoding="utf-8")
+    _write_package(examples_macro_dir, "example_macro", "ExampleMacro")
+
+    registry = MacroRegistry(project_root=tmp_path)
+    registry.reload()
+
+    with pytest.raises(ValueError, match="example_macro"):
+        registry.resolve("example_macro")
+    assert registry.definitions == {}
+
+
+def test_registry_loads_public_example_macro_with_explicit_search_root(tmp_path: Path) -> None:
+    examples_macro_dir = tmp_path / "examples" / "macro"
+    examples_macro_dir.mkdir(parents=True)
+    (examples_macro_dir / "__init__.py").write_text("", encoding="utf-8")
+    package_dir = _write_package(examples_macro_dir, "example_macro", "ExampleMacro")
+
+    registry = MacroRegistry(
+        project_root=tmp_path,
+        macro_search_roots=(
+            MacroSearchRoot(
+                macros_dir=examples_macro_dir,
+                resources_dir=tmp_path / "examples" / "resources",
+            ),
+        ),
+    )
+    registry.reload()
+
+    definition = registry.resolve("example_macro")
+    assert definition.class_name == "ExampleMacro"
+    assert definition.macro_root == package_dir
+    assert definition.resources_root == tmp_path / "examples" / "resources" / "example_macro"
+    assert registry.diagnostics == ()
+
+
+def test_registry_local_macro_shadows_public_example_without_diagnostic(tmp_path: Path) -> None:
+    macros_dir = _prepare_project(tmp_path)
+    _write_package(macros_dir, "shadowed", "LocalShadowMacro")
+    examples_macro_dir = tmp_path / "examples" / "macro"
+    examples_macro_dir.mkdir(parents=True)
+    (examples_macro_dir / "__init__.py").write_text("", encoding="utf-8")
+    _write_package(examples_macro_dir, "shadowed", "ExampleShadowMacro")
+
+    registry = MacroRegistry(
+        project_root=tmp_path,
+        macro_search_roots=(
+            MacroSearchRoot(macros_dir=macros_dir, resources_dir=tmp_path / "resources"),
+            MacroSearchRoot(
+                macros_dir=examples_macro_dir,
+                resources_dir=tmp_path / "examples" / "resources",
+            ),
+        ),
+    )
+    registry.reload()
+
+    assert registry.resolve("shadowed").class_name == "LocalShadowMacro"
+    assert registry.diagnostics == ()
 
 
 @pytest.mark.parametrize("settings_path", [".. /bad.toml", "../bad.toml", "bad\\settings.toml", ""])
