@@ -7,6 +7,7 @@ import numpy as np
 
 from nyxpy.framework.core.constants import (
     THREEDS_HD_BOTTOM_SCREEN,
+    THREEDS_TOUCH_SIZE,
     ScreenPoint,
     ScreenRect,
     TouchPoint,
@@ -132,7 +133,6 @@ def classify_bombs(
         reverse=True,
     )
     consumed = [False] * len(candidates)
-    duplicate_suppression_radius_sq = duplicate_suppression_radius * duplicate_suppression_radius
     for index, anchor in enumerate(candidates):
         if consumed[index]:
             continue
@@ -140,7 +140,8 @@ def classify_bombs(
             group_index
             for group_index, candidate in enumerate(candidates)
             if not consumed[group_index]
-            and _touch_distance_sq(anchor, candidate) <= duplicate_suppression_radius_sq
+            and _touch_distance_sq(anchor, candidate)
+            <= _candidate_group_radius(anchor, candidate, duplicate_suppression_radius) ** 2
         ]
         for group_index in group_indices:
             consumed[group_index] = True
@@ -149,20 +150,26 @@ def classify_bombs(
         black = _best_color_candidate(group, BombColor.BLACK)
         red_score = red.score if red is not None else 0.0
         black_score = black.score if black is not None else 0.0
-        features = measure_color_features(
-            frame_bgr,
-            anchor.hd_center_x - THREEDS_HD_BOTTOM_SCREEN.x,
-            anchor.hd_center_y - THREEDS_HD_BOTTOM_SCREEN.y,
-            color_sample_size,
+        red_features = (
+            _measure_candidate_color_features(frame_bgr, red, color_sample_size)
+            if red is not None
+            else None
         )
-        red_gate = features.red_ratio >= red_min_ratio
+        black_features = (
+            _measure_candidate_color_features(frame_bgr, black, color_sample_size)
+            if black is not None
+            else None
+        )
+        red_gate = red_features is not None and red_features.red_ratio >= red_min_ratio
         black_gate = (
-            features.dark_ratio >= black_min_dark_ratio
-            and features.red_ratio <= black_max_red_ratio
+            black_features is not None
+            and black_features.dark_ratio >= black_min_dark_ratio
+            and black_features.red_ratio <= black_max_red_ratio
         )
 
         selected: DetectedBomb | None = None
         selected_color: BombColor | None = None
+        selected_features: ColorFeatures | None = None
         if (
             red is not None
             and red.score >= red_threshold
@@ -171,6 +178,7 @@ def classify_bombs(
         ):
             selected = red
             selected_color = BombColor.RED
+            selected_features = red_features
         elif (
             black is not None
             and black.score >= black_threshold
@@ -179,13 +187,16 @@ def classify_bombs(
         ):
             selected = black
             selected_color = BombColor.BLACK
+            selected_features = black_features
         elif red_gate != black_gate:
             if red_gate and red is not None and red.score >= red_threshold:
                 selected = red
                 selected_color = BombColor.RED
+                selected_features = red_features
             elif black_gate and black is not None and black.score >= black_threshold:
                 selected = black
                 selected_color = BombColor.BLACK
+                selected_features = black_features
 
         if selected is not None and selected_color is not None:
             classified.append(
@@ -200,7 +211,7 @@ def classify_bombs(
                     height=selected.height,
                     red_score=red_score,
                     black_score=black_score,
-                    color_features=features,
+                    color_features=selected_features,
                 )
             )
     classified.sort(key=lambda item: item.score, reverse=True)
@@ -233,6 +244,19 @@ def measure_color_features(
     return ColorFeatures(
         red_ratio=float(red.sum() / total),
         dark_ratio=float(dark.sum() / total),
+    )
+
+
+def _measure_candidate_color_features(
+    frame_bgr: np.ndarray,
+    candidate: DetectedBomb,
+    sample_size: int,
+) -> ColorFeatures:
+    return measure_color_features(
+        frame_bgr,
+        candidate.hd_center_x - THREEDS_HD_BOTTOM_SCREEN.x,
+        candidate.hd_center_y - THREEDS_HD_BOTTOM_SCREEN.y,
+        sample_size,
     )
 
 
@@ -298,6 +322,23 @@ def _best_color_candidate(candidates: list[DetectedBomb], color: BombColor) -> D
     if not same_color:
         return None
     return max(same_color, key=lambda item: item.score)
+
+
+def _candidate_group_radius(
+    first: DetectedBomb,
+    second: DetectedBomb,
+    duplicate_suppression_radius: int,
+) -> int:
+    if first.color is second.color:
+        return duplicate_suppression_radius
+    first_width_touch = round(
+        first.width * THREEDS_TOUCH_SIZE.width / THREEDS_HD_BOTTOM_SCREEN.width
+    )
+    second_width_touch = round(
+        second.width * THREEDS_TOUCH_SIZE.width / THREEDS_HD_BOTTOM_SCREEN.width
+    )
+    same_bomb_radius = max(4, min(first_width_touch, second_width_touch))
+    return min(duplicate_suppression_radius, same_bomb_radius)
 
 
 def _touch_distance_sq(first: DetectedBomb, second: DetectedBomb) -> int:

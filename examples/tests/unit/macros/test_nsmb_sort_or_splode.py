@@ -1,9 +1,11 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
 import numpy as np
 import pytest
 
+import examples.macros.nsmb_sort_or_splode.macro as macro_module
 from examples.macros.nsmb_sort_or_splode.config import NsmbSortOrSplodeConfig, TouchRect
 from examples.macros.nsmb_sort_or_splode.macro import NsmbSortOrSplodeMacro
 from examples.macros.nsmb_sort_or_splode.recognizer import (
@@ -80,14 +82,21 @@ def _template_images() -> dict[str, np.ndarray]:
 def test_config_accepts_default_settings() -> None:
     cfg = NsmbSortOrSplodeConfig.from_args({})
 
+    assert cfg.scan_interval_seconds == 0.15
+    assert cfg.post_drop_wait_seconds == 0.10
     assert cfg.red_goal_touch == TouchPoint(24, 122)
     assert cfg.black_goal_touch == TouchPoint(296, 122)
     assert cfg.mask_fill_bgr == (0, 255, 0)
     assert cfg.notify_on_finish is False
-    assert cfg.template_score_margin == 0.08
-    assert cfg.red_min_ratio == 0.20
-    assert cfg.black_min_dark_ratio == 0.35
-    assert cfg.black_max_red_ratio == 0.10
+    assert cfg.red_match_threshold == 0.90
+    assert cfg.black_match_threshold == 0.90
+    assert cfg.template_score_margin == 0.01
+    assert cfg.red_min_ratio == 0.50
+    assert cfg.black_min_dark_ratio == 0.50
+    assert cfg.black_max_red_ratio == 0.01
+    assert cfg.duplicate_suppression_radius == 8
+    assert cfg.drag_steps == 1
+    assert cfg.drag_duration_seconds == 0.034
 
 
 def test_config_rejects_invalid_touch_goal() -> None:
@@ -241,6 +250,39 @@ def test_classify_bombs_keeps_nearby_opposite_colors_outside_radius() -> None:
     assert {bomb.color for bomb in classified} == {BombColor.RED, BombColor.BLACK}
 
 
+def test_classify_bombs_keeps_nearby_opposite_colors_outside_same_bomb_radius() -> None:
+    red_template = _load_template("red_bob_omb.png")
+    black_template = _load_template("black_bob_omb.png")
+    frame = np.zeros((160, 180, 3), dtype=np.uint8)
+    frame[40 : 40 + red_template.shape[0], 30 : 30 + red_template.shape[1]] = red_template
+    frame[40 : 40 + black_template.shape[0], 70 : 70 + black_template.shape[1]] = black_template
+    red_x, red_y = _template_center(30, 40, red_template)
+    black_x, black_y = _template_center(70, 40, black_template)
+    red_candidate = _detected_bomb(BombColor.RED, score=0.99, cropped_x=red_x, cropped_y=red_y)
+    black_candidate = _detected_bomb(
+        BombColor.BLACK,
+        score=0.99,
+        cropped_x=black_x,
+        cropped_y=black_y,
+    )
+
+    classified = classify_bombs(
+        frame,
+        [red_candidate],
+        [black_candidate],
+        red_threshold=0.90,
+        black_threshold=0.90,
+        duplicate_suppression_radius=32,
+        template_score_margin=0.01,
+        color_sample_size=28,
+        red_min_ratio=0.20,
+        black_min_dark_ratio=0.35,
+        black_max_red_ratio=0.10,
+    )
+
+    assert {bomb.color for bomb in classified} == {BombColor.RED, BombColor.BLACK}
+
+
 def test_macro_sends_touch_drag_for_detected_bomb() -> None:
     images = _template_images()
     frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -259,6 +301,7 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
             "post_drop_wait_seconds": 0,
             "max_sorted_count": 1,
             "red_match_threshold": 0.95,
+            "red_min_ratio": 0.20,
             "notify_on_finish": True,
         },
     )
@@ -270,6 +313,67 @@ def test_macro_sends_touch_drag_for_detected_bomb() -> None:
     assert any(event[0] == "touch_down" for event in cmd.events)
     assert ("touch_up", None) in cmd.events
     assert any(event[0] == "notify" for event in cmd.events)
+    assert any(
+        event[0] == "log" and event[1][0] == "DEBUG" and "color=red" in event[1][1]
+        for event in cmd.events
+    )
+
+
+def test_macro_saves_latest_debug_frame_when_enabled() -> None:
+    images = _template_images()
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    bottom = THREEDS_HD_BOTTOM_SCREEN
+    template = images["templates/red_bob_omb.png"]
+    frame[
+        bottom.y + 40 : bottom.y + 40 + template.shape[0],
+        bottom.x + 30 : bottom.x + 30 + template.shape[1],
+    ] = template
+    cmd = FakeCommand(frame, images)
+    macro = NsmbSortOrSplodeMacro()
+    macro.initialize(
+        cmd,
+        {
+            "scan_interval_seconds": 0,
+            "post_drop_wait_seconds": 0,
+            "max_sorted_count": 1,
+            "red_match_threshold": 0.95,
+            "red_min_ratio": 0.20,
+            "save_debug_frames": True,
+        },
+    )
+
+    bomb = macro.run_iteration(cmd)
+
+    assert bomb is not None
+    assert list(cmd.saved_images) == ["nsmb_sort_or_splode/latest_detected_bomb.png"]
+    assert cmd.saved_images["nsmb_sort_or_splode/latest_detected_bomb.png"].shape == (
+        THREEDS_HD_BOTTOM_SCREEN.height,
+        THREEDS_HD_BOTTOM_SCREEN.width,
+        3,
+    )
+
+
+def test_run_subtracts_iteration_time_from_scan_interval(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ProbeMacro(NsmbSortOrSplodeMacro):
+        def __init__(self) -> None:
+            self._cfg = SimpleNamespace(scan_interval_seconds=0.15)
+            self._finished = False
+            self.iterations = 0
+
+        def run_iteration(self, cmd) -> None:
+            self.iterations += 1
+            if self.iterations >= 2:
+                self._finished = True
+
+    values = iter([10.000, 10.040, 10.150])
+    monkeypatch.setattr(macro_module, "monotonic", lambda: next(values))
+    cmd = FakeCommand(np.zeros((1, 1, 3), dtype=np.uint8), {})
+    macro = ProbeMacro()
+
+    macro.run(cmd)
+
+    assert macro.iterations == 2
+    assert cmd.events == [("wait", pytest.approx(0.11))]
 
 
 def test_macro_detects_red_and_black_on_same_frame() -> None:

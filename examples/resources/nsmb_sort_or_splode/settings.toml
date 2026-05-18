@@ -1,7 +1,7 @@
 # NSMB Sort or 'Splode 繝槭け繝ｭ險ｭ螳壹ヵ繧｡繧､繝ｫ
 
-scan_interval_seconds = 0.05
-post_drop_wait_seconds = 0.02
+scan_interval_seconds = 0.15
+post_drop_wait_seconds = 0.10
 max_sorted_count = 0
 
 red_template_path = "templates/red_bob_omb.png"
@@ -9,17 +9,17 @@ black_template_path = "templates/black_bob_omb.png"
 mask_fill_bgr = [0, 255, 0]
 
 match_method = "TM_CCOEFF_NORMED"
-red_match_threshold = 0.83
-black_match_threshold = 0.83
-template_score_margin = 0.08
+red_match_threshold = 0.9
+black_match_threshold = 0.9
+template_score_margin = 0.01
 color_sample_size = 28
-red_min_ratio = 0.20
-black_min_dark_ratio = 0.35
-black_max_red_ratio = 0.10
-duplicate_suppression_radius = 18
+red_min_ratio = 0.50
+black_min_dark_ratio = 0.5
+black_max_red_ratio = 0.01
+duplicate_suppression_radius = 8
 
-drag_steps = 4
-drag_duration_seconds = 0.10
+drag_steps = 1
+drag_duration_seconds = 0.034
 red_goal_touch = [24, 122]
 black_goal_touch = [296, 122]
 ignore_touch_rects = [

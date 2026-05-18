@@ -1,3 +1,5 @@
+from time import monotonic
+
 import cv2
 
 from nyxpy.framework.core.constants import THREEDS_HD_BOTTOM_SCREEN, TouchPoint
@@ -13,6 +15,13 @@ from .recognizer import (
     find_bombs,
     paint_ignored_rects,
 )
+
+_DEBUG_DETECTED_FRAME_PATH = "nsmb_sort_or_splode/latest_detected_bomb.png"
+_DEBUG_MARKER_BGR_BY_COLOR = {
+    BombColor.RED: (0, 0, 255),
+    BombColor.BLACK: (0, 0, 0),
+}
+_DEBUG_MARKER_OUTLINE_BGR = (255, 255, 255)
 
 
 class NsmbSortOrSplodeMacro(MacroBase):
@@ -37,9 +46,14 @@ class NsmbSortOrSplodeMacro(MacroBase):
 
     def run(self, cmd: Command) -> None:
         while not self._finished:
+            iteration_started_at = monotonic()
             self.run_iteration(cmd)
             if self._cfg.scan_interval_seconds > 0 and not self._finished:
-                cmd.wait(self._cfg.scan_interval_seconds)
+                remaining_wait = self._cfg.scan_interval_seconds - (
+                    monotonic() - iteration_started_at
+                )
+                if remaining_wait > 0:
+                    cmd.wait(remaining_wait)
 
     def finalize(self, cmd: Command) -> None:
         pass
@@ -90,10 +104,11 @@ class NsmbSortOrSplodeMacro(MacroBase):
         goal = (
             self._cfg.red_goal_touch if bomb.color is BombColor.RED else self._cfg.black_goal_touch
         )
+        self._log_detected_bomb(cmd, bomb)
         self._drag(cmd, bomb.touch_point, goal)
         self._sorted_count += 1
         if self._cfg.save_debug_frames:
-            self._save_debug_frame(cmd, masked, bomb, goal)
+            self._save_debug_frame(cmd, frame, bomb, goal)
         if self._cfg.post_drop_wait_seconds > 0:
             cmd.wait(self._cfg.post_drop_wait_seconds)
         if self._cfg.max_sorted_count > 0 and self._sorted_count >= self._cfg.max_sorted_count:
@@ -126,11 +141,62 @@ class NsmbSortOrSplodeMacro(MacroBase):
         debug = frame.copy()
         cropped_x = bomb.hd_center_x - THREEDS_HD_BOTTOM_SCREEN.x
         cropped_y = bomb.hd_center_y - THREEDS_HD_BOTTOM_SCREEN.y
-        cv2.circle(debug, (cropped_x, cropped_y), 8, (255, 0, 255), thickness=2)
+        marker_bgr = _DEBUG_MARKER_BGR_BY_COLOR[bomb.color]
+        cv2.circle(
+            debug,
+            (cropped_x, cropped_y),
+            10,
+            _DEBUG_MARKER_OUTLINE_BGR,
+            thickness=4,
+        )
+        cv2.circle(debug, (cropped_x, cropped_y), 10, marker_bgr, thickness=2)
         goal_hd_x = round(goal.x * THREEDS_HD_BOTTOM_SCREEN.width / 320)
         goal_hd_y = round(goal.y * THREEDS_HD_BOTTOM_SCREEN.height / 240)
-        cv2.line(debug, (cropped_x, cropped_y), (goal_hd_x, goal_hd_y), (255, 0, 255), 2)
-        cmd.save_img(
-            f"nsmb_sort_or_splode/debug_{self._sorted_count:04d}_{bomb.color}.png",
+        cv2.line(
             debug,
+            (cropped_x, cropped_y),
+            (goal_hd_x, goal_hd_y),
+            _DEBUG_MARKER_OUTLINE_BGR,
+            4,
+        )
+        cv2.line(debug, (cropped_x, cropped_y), (goal_hd_x, goal_hd_y), marker_bgr, 2)
+        text_origin = (min(cropped_x + 14, debug.shape[1] - 48), max(cropped_y - 12, 16))
+        cv2.putText(
+            debug,
+            bomb.color.value,
+            text_origin,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            _DEBUG_MARKER_OUTLINE_BGR,
+            3,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            debug,
+            bomb.color.value,
+            text_origin,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            marker_bgr,
+            1,
+            cv2.LINE_AA,
+        )
+        cmd.save_img(_DEBUG_DETECTED_FRAME_PATH, debug)
+
+    def _log_detected_bomb(self, cmd: Command, bomb: DetectedBomb) -> None:
+        features = bomb.color_features
+        feature_log = ""
+        if features is not None:
+            feature_log = (
+                f", red_ratio={features.red_ratio:.3f}, dark_ratio={features.dark_ratio:.3f}"
+            )
+        cmd.log(
+            "Sort or 'Splode detected bomb: "
+            f"color={bomb.color.value}, "
+            f"score={bomb.score:.3f}, "
+            f"red_score={bomb.red_score:.3f}, "
+            f"black_score={bomb.black_score:.3f}, "
+            f"touch=({bomb.touch_x}, {bomb.touch_y})"
+            f"{feature_log}",
+            level="DEBUG",
         )
