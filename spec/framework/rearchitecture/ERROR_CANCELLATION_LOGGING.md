@@ -334,7 +334,9 @@ error code の体系と発生元は本表を正とする。設定仕様、Runtim
 | `NYX_DEFINE_PARSE_FAILED` | `configuration` | `parse_define_args` | CLI/GUI の define 入力を TOML として解釈できない |
 | `NYX_DEFINE_INVALID` | `configuration` | `parse_define_args` | 空 key、key のみ、重複による型衝突など define 入力が不正 |
 | `NYX_MACRO_ARGS_INVALID` | `configuration` | `MacroRunner` / args schema | マクロ引数が schema に一致しない |
-| `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `SettingsStore`, `SecretsStore`, `MacroSettingsResolver` | TOML 破損または読み込み不能 |
+| `NYX_SETTINGS_NOT_FOUND` | `configuration` | `MacroSettingsResolver` | 明示 settings path の解決先ファイルが存在しない |
+| `NYX_SETTINGS_READ_FAILED` | `configuration` | `MacroSettingsResolver` | 明示 settings path の解決先ファイルを OS エラーで読み込めない |
+| `NYX_SETTINGS_PARSE_FAILED` | `configuration` | `SettingsStore`, `SecretsStore`, `MacroSettingsResolver` | TOML 破損 |
 | `NYX_SETTINGS_SCHEMA_INVALID` | `configuration` | `SettingsStore`, `SecretsStore` | 設定値が schema に一致しない |
 | `NYX_SETTINGS_PATH_INVALID` | `configuration` | `MacroSettingsResolver` | 明示 settings path が空、絶対パス、root 外参照、root 外シンボリックリンクである |
 | `NYX_RUNTIME_CONFIGURATION_INVALID` | `configuration` | `MacroRuntimeBuilder` | Runtime builder に必要な設定が不足、または protocol / baudrate が不正 |

@@ -22,6 +22,7 @@ from nyxpy.framework.core.logger import (
 from nyxpy.framework.core.logger.backend import NullLogBackend
 from nyxpy.framework.core.logger.ports import LogSink
 from nyxpy.framework.core.logger.sinks import RunJsonlFileSink
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 class FailingSink(LogSink):
@@ -81,6 +82,38 @@ def test_logger_port_binds_run_context() -> None:
 
     assert sink.technical_logs[0].event.run_id == "run-1"
     assert sink.technical_logs[0].event.macro_id == "sample"
+
+
+def test_technical_log_includes_framework_error_context() -> None:
+    sink = TestLogSink()
+    sanitizer = LogSanitizer()
+    dispatcher = LogSinkDispatcher(sanitizer)
+    dispatcher.add_sink(sink, level="DEBUG")
+    logger = DefaultLogger(dispatcher, sanitizer)
+    exc = ConfigurationError(
+        "settings missing",
+        code="NYX_SETTINGS_NOT_FOUND",
+        component="MacroSettingsResolver",
+        details={
+            "macro_id": "resource_settings",
+            "resolved_path": r"E:\repo\resources\resource_settings\settings.toml",
+        },
+    )
+
+    logger.technical(
+        "ERROR",
+        "Macro start failed.",
+        component="MainWindow",
+        event="runtime.start_failed",
+        exc=exc,
+    )
+
+    extra = sink.technical_logs[0].event.extra
+    assert extra["error_kind"] == "configuration"
+    assert extra["error_code"] == "NYX_SETTINGS_NOT_FOUND"
+    assert extra["error_component"] == "MacroSettingsResolver"
+    assert extra["recoverable"] is False
+    assert extra["error_details"] == exc.details
 
 
 def test_jsonl_log_backend_writes_technical_log(tmp_path: Path) -> None:

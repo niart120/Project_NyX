@@ -343,6 +343,36 @@ def test_resource_settings_path_resolution(tmp_path: Path) -> None:
     assert registry.get_settings(definition) == {"value": "resource-root"}
 
 
+def test_missing_resource_settings_path_reports_macro_context(tmp_path: Path) -> None:
+    macros_dir = _prepare_project(tmp_path)
+    _write_macro_file(
+        macros_dir / "resource_settings.py",
+        "ResourceSettingsMacro",
+        body='settings_path = "resource:settings.toml"',
+    )
+
+    registry = MacroRegistry(project_root=tmp_path)
+    registry.reload()
+
+    definition = registry.resolve("resource_settings")
+    with pytest.raises(ConfigurationError) as exc_info:
+        registry.get_settings(definition)
+
+    exc = exc_info.value
+    expected_path = tmp_path / "resources" / "resource_settings" / "settings.toml"
+    assert exc.code == "NYX_SETTINGS_NOT_FOUND"
+    assert exc.component == "MacroSettingsResolver"
+    assert "macro_id=resource_settings" in exc.message
+    assert "settings_path='resource:settings.toml'" in exc.message
+    assert str(expected_path) in exc.message
+    assert exc.details == {
+        "macro_id": "resource_settings",
+        "settings_path": "resource:settings.toml",
+        "resolved_path": str(expected_path),
+        "source": "resource",
+    }
+
+
 def test_default_registry_does_not_load_public_example_macro(tmp_path: Path) -> None:
     examples_macro_dir = tmp_path / "examples" / "macro"
     examples_macro_dir.mkdir(parents=True)
