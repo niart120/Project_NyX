@@ -46,13 +46,49 @@ class MacroSettingsResolver:
         source = self.resolve(definition)
         if source is None:
             return {}
+        details = self._error_details(definition, source)
         try:
             return dict(tomlkit.loads(source.path.read_text(encoding="utf-8")))
+        except FileNotFoundError as exc:
+            raise ConfigurationError(
+                "Macro settings file not found: "
+                f"macro_id={definition.id}, settings_path={definition.settings_path!r}, "
+                f"resolved_path={source.path}",
+                code="NYX_SETTINGS_NOT_FOUND",
+                component="MacroSettingsResolver",
+                details=details,
+                cause=exc,
+            ) from exc
+        except OSError as exc:
+            raise ConfigurationError(
+                "Failed to read macro settings: "
+                f"macro_id={definition.id}, settings_path={definition.settings_path!r}, "
+                f"resolved_path={source.path}",
+                code="NYX_SETTINGS_READ_FAILED",
+                component="MacroSettingsResolver",
+                details={**details, "exception_type": type(exc).__name__},
+                cause=exc,
+            ) from exc
         except tomlkit.exceptions.ParseError as exc:
             raise ConfigurationError(
-                f"Failed to parse macro settings: {source.path}",
+                "Failed to parse macro settings: "
+                f"macro_id={definition.id}, settings_path={definition.settings_path!r}, "
+                f"resolved_path={source.path}",
                 code="NYX_SETTINGS_PARSE_FAILED",
+                component="MacroSettingsResolver",
+                details=details,
+                cause=exc,
             ) from exc
+
+    def _error_details(
+        self, definition: MacroDefinition, source: MacroSettingsSource
+    ) -> dict[str, str]:
+        return {
+            "macro_id": definition.id,
+            "settings_path": str(definition.settings_path),
+            "resolved_path": str(source.path),
+            "source": source.source,
+        }
 
     def _source(self, candidate: Path, root: Path, source: str) -> MacroSettingsSource:
         resolved_root = root.resolve()

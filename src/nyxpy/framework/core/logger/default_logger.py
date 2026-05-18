@@ -15,6 +15,7 @@ from nyxpy.framework.core.logger.events import (
 )
 from nyxpy.framework.core.logger.ports import LogBackend
 from nyxpy.framework.core.logger.sanitizer import LogSanitizer
+from nyxpy.framework.core.macro.exceptions import FrameworkError
 
 
 class DefaultLogger:
@@ -44,6 +45,7 @@ class DefaultLogger:
         exc: BaseException | None = None,
     ) -> None:
         log_level = normalize_level(level)
+        technical_extra = self._technical_extra(extra, exc)
         log_event = LogEvent(
             timestamp=datetime.now(),
             level=log_level,
@@ -52,13 +54,28 @@ class DefaultLogger:
             message=self.sanitizer.mask_text(message),
             run_id=self.context.run_id if self.context else None,
             macro_id=self.context.macro_id if self.context else None,
-            extra=self.sanitizer.sanitize_extra_for_technical(extra),
+            extra=self.sanitizer.sanitize_extra_for_technical(technical_extra),
             exception_type=type(exc).__name__ if exc is not None else None,
             traceback="".join(traceback.format_exception(exc)) if exc is not None else None,
         )
         technical_log = TechnicalLog(log_event, include_traceback=exc is not None)
         self._emit_backend(technical_log)
         self.dispatcher.emit_technical(technical_log)
+
+    def _technical_extra(
+        self,
+        extra: dict[str, LogExtraValue] | None,
+        exc: BaseException | None,
+    ) -> dict[str, object]:
+        enriched: dict[str, object] = dict(extra or {})
+        if isinstance(exc, FrameworkError):
+            enriched.setdefault("error_kind", exc.kind.value)
+            enriched.setdefault("error_code", exc.code)
+            enriched.setdefault("error_component", exc.component)
+            enriched.setdefault("recoverable", exc.recoverable)
+            if exc.details:
+                enriched.setdefault("error_details", exc.details)
+        return enriched
 
     def user(
         self,
