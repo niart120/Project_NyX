@@ -25,23 +25,23 @@ class TouchRect:
 
 @dataclass(frozen=True, slots=True)
 class NsmbSortOrSplodeConfig:
-    scan_interval_seconds: float = 0.05
-    post_drop_wait_seconds: float = 0.02
+    scan_interval_seconds: float = 0.15
+    post_drop_wait_seconds: float = 0.10
     max_sorted_count: int = 0
     red_template_path: Path = Path("templates/red_bob_omb.png")
     black_template_path: Path = Path("templates/black_bob_omb.png")
     mask_fill_bgr: tuple[int, int, int] = (0, 255, 0)
     match_method: str = "TM_CCOEFF_NORMED"
-    red_match_threshold: float = 0.83
-    black_match_threshold: float = 0.83
-    template_score_margin: float = 0.08
+    red_match_threshold: float = 0.90
+    black_match_threshold: float = 0.90
+    template_score_margin: float = 0.01
     color_sample_size: int = 28
-    red_min_ratio: float = 0.20
-    black_min_dark_ratio: float = 0.35
-    black_max_red_ratio: float = 0.10
-    duplicate_suppression_radius: int = 18
-    drag_steps: int = 4
-    drag_duration_seconds: float = 0.10
+    red_min_ratio: float = 0.50
+    black_min_dark_ratio: float = 0.50
+    black_max_red_ratio: float = 0.01
+    duplicate_suppression_radius: int = 8
+    drag_steps: int = 1
+    drag_duration_seconds: float = 0.034
     red_goal_touch: TouchPoint = TouchPoint(24, 122)
     black_goal_touch: TouchPoint = TouchPoint(296, 122)
     ignore_touch_rects: tuple[TouchRect, ...] = (
