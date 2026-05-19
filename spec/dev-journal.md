@@ -72,4 +72,4 @@ PyPI アカウントは取得済みで、配布名は `nyxfw`、import 名は `n
 
 ### 方針
 
-Phase 3 で `nyxfw` として公開できる状態へ整備し、`uv build` と PyPI publish 手順を確認してから初回公開する。
+`spec\docs\MACRO_DEVELOPMENT_DOCUMENTATION_PLAN.md` の Phase 3（パッケージから到達できる情報を増やす）で `nyxfw` として公開できる状態へ整備し、`uv build` と PyPI publish 手順を確認してから初回公開する。
