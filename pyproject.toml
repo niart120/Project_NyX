@@ -82,8 +82,11 @@ select = [
     "D104", # pydocstyle: package docstrings
     "D105", # pydocstyle: magic method docstrings
     "D107", # pydocstyle: __init__ docstrings
+    "D402", # pydocstyle: no function signatures in docstrings
     "D403", # pydocstyle Google convention: first word capitalization
     "D417", # pydocstyle Google convention: document all parameters
+    "D418", # pydocstyle: no docstrings on overloads
+    "D419", # pydocstyle: no empty docstrings
     "UP",   # pyupgrade (flags from __future__ imports, old typing syntax, etc.)
 ]
 ignore = [
