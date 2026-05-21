@@ -25,6 +25,7 @@ def skip_opening_and_continue(cmd: Command) -> float:
 
     Returns:
         start_timer() による timer1 開始時刻
+
     """
     t1 = start_timer()
     cmd.press(Button.A, dur=3.50, wait=1.00)  # OP スキップ

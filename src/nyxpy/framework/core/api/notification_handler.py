@@ -64,6 +64,7 @@ def create_notification_handler_from_settings(
 
     Returns:
         NotificationHandler: 通知ハンドラー、または設定が無効の場合はNone
+
     """
     notifiers = []
 

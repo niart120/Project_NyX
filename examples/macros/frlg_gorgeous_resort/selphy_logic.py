@@ -41,6 +41,7 @@ def determine_pokemon(lcg: LCG32, pokedex: set[int]) -> int:
 
     Returns:
         決定されたポケモンの内部コード
+
     """
     # Phase 1: 乱数による抽選（最大100回）
     for _ in range(MAX_RETRY):
@@ -72,6 +73,7 @@ def determine_item(lcg: LCG32) -> str:
 
     Returns:
         アイテム名
+
     """
     rand_value = lcg.get_rand()
     value = rand_value % 100
@@ -97,6 +99,7 @@ def determine_reward(lcg: LCG32, pokedex: set[int]) -> tuple[int, str, int]:
     Returns:
         (species_code, item_name, pokemon_consumed)
         pokemon_consumed はポケモン決定で消費した乱数回数
+
     """
     seed_before = lcg.seed
 

@@ -68,6 +68,7 @@ def configure_logging(
         silence: Trueの場合、ほとんどのログ出力を抑制します
         verbose: Trueの場合、デバッグレベルのログを有効にします
         base_dir: ログ出力ディレクトリ。未指定の場合は現在の作業ディレクトリ配下の logs
+
     """
     logging = create_default_logging(base_dir=base_dir or pathlib.Path.cwd() / "logs")
     if silence:
@@ -92,6 +93,7 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
 
     Raises:
         ValueError: プロトコル名が不明な場合
+
     """
     return ProtocolFactory.create_protocol(protocol_name)
 
@@ -129,6 +131,7 @@ def create_runtime_builder(
 
     Returns:
         設定済みの Runtime builder
+
     """
     resolved_root = resolve_project_root(
         explicit_root=project_root,
@@ -184,6 +187,7 @@ def execute_macro(
 
     Returns:
         Runtime が返した RunResult
+
     """
     result = runtime_builder.run(
         RuntimeBuildRequest(macro_id=macro_name, entrypoint="cli", exec_args=exec_args)
@@ -249,6 +253,7 @@ def cli_main(args: argparse.Namespace) -> int:
 
     Returns:
         終了コード（0:成功、0以外:エラー）
+
     """
     try:
         project_root = resolve_project_root(allow_current_as_new=False)

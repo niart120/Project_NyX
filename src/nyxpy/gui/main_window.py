@@ -482,6 +482,7 @@ class MainWindow(QMainWindow):
 
         Args:
             exec_args: マクロに渡す引数辞書
+
         """
         macro_id = self.macro_browser.selected_macro_id()
         if macro_id is None:
