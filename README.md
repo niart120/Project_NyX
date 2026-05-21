@@ -85,7 +85,7 @@ nyx-gui
 
 ### マクロの作成と実行
 
-1. `macros/` フォルダにマクロを作成 (詳細は[マクロ開発](#4-マクロ開発)参照)
+1. `macros/` フォルダにマクロを作成 (詳細は[マクロ開発](docs/macro-development/README.md)参照)
 2. GUIからマクロを選択
 3. 実行ボタンをクリック
 4. 必要に応じてパラメータを設定
@@ -128,72 +128,9 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ## 4. マクロ開発
 
-マクロはローカル作業用の `macros\` に配置された Python スクリプトです。本リポジトリでは `macros\` と `resources\` はディレクトリだけ Git 管理対象としており、中身のマクロ・設定・画像資産は Git 管理外です。ユーザー向けの例は `examples\macros` と `examples\resources` に配置してあります。
+マクロ本体はローカル作業用の `macros\`、設定・画像資材は `resources\` に配置します。`examples\macros` と `examples\resources` は公開サンプルの参照先であり、利用者の配置先ではありません。
 
-### 基本的なマクロ構造
-
-```python
-from nyxpy.framework.core.macro.base import MacroBase
-from nyxpy.framework.core.constants import Button
-
-class SampleMacro(MacroBase):
-    description = "マクロの説明"
-    tags = ["タグ1", "タグ2"]
-    
-    def initialize(self, cmd, args):
-        # 初期化処理
-        pass
-        
-    def run(self, cmd):
-        # メイン処理
-        cmd.press(Button.A, dur=0.1)
-        cmd.wait(1.0)
-        # 例: 画面キャプチャ
-        img = cmd.capture()
-        # 例: キーボード入力
-        cmd.keyboard("Hello")
-        
-    def finalize(self, cmd):
-        # 後処理
-        pass
-```
-
-軽量マクロは `macros\<macro_id>.py` または `macros\<macro_id>\macro.py` に `MacroBase` 派生クラスを1つ置けば自動検出されます。複数 entrypoint や明示 metadata が必要な場合だけ `macro.toml` を追加します。`examples\macros` の例を実行したい場合は、対象ファイルを `macros\` へコピーしてください。
-
-```toml
-[macro]
-id = "sample_macro"
-entrypoint = "macros.sample_macro.macro:SampleMacro"
-settings = "resource:settings.toml"
-```
-
-### 主なコマンド
-
-- `cmd.press(button, dur=0.1, wait=0.0)`: ボタンを押して離す
-- `cmd.hold(button)`: ボタンを押しっぱなしにする
-- `cmd.release(button)`: 押しっぱなしのボタンを離す
-- `cmd.wait(sec)`: 指定秒数待機
-- `cmd.capture()`: スクリーンショット取得
-- `cmd.save_img(filename, image)`: 画像をファイルに保存
-- `cmd.load_img(filename)`: ファイルから画像を読み込み
-- `cmd.keyboard(text)`: キーボード文字列入力
-- `cmd.type(key)`: キーボード単一キー入力
-- `cmd.notify(text, img)`: 外部通知送信
-- `cmd.log(message)`: ログ出力
-
-**ボタン定数例:**
-- `Button.A`, `Button.B`, `Button.X`, `Button.Y`
-- `Button.L`, `Button.R`, `Button.ZL`, `Button.ZR`
-- `Hat.UP`, `Hat.DOWN`, `Hat.LEFT`, `Hat.RIGHT`
-
-**スティック操作例:**
-- `LStick.UP`, `LStick.DOWN`, `LStick.LEFT`, `LStick.RIGHT`
-- `RStick.UP`, `RStick.DOWN`, `RStick.LEFT`, `RStick.RIGHT`
-- カスタム角度: `LStick(math.pi/4, 0.5)` (45度、半分の強度)
-
-`settings = "resource:settings.toml"` は `resources\<macro_id>\settings.toml` を参照します。`cmd.load_img()` は `resources\<macro_id>\assets` またはマクロパッケージ内の `assets` から相対パスを読み込みます。`cmd.save_img()` と `cmd.artifacts.open_output()` は `runs\<run_id>\outputs` へ実行ごとの成果物を保存します。旧 `static\<macro_name>` 配置は標準探索されません。
-
-詳細は `spec\framework\rearchitecture\MACRO_MIGRATION_GUIDE.md` と `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md` を参照してください。
+実装手順、雛形、AI エージェント向けの要点は [docs\macro-development\README.md](docs/macro-development/README.md) を参照してください。
 
 ## 5. 設定ファイル
 

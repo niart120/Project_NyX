@@ -1,5 +1,4 @@
-"""
-OCRProcessor ユニットテスト
+"""OCRProcessor ユニットテスト
 
 PaddleOCR 3.x を前提とした認識精度の検証。
 PaddleOCR が未インストールの場合はスキップされる。
@@ -47,8 +46,8 @@ def make_text_image(
     height: int = 200,
     font_size: int = 100,
 ) -> np.ndarray:
-    """
-    PIL でテキストを描画した画像を返す。
+    """PIL でテキストを描画した画像を返す。
+
     テキストを画像中央に配置することで端部クリップを回避する。
     フォントは利用可能なシステムフォントを自動選択する。
     """
@@ -184,8 +183,8 @@ class TestExtractDigits:
 
     @pytest.mark.parametrize("number", ["00000", "65535", "12300", "11111"])
     def test_various_5digit_numbers(self, ocr_en, number):
-        """
-        モデルの既知誤認識パターン ("9"→"6", 先頭"1"+後続"0000") を避けた
+        """モデルの既知誤認識パターン ("9"→"6", 先頭"1"+後続"0000") を避けた
+
         5桁整数を使って認識の安定性を確認する。
         """
         img = make_text_image(number)

@@ -16,9 +16,7 @@ from nyxpy.gui.typography import apply_pane_title_font
 
 
 class MacroBrowserPane(QWidget):
-    """
-    Pane for displaying and filtering available macros, exposes selection change signal.
-    """
+    """Pane for displaying and filtering available macros, exposes selection change signal."""
 
     selection_changed = Signal(bool)
 

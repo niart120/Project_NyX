@@ -60,6 +60,8 @@ class MacroLoadDiagnostic:
 
 @dataclass(frozen=True)
 class MacroSettingsSource:
+    """マクロ設定ファイルの解決結果。"""
+
     path: Path
     source: str
 
@@ -79,6 +81,12 @@ class ClassMacroFactory:
 
 @dataclass(frozen=True)
 class MacroDefinition:
+    """読み込み済みマクロの公開情報。
+
+    `id` は実行時に指定する安定した識別子です。`macro_root` はマクロ本体の root、
+    `resources_root` は対応する `resources/<macro_id>` を指します。
+    """
+
     id: str
     aliases: tuple[str, ...]
     display_name: str
@@ -97,11 +105,19 @@ class MacroDefinition:
 
 @dataclass(frozen=True)
 class MacroSearchRoot:
+    """マクロ本体と資材 root の組。"""
+
     macros_dir: Path
     resources_dir: Path
 
 
 class MacroRegistry:
+    """プロジェクト内のマクロを探索し、`MacroDefinition` として保持します。
+
+    既定では `project_root/macros` を探索し、資材 root は `project_root/resources` です。
+    複数 root を渡した場合、先に見つかった macro id が優先されます。
+    """
+
     def __init__(
         self,
         project_root: Path | None = None,

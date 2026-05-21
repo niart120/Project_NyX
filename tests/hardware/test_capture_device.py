@@ -9,8 +9,8 @@ from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
 
 @pytest.mark.realdevice
 def test_continuous_frame_update():
-    """
-    長時間にわたり連続してフレームが取得されるかを確認するテスト。
+    """長時間にわたり連続してフレームが取得されるかを確認するテスト。
+
     初期化後、複数回 get_latest_frame() で得られる内容が更新されていることを確認。
     実際のキャプチャデバイスを起動して、出力映像が変化するようにする必要があります。
     """
@@ -38,8 +38,8 @@ def test_continuous_frame_update():
 
 @pytest.mark.realdevice
 def test_multithreaded_get_latest_frame():
-    """
-    複数スレッドから同時に get_latest_frame() を呼び出して、
+    """複数スレッドから同時に get_latest_frame() を呼び出して、
+
     スレッドセーフに動作するかを検証するテスト。
     """
     device_index = 0
@@ -71,9 +71,7 @@ def test_multithreaded_get_latest_frame():
 
 @pytest.mark.realdevice
 def test_release_idempotence():
-    """
-    release() が複数回呼び出されても問題ないことを確認するテスト。
-    """
+    """release() が複数回呼び出されても問題ないことを確認するテスト。"""
     device_index = 0
     capture_device = CameraCaptureDevice(device_index=device_index, fps=30.0)
     try:

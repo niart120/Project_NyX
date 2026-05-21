@@ -10,10 +10,22 @@ from nyxpy.framework.core.settings.exceptions import ConfigurationError
 
 
 class MacroSettingsResolver:
+    r"""マクロ定義の `settings_path` を実ファイルへ解決して読み込みます。
+
+    文字列の path は環境に依存しない表記として扱い、`\\`、絶対パス、`..` を拒否します。
+    `resource:` は `resources/<macro_id>`、`project:` はプロジェクトルート、
+    接頭辞なしの相対 path はマクロ本体ディレクトリを基準にします。
+    """
+
     def __init__(self, project_root: Path) -> None:
         self.project_root = Path(project_root).resolve()
 
     def resolve(self, definition: MacroDefinition) -> MacroSettingsSource | None:
+        """設定ファイルの解決結果を返します。
+
+        `settings_path` が未指定の場合は `None` を返します。許可された root から外れる
+        path は `ConfigurationError` にします。
+        """
         if definition.settings_path is None:
             return None
 
@@ -43,6 +55,11 @@ class MacroSettingsResolver:
         return (self.project_root / "resources" / definition.id).resolve()
 
     def load(self, definition: MacroDefinition) -> dict[str, Any]:
+        """TOML 設定ファイルを読み込み、辞書として返します。
+
+        ファイル未存在、読み込み失敗、TOML 解析失敗は `ConfigurationError` として
+        macro_id、指定 path、解決後 path を含めて通知します。
+        """
         source = self.resolve(definition)
         if source is None:
             return {}

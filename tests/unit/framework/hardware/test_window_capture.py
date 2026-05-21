@@ -97,7 +97,9 @@ def test_auto_backend_fallback_occurs_inside_session_start() -> None:
         platform_name="Windows",
     )
 
-    session = backend.create_session(WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator())
+    session = backend.create_session(
+        WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator()
+    )
     session.start()
     try:
         assert session.latest_frame()[0, 0].tolist() == [9, 9, 9]
@@ -118,7 +120,9 @@ def test_explicit_backend_does_not_fallback() -> None:
 
     failed.start = fail_start
     backend = FakeBackend(failed)
-    session = backend.create_session(WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator())
+    session = backend.create_session(
+        WindowCaptureSourceConfig(title_pattern="Viewer"), FakeLocator()
+    )
 
     with pytest.raises(RuntimeError, match="explicit failed"):
         session.start()

@@ -64,7 +64,7 @@ class FrlgInitialSeedConfig:
 
     @classmethod
     def from_args(cls, args: dict) -> FrlgInitialSeedConfig:
-        """args dict から設定を構築する。"""
+        """引数 dict から設定を構築する。"""
         cfg = cls()
 
         # 環境設定

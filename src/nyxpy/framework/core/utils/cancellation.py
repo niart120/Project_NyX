@@ -6,8 +6,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError, MacroCance
 
 
 class CancellationToken:
-    """
-    中断要求を管理するためのクラス。
+    """中断要求を管理するためのクラス。
+
     内部にスレッドセーフなイベントを保持し、中断状態を示す。
     """
 

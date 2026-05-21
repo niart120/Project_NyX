@@ -7,7 +7,7 @@ from .exceptions import InvalidImageError, TemplateMatchingError, ThresholdNotMe
 
 @dataclass
 class MatchResult:
-    """テンプレートマッチングの結果"""
+    """テンプレートマッチングの結果。"""
 
     position: tuple[int, int]  # (x, y)
     confidence: float
@@ -20,8 +20,7 @@ def find_template(
     threshold: float = 0.8,
     method: int = cv2.TM_CCOEFF_NORMED,
 ) -> MatchResult:
-    """
-    テンプレートマッチングを実行し、最良の結果を返す
+    """テンプレートマッチングを実行し、最良の一致を返します。
 
     :param source_image: 検索対象の画像
     :param template_image: テンプレート画像
@@ -30,6 +29,7 @@ def find_template(
     :return: マッチング結果
     :raises InvalidImageError: 画像データが無効な場合
     :raises ThresholdNotMetError: 閾値を満たす結果が見つからない場合
+    :raises TemplateMatchingError: OpenCV の処理に失敗した場合
     """
     if source_image is None or template_image is None:
         raise InvalidImageError("Source image or template image is None")
@@ -85,14 +85,13 @@ def contains_template(
     threshold: float = 0.8,
     method: int = cv2.TM_CCOEFF_NORMED,
 ) -> bool:
-    """
-    指定されたテンプレートが画像内に含まれているかを判定
+    """指定されたテンプレートが画像内に含まれるかを判定します。
 
     :param source_image: 検索対象の画像
     :param template_image: テンプレート画像
     :param threshold: マッチング閾値（0.0-1.0）
     :param method: マッチング手法（cv2.TM_* 定数）
-    :return: テンプレートが含まれている場合True
+    :return: テンプレートが含まれている場合 True。閾値未達や無効画像は False
     """
     try:
         find_template(source_image, template_image, threshold, method)

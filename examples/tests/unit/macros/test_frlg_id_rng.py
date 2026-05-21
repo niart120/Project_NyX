@@ -1,5 +1,4 @@
-"""
-FRLG ID調整マクロ テスト
+"""FRLG ID調整マクロ テスト
 
 frame_sweep / keyboard_layout / tid_recognizer / メインマクロクラスの
 ユニットテストを提供する。
@@ -25,12 +24,12 @@ class TestFrameSweep:
     """frame_sweep ジェネレータのテスト"""
 
     def test_basic_sweep(self):
-        """min から max まで 1 ずつ列挙される"""
+        """最小値 min から max まで 1 ずつ列挙される"""
         result = list(frame_sweep(10, 13))
         assert result == [10, 11, 12, 13]
 
     def test_single_value(self):
-        """min == max の場合、値が1つだけ返る"""
+        """最小値 min == max の場合、値が1つだけ返る"""
         result = list(frame_sweep(5, 5))
         assert result == [5]
 

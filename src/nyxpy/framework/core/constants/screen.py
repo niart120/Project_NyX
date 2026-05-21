@@ -1,4 +1,4 @@
-"""3DS screen coordinate constants and conversion helpers."""
+"""3DS 画面座標の定数と変換 helper。"""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -7,6 +7,8 @@ from math import floor
 
 @dataclass(frozen=True, slots=True)
 class ScreenSize:
+    """画面サイズ。"""
+
     width: int
     height: int
 
@@ -17,12 +19,16 @@ class ScreenSize:
 
 @dataclass(frozen=True, slots=True)
 class ScreenPoint:
+    """画面上の 1 点。"""
+
     x: int
     y: int
 
 
 @dataclass(frozen=True, slots=True)
 class ScreenRect:
+    """画面上の矩形。"""
+
     x: int
     y: int
     width: int
@@ -50,6 +56,8 @@ class ScreenRect:
 
 @dataclass(frozen=True, slots=True)
 class TouchPoint:
+    """3DS touch パネル上の 1 点。範囲は 0..319, 0..239 です。"""
+
     x: int
     y: int
 
@@ -92,6 +100,7 @@ def _quantize_point(point: ScreenPoint, rect: ScreenRect, target_size: ScreenSiz
 
 
 def validate_3ds_touch_point(point: TouchPoint) -> TouchPoint:
+    """3DS touch 座標の範囲を検証します。範囲外は `ValueError` です。"""
     if not 0 <= point.x < THREEDS_TOUCH_SIZE.width:
         raise ValueError("Touch X must be in range 0..319")
     if not 0 <= point.y < THREEDS_TOUCH_SIZE.height:
@@ -100,11 +109,13 @@ def validate_3ds_touch_point(point: TouchPoint) -> TouchPoint:
 
 
 def normalized_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint:
+    """400x480 正規化座標の下画面上の点を 320x240 touch 座標へ変換します。"""
     quantized = _quantize_point(point, THREEDS_BOTTOM_SCREEN, THREEDS_TOUCH_SIZE)
     return TouchPoint(quantized.x, quantized.y)
 
 
 def try_normalized_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint | None:
+    """変換できる場合は touch 座標、範囲外なら `None` を返します。"""
     try:
         return normalized_point_to_3ds_touch(point)
     except ValueError:
@@ -132,11 +143,13 @@ def hd_capture_point_to_normalized(point: ScreenPoint) -> ScreenPoint:
 
 
 def hd_capture_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint:
+    """1280x720 HD キャプチャ座標の下画面上の点を touch 座標へ変換します。"""
     quantized = _quantize_point(point, THREEDS_HD_BOTTOM_SCREEN, THREEDS_TOUCH_SIZE)
     return TouchPoint(quantized.x, quantized.y)
 
 
 def try_hd_capture_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint | None:
+    """HD キャプチャ座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return hd_capture_point_to_3ds_touch(point)
     except ValueError:
@@ -182,6 +195,7 @@ def try_cropped_normalized_point_to_3ds_touch(
 
 
 def cropped_hd_point_to_3ds_touch(point: ScreenPoint, crop_region: ScreenRect) -> TouchPoint:
+    """切り出し済み HD 座標を元の HD 座標へ戻して touch 座標へ変換します。"""
     hd_point = ScreenPoint(point.x + crop_region.x, point.y + crop_region.y)
     return hd_capture_point_to_3ds_touch(hd_point)
 
@@ -190,6 +204,7 @@ def try_cropped_hd_point_to_3ds_touch(
     point: ScreenPoint,
     crop_region: ScreenRect,
 ) -> TouchPoint | None:
+    """切り出し済み HD 座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return cropped_hd_point_to_3ds_touch(point, crop_region)
     except ValueError:
@@ -297,6 +312,7 @@ def preview_point_to_3ds_touch(
     *,
     preview_size: ScreenSize,
 ) -> TouchPoint:
+    """GUI プレビュー座標を 3DS touch 座標へ変換します。"""
     rect = preview_touch_rect(preview_size)
     quantized = _quantize_point(point, rect, THREEDS_TOUCH_SIZE)
     return TouchPoint(quantized.x, quantized.y)
@@ -307,6 +323,7 @@ def try_preview_point_to_3ds_touch(
     *,
     preview_size: ScreenSize,
 ) -> TouchPoint | None:
+    """GUI プレビュー座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return preview_point_to_3ds_touch(point, preview_size=preview_size)
     except ValueError:

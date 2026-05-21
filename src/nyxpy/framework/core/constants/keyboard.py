@@ -1,5 +1,4 @@
-"""
-キーボード関連の定数
+"""キーボード関連の定数
 
 このモジュールはキーボード操作に関する定数を定義します。
 """
@@ -9,9 +8,7 @@ from enum import IntEnum
 
 # キーボード操作の種類を定義する列挙型
 class KeyboardOp(IntEnum):
-    """
-    キーボード操作の種類を表す列挙型
-    """
+    """キーボード操作の種類を表す列挙型"""
 
     PRESS = 1
     RELEASE = 2
@@ -24,9 +21,7 @@ class KeyboardOp(IntEnum):
 
 # キーボードの通常キーのキーコードを定義
 class KeyCode(int):
-    """
-    キーボードの通常キーのキーコードを表すクラス
-    """
+    """キーボードの通常キーのキーコードを表すクラス"""
 
     def __new__(cls, char: str = None):
         # 空文字又は Noneの時は0x00として扱う
@@ -49,8 +44,8 @@ class KeyCode(int):
 
 # キーボードの特殊キーのキーコードを定義
 class SpecialKeyCode(IntEnum):
-    """
-    キーボードの特殊キーのキーコードを定義します。
+    """キーボードの特殊キーのキーコードを定義します。
+
     特殊キー（ENTER, ESCAPE, BACKSPACE, TAB, SPACEなど）を定義します。
     また、日本語キーボード固有の半角・全角なども含みます
     """

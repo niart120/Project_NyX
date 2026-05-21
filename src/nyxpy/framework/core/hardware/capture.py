@@ -12,29 +12,23 @@ from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 class CaptureDeviceInterface(ABC):
     @abstractmethod
     def initialize(self) -> None:
-        """
-        デバイスの初期化を行う
-        """
+        """デバイスの初期化を行う"""
         pass
 
     @abstractmethod
     def get_frame(self) -> cv2.typing.MatLike:
-        """
-        最新のフレームを取得する
-        """
+        """最新のフレームを取得する"""
         pass
 
     @abstractmethod
     def release(self) -> None:
-        """
-        デバイスの解放を行う
-        """
+        """デバイスの解放を行う"""
         pass
 
 
 class CameraCaptureDevice(CaptureDeviceInterface):
-    """
-    キャプチャデバイスの非同期スレッド実装。
+    """キャプチャデバイスの非同期スレッド実装。
+
     内部で専用のスレッドを起動し、連続的にフレームを取得して最新フレームをキャッシュします。
     """
 
@@ -121,9 +115,7 @@ class CameraCaptureDevice(CaptureDeviceInterface):
                 time.sleep(self._interval - elapsed)  # Wait for the next frame
 
     def get_frame(self) -> cv2.typing.MatLike:
-        """
-        キャッシュされた最新のフレームを取得します。
-        """
+        """キャッシュされた最新のフレームを取得します。"""
         with self._lock:
             if self.latest_frame is None:
                 raise RuntimeError("CameraCaptureDevice: No frame available yet.")
@@ -140,8 +132,8 @@ class CameraCaptureDevice(CaptureDeviceInterface):
 
 
 class DummyCaptureDevice(CaptureDeviceInterface):
-    """
-    キャプチャデバイスのダミー実装。
+    """キャプチャデバイスのダミー実装。
+
     実際のデバイスがない場合に使用される。
     何もせず、常に黒画面を返す。
     """
@@ -153,21 +145,15 @@ class DummyCaptureDevice(CaptureDeviceInterface):
 
     @override
     def initialize(self) -> None:
-        """
-        ダミーキャプチャデバイスの初期化を行う。
-        """
+        """ダミーキャプチャデバイスの初期化を行う。"""
         pass
 
     @override
     def get_frame(self) -> cv2.typing.MatLike:
-        """
-        ダミーキャプチャデバイスからフレームを取得する。
-        """
+        """ダミーキャプチャデバイスからフレームを取得する。"""
         return self._frame
 
     @override
     def release(self) -> None:
-        """
-        ダミーキャプチャデバイスのリソースを解放する。
-        """
+        """ダミーキャプチャデバイスのリソースを解放する。"""
         pass

@@ -46,8 +46,7 @@ class SerialProtocolInterface(ABC):
 
     @abstractmethod
     def build_keyboard_command(self, text: str) -> bytes:
-        """
-        キーボード文字列入力操作のコマンドデータを生成する
+        """キーボード文字列入力操作のコマンドデータを生成する
 
         :param text: 入力する文字列
         :return: コマンドデータ
@@ -57,8 +56,7 @@ class SerialProtocolInterface(ABC):
 
     @abstractmethod
     def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
-        """
-        キーボード個別キー操作のコマンドデータを生成する
+        """キーボード個別キー操作のコマンドデータを生成する
 
         :param key: 操作するキーの文字
         :param op: KeyboardOp キーボード操作の種類
@@ -73,8 +71,8 @@ class UnsupportedKeyError(ValueError):
 
 
 class CH552SerialProtocol(SerialProtocolInterface):
-    """
-    CH552SerialProtocol は、CH552 デバイス向けの通信プロトコルを実装します。
+    """CH552SerialProtocol は、CH552 デバイス向けの通信プロトコルを実装します。
+
     内部状態（key_state）は以下の構成になっています：
       [header, btn1, btn2, hat, lx, ly, rx, ry, kbdheader, key, centinel]
     - header: 固定値 0xAB
@@ -193,8 +191,8 @@ class CH552SerialProtocol(SerialProtocolInterface):
 
 
 class PokeConSerialProtocol(SerialProtocolInterface):
-    """
-    PokeConSerialProtocol は、PokeCon用プログラムが実装された Arduino デバイス向けの通信プロトコルを実装します。
+    """PokeConSerialProtocol は、PokeCon用プログラムが実装された Arduino デバイス向けの通信プロトコルを実装します。
+
     内部状態（key_state）は以下の構成になっています：
     [hex_btns, hex_hat, hex_pc_lx, hex_pc_ly, hex_pc_rx, hex_pc_ry]
     - hex_btns: ボタンの状態（下位／上位8ビット）

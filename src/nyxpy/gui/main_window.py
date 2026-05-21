@@ -473,8 +473,7 @@ class MainWindow(QMainWindow):
         self._start_macro(exec_args)
 
     def _start_macro(self, exec_args):
-        """
-        共通のマクロ実行処理
+        """共通のマクロ実行処理
 
         Args:
             exec_args: マクロに渡す引数辞書

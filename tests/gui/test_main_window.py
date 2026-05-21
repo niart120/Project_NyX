@@ -434,7 +434,10 @@ def test_controller_pane_has_title_label(window: MainWindow):
 
 
 def test_title_bar_actions_are_right_aligned(window: MainWindow):
-    assert window.virtual_controller_panel.title_layout.itemAt(0).widget() is window.controller_title_label
+    assert (
+        window.virtual_controller_panel.title_layout.itemAt(0).widget()
+        is window.controller_title_label
+    )
     assert window.virtual_controller_panel.title_layout.itemAt(1).spacerItem() is not None
     assert (
         window.virtual_controller_panel.title_layout.itemAt(2).widget()

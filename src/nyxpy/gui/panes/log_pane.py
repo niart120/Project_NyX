@@ -17,9 +17,7 @@ from nyxpy.gui.typography import apply_pane_title_font, log_view_font
 
 
 class LogPane(QWidget):
-    """
-    Pane for displaying real-time user logs in a read-only text view.
-    """
+    """Pane for displaying real-time user logs in a read-only text view."""
 
     def __init__(
         self,

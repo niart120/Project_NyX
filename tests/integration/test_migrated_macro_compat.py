@@ -21,9 +21,8 @@ from tests.support.fakes import (
 
 def _clear_macro_modules() -> None:
     for module_name in list(sys.modules):
-        if (
-            module_name in {"macro", "macros", "examples.macros"}
-            or module_name.startswith(("macro.", "macros.", "examples.macros."))
+        if module_name in {"macro", "macros", "examples.macros"} or module_name.startswith(
+            ("macro.", "macros.", "examples.macros.")
         ):
             del sys.modules[module_name]
 

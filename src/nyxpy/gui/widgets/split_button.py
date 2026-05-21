@@ -3,8 +3,8 @@ from PySide6.QtWidgets import QHBoxLayout, QMenu, QPushButton, QSizePolicy, QToo
 
 
 class CustomSplitDropDownButton(QWidget):
-    """
-    A button with a main action and a dropdown menu for additional actions.
+    """A button with a main action and a dropdown menu for additional actions.
+
     Used for macro execution with optional parameter input.
     """
 

@@ -35,7 +35,7 @@ class FrlgWildRngConfig:
 
     @classmethod
     def from_args(cls, args: dict) -> FrlgWildRngConfig:
-        """args dict から設定を構築する。"""
+        """引数 dict から設定を構築する。"""
         cfg = cls()
 
         # 基本設定

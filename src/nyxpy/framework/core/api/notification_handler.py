@@ -47,12 +47,13 @@ def create_notification_handler_from_settings(
     secrets: NotificationSettings,
     logger: LoggerPort | None = None,
 ):
-    """
-    SecretsSettingsオブジェクトから通知ハンドラーを作成します。
+    """SecretsSettingsオブジェクトから通知ハンドラーを作成します。
+
     通知の有効/無効設定や認証情報など、全ての通知関連設定はSecretsSettingsから取得します。
 
     Args:
         secrets: シークレット設定オブジェクト
+        logger: 通知失敗時の技術ログ出力先
 
     Returns:
         NotificationHandler: 通知ハンドラー、または設定が無効の場合はNone
