@@ -1,3 +1,5 @@
+"""マクロ実行結果の model。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

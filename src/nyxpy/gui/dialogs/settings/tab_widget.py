@@ -1,3 +1,5 @@
+"""設定 dialog の tab container。"""
+
 from PySide6.QtWidgets import QTabWidget
 
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService

@@ -1,3 +1,5 @@
+"""外部通知 adapter の共通 interface。"""
+
 from abc import ABC, abstractmethod
 
 import cv2

@@ -1,3 +1,5 @@
+"""マクロから利用する操作 command API。"""
+
 from __future__ import annotations
 
 import pathlib

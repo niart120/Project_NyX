@@ -1,3 +1,5 @@
+"""主操作と副操作を持つ split button。"""
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QMenu, QPushButton, QSizePolicy, QToolButton, QWidget
 

@@ -1,3 +1,5 @@
+"""Runtime が依存する入出力 port interface。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -1,3 +1,5 @@
+"""マクロ定義の探索と registry 管理。"""
+
 from __future__ import annotations
 
 from collections import defaultdict

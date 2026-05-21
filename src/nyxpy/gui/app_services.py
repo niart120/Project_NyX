@@ -1,3 +1,5 @@
+"""GUI 起動時に共有する application service。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

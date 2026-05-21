@@ -1,3 +1,5 @@
+"""コントローラー出力用シリアル protocol interface。"""
+
 from abc import ABC, abstractmethod
 
 from nyxpy.framework.core.constants import (

@@ -1,3 +1,5 @@
+"""Discord webhook への外部通知 adapter。"""
+
 import io
 
 import cv2

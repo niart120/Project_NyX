@@ -1,3 +1,5 @@
+"""Virtual controller の d-pad widget。"""
+
 import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal

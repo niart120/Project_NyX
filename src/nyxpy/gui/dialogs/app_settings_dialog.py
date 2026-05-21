@@ -1,3 +1,5 @@
+"""GUI の application settings dialog。"""
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QVBoxLayout
 

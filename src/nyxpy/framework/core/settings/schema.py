@@ -1,3 +1,5 @@
+"""設定 schema と型変換 helper。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -102,15 +104,18 @@ class SecretsSnapshot:
 
 
 def freeze_mapping(data: Mapping[str, Any]) -> Mapping[str, SettingValue]:
+    """通常の mapping を再帰的に読み取り専用 mapping へ変換します。"""
     return _freeze(_plain_mapping(data))
 
 
 def dotted_get(data: Mapping[str, Any], key: str, default: Any = None) -> Any:
+    """Dot 区切り key で nested mapping の値を取得します。"""
     value = _get_dotted(data, key, _MISSING)
     return default if value is _MISSING else value
 
 
 def dotted_set(data: dict[str, Any], key: str, value: Any) -> None:
+    """Dot 区切り key で nested dict に値を設定します。"""
     _set_dotted(data, key, value)
 
 

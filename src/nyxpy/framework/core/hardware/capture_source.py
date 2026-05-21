@@ -1,3 +1,5 @@
+"""キャプチャ入力元の設定 model。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -100,6 +102,7 @@ def capture_source_from_settings(
     *,
     capture_name_override: str | None = None,
 ) -> CaptureSourceConfig:
+    """設定値からキャプチャ入力元の設定を構築します。"""
     if capture_name_override is not None:
         return CameraCaptureSourceConfig(
             device_name=_text(capture_name_override),

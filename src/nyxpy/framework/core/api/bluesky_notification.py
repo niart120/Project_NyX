@@ -1,3 +1,5 @@
+"""Bluesky への外部通知 adapter。"""
+
 from datetime import UTC, datetime
 
 import cv2

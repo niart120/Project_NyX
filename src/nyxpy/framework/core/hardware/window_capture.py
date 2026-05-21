@@ -1,3 +1,5 @@
+"""Window capture backend の共通実装。"""
+
 from __future__ import annotations
 
 import platform

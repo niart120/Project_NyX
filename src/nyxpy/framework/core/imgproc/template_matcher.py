@@ -1,3 +1,5 @@
+"""OpenCV による template matching helper。"""
+
 from dataclasses import dataclass
 
 import cv2

@@ -1,3 +1,5 @@
+"""GUI 表示用の macro catalog model。"""
+
 from nyxpy.framework.core.macro.registry import MacroDefinition, MacroRegistry
 
 

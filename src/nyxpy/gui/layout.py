@@ -1,3 +1,5 @@
+"""GUI layout の preset と寸法計算。"""
+
 from dataclasses import dataclass
 
 DEFAULT_WINDOW_SIZE_PRESET_KEY = "full_hd"
@@ -149,6 +151,7 @@ LAYOUT_METRICS_BY_PRESET: dict[str, LayoutMetrics] = {
 
 
 def normalize_window_size_preset_key(value: object) -> str:
+    """未知の window size preset key を既定値へ正規化します。"""
     key = str(value) if value is not None else ""
     if key in WINDOW_SIZE_PRESETS_BY_KEY:
         return key
@@ -156,14 +159,17 @@ def normalize_window_size_preset_key(value: object) -> str:
 
 
 def window_size_preset_for_key(value: object) -> WindowSizePreset:
+    """Preset key に対応する window size preset を返します。"""
     return WINDOW_SIZE_PRESETS_BY_KEY[normalize_window_size_preset_key(value)]
 
 
 def layout_metrics_for_key(value: object) -> LayoutMetrics:
+    """Preset key に対応する layout metrics を返します。"""
     return LAYOUT_METRICS_BY_PRESET[normalize_window_size_preset_key(value)]
 
 
 def virtual_controller_metrics_for_key(value: object) -> VirtualControllerMetrics:
+    """Preset key に対応する virtual controller metrics を返します。"""
     preset = window_size_preset_for_key(value)
     metrics = layout_metrics_for_key(value)
     return VirtualControllerMetrics(

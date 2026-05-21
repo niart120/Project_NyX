@@ -1,3 +1,5 @@
+"""Macro runtime の実行 context model。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

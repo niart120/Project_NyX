@@ -1,3 +1,5 @@
+"""通知 secrets を含む workspace secrets store。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

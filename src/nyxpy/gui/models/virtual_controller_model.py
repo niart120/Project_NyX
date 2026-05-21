@@ -1,3 +1,5 @@
+"""Virtual controller 表示用 model。"""
+
 from PySide6.QtCore import QObject, Signal
 
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick

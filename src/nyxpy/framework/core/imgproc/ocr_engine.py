@@ -1,3 +1,5 @@
+"""PaddleOCR を使った OCR processor。"""
+
 from dataclasses import dataclass
 from threading import Lock
 from typing import ClassVar

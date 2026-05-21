@@ -1,3 +1,5 @@
+"""Manifest entrypoint からマクロ class を読み込む loader。"""
+
 from __future__ import annotations
 
 import importlib

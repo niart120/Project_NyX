@@ -1,3 +1,5 @@
+"""Window capture 対象の探索と解決。"""
+
 from __future__ import annotations
 
 import ctypes
@@ -53,6 +55,7 @@ def resolve_window(
     windows: tuple[WindowInfo, ...],
     config: WindowCaptureSourceConfig,
 ) -> WindowInfo:
+    """設定に一致する window を候補一覧から解決します。"""
     if config.identifier not in (None, ""):
         identifier = str(config.identifier)
         for window in windows:

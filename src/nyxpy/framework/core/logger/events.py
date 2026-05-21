@@ -1,3 +1,5 @@
+"""ログ event と log level の model。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -27,6 +29,7 @@ _LEVEL_ORDER = {
 
 
 def normalize_level(level: str | LogLevel) -> LogLevel:
+    """文字列または `LogLevel` を正規化します。"""
     try:
         return level if isinstance(level, LogLevel) else LogLevel(level.upper())
     except ValueError as exc:
@@ -34,6 +37,7 @@ def normalize_level(level: str | LogLevel) -> LogLevel:
 
 
 def level_enabled(level: LogLevel, minimum: LogLevel) -> bool:
+    """指定 level が minimum 以上なら `True` を返します。"""
     return _LEVEL_ORDER[level] >= _LEVEL_ORDER[minimum]
 
 

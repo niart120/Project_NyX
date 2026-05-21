@@ -1,3 +1,5 @@
+"""マクロ実行引数を入力する dialog。"""
+
 from PySide6.QtWidgets import (
     QDialog,
     QGroupBox,

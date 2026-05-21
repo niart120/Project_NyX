@@ -1,3 +1,5 @@
+"""ログ sink への event 配信。"""
+
 from __future__ import annotations
 
 import sys

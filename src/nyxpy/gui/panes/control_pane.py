@@ -1,3 +1,5 @@
+"""マクロ実行操作 pane。"""
+
 from enum import Enum
 
 from PySide6.QtCore import Signal

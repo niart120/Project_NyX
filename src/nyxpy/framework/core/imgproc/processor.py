@@ -1,3 +1,5 @@
+"""1 枚の画像に対する画像処理 API。"""
+
 import cv2
 
 from .exceptions import InvalidImageError

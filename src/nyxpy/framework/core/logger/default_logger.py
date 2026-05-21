@@ -1,3 +1,5 @@
+"""標準 logger port 実装。"""
+
 from __future__ import annotations
 
 import traceback

@@ -1,3 +1,5 @@
+"""ボム兵ソート自動化マクロ。"""
+
 from time import monotonic
 
 import cv2

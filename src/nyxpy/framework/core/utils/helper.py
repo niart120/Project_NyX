@@ -1,3 +1,5 @@
+"""CLI 互換 helper 関数。"""
+
 import inspect
 from collections.abc import Iterable
 from typing import Any

@@ -1,3 +1,6 @@
+"""マクロ metadata を付与する decorator。"""
+
+
 def check_interrupt(method):
     """Command の各操作メソッド実行前に、InterruptController の状態をチェックするデコレータ。
 

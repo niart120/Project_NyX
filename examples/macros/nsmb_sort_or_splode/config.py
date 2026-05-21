@@ -1,3 +1,5 @@
+"""New スーパーマリオブラザーズのソート用マクロ設定。"""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self

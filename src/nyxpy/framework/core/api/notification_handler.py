@@ -1,3 +1,5 @@
+"""外部通知 adapter を束ねる通知 handler。"""
+
 from typing import Protocol
 
 import cv2

@@ -1,3 +1,5 @@
+"""ログ event を受け取る sink 実装。"""
+
 from __future__ import annotations
 
 import json

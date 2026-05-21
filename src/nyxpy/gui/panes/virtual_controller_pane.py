@@ -1,3 +1,5 @@
+"""Virtual controller 表示 pane。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

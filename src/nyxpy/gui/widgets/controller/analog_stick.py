@@ -1,3 +1,5 @@
+"""Virtual controller の analog stick widget。"""
+
 import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal

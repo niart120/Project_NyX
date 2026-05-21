@@ -1,3 +1,5 @@
+"""MacroBase lifecycle を実行する runner。"""
+
 from __future__ import annotations
 
 import traceback

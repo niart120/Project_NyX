@@ -1,3 +1,5 @@
+"""NyX package entrypoint。"""
+
 import argparse
 import sys
 from pathlib import Path

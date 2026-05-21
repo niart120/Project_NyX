@@ -1,3 +1,5 @@
+"""NyX CLI のマクロ実行 entrypoint。"""
+
 import argparse
 import pathlib
 import sys

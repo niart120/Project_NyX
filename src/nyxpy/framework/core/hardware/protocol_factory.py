@@ -1,3 +1,5 @@
+"""シリアル protocol 実装の factory。"""
+
 from dataclasses import dataclass
 
 from nyxpy.framework.core.hardware.protocol import (

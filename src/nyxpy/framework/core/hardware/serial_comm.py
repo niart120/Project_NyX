@@ -1,3 +1,5 @@
+"""シリアルデバイスへの controller command 送信。"""
+
 from abc import ABC, abstractmethod
 
 import serial

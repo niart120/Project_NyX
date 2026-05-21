@@ -1,3 +1,5 @@
+"""Windows Graphics Capture を使った window capture backend。"""
+
 from __future__ import annotations
 
 import platform

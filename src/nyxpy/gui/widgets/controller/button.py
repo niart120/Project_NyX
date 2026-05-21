@@ -1,3 +1,5 @@
+"""Virtual controller の button widget。"""
+
 from PySide6.QtWidgets import QPushButton
 
 from nyxpy.framework.core.constants import Button

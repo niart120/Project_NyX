@@ -1,3 +1,5 @@
+"""OpenCV を使ったキャプチャデバイス操作。"""
+
 import threading
 import time
 from abc import ABC, abstractmethod

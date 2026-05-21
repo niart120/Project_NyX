@@ -1,3 +1,5 @@
+"""縦横比を維持して pixmap を表示する label。"""
+
 from typing import Any
 
 from PySide6.QtWidgets import QLabel

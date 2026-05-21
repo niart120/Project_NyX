@@ -1,3 +1,5 @@
+"""A ボタン連打の最小サンプルマクロ。"""
+
 from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command

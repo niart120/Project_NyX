@@ -1,3 +1,5 @@
+"""ログ出力前の秘密情報 mask 処理。"""
+
 from __future__ import annotations
 
 import json

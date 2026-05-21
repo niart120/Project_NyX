@@ -1,3 +1,5 @@
+"""ログ API の port 定義。"""
+
 from __future__ import annotations
 
 from abc import ABC

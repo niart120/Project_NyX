@@ -1,3 +1,5 @@
+"""framework log event を Qt signal へ接続する sink。"""
+
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -40,8 +42,10 @@ class GuiLogSink(QObject):
 
 
 def connect_technical_event(sink: GuiLogSink, slot) -> None:
+    """技術ログ signal を queued connection で slot へ接続します。"""
     sink.technical_event.connect(slot, Qt.ConnectionType.QueuedConnection)
 
 
 def connect_user_event(sink: GuiLogSink, slot) -> None:
+    """ユーザ向けログ signal を queued connection で slot へ接続します。"""
     sink.user_event.connect(slot, Qt.ConnectionType.QueuedConnection)

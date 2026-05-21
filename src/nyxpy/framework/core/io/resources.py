@@ -1,3 +1,5 @@
+"""マクロ資材と実行成果物の local file store。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -1,3 +1,5 @@
+"""非同期マクロ実行 handle。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

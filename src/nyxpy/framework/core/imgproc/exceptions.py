@@ -1,3 +1,5 @@
+"""画像処理 API の例外型。"""
+
 # filepath: e:\documents\VSCodeWorkspace\Project_NyX\src\nyxpy\framework\core\imgproc\exceptions.py
 
 

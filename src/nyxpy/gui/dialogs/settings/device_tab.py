@@ -1,3 +1,5 @@
+"""Device 設定 tab。"""
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,

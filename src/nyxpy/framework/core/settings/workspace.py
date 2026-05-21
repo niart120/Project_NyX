@@ -1,3 +1,5 @@
+"""NyX workspace の探索と初期化。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

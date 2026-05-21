@@ -1,3 +1,5 @@
+"""キャプチャデバイスとシリアルデバイスの検出 service。"""
+
 from __future__ import annotations
 
 import platform

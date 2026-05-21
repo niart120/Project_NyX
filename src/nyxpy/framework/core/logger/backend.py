@@ -1,3 +1,5 @@
+"""JSONL 形式の技術ログ backend。"""
+
 from __future__ import annotations
 
 import json

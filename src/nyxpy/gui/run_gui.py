@@ -1,3 +1,5 @@
+"""NyX GUI application entrypoint。"""
+
 import sys
 
 from PySide6.QtWidgets import QApplication
@@ -7,6 +9,7 @@ from nyxpy.gui.main_window import MainWindow
 
 
 def main():
+    """Workspace を初期化して GUI を起動します。"""
     project_root = resolve_project_root(allow_current_as_new=True)
     paths = ensure_workspace(project_root)
     app = QApplication(sys.argv)

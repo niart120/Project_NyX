@@ -1,3 +1,5 @@
+"""キャプチャフレームの表示用変換。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,5 @@
+"""NyX workspace の global settings store。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
