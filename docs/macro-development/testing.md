@@ -51,6 +51,13 @@ uv run ruff check .
 uv run pytest tests macros examples/tests
 ```
 
+`macros\` は Git 管理外の作業場所なので、Ruff の通常探索では `.gitignore` により対象外になります。公開サンプルとして `examples\macros` へ移す前に、次のコマンドでローカルマクロも確認します。
+
+```powershell
+uv run ruff format macros --no-respect-gitignore
+uv run ruff check macros --no-respect-gitignore
+```
+
 公開サンプルだけ確認する場合:
 
 ```powershell
