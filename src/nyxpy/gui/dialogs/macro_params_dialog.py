@@ -11,7 +11,10 @@ from PySide6.QtWidgets import (
 
 
 class MacroParamsDialog(QDialog):
+    """Macro 実行時の任意 parameter を入力する dialog。"""
+
     def __init__(self, parent=None, macro_name: str = None):
+        """対象 macro 名を title に反映し、parameter 入力欄を作成します。"""
         super().__init__(parent)
         # Execution parameter dialog for macro run
         self.setWindowTitle("実行パラメータ")

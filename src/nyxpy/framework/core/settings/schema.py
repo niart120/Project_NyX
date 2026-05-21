@@ -18,6 +18,7 @@ class SecretBoundaryError(ConfigurationError):
     """Raised when plaintext secret values cross into normal settings/logging paths."""
 
     def __init__(self, message: str = "secret boundary violation", **kwargs: object) -> None:
+        """Secret boundary violation の code/component を設定します。"""
         super().__init__(
             message,
             code=str(kwargs.pop("code", "NYX_SECRET_BOUNDARY_INVALID")),

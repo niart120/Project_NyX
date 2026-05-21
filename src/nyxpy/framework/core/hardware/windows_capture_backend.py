@@ -20,6 +20,8 @@ type CaptureClassFactory = Callable[[], type]
 
 
 class WindowsGraphicsCaptureBackend(WindowCaptureBackend):
+    """windows-capture package を使う Windows Graphics Capture backend。"""
+
     def __init__(
         self,
         *,
@@ -27,6 +29,7 @@ class WindowsGraphicsCaptureBackend(WindowCaptureBackend):
         platform_name: str | None = None,
         windows_build: int | None = None,
     ) -> None:
+        """Capture class factory と platform 判定用の値を保持します。"""
         self._capture_class_factory = capture_class_factory or _import_windows_capture
         self._platform_name = platform_name
         self._windows_build = windows_build
@@ -55,6 +58,8 @@ class WindowsGraphicsCaptureBackend(WindowCaptureBackend):
 
 
 class WindowsGraphicsCaptureSession(WindowCaptureSession):
+    """Windows Graphics Capture の capture object を保持する session。"""
+
     def __init__(
         self,
         *,
@@ -64,6 +69,7 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
         platform_name: str | None = None,
         windows_build: int | None = None,
     ) -> None:
+        """Window 設定、locator、capture class factory を保持します。"""
         self.config = config
         self.locator = locator
         self._capture_class_factory = capture_class_factory or _import_windows_capture

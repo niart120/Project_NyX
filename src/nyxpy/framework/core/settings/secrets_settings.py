@@ -51,6 +51,7 @@ class SecretsStore:
         filename: str = "secrets.toml",
         strict_load: bool = True,
     ) -> None:
+        """Secret 設定 directory、schema、保存 file 名、load 厳格性を保持します。"""
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.config_dir / filename
@@ -123,4 +124,5 @@ class SecretsSettings(SecretsStore):
     """Schema-fixed store for notification secrets and flags."""
 
     def __init__(self, config_dir: Path) -> None:
+        """既定 schema と `secrets.toml` を使う secret 設定 store を作成します。"""
         super().__init__(config_dir=config_dir, strict_load=False)

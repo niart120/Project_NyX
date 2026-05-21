@@ -8,10 +8,13 @@ from nyxpy.framework.core.logger import TechnicalLog, UserEvent
 
 
 class GuiLogSink(QObject):
+    """Framework log event を Qt signal として GUI thread へ渡す sink。"""
+
     technical_event = Signal(object)
     user_event = Signal(object)
 
     def __init__(self, parent: QObject | None = None) -> None:
+        """Qt parent と停止 flag を初期化します。"""
         super().__init__(parent)
         self._stopped = False
 

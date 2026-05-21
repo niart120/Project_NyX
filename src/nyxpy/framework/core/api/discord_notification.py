@@ -11,7 +11,10 @@ from .notification_interface import NotificationInterface
 
 
 class DiscordNotification(NotificationInterface):
+    """Discord webhook へテキストと任意画像を送る通知 adapter。"""
+
     def __init__(self, webhook_url: str, logger: LoggerPort | None = None):
+        """Webhook URL と失敗時ログ出力先を保持します。"""
         self.webhook_url = webhook_url
         self.logger = logger or NullLoggerPort()
 

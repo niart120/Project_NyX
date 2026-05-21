@@ -8,6 +8,8 @@ LEFT_PANE_CONTENT_MARGIN = 5
 
 @dataclass(frozen=True)
 class WindowSizePreset:
+    """Window と preview の代表寸法 preset。"""
+
     key: str
     label: str
     window_width: int
@@ -26,6 +28,8 @@ class WindowSizePreset:
 
 @dataclass(frozen=True)
 class LayoutMetrics:
+    """Main window の pane 幅、高さ、余白の算出結果。"""
+
     margin: int
     gap: int
     left_width: int
@@ -71,6 +75,8 @@ class LayoutMetrics:
 
 @dataclass(frozen=True)
 class VirtualControllerMetrics:
+    """Virtual controller widget の描画領域と基準寸法。"""
+
     width: int
     height: int
     base_width: int = 280

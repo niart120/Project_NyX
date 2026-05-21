@@ -94,6 +94,7 @@ class SettingsStore:
         filename: str = "global.toml",
         strict_load: bool = True,
     ) -> None:
+        """設定 directory、schema、保存 file 名、load 厳格性を保持します。"""
         if any(field.secret for field in schema.fields.values()):
             raise SecretBoundaryError("SettingsStore schema must not contain secret fields")
         self.config_dir = Path(config_dir)
@@ -161,6 +162,7 @@ class GlobalSettings(SettingsStore):
     """Schema-fixed store for non-secret global settings."""
 
     def __init__(self, config_dir: Path) -> None:
+        """既定 schema と `global.toml` を使う非 secret 設定 store を作成します。"""
         super().__init__(config_dir=config_dir, strict_load=False)
 
 

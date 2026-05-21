@@ -21,9 +21,12 @@ from nyxpy.framework.core.macro.registry import (
 
 
 class EntryPointLoader:
+    """macros directory から entrypoint module を import して定義へ変換します。"""
+
     def __init__(
         self, project_root: Path, macros_dir: Path, resources_dir: Path | None = None
     ) -> None:
+        """Project root、macro root、resource root、import prefix を初期化します。"""
         self.project_root = Path(project_root).resolve()
         self.macros_dir = Path(macros_dir).resolve()
         self.resources_dir = (

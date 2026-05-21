@@ -12,6 +12,8 @@ from nyxpy.framework.core.hardware.protocol import (
 
 @dataclass(frozen=True)
 class ProtocolDescriptor:
+    """プロトコル名、実装 class、既定 baudrate の対応情報。"""
+
     name: str
     protocol_cls: type[SerialProtocolInterface]
     default_baudrate: int

@@ -13,6 +13,7 @@ class AnalogStick(QWidget):
     valueChanged = Signal(float, float)  # 角度と強さのシグナル
 
     def __init__(self, parent: QWidget | None = None, is_left: bool = True) -> None:
+        """左右 stick 種別と描画状態を初期化します。"""
         super().__init__(parent)
         self.is_left = is_left
         self._diameter = 60

@@ -23,6 +23,7 @@ class MacroBrowserPane(QWidget):
     selection_changed = Signal(bool)
 
     def __init__(self, catalog, parent=None):
+        """Macro catalog を保持し、検索欄と一覧 widget を作成します。"""
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(

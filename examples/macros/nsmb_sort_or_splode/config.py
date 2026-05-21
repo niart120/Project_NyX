@@ -9,6 +9,8 @@ from nyxpy.framework.core.constants import THREEDS_TOUCH_SIZE, TouchPoint, valid
 
 @dataclass(frozen=True, slots=True)
 class TouchRect:
+    """3DS touch 座標上で無視する矩形領域。"""
+
     x: int
     y: int
     width: int
@@ -28,6 +30,8 @@ class TouchRect:
 
 @dataclass(frozen=True, slots=True)
 class NsmbSortOrSplodeConfig:
+    """ボム兵認識と drag 操作に使う実行設定。"""
+
     scan_interval_seconds: float = 0.15
     post_drop_wait_seconds: float = 0.10
     max_sorted_count: int = 0

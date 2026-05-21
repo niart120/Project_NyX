@@ -51,6 +51,7 @@ class VirtualControllerPane(QWidget):
     """仮想コントローラーのメインペイン"""
 
     def __init__(self, logger: LoggerPort, parent: QWidget | None = None) -> None:
+        """Controller model と入力 widget を作成し、signal を接続します。"""
         super().__init__(parent)
         self.model = VirtualControllerModel(logger=logger)
         self._layout_size = QSize(280, 280)

@@ -11,6 +11,8 @@ from .settings.tab_widget import SettingsTabWidget
 
 
 class AppSettingsDialog(QDialog):
+    """Global/secret settings を tab 形式で編集する dialog。"""
+
     settings_applied = Signal()
 
     def __init__(
@@ -21,6 +23,7 @@ class AppSettingsDialog(QDialog):
         *,
         device_discovery: DeviceDiscoveryService | None = None,
     ):
+        """Settings tab を構築し、適用ボタンの signal を接続します。"""
         super().__init__(parent)
         self.setWindowTitle("設定")
         self.resize(500, 400)

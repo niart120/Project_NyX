@@ -29,6 +29,8 @@ from nyxpy.gui.macro_catalog import MacroCatalog
 
 @dataclass(frozen=True)
 class SettingsApplyOutcome:
+    """設定反映後の変更範囲と再接続結果。"""
+
     changed_keys: frozenset[str]
     builder_replaced: bool
     frame_source_changed: bool
@@ -73,7 +75,10 @@ RUNTIME_BUILDER_SETTING_KEYS = (
 
 
 class GuiAppServices:
+    """GUI が共有する registry、runtime builder、settings、logging を管理します。"""
+
     def __init__(self, *, project_root: Path) -> None:
+        """Project root から設定、ログ、macro catalog、runtime builder を構築します。"""
         self.project_root = Path(project_root)
         config_dir = self.project_root / ".nyxpy"
         self.global_settings = GlobalSettings(config_dir=config_dir)

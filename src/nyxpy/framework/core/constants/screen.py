@@ -65,6 +65,8 @@ class TouchPoint:
 
 
 class ScaleRounding(StrEnum):
+    """座標拡大縮小時の丸め方法。"""
+
     FLOOR = "floor"
     ROUND = "round"
 

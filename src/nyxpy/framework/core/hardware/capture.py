@@ -12,6 +12,8 @@ from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 
 class CaptureDeviceInterface(ABC):
+    """フレーム取得デバイスが満たす同期 interface。"""
+
     @abstractmethod
     def initialize(self) -> None:
         """デバイスの初期化を行う"""
@@ -41,6 +43,7 @@ class CameraCaptureDevice(CaptureDeviceInterface):
         fps: float = 60.0,
         logger: LoggerPort | None = None,
     ) -> None:
+        """OpenCV device index と取得 FPS を保持し、初期化時に thread を開始します。"""
         self.logger = logger or NullLoggerPort()
         self.device_index = device_index
         self.api_pref = api_pref  # API preference
@@ -141,6 +144,7 @@ class DummyCaptureDevice(CaptureDeviceInterface):
     """
 
     def __init__(self):
+        """1280x720 の黒画面を返すダミーフレームを生成します。"""
         # DummyCaptureDevice の初期化を行う
         # 返却用の黒画面(1280x720)を生成
         self._frame = np.zeros((720, 1280, 3), dtype=np.uint8)

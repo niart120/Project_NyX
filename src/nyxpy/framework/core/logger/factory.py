@@ -19,6 +19,8 @@ from nyxpy.framework.core.logger.sinks import (
 
 @dataclass
 class LoggingComponents:
+    """Logger 初期化で生成される主要 component の束。"""
+
     logger: DefaultLogger
     dispatcher: LogSinkDispatcher
     sanitizer: LogSanitizer

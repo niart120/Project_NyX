@@ -15,6 +15,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 @dataclass(frozen=True)
 class WindowInfo:
+    """Capture 対象 window の識別子、タイトル、矩形情報。"""
+
     title: str
     identifier: str | int
     rect: CaptureRect
@@ -27,6 +29,8 @@ class WindowInfo:
 
 
 class WindowLocatorBackend(ABC):
+    """Window 候補を列挙し、設定に一致する window を解決します。"""
+
     @abstractmethod
     def list_windows(self) -> tuple[WindowInfo, ...]:
         pass
@@ -36,6 +40,8 @@ class WindowLocatorBackend(ABC):
 
 
 class DefaultWindowLocatorBackend(WindowLocatorBackend):
+    """Windows では Win32 API、その他 platform では空候補を返す locator。"""
+
     def list_windows(self) -> tuple[WindowInfo, ...]:
         if platform.system() != "Windows":
             return ()

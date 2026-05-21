@@ -16,7 +16,10 @@ from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
 
 class NotificationSettingsTab(QWidget):
+    """Discord と Bluesky の通知設定 tab。"""
+
     def __init__(self, settings: GlobalSettings, secrets: SecretsSettings, parent=None):
+        """Global settings と secret store を保持し、通知設定 UI を作ります。"""
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets

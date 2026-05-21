@@ -18,11 +18,15 @@ from nyxpy.framework.core.macro.exceptions import ResourceError
 
 
 class ResourceKind(StrEnum):
+    """資材参照の用途種別。"""
+
     ASSET = "asset"
     OUTPUT = "output"
 
 
 class ResourceSource(StrEnum):
+    """資材または成果物が解決された元の場所。"""
+
     STANDARD_ASSETS = "standard_assets"
     MACRO_PACKAGE = "macro_package"
     PACKAGE_RESOURCE = "package_resource"
@@ -30,13 +34,18 @@ class ResourceSource(StrEnum):
 
 
 class OverwritePolicy(StrEnum):
+    """成果物保存時の既存ファイル処理方針。"""
+
     ERROR = "error"
     REPLACE = "replace"
     UNIQUE = "unique"
 
 
 class ResourcePathError(ResourceError):
+    """資材パスが root 外や不正名を指す場合の例外。"""
+
     def __init__(self, message: str, **kwargs: object) -> None:
+        """不正 path の詳細を `ResourceError` として初期化します。"""
         super().__init__(
             message,
             code=str(kwargs.pop("code", "NYX_RESOURCE_PATH_INVALID")),
@@ -47,7 +56,10 @@ class ResourcePathError(ResourceError):
 
 
 class ResourceNotFoundError(ResourceError):
+    """指定された資材が探索 root に存在しない場合の例外。"""
+
     def __init__(self, message: str, **kwargs: object) -> None:
+        """資材読み込み失敗 code を持つ `ResourceError` として初期化します。"""
         super().__init__(
             message,
             code=str(kwargs.pop("code", "NYX_RESOURCE_READ_FAILED")),
@@ -58,7 +70,10 @@ class ResourceNotFoundError(ResourceError):
 
 
 class ResourceReadError(ResourceError):
+    """資材ファイルの読み込みに失敗した場合の例外。"""
+
     def __init__(self, message: str, **kwargs: object) -> None:
+        """資材読み込み失敗の詳細を `ResourceError` として初期化します。"""
         super().__init__(
             message,
             code=str(kwargs.pop("code", "NYX_RESOURCE_READ_FAILED")),
@@ -69,7 +84,10 @@ class ResourceReadError(ResourceError):
 
 
 class ResourceWriteError(ResourceError):
+    """実行成果物の書き込みに失敗した場合の例外。"""
+
     def __init__(self, message: str, **kwargs: object) -> None:
+        """成果物書き込み失敗の詳細を `ResourceError` として初期化します。"""
         super().__init__(
             message,
             code=str(kwargs.pop("code", "NYX_RESOURCE_WRITE_FAILED")),
@@ -80,11 +98,16 @@ class ResourceWriteError(ResourceError):
 
 
 class ResourceAlreadyExistsError(ResourceWriteError):
+    """上書き禁止の出力先が既に存在する場合の例外。"""
+
     pass
 
 
 class ResourceConfigurationError(ResourceError):
+    """資材 store の設定や出力 mode が不正な場合の例外。"""
+
     def __init__(self, message: str) -> None:
+        """資材設定不正の code を持つ `ResourceError` として初期化します。"""
         super().__init__(
             message,
             code="NYX_RESOURCE_PATH_INVALID",
@@ -262,6 +285,7 @@ class LocalResourceStore(ResourceStorePort):
         scope: MacroResourceScope,
         guard: ResourcePathGuard | None = None,
     ) -> None:
+        """資材探索範囲と path guard を保持します。"""
         self.scope = scope
         self.guard = guard or DefaultResourcePathGuard()
 
@@ -308,6 +332,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         atomic: bool = True,
         guard: ResourcePathGuard | None = None,
     ) -> None:
+        """出力 root、run 情報、上書き方針、path guard を保持します。"""
         self.output_root = Path(output_root).resolve(strict=False)
         self.macro_id = macro_id
         self.run_id = run_id

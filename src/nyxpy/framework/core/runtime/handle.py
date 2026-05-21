@@ -10,6 +10,8 @@ from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 
 class RunHandle(ABC):
+    """非同期 macro 実行の状態確認、キャンセル、結果取得を行う handle。"""
+
     @property
     @abstractmethod
     def run_id(self) -> str: ...
@@ -32,6 +34,8 @@ class RunHandle(ABC):
 
 
 class ThreadRunHandle(RunHandle):
+    """Thread と Event を使う `RunHandle` 実装。"""
+
     def __init__(
         self,
         *,
@@ -41,6 +45,7 @@ class ThreadRunHandle(RunHandle):
         done_event: Event,
         result_getter,
     ) -> None:
+        """Run id、cancellation token、thread、完了 event、結果 getter を保持します。"""
         self._run_id = run_id
         self._cancellation_token = cancellation_token
         self._thread = thread

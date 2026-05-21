@@ -14,6 +14,7 @@ class CancellationToken:
     """
 
     def __init__(self):
+        """Thread-safe event、lock、任意の停止理由を初期化します。"""
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._reason: str | None = None

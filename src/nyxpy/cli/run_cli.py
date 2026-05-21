@@ -30,12 +30,16 @@ from nyxpy.framework.core.utils.helper import parse_define_args
 
 @dataclass(frozen=True)
 class UserMessage:
+    """CLI へ表示するユーザ向けメッセージ。"""
+
     level: str
     text: str
     code: str | None = None
 
 
 class CliPresenter:
+    """`RunResult` を終了コードとユーザ向け表示へ変換します。"""
+
     def render_result(self, result: RunResult) -> UserMessage:
         if result.status is RunStatus.SUCCESS:
             return UserMessage("INFO", "Macro execution completed")

@@ -28,7 +28,10 @@ class _SinkRegistration:
 
 
 class LogSinkDispatcher:
+    """LogSink の登録、level 判定、配送失敗時の隔離を担当します。"""
+
     def __init__(self, sanitizer: LogSanitizer, *, lock_timeout_sec: float = 1.0) -> None:
+        """Sanitizer、lock timeout、sink 登録 table を初期化します。"""
         self.sanitizer = sanitizer
         self.lock_timeout_sec = lock_timeout_sec
         self._sink_lock = threading.RLock()

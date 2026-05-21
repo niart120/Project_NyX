@@ -19,6 +19,8 @@ type SettingsSnapshot = Mapping[str, FrameworkValue]
 
 @dataclass(frozen=True)
 class RuntimeOptions:
+    """単一実行で使う device 許可、timeout、debug 出力の設定。"""
+
     allow_dummy: bool = False
     device_detection_timeout_sec: float = 5.0
     frame_ready_timeout_sec: float = 3.0
@@ -28,6 +30,8 @@ class RuntimeOptions:
 
 @dataclass(frozen=True)
 class ExecutionContext:
+    """Command と runtime が共有する実行中 macro の依存 object 一式。"""
+
     run_id: str
     macro_id: str
     macro_name: str
@@ -51,6 +55,8 @@ class ExecutionContext:
 
 @dataclass(frozen=True)
 class RunContext:
+    """Macro hook へ渡す軽量な実行 context。"""
+
     run_id: str
     macro_id: str
     macro_name: str
@@ -61,6 +67,8 @@ class RunContext:
 
 @dataclass(frozen=True)
 class RuntimeBuildRequest:
+    """Runtime build に必要な macro id、entrypoint、実行引数。"""
+
     macro_id: str
     entrypoint: str = "runtime"
     exec_args: Mapping[str, RuntimeValue] | None = None

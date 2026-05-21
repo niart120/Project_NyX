@@ -189,6 +189,7 @@ class DefaultCommand(Command):
     """
 
     def __init__(self, context: ExecutionContext) -> None:
+        """実行 context を受け取り、controller と cancellation token へ接続します。"""
         self.context = context
         self.ct: CancellationToken = context.cancellation_token
 

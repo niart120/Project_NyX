@@ -21,12 +21,16 @@ from .config import TouchRect
 
 
 class BombColor(StrEnum):
+    """認識対象のボム兵色。"""
+
     RED = "red"
     BLACK = "black"
 
 
 @dataclass(frozen=True, slots=True)
 class DetectedBomb:
+    """テンプレート一致と色特徴量から得たボム兵候補。"""
+
     color: BombColor
     score: float
     hd_center_x: int
@@ -46,6 +50,8 @@ class DetectedBomb:
 
 @dataclass(frozen=True, slots=True)
 class ColorFeatures:
+    """候補周辺領域の赤色比率と暗色比率。"""
+
     red_ratio: float
     dark_ratio: float
 

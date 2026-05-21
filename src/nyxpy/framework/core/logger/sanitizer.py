@@ -10,7 +10,10 @@ from nyxpy.framework.core.logger.events import LogExtraValue
 
 
 class LogSanitizer:
+    """Log payload から secret らしい値を mask します。"""
+
     def __init__(self, mask_secret_keys: list[str] | None = None) -> None:
+        """既定の secret key fragment と追加 mask 対象を登録します。"""
         self.secret_fragments = tuple(
             fragment.lower()
             for fragment in (

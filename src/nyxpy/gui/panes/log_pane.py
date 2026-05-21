@@ -30,6 +30,7 @@ class LogPane(QWidget):
         kind: str = "macro",
         initial_level: str = "INFO",
     ):
+        """Dispatcher へ GUI log sink を登録し、表示 level UI を作成します。"""
         super().__init__(parent)
         self.dispatcher = dispatcher
         self.kind = kind

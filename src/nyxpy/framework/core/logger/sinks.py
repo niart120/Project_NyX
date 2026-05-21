@@ -19,9 +19,12 @@ from nyxpy.framework.core.logger.rotation import (
 
 
 class TestLogSink(LogSink):
+    """テストで log event を memory 上に蓄積する sink。"""
+
     __test__ = False
 
     def __init__(self) -> None:
+        """受信 event list と flush/close 状態を初期化します。"""
         self.technical_logs: list[TechnicalLog] = []
         self.user_events: list[UserEvent] = []
         self.flushed = False
@@ -41,7 +44,10 @@ class TestLogSink(LogSink):
 
 
 class ConsoleLogSink(LogSink):
+    """User event と重要 technical log を stream に出力する sink。"""
+
     def __init__(self, stream: TextIO | None = None) -> None:
+        """出力 stream を保持し、未指定時は標準出力を使います。"""
         self.stream = stream or sys.stdout
 
     def emit_user(self, event: UserEvent) -> None:
@@ -63,6 +69,8 @@ class ConsoleLogSink(LogSink):
 
 
 class TextFileLogSink(LogSink):
+    """User event と technical log を text file に保存する sink。"""
+
     def __init__(
         self,
         path: Path,
@@ -71,6 +79,7 @@ class TextFileLogSink(LogSink):
         backup_count: int = 3,
         retention_days: int = 14,
     ) -> None:
+        """出力 path と rotation 方針を保持し、親 directory を作成します。"""
         self.path = Path(path)
         self.rotation = RotationPolicy(
             max_bytes=max_bytes,
@@ -114,6 +123,8 @@ class TextFileLogSink(LogSink):
 
 
 class JsonlFileSink(LogSink):
+    """User event と technical log を単一 JSONL file に保存する sink。"""
+
     def __init__(
         self,
         path: Path,
@@ -122,6 +133,7 @@ class JsonlFileSink(LogSink):
         backup_count: int = 3,
         retention_days: int = 30,
     ) -> None:
+        """出力 path と rotation 方針を保持し、親 directory を作成します。"""
         self.path = Path(path)
         self.rotation = RotationPolicy(
             max_bytes=max_bytes,
@@ -153,6 +165,8 @@ class JsonlFileSink(LogSink):
 
 
 class RunJsonlFileSink(LogSink):
+    """Run ごとの日付 directory 配下へ JSONL log を保存する sink。"""
+
     def __init__(
         self,
         base_dir: Path,
@@ -161,6 +175,7 @@ class RunJsonlFileSink(LogSink):
         backup_count: int = 3,
         retention_days: int = 30,
     ) -> None:
+        """出力 base directory と rotation 方針を保持します。"""
         self.base_dir = Path(base_dir)
         self.rotation = RotationPolicy(
             max_bytes=max_bytes,

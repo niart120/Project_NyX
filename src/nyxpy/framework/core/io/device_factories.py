@@ -32,6 +32,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 class ControllerOutputPortFactory:
+    """シリアル device 設定から controller output port を生成します。"""
+
     def __init__(
         self,
         *,
@@ -39,6 +41,7 @@ class ControllerOutputPortFactory:
         protocol: SerialProtocolInterface,
         serial_factory: Callable[[str], object] = SerialComm,
     ) -> None:
+        """Device discovery、protocol、serial factory を保持します。"""
         self.discovery = discovery
         self.protocol = protocol
         self.serial_factory = serial_factory
@@ -94,6 +97,8 @@ class ControllerOutputPortFactory:
 
 
 class FrameSourcePortFactory:
+    """キャプチャ入力元設定から frame source port を生成します。"""
+
     def __init__(
         self,
         *,
@@ -103,6 +108,7 @@ class FrameSourcePortFactory:
         window_locator_factory: Callable[[], WindowLocatorBackend] | None = None,
         window_backend_factory: Callable[[str], WindowCaptureBackend] | None = None,
     ) -> None:
+        """Device discovery と camera/window capture factory を保持します。"""
         self.discovery = discovery
         self.logger = logger or NullLoggerPort()
         self.capture_factory = capture_factory

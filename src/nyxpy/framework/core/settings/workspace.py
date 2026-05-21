@@ -10,6 +10,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 @dataclass(frozen=True)
 class WorkspacePaths:
+    """Project root 配下の設定、macro、resource、出力 directory 群。"""
+
     project_root: Path
     config_dir: Path
     macros_dir: Path

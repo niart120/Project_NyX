@@ -16,6 +16,8 @@ CaptureBackendName = Literal["auto", "mss", "windows_graphics_capture"]
 
 @dataclass(frozen=True)
 class CaptureRect:
+    """画面キャプチャ対象の矩形領域。"""
+
     left: int
     top: int
     width: int
@@ -42,6 +44,8 @@ class CaptureRect:
 
 @dataclass(frozen=True)
 class CameraCaptureSourceConfig:
+    """カメラ型キャプチャ入力元の設定。"""
+
     device_name: str = ""
     source_type: Literal["camera"] = "camera"
     fps: float = 60.0
@@ -50,6 +54,8 @@ class CameraCaptureSourceConfig:
 
 @dataclass(frozen=True)
 class WindowCaptureSourceConfig:
+    """Window capture 入力元の検索条件と backend 設定。"""
+
     title_pattern: str = ""
     source_type: Literal["window"] = "window"
     match_mode: WindowMatchMode = "exact"
@@ -64,6 +70,8 @@ CaptureSourceConfig = CameraCaptureSourceConfig | WindowCaptureSourceConfig
 
 @dataclass(frozen=True)
 class CaptureSourceKey:
+    """Frame source の再利用判定に使う正規化済み key。"""
+
     source_type: CaptureSourceType
     identifier: str
     backend: str

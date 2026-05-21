@@ -75,11 +75,13 @@ select = [
     "F",    # pyflakes
     "I",    # isort
     "D100", # pydocstyle: module docstrings
+    "D101", # pydocstyle: public class docstrings
     "D2",   # pydocstyle whitespace conventions
     "D3",   # pydocstyle quote/escape conventions
     "D103", # pydocstyle: public function docstrings
     "D104", # pydocstyle: package docstrings
     "D105", # pydocstyle: magic method docstrings
+    "D107", # pydocstyle: __init__ docstrings
     "D403", # pydocstyle Google convention: first word capitalization
     "D417", # pydocstyle Google convention: document all parameters
     "UP",   # pyupgrade (flags from __future__ imports, old typing syntax, etc.)
@@ -93,6 +95,6 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "conftest.py" = ["D100"]
-"tests/**" = ["D100", "D103", "E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
-"examples/tests/**" = ["D100", "D103", "E402"]
+"tests/**" = ["D100", "D101", "D103", "D107", "E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
+"examples/tests/**" = ["D100", "D101", "D103", "D107", "E402"]
 

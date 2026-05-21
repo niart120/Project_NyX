@@ -12,6 +12,8 @@ type LogExtraValue = FrameworkValue
 
 
 class LogLevel(StrEnum):
+    """Logger が扱う severity level。"""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -43,6 +45,8 @@ def level_enabled(level: LogLevel, minimum: LogLevel) -> bool:
 
 @dataclass(frozen=True)
 class RunLogContext:
+    """単一 macro run に紐づく log context。"""
+
     run_id: str
     macro_id: str
     macro_name: str = ""
@@ -52,6 +56,8 @@ class RunLogContext:
 
 @dataclass(frozen=True)
 class LogEvent:
+    """Backend と technical sink へ送る構造化 log event。"""
+
     timestamp: datetime
     level: LogLevel
     component: str
@@ -66,12 +72,16 @@ class LogEvent:
 
 @dataclass(frozen=True)
 class TechnicalLog:
+    """Traceback 出力方針を伴う technical log payload。"""
+
     event: LogEvent
     include_traceback: bool = True
 
 
 @dataclass(frozen=True)
 class UserEvent:
+    """GUI や console へ提示する利用者向け event。"""
+
     timestamp: datetime
     level: LogLevel
     component: str

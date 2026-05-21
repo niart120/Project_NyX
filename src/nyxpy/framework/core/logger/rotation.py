@@ -9,6 +9,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class RotationPolicy:
+    """Log rotation のサイズ、世代数、保持日数。"""
+
     max_bytes: int = 10 * 1024 * 1024
     backup_count: int = 3
     retention_days: int = 14

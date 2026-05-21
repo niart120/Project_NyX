@@ -21,7 +21,10 @@ from nyxpy.framework.core.utils.helper import validate_keyboard_text
 
 
 class SerialControllerOutputPort(ControllerOutputPort):
+    """SerialComm と SerialProtocol を controller output port へ接続します。"""
+
     def __init__(self, serial_device, protocol: SerialProtocolInterface) -> None:
+        """送信先 serial device と command builder protocol を保持します。"""
         self.serial_device = serial_device
         self.protocol = protocol
 
@@ -86,7 +89,10 @@ class SerialControllerOutputPort(ControllerOutputPort):
 
 
 class CaptureFrameSourcePort(FrameSourcePort):
+    """CaptureDeviceInterface を frame source port として扱う adapter。"""
+
     def __init__(self, capture_device) -> None:
+        """Frame 取得元 device と読み出し lock を保持します。"""
         self.capture_device = capture_device
         self._frame_lock = Lock()
 
@@ -148,7 +154,10 @@ class CaptureFrameSourcePort(FrameSourcePort):
 
 
 class DummyFrameSourcePort(FrameSourcePort):
+    """実機なし実行で固定 frame を返す frame source port。"""
+
     def __init__(self, frame: cv2.typing.MatLike | None = None) -> None:
+        """指定 frame または 1280x720 黒画像を保持します。"""
         self._frame = frame if frame is not None else np.zeros((720, 1280, 3), dtype=np.uint8)
         self.initialized = False
         self.closed = False
@@ -176,7 +185,10 @@ class DummyFrameSourcePort(FrameSourcePort):
 
 
 class NotificationHandlerAdapter(NotificationPort):
+    """NotificationHandler を runtime の notification port へ接続します。"""
+
     def __init__(self, notification_handler) -> None:
+        """委譲先 notification handler を保持します。"""
         self.notification_handler = notification_handler
 
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
@@ -184,5 +196,7 @@ class NotificationHandlerAdapter(NotificationPort):
 
 
 class NoopNotificationAdapter(NotificationPort):
+    """通知を破棄する notification port。"""
+
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         pass

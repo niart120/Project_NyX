@@ -11,6 +11,8 @@ from nyxpy.framework.core.macro.command import Command
 
 
 class TestOcrInitMacro(MacroBase):
+    """PaddleOCR 初期化と簡易 OCR 実行を確認するデバッグ用マクロ。"""
+
     description = "PaddleOCR の初期化・モデルダウンロードを確認するテストマクロ"
     tags = ["test", "ocr", "debug"]
 

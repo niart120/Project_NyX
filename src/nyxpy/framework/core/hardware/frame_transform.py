@@ -10,6 +10,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FrameTransformConfig:
+    """フレーム表示時の aspect box 変換設定。"""
+
     aspect_box_enabled: bool = False
     background_bgr: tuple[int, int, int] = (0, 0, 0)
 
@@ -22,6 +24,8 @@ class FrameTransformConfig:
 
 
 class FrameTransformer:
+    """キャプチャフレームを表示用の縦横比へ変換します。"""
+
     def transform(
         self,
         frame: cv2.typing.MatLike,

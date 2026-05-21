@@ -6,6 +6,8 @@ from nyxpy.framework.core.macro.command import Command
 
 
 class SampleTurboAMacro(MacroBase):
+    """A ボタン連打、キャプチャ保存、通知の基本 API 使用例。"""
+
     description = "Aボタンを一定回数連打し、必要に応じてキャプチャを保存するサンプル"
     tags = ["sample", "basic", "button"]
 
