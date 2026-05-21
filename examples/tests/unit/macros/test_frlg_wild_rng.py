@@ -96,7 +96,7 @@ class TestTeachyTvAdvanceCalculation:
     """おしえテレビのフレーム逆算・excess 計算が正しいこと"""
 
     def test_frame_calculation_default_correction(self):
-        """frames = (consumption - correction) / adv_per_frame"""
+        """フレーム数 = (consumption - correction) / adv_per_frame"""
         cfg = FrlgWildRngConfig.from_args(
             {
                 "teachy_tv_consumption": 94200,
@@ -124,7 +124,7 @@ class TestTeachyTvAdvanceCalculation:
         assert frames == pytest.approx(120.0)
 
     def test_excess_over_field_rate(self):
-        """excess = consumption - rng_multiplier × frames"""
+        """余剰 = consumption - rng_multiplier × frames"""
         cfg = FrlgWildRngConfig.from_args(
             {
                 "teachy_tv_consumption": 94200,

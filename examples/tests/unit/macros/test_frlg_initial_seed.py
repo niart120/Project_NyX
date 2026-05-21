@@ -474,7 +474,7 @@ class TestConfig:
         assert not hasattr(cfg, "file_name")
 
     def test_from_args(self):
-        """args dict から設定が構築される"""
+        """引数 dict から設定が構築される"""
         args = {
             "language": "ENG",
             "rom": "LG",
@@ -504,7 +504,7 @@ class TestConfig:
         assert cfg.fps == 60.0
 
     def test_from_args_base_stats(self):
-        """args dict から base_stats が構築される"""
+        """引数 dict から base_stats が構築される"""
         args = {"base_stats": [100, 80, 120, 80, 140, 100]}
         cfg = FrlgInitialSeedConfig.from_args(args)
         assert cfg.base_stats == (100, 80, 120, 80, 140, 100)
@@ -647,7 +647,7 @@ class TestCSVHelper:
         assert len(lines) == 3
 
     def test_append_csv_artifact_writes_under_run_outputs(self, tmp_path):
-        """artifact store 経由で run outputs に CSV を追記する"""
+        """成果物 store 経由で run outputs に CSV を追記する"""
         store = LocalRunArtifactStore(
             tmp_path / "runs" / "run-1" / "outputs",
             macro_id="frlg_initial_seed",

@@ -76,6 +76,8 @@ select = [
     "I",    # isort
     "D2",   # pydocstyle whitespace conventions
     "D3",   # pydocstyle quote/escape conventions
+    "D403", # pydocstyle Google convention: first word capitalization
+    "D417", # pydocstyle Google convention: document all parameters
     "UP",   # pyupgrade (flags from __future__ imports, old typing syntax, etc.)
 ]
 ignore = [

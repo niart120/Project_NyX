@@ -27,12 +27,12 @@ class LCG32:
         return self._seed
 
     def advance(self, n: int = 1) -> None:
-        """seed を n step 前進させる。"""
+        """内部 seed を n step 前進させる。"""
         for _ in range(n):
             self._seed = (self.A * self._seed + self.C) & self.MASK
 
     def back(self, n: int = 1) -> None:
-        """seed を n step 後退させる。"""
+        """内部 seed を n step 後退させる。"""
         for _ in range(n):
             self._seed = (self.A_INV * self._seed + self.C_INV) & self.MASK
 

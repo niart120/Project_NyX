@@ -103,7 +103,7 @@ class TestDetermineItem:
     """determine_item() のテスト"""
 
     def test_luxury_ball_high_rand(self):
-        """rand % 100 >= 30 のときゴージャスボール"""
+        """乱数値 rand % 100 >= 30 のときゴージャスボール"""
         # 0x0000 から3回 advance した seed を使い、
         # get_rand() が 30 以上になるよう seed を調整
         lcg = LCG32(0)
@@ -119,7 +119,7 @@ class TestDetermineItem:
         pytest.fail("テスト用の乱数値が見つからない")
 
     def test_items_low_rand(self):
-        """rand % 100 < 30 のとき ITEM_TABLE から選択される"""
+        """乱数値 rand % 100 < 30 のとき ITEM_TABLE から選択される"""
         # 特定の seed から各アイテムが返ることを確認
         lcg = LCG32(0)
         found_items: set[str] = set()

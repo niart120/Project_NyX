@@ -61,6 +61,7 @@ def configure_logging(
     Args:
         silence: Trueの場合、ほとんどのログ出力を抑制します
         verbose: Trueの場合、デバッグレベルのログを有効にします
+        base_dir: ログ出力ディレクトリ。未指定の場合は現在の作業ディレクトリ配下の logs
     """
     logging = create_default_logging(base_dir=base_dir or pathlib.Path.cwd() / "logs")
     if silence:
@@ -113,6 +114,12 @@ def create_runtime_builder(
         serial_name: 使用するシリアルデバイス名
         capture_name: 使用するキャプチャデバイス名
         baudrate: シリアルボーレート
+        detection_timeout_sec: デバイス自動検出のタイムアウト秒数
+        settings_store: 差し替え用の設定 store。未指定の場合は workspace から読み込みます
+        secrets_store: 差し替え用の secrets store。未指定の場合は workspace から読み込みます
+        device_discovery: 差し替え用のデバイス検出 service
+        controller_output_factory: 差し替え用の controller output factory
+        frame_source_factory: 差し替え用の frame source factory
 
     Returns:
         設定済みの Runtime builder
@@ -167,6 +174,7 @@ def execute_macro(
         runtime_builder: 実行用 Runtime builder
         macro_name: 実行するマクロの名前
         exec_args: マクロに渡す引数
+        logger: CLI 実行結果を出力する logger
 
     Returns:
         Runtime が返した RunResult

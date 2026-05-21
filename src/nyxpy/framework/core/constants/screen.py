@@ -195,7 +195,7 @@ def try_cropped_normalized_point_to_3ds_touch(
 
 
 def cropped_hd_point_to_3ds_touch(point: ScreenPoint, crop_region: ScreenRect) -> TouchPoint:
-    """crop 済み HD 座標を元の HD 座標へ戻して touch 座標へ変換します。"""
+    """切り出し済み HD 座標を元の HD 座標へ戻して touch 座標へ変換します。"""
     hd_point = ScreenPoint(point.x + crop_region.x, point.y + crop_region.y)
     return hd_capture_point_to_3ds_touch(hd_point)
 
@@ -204,7 +204,7 @@ def try_cropped_hd_point_to_3ds_touch(
     point: ScreenPoint,
     crop_region: ScreenRect,
 ) -> TouchPoint | None:
-    """crop 済み HD 座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
+    """切り出し済み HD 座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return cropped_hd_point_to_3ds_touch(point, crop_region)
     except ValueError:

@@ -48,7 +48,7 @@ class TestParseDefineArgs:
         assert result == {}
 
     def test_boolean_value(self):
-        """bool 値のパース"""
+        """真偽値のパース"""
         result = parse_define_args(["flag=true"])
         assert result["flag"] is True
 
@@ -58,7 +58,7 @@ class TestParseDefineArgs:
         assert result["count"] == 42
 
     def test_accepts_iterable_defines(self):
-        """list 以外の Iterable[str] 入力を受け付ける"""
+        """リスト以外の Iterable[str] 入力を受け付ける"""
         result = parse_define_args(iter(['name="test"', "value=100"]))
         assert result["name"] == "test"
         assert result["value"] == 100
@@ -141,7 +141,7 @@ class TestExtractMacroTags:
         assert extract_macro_tags({}) == []
 
     def test_no_tags_attribute(self):
-        """tags 属性がないマクロは無視される"""
+        """タグ属性がないマクロは無視される"""
         macros = {"A": SimpleNamespace()}  # tags なし
         assert extract_macro_tags(macros) == []
 

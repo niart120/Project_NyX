@@ -53,6 +53,7 @@ def create_notification_handler_from_settings(
 
     Args:
         secrets: シークレット設定オブジェクト
+        logger: 通知失敗時の技術ログ出力先
 
     Returns:
         NotificationHandler: 通知ハンドラー、または設定が無効の場合はNone
