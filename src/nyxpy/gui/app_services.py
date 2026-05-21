@@ -286,7 +286,9 @@ class GuiAppServices:
             discovery = getattr(self, "device_discovery", None)
             display_name = getattr(discovery, "serial_display_name", None)
             serial_display = (
-                str(display_name(serial_identifier)) if callable(display_name) else serial_identifier
+                str(display_name(serial_identifier))
+                if callable(display_name)
+                else serial_identifier
             )
             self.logger.user(
                 "INFO",

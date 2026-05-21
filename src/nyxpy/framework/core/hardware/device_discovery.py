@@ -264,9 +264,7 @@ class DeviceDiscoveryService:
 def _serial_display_name(port) -> str:
     device = str(getattr(port, "device", "") or "")
     description = str(
-        getattr(port, "description", "")
-        or getattr(port, "name", "")
-        or device
+        getattr(port, "description", "") or getattr(port, "name", "") or device
     ).strip()
     if not description or description == device:
         return device
