@@ -43,6 +43,7 @@ class FailingBackend(NullLogBackend):
 
 class NonJsonValue:
     def __repr__(self) -> str:
+        """JSON 化できない値であることが分かる表現を返します。"""
         return "<non-json-value>"
 
 

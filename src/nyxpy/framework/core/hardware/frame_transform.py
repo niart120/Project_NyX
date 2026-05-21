@@ -12,6 +12,7 @@ class FrameTransformConfig:
     background_bgr: tuple[int, int, int] = (0, 0, 0)
 
     def __post_init__(self) -> None:
+        """余白色の BGR 値を検証します。"""
         if len(self.background_bgr) != 3:
             raise ValueError("background_bgr must contain 3 channels")
         if any(channel < 0 or channel > 255 for channel in self.background_bgr):

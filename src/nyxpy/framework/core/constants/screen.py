@@ -13,6 +13,7 @@ class ScreenSize:
     height: int
 
     def __post_init__(self) -> None:
+        """画面サイズが正の値であることを検証します。"""
         if self.width < 1 or self.height < 1:
             raise ValueError("ScreenSize width and height must be greater than 0")
 
@@ -35,6 +36,7 @@ class ScreenRect:
     height: int
 
     def __post_init__(self) -> None:
+        """矩形サイズが正の値であることを検証します。"""
         if self.width < 1 or self.height < 1:
             raise ValueError("ScreenRect width and height must be greater than 0")
 

@@ -24,6 +24,7 @@ class KeyCode(int):
     """キーボードの通常キーのキーコードを表すクラス"""
 
     def __new__(cls, char: str = None):
+        """1 文字の ASCII 入力からキーコードを生成します。"""
         # 空文字又は Noneの時は0x00として扱う
         if char is None or len(char) == 0:
             char = chr(0x00)
@@ -39,6 +40,7 @@ class KeyCode(int):
         return instance
 
     def __str__(self):
+        """元の入力文字を返します。"""
         return self.char
 
 
@@ -72,4 +74,5 @@ class SpecialKeyCode(IntEnum):
     ARROW_UP = 0x52
 
     def __str__(self):
+        """シリアル送信用の特殊キー値を返します。"""
         return self.value

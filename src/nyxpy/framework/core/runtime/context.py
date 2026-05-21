@@ -42,6 +42,7 @@ class ExecutionContext:
     options: RuntimeOptions = RuntimeOptions()
 
     def __post_init__(self) -> None:
+        """実行引数と metadata を読み取り専用 mapping に変換します。"""
         object.__setattr__(self, "exec_args", MappingProxyType(dict(self.exec_args)))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 

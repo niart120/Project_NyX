@@ -31,6 +31,7 @@ class LStick:
         self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
 
     def __repr__(self):
+        """スティック座標を含む表現を返します。"""
         return f"LStick(x={self.x}, y={self.y})"
 
 
@@ -71,6 +72,7 @@ class RStick:
         self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
 
     def __repr__(self):
+        """スティック座標を含む表現を返します。"""
         return f"RStick(x={self.x}, y={self.y})"
 
 

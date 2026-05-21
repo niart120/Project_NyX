@@ -1,3 +1,5 @@
+"""GUI pane widgets。"""
+
 from nyxpy.gui.panes.control_pane import ControlPane
 from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane

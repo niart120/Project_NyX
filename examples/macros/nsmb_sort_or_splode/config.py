@@ -13,6 +13,7 @@ class TouchRect:
     height: int
 
     def __post_init__(self) -> None:
+        """タッチ矩形が 3DS touch 座標内に収まることを検証します。"""
         if self.x < 0 or self.y < 0:
             raise ValueError("TouchRect x and y must be greater than or equal to 0")
         if self.width < 1 or self.height < 1:

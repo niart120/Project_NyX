@@ -20,6 +20,7 @@ class CaptureRect:
     height: int
 
     def __post_init__(self) -> None:
+        """キャプチャ範囲のサイズを検証します。"""
         if self.width <= 0 or self.height <= 0:
             raise ConfigurationError(
                 "capture region width and height must be positive",
