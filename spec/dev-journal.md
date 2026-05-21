@@ -73,3 +73,17 @@ PyPI アカウントは取得済みで、配布名は `nyxfw`、import 名は `n
 ### 方針
 
 `spec\docs\MACRO_DEVELOPMENT_DOCUMENTATION_PLAN.md` の Phase 3（パッケージから到達できる情報を増やす）で `nyxfw` として公開できる状態へ整備し、`uv build` と PyPI publish 手順を確認してから初回公開する。
+
+## 2026-05-22: D102 docstring ルールの適用整理
+
+### 現状
+
+`pyproject.toml` では D100/D101/D103/D104/D105/D107 と D2/D3/D403/D417 を有効化済みだが、public method docstring の `D102` は未適用である。
+
+### 観察
+
+`D102` は framework public API、macro author 向け API、GUI event handler、Qt override を同時に対象にするため、薄い docstring を増やさないための分類が必要になる。
+
+### 方針
+
+次の docstring ルール拡充では `src\nyxpy\` と `examples\macros\` の public method を分類し、Qt override や signal handler の扱いを決めてから D102 を段階適用する。
