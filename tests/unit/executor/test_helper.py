@@ -1,5 +1,4 @@
-"""
-helper.py ユニットテスト
+"""helper.py ユニットテスト
 
 parse_define_args / validate_keyboard_text / extract_macro_tags /
 calc_aspect_size のテストを提供する。

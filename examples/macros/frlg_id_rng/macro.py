@@ -1,5 +1,4 @@
-"""
-FRLG TID 乱数調整マクロ
+"""FRLG TID 乱数調整マクロ
 
 ポケットモンスター ファイアレッド・リーフグリーンのニューゲーム開始時に
 乱数を制御し、目標のトレーナーID (TID) を取得する自動化マクロ。
@@ -336,7 +335,6 @@ class FrlgIdRngMacro(MacroBase):
         名前決定後の会話 → ライバル名確定 → ゲーム開始までを
         一定時間の B 連打でまとめて突破する。
         """
-
         # 名前確定後の会話を2行進める
         cmd.press(Button.A, dur=0.1, wait=0.5)
         cmd.press(Button.A, dur=0.1, wait=0.5)

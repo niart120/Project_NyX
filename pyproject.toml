@@ -74,11 +74,16 @@ select = [
     "E",    # pycodestyle errors
     "F",    # pyflakes
     "I",    # isort
+    "D2",   # pydocstyle whitespace conventions
+    "D3",   # pydocstyle quote/escape conventions
     "UP",   # pyupgrade (flags from __future__ imports, old typing syntax, etc.)
 ]
 ignore = [
     "E501",  # line too long — ruff format が担う
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E402"]  # pytest.importorskip / sys.path.insert 後の import を許容

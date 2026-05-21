@@ -10,7 +10,7 @@ from nyxpy.framework.core.settings.exceptions import ConfigurationError
 
 
 class MacroSettingsResolver:
-    """マクロ定義の `settings_path` を実ファイルへ解決して読み込みます。
+    r"""マクロ定義の `settings_path` を実ファイルへ解決して読み込みます。
 
     文字列の path は環境に依存しない表記として扱い、`\\`、絶対パス、`..` を拒否します。
     `resource:` は `resources/<macro_id>`、`project:` はプロジェクトルート、

@@ -18,8 +18,8 @@ class ProtocolDescriptor:
 
 
 class ProtocolFactory:
-    """
-    シリアルプロトコルのファクトリークラス。
+    """シリアルプロトコルのファクトリークラス。
+
     プロトコル名から対応するプロトコル実装と接続メタデータを解決する。
     """
 
@@ -48,8 +48,7 @@ class ProtocolFactory:
 
     @classmethod
     def get_protocol_names(cls) -> list[str]:
-        """
-        利用可能なプロトコル名のリストを取得する。
+        """利用可能なプロトコル名のリストを取得する。
 
         :return: プロトコル名のリスト
         """
@@ -57,8 +56,7 @@ class ProtocolFactory:
 
     @classmethod
     def get_descriptor(cls, protocol_name: str) -> ProtocolDescriptor:
-        """
-        指定されたプロトコル名のメタデータを取得する。
+        """指定されたプロトコル名のメタデータを取得する。
 
         :param protocol_name: プロトコル名
         :return: プロトコルメタデータ
@@ -76,8 +74,7 @@ class ProtocolFactory:
 
     @classmethod
     def get_default_baudrate(cls, protocol_name: str) -> int:
-        """
-        指定されたプロトコルの既定ボーレートを取得する。
+        """指定されたプロトコルの既定ボーレートを取得する。
 
         :param protocol_name: プロトコル名
         :return: 既定ボーレート
@@ -86,8 +83,7 @@ class ProtocolFactory:
 
     @classmethod
     def resolve_baudrate(cls, protocol_name: str, baudrate: int | None = None) -> int:
-        """
-        明示ボーレートまたはプロトコル既定値から接続ボーレートを決定する。
+        """明示ボーレートまたはプロトコル既定値から接続ボーレートを決定する。
 
         :param protocol_name: プロトコル名
         :param baudrate: 明示ボーレート。None の場合は既定値を返す
@@ -106,8 +102,7 @@ class ProtocolFactory:
 
     @classmethod
     def create_protocol(cls, protocol_name: str) -> SerialProtocolInterface:
-        """
-        指定されたプロトコル名に対応するプロトコルのインスタンスを生成する。
+        """指定されたプロトコル名に対応するプロトコルのインスタンスを生成する。
 
         :param protocol_name: プロトコル名
         :return: シリアルプロトコルインターフェースの実装

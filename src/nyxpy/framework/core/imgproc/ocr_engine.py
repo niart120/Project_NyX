@@ -52,9 +52,7 @@ class OCRProcessor:
             cls._instances.clear()
 
     def __init__(self, language: str = "ja"):
-        """
-        :param language: 認識言語 ('ja', 'en')
-        """
+        """:param language: 認識言語 ('ja', 'en')"""
         self.language = language
         self._ocr_engine = None
         self._init_engine()

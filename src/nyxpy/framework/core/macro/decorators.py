@@ -1,6 +1,6 @@
 def check_interrupt(method):
-    """
-    Command の各操作メソッド実行前に、InterruptController の状態をチェックするデコレータ。
+    """Command の各操作メソッド実行前に、InterruptController の状態をチェックするデコレータ。
+
     中断要求があれば MacroCancelled を発生させる。
     """
 

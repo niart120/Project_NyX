@@ -20,8 +20,8 @@ def get_caller_class_name():
 
 
 def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:
-    """
-    コマンドライン引数で渡された定義を解析して辞書に変換する関数
+    """コマンドライン引数で渡された定義を解析して辞書に変換する関数
+
     key=value 形式の文字列を受け取り、tomlパーサに従う形で辞書に変換する。
     例えば、以下のような引数が渡された場合:
 
@@ -39,7 +39,6 @@ def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:
     となる。
 
     """
-
     if isinstance(defines, str):
         define_items = [defines]
     else:
@@ -79,8 +78,8 @@ def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:
 
 
 def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
-    """
-    指定されたテキストがキーボード入力として有効かどうかを検証します。
+    """指定されたテキストがキーボード入力として有効かどうかを検証します。
+
     有効な文字は、ASCIIの印刷可能な文字（0x20から0x7F）です。
     特殊キーコードを許可する場合は、allow_specialをTrueに設定します。
 
@@ -89,7 +88,6 @@ def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
     :return: 検証されたテキスト
     :raises ValueError: 無効な文字が含まれている場合
     """
-
     # 入力が空でないことを確認
     if not text:
         raise ValueError("Input text is empty.")
@@ -108,9 +106,7 @@ def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
 
 
 def extract_macro_tags(macros: dict[str, any]) -> list[str]:
-    """
-    マクロ辞書からユニークなタグリストを抽出します。GUIのタグフィルタ用に利用。
-    """
+    """マクロ辞書からユニークなタグリストを抽出します。GUIのタグフィルタ用に利用。"""
     tags = set()
     for m in macros.values():
         tags.update(getattr(m, "tags", []))
@@ -118,9 +114,7 @@ def extract_macro_tags(macros: dict[str, any]) -> list[str]:
 
 
 def calc_aspect_size(size, aspect_w=16, aspect_h=9):
-    """
-    Calculate target width and height to fit within given size while maintaining aspect ratio.
-    """
+    """Calculate target width and height to fit within given size while maintaining aspect ratio."""
     w, h = size.width(), size.height()
     target_w = w
     target_h = int(w * aspect_h / aspect_w)

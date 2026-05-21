@@ -4,8 +4,8 @@ import serial
 
 
 class SerialCommInterface(ABC):
-    """
-    シリアル通信の抽象インターフェース。
+    """シリアル通信の抽象インターフェース。
+
     DefaultCommand などからこのインターフェース経由で操作する。
     """
 
@@ -23,9 +23,7 @@ class SerialCommInterface(ABC):
 
 
 class SerialComm(SerialCommInterface):
-    """
-    pyserial を利用したシリアル通信の実装例。
-    """
+    """pyserial を利用したシリアル通信の実装例。"""
 
     def __init__(self, port: str):
         self.ser: serial.Serial = None
@@ -48,8 +46,8 @@ class SerialComm(SerialCommInterface):
 
 
 class DummySerialComm(SerialCommInterface):
-    """
-    ダミーのシリアル通信クラス。
+    """ダミーのシリアル通信クラス。
+
     実際の通信は行わない。
     """
 

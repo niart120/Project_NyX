@@ -1,5 +1,4 @@
-"""
-FRLG 初期Seed特定マクロ — ユニットテスト
+"""FRLG 初期Seed特定マクロ — ユニットテスト
 
 LCG32 / nature / pokemon_gen / seed_solver のテストを提供する。
 """

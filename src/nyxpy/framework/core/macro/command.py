@@ -28,8 +28,8 @@ class Command(ABC):
 
     @abstractmethod
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
-        """
-        指定されたキーを押下します。
+        """指定されたキーを押下します。
+
         押下時間と待機時間を指定することができます。
 
         :param keys: 押下するキーのリスト
@@ -40,8 +40,8 @@ class Command(ABC):
 
     @abstractmethod
     def hold(self, *keys: KeyType) -> None:
-        """
-        指定されたキーを押し続けます。より厳密には、現在のキー入力の内部状態を破棄し、指定されたキー入力に変更します。
+        """指定されたキーを押し続けます。より厳密には、現在のキー入力の内部状態を破棄し、指定されたキー入力に変更します。
+
         これは、連続的な入力を必要とする場合に使用されます。
 
         :param keys: 押し続けるキーのリスト
@@ -50,8 +50,8 @@ class Command(ABC):
 
     @abstractmethod
     def release(self, *keys: KeyType) -> None:
-        """
-        指定されたキーを解放します。
+        """指定されたキーを解放します。
+
         これは、押下または保持されたキーを解放するために使用されます。
         すべてのキーを解放する場合は、引数を省略できます。
 
@@ -72,16 +72,15 @@ class Command(ABC):
 
     @abstractmethod
     def stop(self) -> None:
-        """
-        マクロの実行を中断します。
+        """マクロの実行を中断します。
+
         これは、ユーザーが中断要求を行った場合に使用されます。
         """
         pass
 
     @abstractmethod
     def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
-        """
-        ログ出力を行います。
+        """ログ出力を行います。
 
         :param values: ログに出力する値
         :param sep: 値の区切り文字
@@ -94,8 +93,8 @@ class Command(ABC):
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
     ) -> cv2.typing.MatLike | None:
-        """
-        キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
+        """キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
+
         3DS のアスペクトボックス入力では、3DS 画面本体は (x=340, y=0, width=600, height=720) として扱います。
         3DS の下画面実領域は (x=400, y=360, width=480, height=360) です。
 
@@ -108,8 +107,8 @@ class Command(ABC):
 
     @abstractmethod
     def save_img(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
-        """
-        画像を指定されたパスに保存します。
+        """画像を指定されたパスに保存します。
+
         ディレクトリが存在しない場合は作成します。
 
         :param filename: 保存先のファイル名 （例: "image.png"）
@@ -119,8 +118,8 @@ class Command(ABC):
 
     @abstractmethod
     def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
-        """
-        指定されたパスから画像を読み込みます。
+        """指定されたパスから画像を読み込みます。
+
         画像が存在しない場合は例外をスローします。
 
         :param filename: 読み込む画像のファイル名 （例: "image.png"）
@@ -132,8 +131,8 @@ class Command(ABC):
 
     @abstractmethod
     def keyboard(self, text: str) -> None:
-        """
-        指定されたテキスト(英数字)をキーボード入力として送信します。
+        """指定されたテキスト(英数字)をキーボード入力として送信します。
+
         プロトコルが対応していない場合は、文字ごとに typekey に委譲されます。
 
         :param text: 送信するテキスト
@@ -142,8 +141,8 @@ class Command(ABC):
 
     @abstractmethod
     def type(self, key: KeyCode | SpecialKeyCode) -> None:
-        """
-        指定されたキーを個別のキーボード入力として送信します。
+        """指定されたキーを個別のキーボード入力として送信します。
+
         これは個々のキーの押下・解放操作を表します。
 
         :param key: 送信する通常キーまたは特殊キーのキーコード
@@ -152,9 +151,7 @@ class Command(ABC):
 
     @abstractmethod
     def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
-        """
-        外部サービスへ通知を送信する
-        """
+        """外部サービスへ通知を送信する"""
         pass
 
     @property
@@ -180,8 +177,8 @@ class Command(ABC):
 
 
 class DefaultCommand(Command):
-    """
-    DefaultCommand は、フレームワーク側で提供するコマンド実装です。
+    """DefaultCommand は、フレームワーク側で提供するコマンド実装です。
+
     SerialProtocol を利用して各操作をプロトコルに基づくコマンドデータに変換し、
     Runtime の controller Port 経由で送信します。
 
@@ -313,9 +310,7 @@ class DefaultCommand(Command):
 
     @check_interrupt
     def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
-        """
-        外部サービスへ通知を送信する
-        """
+        """外部サービスへ通知を送信する"""
         try:
             self.context.notifications.publish(text, img)
         except Exception as exc:

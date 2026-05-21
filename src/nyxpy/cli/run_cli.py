@@ -56,8 +56,7 @@ def configure_logging(
     *,
     base_dir: pathlib.Path | None = None,
 ) -> LoggingComponents:
-    """
-    コマンドライン引数に基づいてログレベルを設定します。
+    """コマンドライン引数に基づいてログレベルを設定します。
 
     Args:
         silence: Trueの場合、ほとんどのログ出力を抑制します
@@ -76,8 +75,7 @@ def configure_logging(
 
 
 def create_protocol(protocol_name: str) -> SerialProtocolInterface:
-    """
-    プロトコル名に基づいてプロトコルインスタンスを作成して返します。
+    """プロトコル名に基づいてプロトコルインスタンスを作成して返します。
 
     Args:
         protocol_name: 作成するプロトコルの名前
@@ -106,8 +104,7 @@ def create_runtime_builder(
     controller_output_factory: ControllerOutputPortFactory | None = None,
     frame_source_factory: FrameSourcePortFactory | None = None,
 ) -> MacroRuntimeBuilder:
-    """
-    CLI で利用する Runtime builder を作成します。
+    """CLI で利用する Runtime builder を作成します。
 
     Args:
         protocol: 使用するプロトコル実装
@@ -164,8 +161,7 @@ def execute_macro(
     exec_args: dict[str, Any],
     logger: LoggerPort,
 ) -> RunResult:
-    """
-    CLI entrypoint の RuntimeBuildRequest を作成し、Runtime builder で実行します。
+    """CLI entrypoint の RuntimeBuildRequest を作成し、Runtime builder で実行します。
 
     Args:
         runtime_builder: 実行用 Runtime builder
@@ -230,8 +226,8 @@ def _run_cleanup(
 
 
 def cli_main(args: argparse.Namespace) -> int:
-    """
-    CLIアプリケーションのメインエントリーポイント。
+    """CLIアプリケーションのメインエントリーポイント。
+
     この関数は解析済み引数から Runtime 実行要求を組み立てます。
 
     Args:
@@ -315,9 +311,7 @@ def cli_main(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """
-    CLIの引数パーサーを構築します。
-    """
+    """CLIの引数パーサーを構築します。"""
     parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
     parser.add_argument("macro_name", help="実行するマクロ名")
     parser.add_argument("--serial", required=True, help="シリアルデバイス名")
@@ -335,8 +329,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
-    """
-    CLIのメインエントリーポイント
+    """CLIのメインエントリーポイント
+
     コマンドライン引数を解析してcli_mainを呼び出します
     """
     parser = build_parser()

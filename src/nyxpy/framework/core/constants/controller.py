@@ -5,9 +5,7 @@ from enum import IntEnum
 
 
 class Button(IntEnum):
-    """
-    コントローラーのボタンを表す定数
-    """
+    """コントローラーのボタンを表す定数"""
 
     Y = 0x0001
     B = 0x0002
@@ -32,9 +30,7 @@ class Button(IntEnum):
 
 
 class Hat(IntEnum):
-    """
-    コントローラーの方向キー（HAT）を表す定数
-    """
+    """コントローラーの方向キー（HAT）を表す定数"""
 
     UP = 0x00
     UPRIGHT = 0x01

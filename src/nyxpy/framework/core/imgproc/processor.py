@@ -14,9 +14,7 @@ class ImageProcessor:
     """
 
     def __init__(self, image: cv2.typing.MatLike):
-        """
-        :param image: 処理対象の画像（OpenCV形式）
-        """
+        """:param image: 処理対象の画像（OpenCV形式）"""
         if image is None or image.size == 0:
             raise InvalidImageError("画像が無効です")
         self.image = image

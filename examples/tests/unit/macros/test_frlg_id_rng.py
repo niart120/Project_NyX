@@ -1,5 +1,4 @@
-"""
-FRLG ID調整マクロ テスト
+"""FRLG ID調整マクロ テスト
 
 frame_sweep / keyboard_layout / tid_recognizer / メインマクロクラスの
 ユニットテストを提供する。

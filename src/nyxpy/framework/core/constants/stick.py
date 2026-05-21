@@ -1,5 +1,4 @@
-"""
-スティック関連の定数
+"""スティック関連の定数
 
 このモジュールはコントローラーの左右スティックの位置を表す定数を定義します。
 """
@@ -8,13 +7,10 @@ import math
 
 
 class LStick:
-    """
-    コントローラーの左スティックの位置を表すクラス
-    """
+    """コントローラーの左スティックの位置を表すクラス"""
 
     def __init__(self, rad: float, magnification: float, is_degree=False):
-        """
-        左スティックの位置を初期化します
+        """左スティックの位置を初期化します
 
         Args:
             rad: スティックの角度（ラジアン、またはis_degree=Trueの場合は度）
@@ -51,13 +47,10 @@ LStick.CENTER = LStick(0.0, 0.0)
 
 
 class RStick:
-    """
-    コントローラーの右スティックの位置を表すクラス
-    """
+    """コントローラーの右スティックの位置を表すクラス"""
 
     def __init__(self, rad: float, magnification: float, is_degree=False):
-        """
-        右スティックの位置を初期化します
+        """右スティックの位置を初期化します
 
         Args:
             rad: スティックの角度（ラジアン、またはis_degree=Trueの場合は度）

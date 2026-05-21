@@ -10,9 +10,7 @@ from nyxpy.gui.run_gui import main as gui_main
 
 
 def init_app() -> int:
-    """
-    Initialize the workspace for GUI/CLI: create macros, snapshots, resources, runs folders.
-    """
+    """Initialize the workspace for GUI/CLI: create macros, snapshots, resources, runs folders."""
     paths = ensure_workspace(Path.cwd())
     GlobalSettings(config_dir=paths.config_dir)
     SecretsSettings(config_dir=paths.config_dir)
@@ -22,8 +20,7 @@ def init_app() -> int:
 
 
 def parse_arguments() -> argparse.Namespace:
-    """
-    NyXアプリケーションのコマンドライン引数を解析します。
+    """NyXアプリケーションのコマンドライン引数を解析します。
 
     Returns:
         解析されたコマンドライン引数
@@ -92,8 +89,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> int:
-    """
-    NyXアプリケーションのメインエントリーポイント。
+    """NyXアプリケーションのメインエントリーポイント。
 
     Returns:
         終了コード（0:成功、0以外:失敗）
