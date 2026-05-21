@@ -24,7 +24,7 @@ https://raw.githubusercontent.com/niart120/Project_NyX/master/docs/macro-develop
 https://raw.githubusercontent.com/niart120/Project_NyX/master/docs/macro-development/macro-template.md
 ```
 
-Phase 2 の詳細ページが未作成の間は、上記 3 文書、現行コード、既存 examples、テストを根拠にします。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
+詳細が必要な場合は `docs\macro-development\` 配下の各資料、現行コード、既存 examples、テストを根拠にします。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
 
 ## 対象
 

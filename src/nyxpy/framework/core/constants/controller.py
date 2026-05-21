@@ -51,7 +51,7 @@ class Hat(IntEnum):
 
 
 class ThreeDSButton(IntEnum):
-    """3DS 固有のボタンを表す定数。"""
+    """3DS 固有のボタンを表す定数。対応プロトコルでのみ使用できます。"""
 
     POWER = 0x2000
 
@@ -61,7 +61,7 @@ class ThreeDSButton(IntEnum):
 
 @dataclass(frozen=True)
 class TouchState:
-    """3DS タッチパネルの入力状態。"""
+    """3DS タッチパネルの入力状態。座標は 320x240 の touch 座標です。"""
 
     pressed: bool
     x: int = 0
@@ -69,8 +69,10 @@ class TouchState:
 
     @classmethod
     def down(cls, x: int, y: int) -> "TouchState":
+        """指定座標を押している状態を返します。"""
         return cls(True, x, y)
 
     @classmethod
     def up(cls) -> "TouchState":
+        """タッチ入力を離した状態を返します。"""
         return cls(False)

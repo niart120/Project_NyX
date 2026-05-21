@@ -20,9 +20,10 @@ if TYPE_CHECKING:
 
 
 class Command(ABC):
-    """
-    Command は、マクロ用コマンドのインターフェースを定義します。
-    コントローラー操作の実行、待機、ログ出力、キャプチャなどの基本的な操作を提供します。
+    """マクロから実行環境を操作するための公開 API。
+
+    コントローラー操作、待機、ログ、キャプチャ、画像入出力、通知は
+    このインターフェース経由で行います。
     """
 
     @abstractmethod
@@ -60,8 +61,10 @@ class Command(ABC):
 
     @abstractmethod
     def wait(self, wait: float) -> None:
-        """
-        指定された時間だけ待機します。
+        """指定秒数だけ待機します。
+
+        実装は待機中も中断要求を確認します。長い処理では `time.sleep()` を直接使わず、
+        このメソッドを使います。
 
         :param wait: 待機時間（秒）
         """
@@ -90,7 +93,7 @@ class Command(ABC):
     @abstractmethod
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike:
+    ) -> cv2.typing.MatLike | None:
         """
         キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
         3DS のアスペクトボックス入力では、3DS 画面本体は (x=340, y=0, width=600, height=720) として扱います。
@@ -98,7 +101,7 @@ class Command(ABC):
 
         :param crop_region: (optional) クロップする領域の指定 (x, y, width, height)
         :param grayscale: (optional) グレースケール変換を行うかどうかのフラグ (デフォルト:False)
-        :return result_frame: キャプチャした画像データ
+        :return result_frame: キャプチャした画像データ。フレームがない場合は None
         :raises ValueError: クロップ領域がフレームサイズ(1280x720)を超える場合にスローされます。
         """
         pass
@@ -156,18 +159,23 @@ class Command(ABC):
 
     @property
     def artifacts(self) -> RunArtifactStore:
+        """実行ごとの出力先へアクセスします。"""
         raise NotImplementedError("Current command does not expose run artifacts.")
 
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
+        """3DS touch 対応プロトコルで touch down / wait / touch up を行います。"""
         raise NotImplementedError("Current serial protocol does not support touch input.")
 
     def touch_down(self, x: int, y: int) -> None:
+        """3DS touch 対応プロトコルで指定座標を押し続けます。"""
         raise NotImplementedError("Current serial protocol does not support touch input.")
 
     def touch_up(self) -> None:
+        """3DS touch 対応プロトコルで touch 入力を離します。"""
         raise NotImplementedError("Current serial protocol does not support touch input.")
 
     def disable_sleep(self, enabled: bool = True) -> None:
+        """対応プロトコルでスリープ制御を切り替えます。"""
         raise NotImplementedError("Current serial protocol does not support sleep control.")
 
 
@@ -259,7 +267,7 @@ class DefaultCommand(Command):
     @check_interrupt
     def capture(
         self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike:
+    ) -> cv2.typing.MatLike | None:
         self._debug_command("Capturing screen...")
         capture_data = self.context.frame_source.latest_frame()
         if capture_data is None:

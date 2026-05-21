@@ -8,8 +8,15 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 |------|------|
 | [agent-brief.md](agent-brief.md) | AI エージェントに渡す要点。配置、依存、公開 API、検証コマンドをまとめます。 |
 | [macro-template.md](macro-template.md) | `macros\<macro_id>` と `resources\<macro_id>` に置く雛形、任意の `macro.toml`、完了前確認。 |
-
-詳細資料は Phase 2 で追加します。予定している文書は `macro-layout.md`, `macro-lifecycle.md`, `command-api.md`, `settings-and-resources.md`, `manifest.md`, `testing.md`, `nintendo-3ds.md`, `image-processing.md` です。
+| [macro-layout.md](macro-layout.md) | `macros\`, `resources\`, `examples\` の使い分けと依存方向。 |
+| [macro-lifecycle.md](macro-lifecycle.md) | `MacroBase` のメタデータ、`initialize`, `run`, `finalize` の責務。 |
+| [command-api.md](command-api.md) | `Command` の操作 API、待機、キャプチャ、画像入出力、通知、ログ。 |
+| [settings-and-resources.md](settings-and-resources.md) | `settings_path`, `resource:`, 画像資材、実行ごとの出力。 |
+| [manifest.md](manifest.md) | `macro.toml` が必要な場面、entrypoint、metadata。 |
+| [testing.md](testing.md) | 単体テスト、実機テスト、公開サンプルのテスト配置。 |
+| [nintendo-3ds.md](nintendo-3ds.md) | 3DS 向け座標、touch、sleep control。 |
+| [image-processing.md](image-processing.md) | テンプレートマッチング、OCR、前処理。 |
+| [sample-macros.md](sample-macros.md) | `examples\macros`, `examples\resources`, `examples\tests` の対応。 |
 
 ## 推奨配置
 
@@ -97,6 +104,8 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 ```
 
 ## サンプル一覧
+
+代表的なサンプルだけを示します。完全な一覧は [sample-macros.md](sample-macros.md) を参照してください。
 
 | サンプル | 実装内容 |
 |----------|------------|

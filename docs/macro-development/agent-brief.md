@@ -1,6 +1,6 @@
 # NyX マクロ実装エージェント向け要点
 
-この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細資料は Phase 2 で追加予定です。現時点で不足する API 詳細は、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
+この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細は同じディレクトリの各資料と、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
 
 ## 前提
 
@@ -8,6 +8,20 @@
 - 実装者のマクロ本体は `macros\<macro_id>`、設定・画像資材は `resources\<macro_id>` に置きます。
 - `examples\macros` と `examples\resources` は参照用サンプルの置き場であり、利用者の配置先ではありません。
 - PowerShell コマンドを使います。bash / sh 前提のコマンドは書きません。
+
+## 詳細資料
+
+| 文書 | 用途 |
+|------|------|
+| `macro-layout.md` | 配置規約と依存方向 |
+| `macro-lifecycle.md` | `MacroBase` のライフサイクル |
+| `command-api.md` | `Command` の操作 API |
+| `settings-and-resources.md` | 設定、画像資材、出力 |
+| `manifest.md` | `macro.toml` |
+| `testing.md` | テスト配置と実行コマンド |
+| `nintendo-3ds.md` | 3DS 座標と touch |
+| `image-processing.md` | テンプレートマッチング、OCR、前処理 |
+| `sample-macros.md` | 公開サンプル一覧 |
 
 ## 必ず守る制約
 

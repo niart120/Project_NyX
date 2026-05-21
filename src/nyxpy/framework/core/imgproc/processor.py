@@ -7,9 +7,10 @@ from .utils import ImagePreprocessor
 
 
 class ImageProcessor:
-    """
-    画像処理ラッパークラス
-    対象画像をコンストラクタで受け取り、シンプルなAPIを提供
+    """1 枚の OpenCV 画像に対する画像処理 API。
+
+    テンプレートマッチング、OCR、用途別前処理をまとめて呼び出す入口です。
+    `image` が `None` または空画像の場合は `InvalidImageError` を送出します。
     """
 
     def __init__(self, image: cv2.typing.MatLike):
@@ -28,14 +29,13 @@ class ImageProcessor:
         method: int = cv2.TM_CCOEFF_NORMED,
         preprocess: bool = False,
     ) -> bool:
-        """
-        指定されたテンプレートが画像内に含まれているかを判定
+        """指定されたテンプレートが画像内に含まれるかを判定します。
 
         :param template: テンプレート画像
         :param threshold: マッチング閾値
         :param method: マッチング手法
         :param preprocess: 前処理を行うか
-        :return: テンプレートが含まれている場合True
+        :return: テンプレートが含まれている場合 True
         """
         source_img = self.image
         template_img = template
@@ -53,8 +53,7 @@ class ImageProcessor:
         method: int = cv2.TM_CCOEFF_NORMED,
         preprocess: bool = False,
     ) -> MatchResult:
-        """
-        テンプレートマッチングを実行し、結果を返す
+        """テンプレートマッチングを実行し、最良の一致を返します。
 
         :param template: テンプレート画像
         :param threshold: マッチング閾値
@@ -77,8 +76,7 @@ class ImageProcessor:
         region: tuple[int, int, int, int] | None = None,
         preprocess: bool = False,
     ) -> str:
-        """
-        画像からテキストを認識し、最も信頼度の高い文字列を返す
+        """画像からテキストを認識し、最も信頼度の高い文字列を返します。
 
         :param language: 認識言語 ('ja', 'en')
         :param region: 認識領域 (x, y, width, height) - 指定しない場合は全体
@@ -107,8 +105,7 @@ class ImageProcessor:
         region: tuple[int, int, int, int] | None = None,
         preprocess: bool = False,
     ) -> str:
-        """
-        画像から数字のみを認識して返す
+        """画像から数字のみを認識して返します。
 
         :param language: 認識言語 ('ja', 'en')
         :param region: 認識領域 (x, y, width, height)
@@ -139,8 +136,7 @@ class ImageProcessor:
         template_threshold: float = 0.8,
         preprocess: bool = False,
     ) -> str:
-        """
-        テンプレートマッチングでテキスト領域を特定し、OCR実行
+        """テンプレートマッチングでテキスト領域を特定し、OCR を実行します。
 
         :param template: テンプレート画像
         :param roi_offset: マッチ位置からの相対オフセット (x_offset, y_offset, w_offset, h_offset)

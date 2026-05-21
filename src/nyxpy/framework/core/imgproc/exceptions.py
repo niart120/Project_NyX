@@ -2,42 +2,42 @@
 
 
 class ImageProcessingError(Exception):
-    """画像処理に関連するエラーの基底クラス"""
+    """画像処理に関連するエラーの基底クラス。"""
 
     pass
 
 
 class TemplateMatchingError(ImageProcessingError):
-    """テンプレートマッチング処理でのエラー"""
+    """テンプレートマッチング処理でのエラー。"""
 
     pass
 
 
 class OCRError(ImageProcessingError):
-    """OCR処理でのエラー"""
+    """OCR 処理でのエラー。"""
 
     pass
 
 
 class InvalidImageError(ImageProcessingError):
-    """無効な画像データエラー"""
+    """無効な画像データを受け取った場合のエラー。"""
 
     pass
 
 
 class ThresholdNotMetError(ImageProcessingError):
-    """閾値を満たさないエラー"""
+    """テンプレートマッチング結果が閾値を満たさない場合のエラー。"""
 
     pass
 
 
 class OCREngineNotFoundError(OCRError):
-    """OCRエンジンが見つからないエラー"""
+    """OCR エンジンを初期化できない場合のエラー。"""
 
     pass
 
 
 class OCRProcessingError(OCRError):
-    """OCR処理中のエラー"""
+    """OCR 処理中のエラー。"""
 
     pass

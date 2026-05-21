@@ -9,14 +9,14 @@ from .exceptions import OCREngineNotFoundError, OCRProcessingError
 
 @dataclass
 class OCRResult:
-    """OCR認識結果"""
+    """OCR 認識結果。"""
 
     text: str
     confidence: float
 
 
 class OCRProcessor:
-    """シンプルなOCR処理クラス
+    """PaddleOCR を使う OCR 処理クラス。
 
     通常のインスタンス生成 (``OCRProcessor(language)``) に加え、
     ``get_instance(language)`` で言語ごとにキャッシュされた
@@ -84,8 +84,7 @@ class OCRProcessor:
             raise OCREngineNotFoundError(f"PaddleOCRの初期化に失敗しました: {e}")
 
     def recognize_text(self, image: cv2.typing.MatLike) -> list[OCRResult]:
-        """
-        テキスト認識実行
+        """テキスト認識を実行します。
 
         :param image: 認識対象画像
         :return: 認識結果のリスト
@@ -118,8 +117,7 @@ class OCRProcessor:
             raise OCRProcessingError(f"OCR処理中にエラーが発生しました: {e}")
 
     def get_best_text(self, image: cv2.typing.MatLike) -> str:
-        """
-        最も信頼度の高いテキストを取得
+        """最も信頼度の高いテキストを取得します。
 
         :param image: 認識対象画像
         :return: 最も信頼度の高いテキスト（見つからない場合は空文字列）
@@ -131,8 +129,7 @@ class OCRProcessor:
         return ""
 
     def extract_digits(self, image: cv2.typing.MatLike) -> str:
-        """
-        画像から数字のみを認識して返す
+        """画像から数字のみを認識して返します。
 
         :param image: 認識対象画像
         :return: 認識された数字文字列

@@ -2,14 +2,13 @@ import cv2
 
 
 class ImagePreprocessor:
-    """画像前処理ユーティリティ"""
+    """テンプレートマッチングや OCR 向けの画像前処理。"""
 
     @staticmethod
     def enhance_contrast(
         image: cv2.typing.MatLike, clip_limit: float = 2.0, tile_grid_size: tuple[int, int] = (8, 8)
     ) -> cv2.typing.MatLike:
-        """
-        コントラスト強化（CLAHE）
+        """CLAHE でコントラストを強調します。
 
         :param image: 入力画像
         :param clip_limit: クリップ制限値
@@ -34,8 +33,7 @@ class ImagePreprocessor:
 
     @staticmethod
     def denoise(image: cv2.typing.MatLike, strength: int = 7) -> cv2.typing.MatLike:
-        """
-        ノイズ除去
+        """ノイズを除去します。
 
         :param image: 入力画像
         :param strength: ノイズ除去強度
@@ -50,8 +48,7 @@ class ImagePreprocessor:
     def sharpen(
         image: cv2.typing.MatLike, kernel_size: int = 5, sigma: float = 1.0, amount: float = 1.0
     ) -> cv2.typing.MatLike:
-        """
-        シャープニング（アンシャープマスク）
+        """アンシャープマスクで輪郭を強調します。
 
         :param image: 入力画像
         :param kernel_size: カーネルサイズ
@@ -70,8 +67,7 @@ class ImagePreprocessor:
         adaptive: bool = True,
         inverse: bool = False,
     ) -> cv2.typing.MatLike:
-        """
-        二値化処理
+        """固定閾値または適応的閾値で二値化します。
 
         :param image: 入力画像
         :param threshold: 閾値（Noneの場合は自動決定）
@@ -106,8 +102,7 @@ class ImagePreprocessor:
 
     @staticmethod
     def enhance_for_template_matching(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
-        """
-        テンプレートマッチング用の前処理
+        """テンプレートマッチング向けの前処理を適用します。
 
         :param image: 入力画像
         :return: 前処理された画像
@@ -119,8 +114,7 @@ class ImagePreprocessor:
 
     @staticmethod
     def enhance_for_ocr(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
-        """
-        OCR用の前処理
+        """OCR 向けの前処理を適用します。
 
         :param image: 入力画像
         :return: 前処理された画像
