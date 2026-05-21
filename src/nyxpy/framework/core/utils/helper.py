@@ -30,7 +30,7 @@ def parse_define_args(defines: str | Iterable[str]) -> dict[str, Any]:
     `-D key1=value1 -D key2.key3=value2`
 
     これを辞書に変換すると:
-    ```
+    ```json
     {
         "key1": "value1",
         "key2": {
