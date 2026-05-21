@@ -98,7 +98,7 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 
 ## サンプル一覧
 
-| サンプル | 確認する内容 |
+| サンプル | 実装内容 |
 |----------|------------|
 | `examples\macros\sample_turbo_a_macro.py` | ボタン入力、ログ、キャプチャ保存、通知の最小例 |
 | `examples\macros\nsmb_sort_or_splode` | 3DS touch、テンプレートマッチング、`settings_path = "resource:settings.toml"` |
