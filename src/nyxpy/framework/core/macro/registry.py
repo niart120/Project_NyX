@@ -1,3 +1,5 @@
+"""マクロ定義の探索と registry 管理。"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -25,6 +27,7 @@ class MacroLoadError(Exception):
         entrypoint: str | None = None,
         module_name: str = "",
     ) -> None:
+        """失敗種別、macro id、entrypoint、module 名を保持します。"""
         super().__init__(message)
         self.error_type = error_type
         self.macro_id = macro_id
@@ -36,6 +39,7 @@ class AmbiguousMacroError(ValueError):
     """互換名が複数マクロへ解決される場合に送出する。"""
 
     def __init__(self, requested_name: str, candidates: Sequence[str]) -> None:
+        """要求名と候補 macro id を保持し、利用者向け message を作ります。"""
         self.requested_name = requested_name
         self.candidates = tuple(candidates)
         candidate_text = ", ".join(self.candidates)
@@ -48,6 +52,8 @@ class RegistryLockTimeoutError(TimeoutError):
 
 @dataclass(frozen=True)
 class MacroLoadDiagnostic:
+    """Macro load 失敗の診断情報。"""
+
     macro_id: str | None
     entrypoint: str | None
     source_path: Path
@@ -67,12 +73,16 @@ class MacroSettingsSource:
 
 
 class MacroFactory(Protocol):
+    """実行単位の `MacroBase` instance を生成する factory protocol。"""
+
     def create(self) -> MacroBase:
         """実行ごとに新しい MacroBase インスタンスを返す。"""
 
 
 @dataclass(frozen=True)
 class ClassMacroFactory:
+    """Macro class から実行ごとに新しい instance を生成します。"""
+
     macro_cls: type[MacroBase]
 
     def create(self) -> MacroBase:
@@ -125,6 +135,7 @@ class MacroRegistry:
         macro_search_roots: Sequence[MacroSearchRoot] | None = None,
         settings_resolver: MacroSettingsResolver | None = None,
     ) -> None:
+        """Project root、探索 root、settings resolver、reload lock を準備します。"""
         if project_root is None:
             raise ValueError("project_root is required")
         self.project_root = Path(project_root).resolve()

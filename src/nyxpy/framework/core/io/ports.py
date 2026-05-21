@@ -1,3 +1,5 @@
+"""Runtime が依存する入出力 port interface。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -9,7 +11,10 @@ from nyxpy.framework.core.macro.exceptions import DeviceError
 
 
 class FrameNotReadyError(DeviceError):
+    """Frame source がまだ読み出し可能な frame を持たない場合の例外。"""
+
     def __init__(self, message: str = "Frame source is not ready.") -> None:
+        """Frame 未準備を示す framework error として初期化します。"""
         super().__init__(
             message,
             code="NYX_FRAME_NOT_READY",
@@ -18,7 +23,10 @@ class FrameNotReadyError(DeviceError):
 
 
 class FrameReadError(DeviceError):
+    """Frame source からの frame 読み出しに失敗した場合の例外。"""
+
     def __init__(self, message: str = "Frame source read failed.") -> None:
+        """Frame 読み出し失敗を示す framework error として初期化します。"""
         super().__init__(
             message,
             code="NYX_FRAME_READ_FAILED",
@@ -27,6 +35,8 @@ class FrameReadError(DeviceError):
 
 
 class ControllerOutputPort(ABC):
+    """Runtime が controller 入力を送るための出力 port。"""
+
     @abstractmethod
     def press(self, keys: tuple[KeyType, ...]) -> None: ...
 
@@ -60,6 +70,8 @@ class ControllerOutputPort(ABC):
 
 
 class FrameSourcePort(ABC):
+    """Runtime が最新 frame を取得するための入力 port。"""
+
     @abstractmethod
     def initialize(self) -> None: ...
 
@@ -77,5 +89,7 @@ class FrameSourcePort(ABC):
 
 
 class NotificationPort(ABC):
+    """Runtime が外部通知を送るための port。"""
+
     @abstractmethod
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None: ...

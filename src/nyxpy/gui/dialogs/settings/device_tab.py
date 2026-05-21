@@ -1,3 +1,5 @@
+"""Device 設定 tab。"""
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -18,6 +20,8 @@ from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_k
 
 
 class DeviceSettingsTab(QWidget):
+    """Capture device と serial controller の設定 tab。"""
+
     def __init__(
         self,
         settings: GlobalSettings,
@@ -26,6 +30,7 @@ class DeviceSettingsTab(QWidget):
         *,
         device_discovery: DeviceDiscoveryService | None = None,
     ):
+        """Settings store と device discovery service を保持し、選択 UI を作ります。"""
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets

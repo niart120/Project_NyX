@@ -1,3 +1,5 @@
+"""キャプチャ preview pane。"""
+
 from datetime import datetime
 from pathlib import Path
 
@@ -24,6 +26,8 @@ SNAPSHOT_DIR = "snapshots"
 
 
 class PreviewPane(QWidget):
+    """Camera/window preview 表示、snapshot、touch signal を担当する pane。"""
+
     snapshot_taken = Signal(str)
     touch_down_requested = Signal(int, int)
     touch_move_requested = Signal(int, int)
@@ -40,6 +44,7 @@ class PreviewPane(QWidget):
         frame_source: FrameSourcePort | None = None,
         fixed_preview_size: tuple[int, int] = (1280, 720),
     ):
+        """Preview source と timer を準備し、snapshot directory を作成します。"""
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

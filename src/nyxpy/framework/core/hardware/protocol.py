@@ -1,3 +1,5 @@
+"""コントローラー出力用シリアル protocol interface。"""
+
 from abc import ABC, abstractmethod
 
 from nyxpy.framework.core.constants import (
@@ -15,6 +17,8 @@ from nyxpy.framework.core.constants import (
 
 
 class SerialProtocolInterface(ABC):
+    """Controller 入力をシリアル送信用 bytes へ変換する protocol。"""
+
     supports_touch: bool = False
 
     @abstractmethod
@@ -84,6 +88,7 @@ class CH552SerialProtocol(SerialProtocolInterface):
     """
 
     def __init__(self):
+        """CH552 の 11 byte 入力 frame を未押下状態で初期化します。"""
         self._initialize_key_state()
 
     def _initialize_key_state(self) -> None:
@@ -202,6 +207,7 @@ class PokeConSerialProtocol(SerialProtocolInterface):
     """
 
     def __init__(self):
+        """PokeCon 用の 6 要素入力状態を未押下状態で初期化します。"""
         self._initialize_key_state()
 
     def _initialize_key_state(self) -> None:
@@ -361,6 +367,7 @@ class ThreeDSSerialProtocol(SerialProtocolInterface):
     }
 
     def __init__(self):
+        """3DS controller frame の button、stick、touch 状態を初期化します。"""
         self._initialize_key_state()
 
     def _initialize_key_state(self) -> None:

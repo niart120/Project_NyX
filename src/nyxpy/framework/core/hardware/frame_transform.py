@@ -1,3 +1,5 @@
+"""キャプチャフレームの表示用変換。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,10 +10,13 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FrameTransformConfig:
+    """フレーム表示時の aspect box 変換設定。"""
+
     aspect_box_enabled: bool = False
     background_bgr: tuple[int, int, int] = (0, 0, 0)
 
     def __post_init__(self) -> None:
+        """余白色の BGR 値を検証します。"""
         if len(self.background_bgr) != 3:
             raise ValueError("background_bgr must contain 3 channels")
         if any(channel < 0 or channel > 255 for channel in self.background_bgr):
@@ -19,6 +24,8 @@ class FrameTransformConfig:
 
 
 class FrameTransformer:
+    """キャプチャフレームを表示用の縦横比へ変換します。"""
+
     def transform(
         self,
         frame: cv2.typing.MatLike,

@@ -1,3 +1,5 @@
+"""マクロ中断 token と中断可能 wait。"""
+
 import threading
 import time
 from datetime import datetime
@@ -12,6 +14,7 @@ class CancellationToken:
     """
 
     def __init__(self):
+        """Thread-safe event、lock、任意の停止理由を初期化します。"""
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._reason: str | None = None
@@ -64,6 +67,7 @@ class CancellationToken:
 
 
 def cancellation_aware_wait(seconds: float, token: CancellationToken) -> bool:
+    """中断要求を監視しながら指定秒数待機します。"""
     if seconds < 0:
         raise ConfigurationError(
             "wait seconds must be greater than or equal to 0",

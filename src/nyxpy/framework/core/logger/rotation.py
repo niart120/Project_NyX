@@ -1,3 +1,5 @@
+"""ログファイル rotation と保持期間 cleanup。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,12 +9,15 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class RotationPolicy:
+    """Log rotation のサイズ、世代数、保持日数。"""
+
     max_bytes: int = 10 * 1024 * 1024
     backup_count: int = 3
     retention_days: int = 14
 
 
 def rotate_if_needed(path: Path, policy: RotationPolicy) -> None:
+    """必要に応じてログファイルを rotation します。"""
     path = Path(path)
     cleanup_retention(path, policy)
     if policy.max_bytes <= 0 or not path.exists() or path.stat().st_size < policy.max_bytes:
@@ -32,6 +37,7 @@ def rotate_if_needed(path: Path, policy: RotationPolicy) -> None:
 
 
 def cleanup_retention(path: Path, policy: RotationPolicy) -> None:
+    """Rotation 済みログの保持期間を超えたファイルを削除します。"""
     if policy.retention_days <= 0:
         return
     cutoff = datetime.now() - timedelta(days=policy.retention_days)
@@ -41,6 +47,7 @@ def cleanup_retention(path: Path, policy: RotationPolicy) -> None:
 
 
 def cleanup_retention_glob(base_dir: Path, pattern: str, retention_days: int) -> None:
+    """Glob pattern に一致する古いログファイルを削除します。"""
     if retention_days <= 0:
         return
     cutoff = datetime.now() - timedelta(days=retention_days)

@@ -1,9 +1,13 @@
+"""外部通知 adapter の共通 interface。"""
+
 from abc import ABC, abstractmethod
 
 import cv2
 
 
 class NotificationInterface(ABC):
+    """通知 service adapter が実装する送信 interface。"""
+
     @abstractmethod
     def notify(self, text: str, img: cv2.Mat | None = None) -> None:
         """通知を送信する。imgは任意添付。未対応サービスはテキストのみ送信。"""

@@ -1,3 +1,5 @@
+"""MacroRegistry と RuntimeBuilder を束ねる runtime facade。"""
+
 from __future__ import annotations
 
 import traceback
@@ -21,11 +23,14 @@ from nyxpy.framework.core.runtime.runner import MacroRunner
 
 
 class MacroRuntime:
+    """Macro 実行を同期・非同期に開始し、結果へ変換する runtime。"""
+
     def __init__(
         self,
         registry: MacroRegistry,
         runner: MacroRunner | None = None,
     ) -> None:
+        """Macro registry と runner を保持します。"""
         self.registry = registry
         self.runner = runner or MacroRunner()
 

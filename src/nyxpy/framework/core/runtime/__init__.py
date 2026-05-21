@@ -1,3 +1,5 @@
+"""マクロ実行 runtime API。"""
+
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, RuntimeBuildRequest
 from nyxpy.framework.core.runtime.context import ExecutionContext, RunContext, RuntimeOptions

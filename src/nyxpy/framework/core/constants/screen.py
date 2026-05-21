@@ -13,6 +13,7 @@ class ScreenSize:
     height: int
 
     def __post_init__(self) -> None:
+        """画面サイズが正の値であることを検証します。"""
         if self.width < 1 or self.height < 1:
             raise ValueError("ScreenSize width and height must be greater than 0")
 
@@ -35,6 +36,7 @@ class ScreenRect:
     height: int
 
     def __post_init__(self) -> None:
+        """矩形サイズが正の値であることを検証します。"""
         if self.width < 1 or self.height < 1:
             raise ValueError("ScreenRect width and height must be greater than 0")
 
@@ -63,6 +65,8 @@ class TouchPoint:
 
 
 class ScaleRounding(StrEnum):
+    """座標拡大縮小時の丸め方法。"""
+
     FLOOR = "floor"
     ROUND = "round"
 
@@ -123,11 +127,13 @@ def try_normalized_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint | None:
 
 
 def touch_point_to_3ds_normalized(point: TouchPoint) -> ScreenPoint:
+    """3DS touch 座標を正規化下画面座標へ変換します。"""
     point = validate_3ds_touch_point(point)
     return ScreenPoint(THREEDS_BOTTOM_SCREEN.x + point.x, THREEDS_BOTTOM_SCREEN.y + point.y)
 
 
 def normalized_point_to_hd_capture(point: ScreenPoint) -> ScreenPoint:
+    """3DS 正規化座標を 1280x720 HD キャプチャ座標へ変換します。"""
     if not THREEDS_FULL_SCREEN.contains(point):
         raise ValueError("Point is outside 3DS normalized screen")
     return ScreenPoint(
@@ -139,6 +145,7 @@ def normalized_point_to_hd_capture(point: ScreenPoint) -> ScreenPoint:
 
 
 def hd_capture_point_to_normalized(point: ScreenPoint) -> ScreenPoint:
+    """1280x720 HD キャプチャ座標を 3DS 正規化座標へ変換します。"""
     return _quantize_point(point, THREEDS_HD_CONTENT, THREEDS_CAPTURE_SIZE)
 
 
@@ -157,6 +164,7 @@ def try_hd_capture_point_to_3ds_touch(point: ScreenPoint) -> TouchPoint | None:
 
 
 def touch_point_to_3ds_hd_capture(point: TouchPoint) -> ScreenPoint:
+    """3DS touch 座標を HD キャプチャ下画面上の座標へ変換します。"""
     point = validate_3ds_touch_point(point)
     return ScreenPoint(
         THREEDS_HD_BOTTOM_SCREEN.x + floor(point.x * THREEDS_HD_BOTTOM_SCREEN.width / 320),
@@ -168,10 +176,12 @@ def cropped_normalized_point_to_normalized(
     point: ScreenPoint,
     crop_region: ScreenRect,
 ) -> ScreenPoint:
+    """切り出し済み正規化座標を元の正規化座標へ戻します。"""
     return ScreenPoint(point.x + crop_region.x, point.y + crop_region.y)
 
 
 def normalized_point_to_cropped(point: ScreenPoint, crop_region: ScreenRect) -> ScreenPoint:
+    """正規化座標を指定領域で切り出した後の座標へ変換します。"""
     if not crop_region.contains(point):
         raise ValueError("Point is outside crop region")
     return ScreenPoint(point.x - crop_region.x, point.y - crop_region.y)
@@ -181,6 +191,7 @@ def cropped_normalized_point_to_3ds_touch(
     point: ScreenPoint,
     crop_region: ScreenRect,
 ) -> TouchPoint:
+    """切り出し済み正規化座標を 3DS touch 座標へ変換します。"""
     return normalized_point_to_3ds_touch(cropped_normalized_point_to_normalized(point, crop_region))
 
 
@@ -188,6 +199,7 @@ def try_cropped_normalized_point_to_3ds_touch(
     point: ScreenPoint,
     crop_region: ScreenRect,
 ) -> TouchPoint | None:
+    """切り出し済み正規化座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return cropped_normalized_point_to_3ds_touch(point, crop_region)
     except ValueError:
@@ -218,6 +230,7 @@ def scale_point(
     target_size: ScreenSize = THREEDS_CAPTURE_SIZE,
     rounding: ScaleRounding = ScaleRounding.FLOOR,
 ) -> ScreenPoint:
+    """点を source size から target size へ拡大縮小します。"""
     x_float = (point.x + 0.5) * target_size.width / source_size.width
     y_float = (point.y + 0.5) * target_size.height / source_size.height
     if rounding is ScaleRounding.ROUND:
@@ -234,6 +247,7 @@ def scaled_source_point_to_3ds_touch(
     *,
     source_size: ScreenSize,
 ) -> TouchPoint:
+    """任意サイズの入力画像座標を 3DS touch 座標へ変換します。"""
     return normalized_point_to_3ds_touch(
         scale_point(point, source_size=source_size, target_size=THREEDS_CAPTURE_SIZE)
     )
@@ -244,6 +258,7 @@ def try_scaled_source_point_to_3ds_touch(
     *,
     source_size: ScreenSize,
 ) -> TouchPoint | None:
+    """任意サイズの入力画像座標を touch 座標へ変換し、範囲外なら `None` を返します。"""
     try:
         return scaled_source_point_to_3ds_touch(point, source_size=source_size)
     except ValueError:
@@ -251,6 +266,7 @@ def try_scaled_source_point_to_3ds_touch(
 
 
 def aspect_fit_rect(source_size: ScreenSize, target_size: ScreenSize) -> ScreenRect:
+    """縦横比を保って target size 内に収めた表示矩形を返します。"""
     scale = min(target_size.width / source_size.width, target_size.height / source_size.height)
     width = max(1, round(source_size.width * scale))
     height = max(1, round(source_size.height * scale))
@@ -260,6 +276,7 @@ def aspect_fit_rect(source_size: ScreenSize, target_size: ScreenSize) -> ScreenR
 
 
 def project_hd_rect_to_preview(rect: ScreenRect, *, preview_size: ScreenSize) -> ScreenRect:
+    """HD キャプチャ上の矩形を preview 表示座標へ投影します。"""
     display = aspect_fit_rect(THREEDS_HD_CAPTURE_SIZE, preview_size)
     scale_x = display.width / THREEDS_HD_CAPTURE_SIZE.width
     scale_y = display.height / THREEDS_HD_CAPTURE_SIZE.height
@@ -272,6 +289,7 @@ def project_hd_rect_to_preview(rect: ScreenRect, *, preview_size: ScreenSize) ->
 
 
 def preview_touch_rect(preview_size: ScreenSize) -> ScreenRect:
+    """Preview 表示上の 3DS touch 下画面領域を返します。"""
     return project_hd_rect_to_preview(THREEDS_HD_BOTTOM_SCREEN, preview_size=preview_size)
 
 
@@ -281,6 +299,7 @@ def preview_point_to_hd_capture(
     preview_size: ScreenSize,
     hd_capture_size: ScreenSize = THREEDS_HD_CAPTURE_SIZE,
 ) -> ScreenPoint:
+    """Preview 表示座標を HD キャプチャ座標へ戻します。"""
     display = aspect_fit_rect(hd_capture_size, preview_size)
     if not display.contains(point):
         raise ValueError("Point is outside preview display rectangle")
@@ -297,6 +316,7 @@ def try_preview_point_to_hd_capture(
     preview_size: ScreenSize,
     hd_capture_size: ScreenSize = THREEDS_HD_CAPTURE_SIZE,
 ) -> ScreenPoint | None:
+    """Preview 表示座標を HD キャプチャ座標へ戻し、範囲外なら `None` を返します。"""
     try:
         return preview_point_to_hd_capture(
             point,

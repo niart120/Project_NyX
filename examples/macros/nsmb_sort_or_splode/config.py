@@ -1,3 +1,5 @@
+"""New スーパーマリオブラザーズのソート用マクロ設定。"""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
@@ -7,12 +9,15 @@ from nyxpy.framework.core.constants import THREEDS_TOUCH_SIZE, TouchPoint, valid
 
 @dataclass(frozen=True, slots=True)
 class TouchRect:
+    """3DS touch 座標上で無視する矩形領域。"""
+
     x: int
     y: int
     width: int
     height: int
 
     def __post_init__(self) -> None:
+        """タッチ矩形が 3DS touch 座標内に収まることを検証します。"""
         if self.x < 0 or self.y < 0:
             raise ValueError("TouchRect x and y must be greater than or equal to 0")
         if self.width < 1 or self.height < 1:
@@ -25,6 +30,8 @@ class TouchRect:
 
 @dataclass(frozen=True, slots=True)
 class NsmbSortOrSplodeConfig:
+    """ボム兵認識と drag 操作に使う実行設定。"""
+
     scan_interval_seconds: float = 0.15
     post_drop_wait_seconds: float = 0.10
     max_sorted_count: int = 0

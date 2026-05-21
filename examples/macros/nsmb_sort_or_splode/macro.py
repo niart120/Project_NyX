@@ -1,3 +1,5 @@
+"""ボム兵ソート自動化マクロ。"""
+
 from time import monotonic
 
 import cv2
@@ -25,6 +27,8 @@ _DEBUG_MARKER_OUTLINE_BGR = (255, 255, 255)
 
 
 class NsmbSortOrSplodeMacro(MacroBase):
+    """3DS 下画面のボム兵を画像認識し、色ごとの目標位置へ drag します。"""
+
     macro_id = "nsmb_sort_or_splode"
     display_name = "NSMB Sort or 'Splode"
     description = "NSMB Sort or 'Splode（ボムへいをわけろ）自動仕分けマクロ"

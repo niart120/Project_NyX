@@ -1,3 +1,5 @@
+"""画像前処理 helper。"""
+
 import cv2
 
 

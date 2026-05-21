@@ -1,3 +1,5 @@
+"""マクロ実行結果の model。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,17 +10,22 @@ from nyxpy.framework.core.macro.exceptions import ErrorInfo
 
 
 class RunStatus(StrEnum):
+    """Macro run の最終状態。"""
+
     SUCCESS = "success"
     CANCELLED = "cancelled"
     FAILED = "failed"
 
 
 class CleanupWarning(Exception):
+    """Run 終了後の port cleanup 失敗を結果に残す warning。"""
+
     port_name: str
     exception_type: str
     message: str
 
     def __init__(self, port_name: str, exception_type: str, message: str) -> None:
+        """Cleanup 失敗元 port、例外型、message を保持します。"""
         super().__init__(message)
         self.port_name = port_name
         self.exception_type = exception_type
@@ -27,6 +34,8 @@ class CleanupWarning(Exception):
 
 @dataclass(frozen=True)
 class RunResult:
+    """Macro run の結果、error 情報、cleanup warning。"""
+
     run_id: str
     macro_id: str
     macro_name: str

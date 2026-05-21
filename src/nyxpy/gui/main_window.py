@@ -1,3 +1,5 @@
+"""NyX GUI の main window。"""
+
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -102,12 +104,15 @@ class _VirtualControllerPanel(QWidget):
 
 
 class MainWindow(QMainWindow):
+    """NyX GUI の main window。"""
+
     def __init__(
         self,
         services: GuiAppServices | None = None,
         *,
         project_root: Path | None = None,
     ):
+        """GUI service を準備し、各 pane、menu、signal 接続を初期化します。"""
         super().__init__()
         if services is None:
             self.project_root = Path.cwd() if project_root is None else Path(project_root)
@@ -477,6 +482,7 @@ class MainWindow(QMainWindow):
 
         Args:
             exec_args: マクロに渡す引数辞書
+
         """
         macro_id = self.macro_browser.selected_macro_id()
         if macro_id is None:

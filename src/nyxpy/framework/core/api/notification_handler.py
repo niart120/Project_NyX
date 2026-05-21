@@ -1,3 +1,5 @@
+"""外部通知 adapter を束ねる通知 handler。"""
+
 from typing import Protocol
 
 import cv2
@@ -11,11 +13,14 @@ from .notification_interface import NotificationInterface
 
 
 class NotificationHandler:
+    """複数の通知 adapter へ同じ通知を配信します。"""
+
     def __init__(
         self,
         notifiers: list[NotificationInterface] | None = None,
         logger: LoggerPort | None = None,
     ):
+        """通知 adapter 群と失敗時ログ出力先を保持します。"""
         self.notifiers = notifiers or []
         self.logger = logger or NullLoggerPort()
 
@@ -38,6 +43,8 @@ class NotificationHandler:
 
 
 class NotificationSettings(Protocol):
+    """通知設定と secret を読み出す最小 protocol。"""
+
     def get(self, key: str, default: SettingValue = None) -> SettingValue: ...
 
     def get_secret(self, key: str) -> str: ...
@@ -57,6 +64,7 @@ def create_notification_handler_from_settings(
 
     Returns:
         NotificationHandler: 通知ハンドラー、または設定が無効の場合はNone
+
     """
     notifiers = []
 

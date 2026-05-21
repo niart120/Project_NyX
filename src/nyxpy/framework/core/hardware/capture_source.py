@@ -1,3 +1,5 @@
+"""キャプチャ入力元の設定 model。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -14,12 +16,15 @@ CaptureBackendName = Literal["auto", "mss", "windows_graphics_capture"]
 
 @dataclass(frozen=True)
 class CaptureRect:
+    """画面キャプチャ対象の矩形領域。"""
+
     left: int
     top: int
     width: int
     height: int
 
     def __post_init__(self) -> None:
+        """キャプチャ範囲のサイズを検証します。"""
         if self.width <= 0 or self.height <= 0:
             raise ConfigurationError(
                 "capture region width and height must be positive",
@@ -39,6 +44,8 @@ class CaptureRect:
 
 @dataclass(frozen=True)
 class CameraCaptureSourceConfig:
+    """カメラ型キャプチャ入力元の設定。"""
+
     device_name: str = ""
     source_type: Literal["camera"] = "camera"
     fps: float = 60.0
@@ -47,6 +54,8 @@ class CameraCaptureSourceConfig:
 
 @dataclass(frozen=True)
 class WindowCaptureSourceConfig:
+    """Window capture 入力元の検索条件と backend 設定。"""
+
     title_pattern: str = ""
     source_type: Literal["window"] = "window"
     match_mode: WindowMatchMode = "exact"
@@ -61,6 +70,8 @@ CaptureSourceConfig = CameraCaptureSourceConfig | WindowCaptureSourceConfig
 
 @dataclass(frozen=True)
 class CaptureSourceKey:
+    """Frame source の再利用判定に使う正規化済み key。"""
+
     source_type: CaptureSourceType
     identifier: str
     backend: str
@@ -99,6 +110,7 @@ def capture_source_from_settings(
     *,
     capture_name_override: str | None = None,
 ) -> CaptureSourceConfig:
+    """設定値からキャプチャ入力元の設定を構築します。"""
     if capture_name_override is not None:
         return CameraCaptureSourceConfig(
             device_name=_text(capture_name_override),

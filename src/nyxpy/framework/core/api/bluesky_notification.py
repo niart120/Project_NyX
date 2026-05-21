@@ -1,3 +1,5 @@
+"""Bluesky への外部通知 adapter。"""
+
 from datetime import UTC, datetime
 
 import cv2
@@ -9,7 +11,10 @@ from .notification_interface import NotificationInterface
 
 
 class BlueskyNotification(NotificationInterface):
+    """Bluesky の atproto API へテキストと画像を投稿する通知 adapter。"""
+
     def __init__(self, identifier: str, password: str, logger: LoggerPort | None = None):
+        """認証情報で session を作成し、投稿用 token を保持します。"""
         self.identifier = identifier
         self.password = password
         self.logger = logger or NullLoggerPort()

@@ -1,3 +1,5 @@
+"""Window capture backend の共通実装。"""
+
 from __future__ import annotations
 
 import platform
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
 
 
 class WindowCaptureSession(ABC):
+    """Window capture backend が返す frame source session。"""
+
     @abstractmethod
     def start(self) -> None:
         pass
@@ -40,6 +44,8 @@ class WindowCaptureSession(ABC):
 
 
 class WindowCaptureBackend(ABC):
+    """Window capture session を生成し、backend resource を解放します。"""
+
     @abstractmethod
     def create_session(
         self,
@@ -54,6 +60,8 @@ class WindowCaptureBackend(ABC):
 
 
 class MssWindowCaptureBackend(WindowCaptureBackend):
+    """mss を使って window 領域を取得する backend。"""
+
     def create_session(
         self,
         config: WindowCaptureSourceConfig,
@@ -66,12 +74,15 @@ class MssWindowCaptureBackend(WindowCaptureBackend):
 
 
 class MssCaptureSession(WindowCaptureSession):
+    """mss の screen grabber を保持する window capture session。"""
+
     def __init__(
         self,
         *,
         config: WindowCaptureSourceConfig,
         locator: WindowLocatorBackend | None,
     ) -> None:
+        """Window 設定と locator を保持し、start 時に mss を初期化します。"""
         self.config = config
         self.locator = locator
         self._mss: MSSBase | None = None
@@ -112,6 +123,8 @@ class MssCaptureSession(WindowCaptureSession):
 
 
 class AutoWindowCaptureBackend(WindowCaptureBackend):
+    """実行環境に応じて利用可能な window capture backend を選択します。"""
+
     def __init__(
         self,
         *,
@@ -119,6 +132,7 @@ class AutoWindowCaptureBackend(WindowCaptureBackend):
         platform_name: str | None = None,
         logger: LoggerPort | None = None,
     ) -> None:
+        """Backend 候補 factory を準備し、生成した session を追跡します。"""
         self.logger = logger or NullLoggerPort()
         self._sessions: list[AutoWindowCaptureSession] = []
         self._backend_factories = backend_factories or _auto_backend_factories(platform_name)
@@ -144,6 +158,8 @@ class AutoWindowCaptureBackend(WindowCaptureBackend):
 
 
 class AutoWindowCaptureSession(WindowCaptureSession):
+    """候補 backend を順に試し、成功した session を委譲先にします。"""
+
     def __init__(
         self,
         *,
@@ -152,6 +168,7 @@ class AutoWindowCaptureSession(WindowCaptureSession):
         backend_factories: tuple[tuple[str, Callable[[], WindowCaptureBackend]], ...],
         logger: LoggerPort,
     ) -> None:
+        """Window 設定、locator、backend 候補、ログ出力先を保持します。"""
         self.config = config
         self.locator = locator
         self.backend_factories = backend_factories
@@ -224,6 +241,8 @@ class AutoWindowCaptureSession(WindowCaptureSession):
 
 
 class WindowCaptureDevice(CaptureDeviceInterface):
+    """Window capture session を threaded capture device として扱う adapter。"""
+
     def __init__(
         self,
         config: WindowCaptureSourceConfig,
@@ -232,6 +251,7 @@ class WindowCaptureDevice(CaptureDeviceInterface):
         backend: WindowCaptureBackend | None = None,
         logger: LoggerPort | None = None,
     ) -> None:
+        """Window capture session を作成し、capture device interface に接続します。"""
         self._device = _ThreadedSessionCaptureDevice(
             config=config,
             locator=locator or DefaultWindowLocatorBackend(),

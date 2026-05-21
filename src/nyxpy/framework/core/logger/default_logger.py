@@ -1,3 +1,5 @@
+"""標準 logger port 実装。"""
+
 from __future__ import annotations
 
 import traceback
@@ -19,6 +21,8 @@ from nyxpy.framework.core.macro.exceptions import FrameworkError
 
 
 class DefaultLogger:
+    """User event と technical log を sink/backend へ配送する logger。"""
+
     def __init__(
         self,
         dispatcher: LogSinkDispatcher,
@@ -26,6 +30,7 @@ class DefaultLogger:
         backend: LogBackend | None = None,
         context: RunLogContext | None = None,
     ) -> None:
+        """Dispatcher、sanitizer、backend、任意の run context を保持します。"""
         self.dispatcher = dispatcher
         self.sanitizer = sanitizer
         self.backend = backend or NullLogBackend()
@@ -130,6 +135,8 @@ class DefaultLogger:
 
 
 class NullLoggerPort:
+    """ログを出力しない logger port。"""
+
     def bind_context(self, context: RunLogContext) -> NullLoggerPort:
         return self
 

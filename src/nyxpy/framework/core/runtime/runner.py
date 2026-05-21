@@ -1,3 +1,5 @@
+"""MacroBase lifecycle を実行する runner。"""
+
 from __future__ import annotations
 
 import traceback
@@ -24,10 +26,14 @@ type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, Ru
 
 @runtime_checkable
 class SupportsFinalizeOutcome(Protocol):
+    """RunResult を受け取る finalize hook を持つ macro protocol。"""
+
     def finalize_with_outcome(self, cmd: Command, outcome: RunResult) -> None: ...
 
 
 class MacroRunner:
+    """Macro lifecycle hook を順に呼び出して単一 macro を実行します。"""
+
     def run(
         self,
         macro: MacroBase,

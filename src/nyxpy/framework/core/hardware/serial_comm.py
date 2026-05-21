@@ -1,3 +1,5 @@
+"""シリアルデバイスへの controller command 送信。"""
+
 from abc import ABC, abstractmethod
 
 import serial
@@ -26,6 +28,7 @@ class SerialComm(SerialCommInterface):
     """pyserial を利用したシリアル通信の実装例。"""
 
     def __init__(self, port: str):
+        """接続先 port 名を保持し、open 時に `serial.Serial` を生成します。"""
         self.ser: serial.Serial = None
         self.port: str = port
 
@@ -52,6 +55,7 @@ class DummySerialComm(SerialCommInterface):
     """
 
     def __init__(self, port: str):
+        """通信を行わないダミー port 名を保持します。"""
         self.port = port
 
     def open(self, baudrate: int) -> None:

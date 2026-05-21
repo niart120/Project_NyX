@@ -1,3 +1,5 @@
+"""主操作と副操作を持つ split button。"""
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QMenu, QPushButton, QSizePolicy, QToolButton, QWidget
 
@@ -12,6 +14,7 @@ class CustomSplitDropDownButton(QWidget):
     main_clicked = Signal()
 
     def __init__(self, main_text="Action", dropdown_items=None, parent=None):
+        """Main button text と dropdown action list を保持します。"""
         super().__init__(parent)
         self.main_text = main_text
         # dropdown_items format: [(action_text, callable), ...]

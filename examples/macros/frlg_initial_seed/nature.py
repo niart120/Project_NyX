@@ -110,6 +110,7 @@ def get_nature_multipliers(nature: str) -> dict[str, float]:
         {"Attack": 1.0, "Defense": 1.0, "Speed": 1.0,
          "SpecialAttack": 1.0, "SpecialDefense": 1.0}
         上昇ステータスは 1.1, 下降ステータスは 0.9 になる。
+
     """
     multipliers = {key: 1.0 for key in _STAT_KEYS}
     modifier = _NATURE_MODIFIERS.get(nature)

@@ -1,3 +1,5 @@
+"""Macro runtime の構築 helper。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -53,6 +55,8 @@ type ShutdownCallback = Callable[[], None]
 
 
 class MacroRuntimeBuilder:
+    """MacroDefinition から実行 context と runtime handle を組み立てます。"""
+
     def __init__(
         self,
         *,
@@ -70,6 +74,7 @@ class MacroRuntimeBuilder:
         manual_controller_factory: LifetimePortFactory[ControllerOutputPort] | None = None,
         shutdown_callbacks: tuple[ShutdownCallback, ...] = (),
     ) -> None:
+        """Registry、各 port factory、settings snapshot、runtime を保持します。"""
         self.project_root = Path(project_root).resolve()
         self.registry = registry
         self.settings = dict(settings or {})

@@ -16,6 +16,7 @@ def restart_game(cmd: Command) -> float:
 
     Returns:
         start_timer() による timer0 開始時刻
+
     """
     cmd.press(Button.HOME, dur=0.15, wait=1.00)
     cmd.press(Button.X, dur=0.20, wait=0.60)

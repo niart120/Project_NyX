@@ -45,6 +45,7 @@ def search_akiho_frames(
 
     Returns:
         各フレームの結果リスト
+
     """
     results: list[AkihoResult] = []
 

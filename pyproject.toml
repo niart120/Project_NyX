@@ -63,6 +63,9 @@ markers = [
 target-version = "py312"
 line-length = 100
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.uv]
 constraint-dependencies = [
     "urllib3>=2.7.0",  # CVE-2026-21441 / CVE-2026-44432 対策
@@ -74,10 +77,29 @@ select = [
     "E",    # pycodestyle errors
     "F",    # pyflakes
     "I",    # isort
+    "D100", # pydocstyle: module docstrings
+    "D101", # pydocstyle: public class docstrings
     "D2",   # pydocstyle whitespace conventions
     "D3",   # pydocstyle quote/escape conventions
+    "D103", # pydocstyle: public function docstrings
+    "D104", # pydocstyle: package docstrings
+    "D105", # pydocstyle: magic method docstrings
+    "D107", # pydocstyle: __init__ docstrings
+    "D402", # pydocstyle: no function signatures in docstrings
     "D403", # pydocstyle Google convention: first word capitalization
+    "D405", # pydocstyle: section names must be capitalized
+    "D406", # pydocstyle: section names must be followed by a blank line
+    "D407", # pydocstyle: dashed underline after sections
+    "D408", # pydocstyle: section underline after section name
+    "D409", # pydocstyle: section underline length
+    "D410", # pydocstyle: blank line after sections
+    "D411", # pydocstyle: blank line before sections
+    "D412", # pydocstyle: no blank lines between section header and content
+    "D413", # pydocstyle: blank line after last section
+    "D414", # pydocstyle: no empty docstring sections
     "D417", # pydocstyle Google convention: document all parameters
+    "D418", # pydocstyle: no docstrings on overloads
+    "D419", # pydocstyle: no empty docstrings
     "UP",   # pyupgrade (flags from __future__ imports, old typing syntax, etc.)
 ]
 ignore = [
@@ -88,6 +110,7 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
-"examples/tests/**" = ["E402"]
+"conftest.py" = ["D100"]
+"tests/**" = ["D100", "D101", "D103", "D107", "E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
+"examples/tests/**" = ["D100", "D101", "D103", "D107", "E402"]
 

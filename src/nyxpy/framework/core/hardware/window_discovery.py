@@ -1,3 +1,5 @@
+"""Window capture 対象の探索と解決。"""
+
 from __future__ import annotations
 
 import ctypes
@@ -13,6 +15,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 @dataclass(frozen=True)
 class WindowInfo:
+    """Capture 対象 window の識別子、タイトル、矩形情報。"""
+
     title: str
     identifier: str | int
     rect: CaptureRect
@@ -25,6 +29,8 @@ class WindowInfo:
 
 
 class WindowLocatorBackend(ABC):
+    """Window 候補を列挙し、設定に一致する window を解決します。"""
+
     @abstractmethod
     def list_windows(self) -> tuple[WindowInfo, ...]:
         pass
@@ -34,6 +40,8 @@ class WindowLocatorBackend(ABC):
 
 
 class DefaultWindowLocatorBackend(WindowLocatorBackend):
+    """Windows では Win32 API、その他 platform では空候補を返す locator。"""
+
     def list_windows(self) -> tuple[WindowInfo, ...]:
         if platform.system() != "Windows":
             return ()
@@ -53,6 +61,7 @@ def resolve_window(
     windows: tuple[WindowInfo, ...],
     config: WindowCaptureSourceConfig,
 ) -> WindowInfo:
+    """設定に一致する window を候補一覧から解決します。"""
     if config.identifier not in (None, ""):
         identifier = str(config.identifier)
         for window in windows:

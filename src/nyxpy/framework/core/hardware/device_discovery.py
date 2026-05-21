@@ -1,3 +1,5 @@
+"""キャプチャデバイスとシリアルデバイスの検出 service。"""
+
 from __future__ import annotations
 
 import platform
@@ -22,6 +24,8 @@ DeviceKind = Literal["serial", "capture"]
 
 @dataclass(frozen=True)
 class DeviceInfo:
+    """GUI/CLI へ提示する検出済み device の情報。"""
+
     kind: DeviceKind
     name: str
     identifier: str | int
@@ -34,6 +38,8 @@ class DeviceInfo:
 
 @dataclass(frozen=True)
 class DeviceDiscoveryResult:
+    """シリアル・キャプチャ device 検出の結果。"""
+
     serial_devices: tuple[DeviceInfo, ...] = ()
     capture_devices: tuple[DeviceInfo, ...] = ()
     timed_out: bool = False
@@ -47,7 +53,10 @@ class DeviceDiscoveryResult:
 
 
 class DeviceDiscoveryService:
+    """シリアル、カメラ、window capture 候補を検出します。"""
+
     def __init__(self, *, logger: LoggerPort | None = None) -> None:
+        """ログ出力先と window locator を準備し、直近結果を初期化します。"""
         self.logger = logger or NullLoggerPort()
         self.window_locator = DefaultWindowLocatorBackend()
         self._last_result = DeviceDiscoveryResult()

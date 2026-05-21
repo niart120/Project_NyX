@@ -1,3 +1,5 @@
+"""マクロ実行操作 pane。"""
+
 from enum import Enum
 
 from PySide6.QtCore import Signal
@@ -9,6 +11,8 @@ _CONTROL_BUTTON_HEIGHT = 34
 
 
 class RunUiState(Enum):
+    """Run control pane の表示状態。"""
+
     IDLE = "idle"
     RUNNING = "running"
     CANCELLING = "cancelling"
@@ -26,6 +30,7 @@ class ControlPane(QWidget):
     running_changed = Signal(bool)
 
     def __init__(self, parent=None, *, horizontal_margin: int = 0):
+        """操作 button を作成し、指定 margin で grid layout に配置します。"""
         super().__init__(parent)
         self._layout = QGridLayout(self)
         self._layout.setContentsMargins(horizontal_margin, 0, horizontal_margin, 0)

@@ -105,6 +105,7 @@ def recognize_stats(
 
     Returns:
         (HP, Atk, Def, SpA, SpD, Spe) のタプル、または認識失敗時は None
+
     """
     valid_ranges = calc_stat_valid_ranges(base_stats, level)
     values: list[int] = []

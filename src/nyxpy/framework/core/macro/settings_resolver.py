@@ -1,3 +1,5 @@
+"""マクロ設定ファイル path の解決と読み込み。"""
+
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
@@ -18,6 +20,7 @@ class MacroSettingsResolver:
     """
 
     def __init__(self, project_root: Path) -> None:
+        """Project root を保持し、設定 path 解決の基準にします。"""
         self.project_root = Path(project_root).resolve()
 
     def resolve(self, definition: MacroDefinition) -> MacroSettingsSource | None:

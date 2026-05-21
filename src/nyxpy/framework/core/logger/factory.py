@@ -1,3 +1,5 @@
+"""標準ログ構成を組み立てる factory。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,6 +19,8 @@ from nyxpy.framework.core.logger.sinks import (
 
 @dataclass
 class LoggingComponents:
+    """Logger 初期化で生成される主要 component の束。"""
+
     logger: DefaultLogger
     dispatcher: LogSinkDispatcher
     sanitizer: LogSanitizer
@@ -64,6 +68,7 @@ def create_default_logging(
     run_retention_days: int = 30,
     mask_secret_keys: list[str] | None = None,
 ) -> LoggingComponents:
+    """標準の logger、dispatcher、backend を作成します。"""
     sanitizer = LogSanitizer(mask_secret_keys)
     dispatcher = LogSinkDispatcher(sanitizer)
     backend = JsonlLogBackend(

@@ -1,3 +1,5 @@
+"""Virtual controller の d-pad widget。"""
+
 import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
@@ -21,6 +23,7 @@ class DPad(QWidget):
     directionChanged = Signal(Hat)
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """方向、押下状態、既定直径を初期化します。"""
         super().__init__(parent)
         self.set_diameter(70)
         self.current_direction: Hat = Hat.CENTER

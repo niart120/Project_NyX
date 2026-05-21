@@ -26,6 +26,7 @@ class Button(IntEnum):
     CAP = 0x2000
 
     def __repr__(self):
+        """列挙値名を含む表現を返します。"""
         return f"Button.{self.name}"
 
 
@@ -43,6 +44,7 @@ class Hat(IntEnum):
     CENTER = 0x08
 
     def __repr__(self):
+        """列挙値名を含む表現を返します。"""
         return f"Hat.{self.name}"
 
 
@@ -52,6 +54,7 @@ class ThreeDSButton(IntEnum):
     POWER = 0x2000
 
     def __repr__(self):
+        """列挙値名を含む表現を返します。"""
         return f"ThreeDSButton.{self.name}"
 
 

@@ -1,3 +1,5 @@
+"""ログ event と log level の model。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,6 +12,8 @@ type LogExtraValue = FrameworkValue
 
 
 class LogLevel(StrEnum):
+    """Logger が扱う severity level。"""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -27,6 +31,7 @@ _LEVEL_ORDER = {
 
 
 def normalize_level(level: str | LogLevel) -> LogLevel:
+    """文字列または `LogLevel` を正規化します。"""
     try:
         return level if isinstance(level, LogLevel) else LogLevel(level.upper())
     except ValueError as exc:
@@ -34,11 +39,14 @@ def normalize_level(level: str | LogLevel) -> LogLevel:
 
 
 def level_enabled(level: LogLevel, minimum: LogLevel) -> bool:
+    """指定 level が minimum 以上なら `True` を返します。"""
     return _LEVEL_ORDER[level] >= _LEVEL_ORDER[minimum]
 
 
 @dataclass(frozen=True)
 class RunLogContext:
+    """単一 macro run に紐づく log context。"""
+
     run_id: str
     macro_id: str
     macro_name: str = ""
@@ -48,6 +56,8 @@ class RunLogContext:
 
 @dataclass(frozen=True)
 class LogEvent:
+    """Backend と technical sink へ送る構造化 log event。"""
+
     timestamp: datetime
     level: LogLevel
     component: str
@@ -62,12 +72,16 @@ class LogEvent:
 
 @dataclass(frozen=True)
 class TechnicalLog:
+    """Traceback 出力方針を伴う technical log payload。"""
+
     event: LogEvent
     include_traceback: bool = True
 
 
 @dataclass(frozen=True)
 class UserEvent:
+    """GUI や console へ提示する利用者向け event。"""
+
     timestamp: datetime
     level: LogLevel
     component: str

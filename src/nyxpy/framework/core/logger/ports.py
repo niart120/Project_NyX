@@ -1,3 +1,5 @@
+"""ログ API の port 定義。"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -14,6 +16,8 @@ from nyxpy.framework.core.logger.events import (
 
 
 class LoggerPort(Protocol):
+    """Framework 各層が依存する logger port protocol。"""
+
     def bind_context(self, context: RunLogContext) -> LoggerPort: ...
 
     def technical(
@@ -40,6 +44,8 @@ class LoggerPort(Protocol):
 
 
 class LogSink(ABC):
+    """User event と technical log を受け取る sink の基底 class。"""
+
     def emit_technical(self, event: TechnicalLog) -> None:
         pass
 
@@ -54,6 +60,8 @@ class LogSink(ABC):
 
 
 class LogBackend(Protocol):
+    """Technical log の永続化 backend protocol。"""
+
     def emit_technical(self, event: TechnicalLog) -> None: ...
 
     def flush(self) -> None: ...

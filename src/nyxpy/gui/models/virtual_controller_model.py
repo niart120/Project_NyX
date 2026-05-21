@@ -1,3 +1,5 @@
+"""Virtual controller 表示用 model。"""
+
 from PySide6.QtCore import QObject, Signal
 
 from nyxpy.framework.core.constants import Button, Hat, LStick, RStick
@@ -16,6 +18,7 @@ class VirtualControllerModel(QObject):
         logger: LoggerPort,
         controller: ControllerOutputPort | None = None,
     ) -> None:
+        """Logger と controller port を保持し、仮想 controller 状態を初期化します。"""
         super().__init__()
         self.logger = logger
         self.controller = controller

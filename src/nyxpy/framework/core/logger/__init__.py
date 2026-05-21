@@ -1,3 +1,5 @@
+"""framework core のログ API。"""
+
 from nyxpy.framework.core.logger.backend import JsonlLogBackend, NullLogBackend
 from nyxpy.framework.core.logger.default_logger import DefaultLogger, NullLoggerPort
 from nyxpy.framework.core.logger.dispatcher import LogSinkDispatcher

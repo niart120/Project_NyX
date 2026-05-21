@@ -1,3 +1,5 @@
+"""キャプチャ処理向けの platform 初期化。"""
+
 from __future__ import annotations
 
 import ctypes
@@ -7,6 +9,7 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 def ensure_capture_coordinate_space() -> None:
+    """Windows で DPI awareness を設定し、キャプチャ座標のずれを防ぎます。"""
     if platform.system() != "Windows":
         return
     try:

@@ -19,6 +19,7 @@ class LCG32:
     C_INV: int = 0x0A3561A1
 
     def __init__(self, seed: int) -> None:
+        """32bit に丸めた初期 seed で内部状態を初期化する。"""
         self._seed = seed & self.MASK
 
     @property

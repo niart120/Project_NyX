@@ -1,3 +1,5 @@
+"""framework core の入出力 port と resource store。"""
+
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
     DummyFrameSourcePort,

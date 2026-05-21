@@ -1,3 +1,5 @@
+"""JSONL 形式の技術ログ backend。"""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +17,8 @@ from nyxpy.framework.core.logger.rotation import RotationPolicy, rotate_if_neede
 
 
 class NullLogBackend:
+    """技術ログを破棄する backend。"""
+
     def emit_technical(self, event: TechnicalLog) -> None:
         pass
 
@@ -26,6 +30,8 @@ class NullLogBackend:
 
 
 class JsonlLogBackend:
+    """技術ログを単一 JSONL ファイルへ保存する backend。"""
+
     def __init__(
         self,
         path: Path,
@@ -35,6 +41,7 @@ class JsonlLogBackend:
         backup_count: int = 3,
         retention_days: int = 30,
     ) -> None:
+        """出力 path と rotation 方針を保持し、親 directory を作成します。"""
         self.path = Path(path)
         self.minimum_level = normalize_level(level)
         self.rotation = RotationPolicy(

@@ -25,6 +25,7 @@ def _build_nature_mult_arrays() -> dict[str, np.ndarray]:
     Returns:
         {"Attack": float64[25], "Defense": ..., ...}
         nature_id でインデクシングして各 seed の補正値を一括取得できる。
+
     """
     keys = ("Attack", "Defense", "SpecialAttack", "SpecialDefense", "Speed")
     arrays: dict[str, np.ndarray] = {k: np.empty(25, dtype=np.float64) for k in keys}
@@ -58,6 +59,7 @@ def solve_initial_seed(
         - 一意に特定できた場合: ("XXXX", advance)
         - 候補が見つからない:   ("False", None)
         - 候補が2つ以上:       ("MULT", None)
+
     """
     nature_mult_arrays = _build_nature_mult_arrays()
 

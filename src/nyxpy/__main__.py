@@ -1,3 +1,5 @@
+"""NyX package entrypoint。"""
+
 import argparse
 import sys
 from pathlib import Path
@@ -24,6 +26,7 @@ def parse_arguments() -> argparse.Namespace:
 
     Returns:
         解析されたコマンドライン引数
+
     """
     parser = argparse.ArgumentParser(
         prog="nyxpy", description="NyX Macro Framework for Nintendo Switch automation"
@@ -93,6 +96,7 @@ def main() -> int:
 
     Returns:
         終了コード（0:成功、0以外:失敗）
+
     """
     try:
         args = parse_arguments()

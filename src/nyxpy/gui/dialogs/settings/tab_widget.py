@@ -1,3 +1,5 @@
+"""設定 dialog の tab container。"""
+
 from PySide6.QtWidgets import QTabWidget
 
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
@@ -9,6 +11,8 @@ from .notification_tab import NotificationSettingsTab
 
 
 class SettingsTabWidget(QTabWidget):
+    """Application settings dialog 内の設定 tab container。"""
+
     def __init__(
         self,
         parent=None,
@@ -17,6 +21,7 @@ class SettingsTabWidget(QTabWidget):
         *,
         device_discovery: DeviceDiscoveryService | None = None,
     ):
+        """Device/notification tab を生成し、store と discovery service を渡します。"""
         super().__init__(parent)
         self.device_tab = DeviceSettingsTab(
             settings,

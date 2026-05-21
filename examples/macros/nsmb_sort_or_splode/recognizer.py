@@ -1,3 +1,5 @@
+"""ボム兵の画像認識とドラッグ経路計算。"""
+
 from dataclasses import dataclass
 from enum import StrEnum
 from math import ceil, floor
@@ -19,12 +21,16 @@ from .config import TouchRect
 
 
 class BombColor(StrEnum):
+    """認識対象のボム兵色。"""
+
     RED = "red"
     BLACK = "black"
 
 
 @dataclass(frozen=True, slots=True)
 class DetectedBomb:
+    """テンプレート一致と色特徴量から得たボム兵候補。"""
+
     color: BombColor
     score: float
     hd_center_x: int
@@ -44,11 +50,14 @@ class DetectedBomb:
 
 @dataclass(frozen=True, slots=True)
 class ColorFeatures:
+    """候補周辺領域の赤色比率と暗色比率。"""
+
     red_ratio: float
     dark_ratio: float
 
 
 def touch_rect_to_cropped_hd_rect(rect: TouchRect) -> ScreenRect:
+    """Touch 座標の矩形を HD 下画面の切り出し座標へ変換します。"""
     start = touch_point_to_3ds_hd_capture(TouchPoint(rect.x, rect.y))
     end_x = THREEDS_HD_BOTTOM_SCREEN.x + ceil((rect.x + rect.width) * 480 / 320)
     end_y = THREEDS_HD_BOTTOM_SCREEN.y + ceil((rect.y + rect.height) * 360 / 240)
@@ -66,6 +75,7 @@ def paint_ignored_rects(
     *,
     fill_bgr: tuple[int, int, int] = (0, 255, 0),
 ) -> np.ndarray:
+    """無視対象の touch 矩形を HD 下画面画像上で塗りつぶします。"""
     masked = frame_bgr.copy()
     for touch_rect in ignore_touch_rects:
         rect = touch_rect_to_cropped_hd_rect(touch_rect)
@@ -89,6 +99,7 @@ def find_bombs(
     threshold: float,
     duplicate_suppression_radius: int,
 ) -> list[DetectedBomb]:
+    """テンプレートマッチングで指定色のボム兵候補を検出します。"""
     if frame_bgr.ndim != 3 or template_bgr.ndim != 3:
         raise ValueError("frame_bgr and template_bgr must be color images")
     if frame_bgr.shape[0] < template_bgr.shape[0] or frame_bgr.shape[1] < template_bgr.shape[1]:
@@ -126,6 +137,7 @@ def classify_bombs(
     black_min_dark_ratio: float,
     black_max_red_ratio: float,
 ) -> list[DetectedBomb]:
+    """赤黒それぞれの候補を統合し、色特徴量で最終分類します。"""
     classified: list[DetectedBomb] = []
     candidates = sorted(
         [*red_candidates, *black_candidates],
@@ -224,6 +236,7 @@ def measure_color_features(
     cropped_center_y: int,
     sample_size: int,
 ) -> ColorFeatures:
+    """指定中心点の周辺領域から赤色比率と暗色比率を測定します。"""
     if sample_size < 1:
         raise ValueError("sample_size must be greater than 0")
     half = sample_size // 2
@@ -266,6 +279,7 @@ def build_drag_path(
     *,
     steps: int,
 ) -> tuple[TouchPoint, ...]:
+    """開始点から目標点までの drag 用 touch 座標列を生成します。"""
     if steps < 1:
         raise ValueError("steps must be greater than 0")
     return tuple(

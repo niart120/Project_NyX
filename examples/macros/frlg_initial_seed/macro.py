@@ -226,6 +226,7 @@ class FrlgInitialSeedMacro(MacroBase):
 
         Returns:
             (Seed 文字列, advance) または認識失敗時は None。
+
         """
         cfg = self._cfg
 
