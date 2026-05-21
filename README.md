@@ -130,7 +130,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 マクロ本体はローカル作業用の `macros\`、設定・画像資材は `resources\` に配置します。`examples\macros` と `examples\resources` は公開サンプルの参照先であり、利用者の配置先ではありません。
 
-実装手順、雛形、AI エージェント向け短縮仕様は [docs\macro-development\README.md](docs/macro-development/README.md) を参照してください。
+実装手順、雛形、AI エージェント向けの要点は [docs\macro-development\README.md](docs/macro-development/README.md) を参照してください。
 
 ## 5. 設定ファイル
 

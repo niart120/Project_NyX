@@ -1,15 +1,15 @@
 # マクロ開発者向けドキュメント
 
-NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの入口です。現時点の配布パッケージは未公開です。将来の PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` としますが、現在はこのリポジトリをクローンして `uv sync` した環境を前提にします。
+NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの案内です。現時点の配布パッケージは未公開です。将来の PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` としますが、現在はこのリポジトリをクローンして `uv sync` した環境を前提にします。
 
-## まず読むもの
+## 関連文書
 
 | 文書 | 用途 |
 |------|------|
-| [agent-brief.md](agent-brief.md) | AI エージェントに渡す短縮仕様。配置、依存、公開 API、検証コマンドをまとめます。 |
+| [agent-brief.md](agent-brief.md) | AI エージェントに渡す要点。配置、依存、公開 API、検証コマンドをまとめます。 |
 | [macro-template.md](macro-template.md) | `macros\<macro_id>` と `resources\<macro_id>` に置く雛形、任意の `macro.toml`、完了前確認。 |
 
-詳細リファレンスは Phase 2 で追加します。予定している文書は `macro-layout.md`, `macro-lifecycle.md`, `command-api.md`, `settings-and-resources.md`, `manifest.md`, `testing.md`, `nintendo-3ds.md`, `image-processing.md` です。
+詳細資料は Phase 2 で追加します。予定している文書は `macro-layout.md`, `macro-lifecycle.md`, `command-api.md`, `settings-and-resources.md`, `manifest.md`, `testing.md`, `nintendo-3ds.md`, `image-processing.md` です。
 
 ## 推奨配置
 
@@ -27,9 +27,9 @@ resources\<macro_id>\
     template.png
 ```
 
-`examples\macros` と `examples\resources` は公開サンプルの参照先です。利用者のマクロ配置先ではありません。完成したサンプルを公開するときだけ、実装済みマクロを examples 側へコピーして、対応する `examples\tests` を追加します。
+`examples\macros` と `examples\resources` は参照用サンプルの置き場です。利用者のマクロ配置先ではありません。完成したサンプルを公開するときだけ、実装済みマクロを `examples\` 配下へコピーして、対応する `examples\tests` を追加します。
 
-## 最短のマクロ
+## 最小構成の例
 
 `macros\sample_turbo\macro.py`:
 
@@ -65,7 +65,7 @@ class SampleTurboMacro(MacroBase):
 
 `settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はキャプチャフレームがない場合に `None` を返すため、画像処理や保存の前に必ず確認します。
 
-## 自動検出される形
+## 自動検出の条件
 
 軽量マクロは、次のどちらかに `MacroBase` 派生クラスを 1 つだけ置くと自動検出されます。
 
@@ -80,7 +80,7 @@ class SampleTurboMacro(MacroBase):
 - `macros\xxx` から `macros\yyy` を直接インポートしません。複数マクロで使う処理は共有部品へ切り出します。
 - コントローラー操作、待機、キャプチャ、通知、ログは `Command` 経由に集約します。
 - 乱数計算、画像判定、設定変換などの副作用がない処理は関数へ分離し、`Command` なしで単体テストできるようにします。
-- `macro.toml` や設定ファイルに保存する移植可能パスは `/` を使います。Windows のファイル表示例では `\` を使ってよいですが、設定値には `assets/template.png` のように書きます。
+- `macro.toml` や設定ファイルに保存する環境に依存しないパス表記では `/` を使います。Windows のファイル表示例では `\` を使ってよいですが、設定値には `assets/template.png` のように書きます。
 
 ## 検証コマンド
 
@@ -96,9 +96,9 @@ uv run pytest tests macros examples/tests
 uv run pytest tests macros examples/tests -m "not realdevice"
 ```
 
-## 参照できるサンプル
+## サンプル一覧
 
-| サンプル | 読みどころ |
+| サンプル | 確認する内容 |
 |----------|------------|
 | `examples\macros\sample_turbo_a_macro.py` | ボタン入力、ログ、キャプチャ保存、通知の最小例 |
 | `examples\macros\nsmb_sort_or_splode` | 3DS touch、テンプレートマッチング、`settings_path = "resource:settings.toml"` |

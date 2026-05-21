@@ -61,7 +61,7 @@ examples\macros\xxx  -> examples\macros\yyy     NG
 ## パスと設定
 
 - Windows のファイル表示や説明では `\` を使います。
-- `macro.toml` や設定ファイルに保存する移植可能パスは `/` を使います。
+- `macro.toml` や設定ファイルに保存する環境に依存しないパス表記では `/` を使います。
 - `resource:` パスは `resources\<macro_id>` からの相対指定にします。
 - `project:` パスはプロジェクトルートからの相対指定にします。
 - 旧 `static\<macro_name>` は標準探索されません。

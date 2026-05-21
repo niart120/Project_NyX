@@ -1,12 +1,12 @@
-# NyX マクロ実装エージェント向け短縮仕様
+# NyX マクロ実装エージェント向け要点
 
-この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す短縮仕様です。詳細リファレンスは Phase 2 で追加予定です。現時点で不足する API 詳細は、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
+この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細資料は Phase 2 で追加予定です。現時点で不足する API 詳細は、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
 
 ## 前提
 
 - 現在の PyPI 配布パッケージは未公開です。将来の配布名は `nyxfw`、インポート名は `nyxpy` です。
 - 実装者のマクロ本体は `macros\<macro_id>`、設定・画像資材は `resources\<macro_id>` に置きます。
-- `examples\macros` と `examples\resources` はサンプル参照先であり、利用者の配置先ではありません。
+- `examples\macros` と `examples\resources` は参照用サンプルの置き場であり、利用者の配置先ではありません。
 - PowerShell コマンドを使います。bash / sh 前提のコマンドは書きません。
 
 ## 必ず守る制約
@@ -17,7 +17,7 @@
 - コントローラー操作、待機、キャプチャ、画像入出力、通知、ログは `Command` 経由で行います。
 - `cmd.capture()` はフレームがない場合に `None` を返します。画像処理・保存・shape 参照の前に必ず確認します。
 - `settings_path` の標準例は `settings_path = "resource:settings.toml"`。
-- `resource:` / `project:` / マニフェスト相対パスなどの移植可能パスは `/` を使います。例: `assets/template.png`。
+- `resource:` / `project:` / マニフェスト相対パスなど、環境に依存しないパス表記では `/` を使います。例: `assets/template.png`。
 - 旧 `static\<macro_name>` 配置は標準探索されません。
 
 ## 公開 API の基本インポート
@@ -46,7 +46,7 @@ from nyxpy.framework.core.constants import (
 from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor, contains_template, find_template
 ```
 
-## 最小雛形
+## 最小構成の例
 
 ```python
 from nyxpy.framework.core.constants import Button
@@ -80,7 +80,7 @@ class SampleMacro(MacroBase):
 
 ## 配置と検出
 
-自動検出される形:
+自動検出される配置:
 
 ```text
 macros\<macro_id>.py

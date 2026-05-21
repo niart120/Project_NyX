@@ -1,4 +1,4 @@
-# マクロ雛形
+# マクロの雛形
 
 この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
 
@@ -144,7 +144,7 @@ tags = ["sample", "button"]
 settings = "resource:settings.toml"
 ```
 
-`macro.toml` の移植可能パスも `/` を使います。`settings = "resource:settings.toml"` は `resources\sample_macro\settings.toml` を参照します。
+`macro.toml` で環境に依存しないパスを書く場合も `/` を使います。`settings = "resource:settings.toml"` は `resources\sample_macro\settings.toml` を参照します。
 
 ## 完了前確認
 
@@ -154,7 +154,7 @@ settings = "resource:settings.toml"
 - [ ] `cmd.capture()` の戻り値 `None` を処理している。
 - [ ] `finalize()` で必要な `cmd.release()` を呼んでいる。
 - [ ] 副作用のない設定変換・判定ロジックをテストしている。
-- [ ] 移植可能パスに `\` や絶対パスを書いていない。
+- [ ] 環境に依存しないパス表記に `\` や絶対パスを書いていない。
 - [ ] 次のコマンドで確認している。
 
 ```powershell
