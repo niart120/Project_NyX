@@ -92,6 +92,12 @@ class ResourceConfigurationError(ResourceError):
 
 @dataclass(frozen=True)
 class MacroResourceScope:
+    """マクロごとの資材探索範囲を表します。
+
+    標準資材は `resources/<macro_id>/assets` に置きます。マクロ本体パッケージ内の
+    `assets` は、サンプルや配布形態で資材を同梱する場合の代替探索先です。
+    """
+
     project_root: Path
     macro_id: str
     macro_root: Path | None
@@ -99,6 +105,7 @@ class MacroResourceScope:
 
     @classmethod
     def from_definition(cls, definition, project_root: Path) -> MacroResourceScope:
+        """マクロ定義から標準資材 root と代替資材 root を組み立てます。"""
         project_root = Path(project_root).resolve()
         macro_id = str(definition.id)
         _validate_resource_identifier(macro_id)
@@ -124,12 +131,15 @@ class MacroResourceScope:
     def candidate_asset_paths(
         self, name: str | Path, guard: ResourcePathGuard | None = None
     ) -> tuple[Path, ...]:
+        """資材名に対応する候補パスを探索順に返します。"""
         path_guard = guard or DefaultResourcePathGuard()
         return tuple(path_guard.resolve_under_root(root, name) for root in self.assets_roots)
 
 
 @dataclass(frozen=True)
 class ResourceRef:
+    """解決済み資材または実行成果物の参照情報です。"""
+
     kind: ResourceKind
     source: ResourceSource
     path: Path
@@ -139,10 +149,14 @@ class ResourceRef:
 
 
 class ResourcePathGuard(Protocol):
+    """資材パスが許可された root の内側に収まることを保証する protocol です。"""
+
     def resolve_under_root(self, root: Path, name: str | Path) -> Path: ...
 
 
 class DefaultResourcePathGuard:
+    """相対パスだけを許可し、root 外への脱出と Windows 予約名を拒否します。"""
+
     _RESERVED_WINDOWS_NAMES = {
         "CON",
         "PRN",
@@ -153,6 +167,7 @@ class DefaultResourcePathGuard:
     }
 
     def resolve_under_root(self, root: Path, name: str | Path) -> Path:
+        """資材名を root 配下の安全な絶対パスへ解決します。"""
         if not isinstance(name, (str, PathLike)):
             raise ResourcePathError("resource path must be str or Path")
         root_path = Path(root)
@@ -187,6 +202,12 @@ class DefaultResourcePathGuard:
 
 
 class ResourceStorePort(ABC):
+    """読み取り専用のマクロ資材 store です。
+
+    実装は資材名を安全なパスへ解決し、標準資材 root とマクロパッケージ内の
+    `assets` を探索対象にできます。
+    """
+
     @abstractmethod
     def resolve_asset_path(self, name: str | Path) -> ResourceRef: ...
 
@@ -198,6 +219,12 @@ class ResourceStorePort(ABC):
 
 
 class RunArtifactStore(ABC):
+    """マクロ実行ごとの出力成果物 store です。
+
+    保存先は run outputs 配下に限定します。実装は親ディレクトリ作成、
+    上書き方針、atomic write、path guard を扱います。
+    """
+
     @abstractmethod
     def resolve_output_path(self, name: str | Path) -> ResourceRef: ...
 
@@ -226,6 +253,8 @@ class RunArtifactStore(ABC):
 
 
 class LocalResourceStore(ResourceStorePort):
+    """ローカルファイルシステム上のマクロ資材 store です。"""
+
     def __init__(
         self,
         scope: MacroResourceScope,
@@ -235,6 +264,7 @@ class LocalResourceStore(ResourceStorePort):
         self.guard = guard or DefaultResourcePathGuard()
 
     def resolve_asset_path(self, name: str | Path) -> ResourceRef:
+        """探索順に資材を解決し、見つからない場合は `ResourceNotFoundError` にします。"""
         for index, root in enumerate(self.scope.assets_roots):
             candidate = self.guard.resolve_under_root(root, name)
             if candidate.exists():
@@ -254,6 +284,7 @@ class LocalResourceStore(ResourceStorePort):
         raise ResourceNotFoundError(f"resource not found: {name}")
 
     def load_image(self, name: str | Path, grayscale: bool = False) -> cv2.typing.MatLike:
+        """画像資材を OpenCV 画像として読み込みます。"""
         ref = self.resolve_asset_path(name)
         flag = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         image = cv2.imread(str(ref.path), flag)
@@ -263,6 +294,8 @@ class LocalResourceStore(ResourceStorePort):
 
 
 class LocalRunArtifactStore(RunArtifactStore):
+    """ローカルファイルシステム上の run outputs store です。"""
+
     def __init__(
         self,
         output_root: Path,
@@ -281,6 +314,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         self.guard = guard or DefaultResourcePathGuard()
 
     def resolve_output_path(self, name: str | Path) -> ResourceRef:
+        """出力名を run outputs 配下の安全なパスへ解決します。"""
         path = self.guard.resolve_under_root(self.output_root, name)
         return self._ref(path)
 
@@ -292,6 +326,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
     ) -> ResourceRef:
+        """画像を run outputs 配下に保存し、保存後の参照情報を返します。"""
         final_ref = self._prepare_output(name, overwrite or self.overwrite)
         use_atomic = self.atomic if atomic is None else atomic
         if use_atomic:
@@ -308,6 +343,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
     ) -> BinaryIO:
+        """実行成果物ディレクトリ配下の任意バイナリ出力を開きます。"""
         if "b" not in mode:
             raise ResourceConfigurationError("open_output requires a binary mode")
         if not any(flag in mode for flag in ("w", "x", "a")):
