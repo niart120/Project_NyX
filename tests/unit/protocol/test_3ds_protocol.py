@@ -59,13 +59,13 @@ def test_3ds_release_all(protocol):
     ("stick", "expected"),
     [
         (LStick.CENTER, bytes([0xA2, 0x80, 0x80])),
-        (LStick.LEFT, bytes([0xA2, 0x7E, 0x80])),
-        (LStick.RIGHT, bytes([0xA2, 0xFA, 0x80])),
-        (LStick.UP, bytes([0xA2, 0x80, 0x7E])),
-        (LStick.DOWN, bytes([0xA2, 0x80, 0xFA])),
+        (LStick.LEFT, bytes([0xA2, 0xFF, 0x80])),
+        (LStick.RIGHT, bytes([0xA2, 0x00, 0x80])),
+        (LStick.UP, bytes([0xA2, 0x80, 0xFF])),
+        (LStick.DOWN, bytes([0xA2, 0x80, 0x00])),
     ],
 )
-def test_3ds_slide_pad_presets(protocol, stick, expected):
+def test_3ds_slide_pad_presets_use_new_firmware_dac_spec(protocol, stick, expected):
     assert protocol.build_press_command((stick,))[3:6] == expected
 
 
@@ -86,7 +86,7 @@ def test_3ds_c_stick_presets(protocol, stick, expected):
 def test_3ds_mixed_input_fixed_frame(protocol):
     assert protocol.build_press_command(
         (Button.A, Hat.UP, LStick.RIGHT, RStick.UP, TouchState.down(319, 239))
-    ) == bytes([0xA1, 0x18, 0x00, 0xA2, 0xFA, 0x80, 0xA4, 0x00, 0x80, 0xB2, 0x01, 0x01, 0x3F, 0xEF])
+    ) == bytes([0xA1, 0x18, 0x00, 0xA2, 0x00, 0x80, 0xA4, 0x00, 0x80, 0xB2, 0x01, 0x01, 0x3F, 0xEF])
 
 
 def test_3ds_touch_state_keytype(protocol):
