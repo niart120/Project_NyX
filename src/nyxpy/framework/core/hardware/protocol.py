@@ -410,8 +410,8 @@ class ThreeDSSerialProtocol(SerialProtocolInterface):
         elif isinstance(key, Hat):
             self.button_mask |= self._hat_mask(key)
         elif isinstance(key, LStick):
-            self.slide_x = self._convert_slide_axis(key.x)
-            self.slide_y = self._convert_slide_axis(key.y)
+            self.slide_x = self._convert_slide_pad_axis(key.x)
+            self.slide_y = self._convert_slide_pad_axis(key.y)
         elif isinstance(key, RStick):
             self.c_stick_x = self._convert_c_stick_axis(key.x)
             self.c_stick_y = self._convert_c_stick_axis(key.y)
@@ -466,12 +466,12 @@ class ThreeDSSerialProtocol(SerialProtocolInterface):
             raise ValueError("Touch Y must be in range 0..239")
 
     @staticmethod
-    def _convert_slide_axis(value: int) -> int:
+    def _convert_slide_pad_axis(value: int) -> int:
         if not 0 <= value <= 255:
             raise ValueError("Stick axis must be in range 0..255")
         if value <= 128:
-            return round(0x7E + (value / 128) * (0x80 - 0x7E))
-        return round(0x80 + ((value - 128) / 127) * (0xFA - 0x80))
+            return round(0xFF - (value / 128) * (0xFF - 0x80))
+        return round(0x80 - ((value - 128) / 127) * 0x80)
 
     @staticmethod
     def _convert_c_stick_axis(value: int) -> int:

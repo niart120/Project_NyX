@@ -6,6 +6,10 @@
 import math
 
 
+def _round_axis(value: float) -> int:
+    return max(0, min(255, round(value + 1e-9)))
+
+
 class LStick:
     """コントローラーの左スティックの位置を表すクラス"""
 
@@ -27,9 +31,8 @@ class LStick:
         if magnification < 0:
             self.mag = 0.0
 
-        # 小数点演算誤差を考慮する必要は無い
-        self.x = math.ceil(127.5 * math.cos(rad) * self.mag + 127.5)
-        self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
+        self.x = _round_axis(127.5 * math.cos(rad) * self.mag + 127.5)
+        self.y = _round_axis(127.5 - 127.5 * math.sin(rad) * self.mag)
 
     def __repr__(self):
         """スティック座標を含む表現を返します。"""
@@ -69,9 +72,8 @@ class RStick:
         if magnification < 0:
             self.mag = 0.0
 
-        # 小数点演算誤差を考慮する必要は無い
-        self.x = math.ceil(127.5 * math.cos(rad) * self.mag + 127.5)
-        self.y = 255 - math.ceil(127.5 * math.sin(rad) * self.mag + 127.5)  # y軸のみ反転を考慮する
+        self.x = _round_axis(127.5 * math.cos(rad) * self.mag + 127.5)
+        self.y = _round_axis(127.5 - 127.5 * math.sin(rad) * self.mag)
 
     def __repr__(self):
         """スティック座標を含む表現を返します。"""

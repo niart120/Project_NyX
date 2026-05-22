@@ -13,6 +13,10 @@ from nyxpy.framework.core.runtime.result import RunStatus
 from nyxpy.framework.core.runtime.runtime import MacroRuntime
 from tests.support.fake_execution_context import make_fake_execution_context
 
+NEUTRAL_3DS_FRAME = bytes(
+    [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x00, 0x00, 0x00, 0x00]
+)
+
 
 @dataclass(frozen=True)
 class Factory:
@@ -120,24 +124,7 @@ def test_3ds_runtime_command_touch_with_fake_serial(tmp_path: Path) -> None:
                 0xEF,
             ]
         ),
-        bytes(
-            [
-                0xA1,
-                0x00,
-                0x00,
-                0xA2,
-                0x80,
-                0x80,
-                0xA4,
-                0x00,
-                0x00,
-                0xB2,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-            ]
-        ),
+        NEUTRAL_3DS_FRAME,
     ]
 
 
@@ -192,22 +179,5 @@ def test_3ds_runtime_keeps_basic_button_input_with_touch_support(tmp_path: Path)
                 0x00,
             ]
         ),
-        bytes(
-            [
-                0xA1,
-                0x00,
-                0x00,
-                0xA2,
-                0x80,
-                0x80,
-                0xA4,
-                0x00,
-                0x00,
-                0xB2,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-            ]
-        ),
+        NEUTRAL_3DS_FRAME,
     ]

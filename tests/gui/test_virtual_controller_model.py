@@ -1,12 +1,27 @@
+import math
 from pathlib import Path
 
 from nyxpy.framework.core.constants import Button, Hat
+from nyxpy.framework.core.hardware.protocol import ThreeDSSerialProtocol
+from nyxpy.framework.core.io.adapters import SerialControllerOutputPort
 from nyxpy.gui.models.virtual_controller_model import VirtualControllerModel
 from tests.support.fakes import (
     FakeControllerOutputPort,
     FakeFullCapabilityController,
     FakeLoggerPort,
 )
+
+THREEDS_NEUTRAL_FRAME = bytes(
+    [0xA1, 0x00, 0x00, 0xA2, 0x80, 0x80, 0xA4, 0x00, 0x00, 0xB2, 0x00, 0x00, 0x00, 0x00]
+)
+
+
+class SerialDevice:
+    def __init__(self) -> None:
+        self.sent: list[bytes] = []
+
+    def send(self, data: bytes) -> None:
+        self.sent.append(data)
 
 
 def test_button_operations_use_controller_output_port() -> None:
@@ -88,6 +103,68 @@ def test_virtual_controller_model_ignores_touch_when_unsupported() -> None:
     model.touch_up()
 
     assert controller.events == []
+
+
+def test_virtual_controller_left_stick_uses_3ds_new_firmware_dac_spec() -> None:
+    serial = SerialDevice()
+    controller = SerialControllerOutputPort(serial, ThreeDSSerialProtocol())
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+
+    model.set_left_stick(0.0, 1.0)
+    model.set_left_stick(0.0, 0.0)
+
+    assert serial.sent == [
+        bytes(
+            [
+                0xA1,
+                0x00,
+                0x00,
+                0xA2,
+                0x00,
+                0x80,
+                0xA4,
+                0x00,
+                0x00,
+                0xB2,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        ),
+        THREEDS_NEUTRAL_FRAME,
+    ]
+
+
+def test_virtual_controller_right_stick_uses_3ds_c_stick_axis_spec() -> None:
+    serial = SerialDevice()
+    controller = SerialControllerOutputPort(serial, ThreeDSSerialProtocol())
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+
+    model.set_right_stick(math.pi / 2, 1.0)
+    model.set_right_stick(0.0, 0.0)
+
+    assert serial.sent == [
+        bytes(
+            [
+                0xA1,
+                0x00,
+                0x00,
+                0xA2,
+                0x80,
+                0x80,
+                0xA4,
+                0x00,
+                0x80,
+                0xB2,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        ),
+        THREEDS_NEUTRAL_FRAME,
+    ]
 
 
 def test_virtual_controller_model_has_no_event_bus_dependency() -> None:
