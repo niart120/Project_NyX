@@ -10,10 +10,10 @@
 |------|------|
 | 雛形説明 | `docs\macro-development\macro-template.md` に存在 |
 | workspace 初期化 | `ensure_workspace()` が `.nyxpy`, `macros`, `resources`, `snapshots`, `runs`, `logs` を作成済み |
-| package data | 未整備 |
-| macro 個別生成 | 未整備 |
-| CLI 生成導線 | 未整備。`nyxpy create <macro_id>` を主導線にする |
-| 生成先 | 手作業で `macros\<macro_id>` と `resources\<macro_id>` を作る必要がある |
+| package data | `src\nyxpy\templates\macro\` に追加済み |
+| macro 個別生成 | `create_macro_scaffold()` を追加済み |
+| CLI 生成導線 | `nyxpy create <macro_id>` を追加済み |
+| 生成先 | `macros\<macro_id>` と `resources\<macro_id>` を生成できる |
 
 ## 3. 判断
 
@@ -43,6 +43,7 @@
 
 ```text
 macros\<macro_id>\
+  __init__.py
   macro.py
   config.py
   test_logic.py

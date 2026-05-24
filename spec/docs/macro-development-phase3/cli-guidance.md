@@ -8,11 +8,11 @@
 
 | 項目 | 状態 |
 |------|------|
-| CLI parser | `nyx-cli` は positional `macro_name` を必須にする |
+| CLI parser | `nyxpy` が `init`, `create`, `run`, `docs`, `gui` を持つ |
 | 必須 option | `--serial`, `--capture` |
-| docs 表示 | なし |
-| workspace 初期化 | `python -m nyxpy init` が `.nyxpy`, `macros`, `resources`, `snapshots`, `runs`, `logs` を作成する |
-| scaffold | macro 個別生成サービスは未整備 |
+| docs 表示 | `nyxpy docs` を追加済み |
+| workspace 初期化 | `nyxpy init` が `.nyxpy`, `macros`, `resources`, `snapshots`, `runs`, `logs` を作成する |
+| scaffold | `nyxpy create <macro_id>` を追加済み |
 
 ## 3. 判断
 
@@ -57,10 +57,11 @@ Local API help: python -m pydoc nyxpy.framework.core.macro.command
 
 ```text
 Created macro scaffold: sample_turbo
-  macros\sample_turbo\macro.py
-  macros\sample_turbo\config.py
-  macros\sample_turbo\test_logic.py
-  resources\sample_turbo\settings.toml
+  created: macros\sample_turbo\__init__.py
+  created: macros\sample_turbo\macro.py
+  created: macros\sample_turbo\config.py
+  created: macros\sample_turbo\test_logic.py
+  created: resources\sample_turbo\settings.toml
 ```
 
 ## 7. 検証仕様

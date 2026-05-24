@@ -1,0 +1,31 @@
+"""Generated NyX macro scaffold."""
+
+from nyxpy.framework.core.constants import Button
+from nyxpy.framework.core.macro.base import MacroBase
+from nyxpy.framework.core.macro.command import Command
+
+from .config import {class_name}Config
+
+
+class {class_name}(MacroBase):
+    """Generated sample macro that presses Button.A."""
+
+    description = "Generated sample macro"
+    tags = ["sample"]
+    settings_path = "resource:settings.toml"
+
+    def initialize(self, cmd: Command, args: dict) -> None:
+        self._cfg = {class_name}Config.from_args(args)
+        cmd.log(
+            f"{class_name} initialized: count={{self._cfg.count}}",
+            level="INFO",
+        )
+
+    def run(self, cmd: Command) -> None:
+        for index in range(1, self._cfg.count + 1):
+            cmd.press(Button.A, dur=self._cfg.press_seconds, wait=self._cfg.wait_seconds)
+            if index % 5 == 0:
+                cmd.log(f"progress: {{index}}/{{self._cfg.count}}", level="INFO")
+
+    def finalize(self, cmd: Command) -> None:
+        cmd.release()

@@ -40,8 +40,9 @@ docs = [
 ]
 
 [project.scripts]
-nyx-cli = "nyxpy.cli.run_cli:main"
-nyx-gui = "nyxpy.gui.run_gui:main"
+nyxpy = "nyxpy.__main__:main"
+nyx-cli = "nyxpy.__main__:run_alias_main"
+nyx-gui = "nyxpy.__main__:gui_app"
 
 [project.optional-dependencies]
 windows = [
@@ -118,4 +119,3 @@ convention = "google"
 "conftest.py" = ["D100"]
 "tests/**" = ["D100", "D101", "D103", "D107", "E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
 "examples/tests/**" = ["D100", "D101", "D103", "D107", "E402"]
-
