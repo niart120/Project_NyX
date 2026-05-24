@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-`docs\macro-development\`、`docs\user-guide\`、API reference を GitHub Pages で公開し、`README.md` と `nyx-cli docs` から到達できるようにする。GitHub Wiki は使わず、docs source と build 設定を repository 内で review 可能にする。
+`docs\macro-development\`、`docs\user-guide\`、API reference を GitHub Pages で公開し、`README.md` と `nyxpy docs` から到達できるようにする。GitHub Wiki は使わず、docs source と build 設定を repository 内で review 可能にする。
 
 ## 2. 現状
 

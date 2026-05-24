@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-リポジトリを clone しない利用者でも、NyX の標準配置に沿ったマクロ雛形を生成できるようにする。workspace 初期化が作る空の `macros\` / `resources\` と、特定の `macro_id` 用ファイル生成の責務を分ける。
+リポジトリを clone しない利用者でも、NyX の標準配置に沿ったマクロ雛形を生成できるようにする。workspace 初期化が作る `macros\` / `resources\` と、特定の `macro_id` 用ファイル生成の責務を分ける。
 
 ## 2. 現状
 
@@ -12,7 +12,7 @@
 | workspace 初期化 | `ensure_workspace()` が `.nyxpy`, `macros`, `resources`, `snapshots`, `runs`, `logs` を作成済み |
 | package data | 未整備 |
 | macro 個別生成 | 未整備 |
-| CLI 生成導線 | 未整備。`nyx-cli scaffold` 固定ではなく、入口は再検討対象 |
+| CLI 生成導線 | 未整備。`nyxpy create <macro_id>` を主導線にする |
 | 生成先 | 手作業で `macros\<macro_id>` と `resources\<macro_id>` を作る必要がある |
 
 ## 3. 判断
@@ -21,7 +21,9 @@
 
 最小テンプレートだけを package data として同梱する。`examples\macros` は公開サンプルであり、利用者の雛形生成元にはしない。
 
-CLI 入口はこの段階で `nyx-cli scaffold` に固定しない。`nyx-cli` は現状マクロ実行用の console script であり、ハードウェア不要の開発補助 command を直接背負わせると責務が混ざるためである。まず生成サービスを実装し、その後に `python -m nyxpy init --macro <macro_id>`、`python -m nyxpy macro new <macro_id>`、将来の統合 console script などから呼べる形にする。
+`uv tool install nyxfw` 後の主導線は `nyxpy ...` とし、macro 個別生成は `nyxpy create <macro_id>` から呼ぶ。`nyx-cli` は実行系 alias として扱い、scaffold の主導線にはしない。`nyxpy new` は多義的なため使わない。
+
+`nyxpy init` は通常、workspace 初期化後にサンプルマクロ `sample_macro` も生成する。空の workspace だけを作る場合は `nyxpy init --blank` を使う。`nyxpy create <macro_id>` は workspace が存在しない場合に失敗し、先に `nyxpy init` を実行するよう案内する。
 
 ## 4. 生成サービス仕様
 
@@ -68,25 +70,21 @@ resources\<macro_id>\
 
 ## 5. CLI / 初期化導線との接続
 
-初期実装では、生成サービスを CLI から直接呼ぶかどうかを分離して判断する。候補は次の通り。
+| command | 役割 |
+|---------|------|
+| `nyxpy init` | workspace を作成し、サンプルマクロ `sample_macro` を同時生成する |
+| `nyxpy init --blank` | `.nyxpy`, `macros`, `resources`, `snapshots`, `runs`, `logs` だけを作成する |
+| `nyxpy create <macro_id>` | 既存 workspace に macro 個別 scaffold を生成する |
 
-| 候補 | 評価 |
-|------|------|
-| `python -m nyxpy init --macro sample_turbo` | workspace 初期化と同じ入口で説明しやすい。既に `init` が `macros\` / `resources\` を作るため、差分が自然 |
-| `python -m nyxpy macro new sample_turbo` | 生成対象が明確で、将来 `macro list`, `macro validate` を増やしやすい |
-| `nyx-cli scaffold sample_turbo` | console script としては短いが、現状の `nyx-cli` はマクロ実行専用であり責務が混ざる |
-
-どの入口を選ぶ場合も、生成本体は同じサービスを呼ぶ。既存ファイルがある場合、既定では失敗する。`--force` 相当の明示指定時だけ上書きを許可する。部分生成に失敗した場合は、作成済みファイルを報告し、成功したかのようなメッセージを出さない。
+どの入口から呼ぶ場合も、生成本体は同じサービスを使う。既存ファイルがある場合、既定では失敗する。`--force` 相当の明示指定時だけ上書きを許可する。部分生成に失敗した場合は、作成済みファイルを報告し、成功したかのようなメッセージを出さない。
 
 ## 6. 検証仕様
 
 ```powershell
-python -m nyxpy init
-python -m nyxpy macro new sample_turbo
+nyxpy init --blank
+nyxpy create sample_turbo
 uv run ruff check --no-respect-gitignore macros\sample_turbo
 uv run pytest macros\sample_turbo
 ```
 
 生成物は `.gitignore` 対象の `macros\` 配下に置かれるため、Ruff では `--no-respect-gitignore` を付ける。
-
-CLI 入口を `python -m nyxpy macro new` 以外に決めた場合は、検証コマンドだけを実装に合わせて差し替える。
