@@ -31,3 +31,13 @@
 ::: nyxpy.framework.core.io.resources
     options:
       heading_level: 3
+
+## 例外
+
+::: nyxpy.framework.core.macro.exceptions
+    options:
+      heading_level: 3
+
+::: nyxpy.framework.core.io.ports
+    options:
+      heading_level: 3

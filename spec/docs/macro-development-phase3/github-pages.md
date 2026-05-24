@@ -8,7 +8,7 @@
 
 | 項目 | 状態 |
 |------|------|
-| docs source | `docs\`, `docs\macro-development\`, 今後追加する `docs\user-guide\` |
+| docs source | `docs\`, `docs\macro-development\`, `docs\user-guide\` |
 | build 設定 | `mkdocs.yml` を追加済み |
 | API reference | `docs\api\framework.md` を追加済み |
 | deploy workflow | `.github\workflows\docs.yml` を追加済み |
@@ -69,4 +69,4 @@ pull request 上では build が成功することを確認する。deploy は `
 - `master` push または manual dispatch で Pages artifact が deploy される。
 - deploy job は `github-pages` environment の URL を出力する。
 - 公開後に `https://niart120.github.io/Project_NyX/`, `https://niart120.github.io/Project_NyX/macro-development/`, `https://niart120.github.io/Project_NyX/api/framework/` を表示できる。
-- `docs\user-guide\` 追加後は同じ workflow と nav で通常利用者向けページも公開できる。
+- `docs\user-guide\` は同じ workflow と nav で通常利用者向けページとして公開できる。

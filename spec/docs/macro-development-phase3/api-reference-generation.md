@@ -13,6 +13,7 @@
 | docs generator | `mkdocs.yml` に MkDocs + mkdocstrings 構成を追加済み |
 | docs dependency group | `pyproject.toml` の `docs` group に `mkdocs`, `mkdocstrings[python]` を追加済み |
 | local build | `uv run mkdocs build --strict` が成功する |
+| docs-only build | `uv sync --locked --only-group docs --no-install-project` 後に `uv run --no-sync mkdocs build --strict` が成功する |
 
 ## 3. 判断
 
@@ -34,6 +35,7 @@ docs dependency group:
 docs = [
     "mkdocs>=1.6",
     "mkdocstrings[python]>=0.29",
+    "ruff>=0.15.12",
 ]
 ```
 
@@ -46,6 +48,8 @@ docs = [
 | `nyxpy.framework.core.constants` | Button、stick、3DS 座標定数 |
 | `nyxpy.framework.core.imgproc` | テンプレートマッチング、OCR、前処理 |
 | `nyxpy.framework.core.io.resources` | resources / outputs の探索と保存 |
+| `nyxpy.framework.core.macro.exceptions` | `MacroStopException`, `ConfigurationError`, `ResourceError` など、マクロ実装者が読む例外階層 |
+| `nyxpy.framework.core.io.ports` | `FrameNotReadyError` など `Command.capture()` から見える入出力例外 |
 
 ## 6. 検証仕様
 
@@ -60,5 +64,5 @@ uv run --no-sync mkdocs build --strict
 
 - `uv run mkdocs build --strict` が成功する。
 - docs CI で `uv sync --locked --only-group docs --no-install-project` 後に build できる。
-- `docs\api\framework.md` で `MacroBase`, `Command`, constants, imgproc, resources の docstring / 型ヒントが表示される。
+- `docs\api\framework.md` で `MacroBase`, `Command`, constants, imgproc, resources, exception classes の docstring / 型ヒントが表示される。
 - API reference の対象 module path が実体と一致している。

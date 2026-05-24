@@ -46,6 +46,7 @@ dev = [
 docs = [
     "mkdocs>=1.6",
     "mkdocstrings[python]>=0.29",
+    "ruff>=0.15.12",
 ]
 
 [project.scripts]

@@ -12,7 +12,7 @@
 | PEP 561 marker | `src\nyxpy\py.typed` を追加済み |
 | 全体 baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` で 0 diagnostics |
 | 公開 API 周辺 baseline | macro / constants / imgproc / resources 対象で 0 diagnostics |
-| CI gate | 未適用 |
+| CI gate | `.github\workflows\test.yml` に適用済み |
 
 公開 API 周辺 baseline の取得コマンド:
 
