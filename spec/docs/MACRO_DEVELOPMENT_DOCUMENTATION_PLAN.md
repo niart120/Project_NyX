@@ -393,7 +393,7 @@ Phase 0 では、以後の docs に影響する前提を確定する。特に Py
 ### Phase 3: パッケージから到達できる情報を増やす
 
 詳細仕様は `spec\docs\MACRO_DEVELOPMENT_PHASE3_SPEC.md` に分離する。
-実装順は、PEP 561 対応、API reference 生成、GitHub Pages 配信、scaffold template、`nyx-cli` 導線、利用者向け docs 更新、package-publish の順を推奨する。`package-publish` は最終公開準備として最後に回す。
+実装順は、PEP 561 対応、`ty` 型検査厳格化、API reference 生成、GitHub Pages 配信、scaffold template、`nyx-cli` 導線、利用者向け docs 更新、package-publish の順を推奨する。`package-publish` は最終公開準備として最後に回す。
 
 | 作業 | 成果物 |
 |------|--------|
