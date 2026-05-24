@@ -1,5 +1,6 @@
 site_name: Project NyX
 site_description: Nintendo Switch 自動化フレームワークとマクロ開発者向けドキュメント
+site_url: https://niart120.github.io/Project_NyX/
 repo_url: https://github.com/niart120/Project_NyX
 docs_dir: docs
 site_dir: site

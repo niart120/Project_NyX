@@ -404,6 +404,8 @@ Phase 0 では、以後の docs に影響する前提を確定する。特に Py
 | MkDocs + mkdocstrings による API リファレンス生成を検証する | docs 生成方式の判断 |
 | GitHub Pages へ生成 docs を配信できるか確認する | 公開面の判断 |
 
+GitHub Pages の公開面はマクロ開発者向け docs と API reference だけに限定しない。通常利用者向け手順は `docs\user-guide\` に整備し、同じ MkDocs site から公開する。初期公開 URL は repository root、`/macro-development/`、`/api/framework/` を起点にし、`docs\user-guide\` 整備後に `/user-guide/` を nav に追加する。
+
 ### Phase 4: 重複削減と検証
 
 | 作業 | 成果物 |
