@@ -308,6 +308,7 @@ GitHub Pages へ生成 docs を配信する workflow を追加する。公開先
 | local macro lint | `uv run ruff check --no-respect-gitignore macros\<macro_id>` | scaffold 生成先が `.gitignore` 対象でも lint できること |
 | format | `uv run ruff format .` | Python 変更が formatter 済みであること |
 | unit / integration | `uv run pytest tests/unit tests/integration` | CLI / framework の既存挙動を壊していないこと |
+| type check baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` | PEP 561 公開後に利用者へ見える型ヒントの診断を確認する。現時点では baseline 取得用であり、CI gate にはしない |
 | package build | `uv build` | sdist / wheel を作成できること |
 | metadata check | `uvx twine check dist\*` | PyPI metadata が妥当であること |
 | wheel contents | `$wheel = Get-ChildItem dist\*.whl \| Select-Object -First 1; python -m zipfile --list $wheel.FullName` | `nyxpy\py.typed` と scaffold template が含まれること |
@@ -320,6 +321,7 @@ GitHub Pages へ生成 docs を配信する workflow を追加する。公開先
 - [x] Phase 3 詳細仕様を作成する
 - [x] Phase 3 の推奨実装順を整理する
 - [x] `src\nyxpy\py.typed` を追加する
+- [x] `ty` を開発依存に追加し、型検査 baseline を確認する
 - [x] MkDocs + mkdocstrings の構成を追加する
 - [ ] GitHub Pages workflow を追加する
 - [ ] scaffold template を package data として追加する
