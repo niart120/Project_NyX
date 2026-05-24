@@ -56,7 +56,7 @@ uv run ty check src\nyxpy\framework\core\macro src\nyxpy\framework\core\constant
 
 | 分類 | 代表例 | 対応方針 |
 |------|--------|----------|
-| `None` 非許容の型注釈 | `Command.capture(crop_region=None)`, `Command.notify(img=None)` | `None` が既定値や添付なしを表す場合は `T | None` にする。失敗を表す `None` は strict API と `try_*` API に分離する |
+| `None` 非許容の型注釈 | `Command.capture(crop_region=None)`, `Command.notify(img=None)` | `None` が既定値や添付なしを表す場合は `T | None` にする。失敗を表す `None` は例外に寄せ、マクロ作者向け API へ optional を広げない |
 | 動的 class 属性 | `LStick.UP`, `RStick.CENTER` | `ClassVar` 宣言または module-level constant に移す。公開 API と docs を同時に更新する |
 | 外部ライブラリ optional state | `OCRProcessor.ocr` が `None | PaddleOCR` | 初期化後に `None` でないことを guard し、局所変数へ束縛してから使う |
 | OpenCV / NumPy shape 型 | `max_loc` が `Sequence[int]` | 必要なら `tuple[int, int]` へ明示変換する |
@@ -68,7 +68,7 @@ uv run ty check src\nyxpy\framework\core\macro src\nyxpy\framework\core\constant
 ## 6. 実装順
 
 1. `constants` を直す。`LStick` / `RStick` の公開定数と `KeyCode` の `None` 型を整理する。
-2. `macro.command` を直す。`capture()` は strict API、`try_capture()` は optional API として分離し、`None` を既定値にする引数を docstring と揃える。
+2. `macro.command` を直す。`capture()` は strict API とし、`None` を既定値にする引数を docstring と揃える。
 3. `macro.exceptions` / `registry` を直す。`**kwargs` と `list` name shadowing を解消する。
 4. `imgproc` を直す。OCR 初期化 guard、OpenCV 戻り値の型変換、前処理値の型を整理する。
 5. `io.resources` を直す。読み書き context manager の型を実装に合わせる。

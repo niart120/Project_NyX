@@ -45,18 +45,15 @@ class TestOcrInitMacro(MacroBase):
 
         # --- Step 3: キャプチャ画像で OCR を実行 ---
         cmd.log("Step 3: キャプチャ画像で OCR を実行します...")
-        frame = cmd.try_capture()
-        if frame is not None:
-            try:
-                from nyxpy.framework.core.imgproc import ImageProcessor
+        frame = cmd.capture()
+        try:
+            from nyxpy.framework.core.imgproc import ImageProcessor
 
-                processor = ImageProcessor(frame)
-                text = processor.get_text(language=self.lang, preprocess=True)
-                cmd.log(f"  キャプチャ OCR 結果: '{text}'")
-            except Exception as e:
-                cmd.log(f"  キャプチャ OCR でエラー: {e}")
-        else:
-            cmd.log("  キャプチャ取得不可（デバイス未接続）")
+            processor = ImageProcessor(frame)
+            text = processor.get_text(language=self.lang, preprocess=True)
+            cmd.log(f"  キャプチャ OCR 結果: '{text}'")
+        except Exception as e:
+            cmd.log(f"  キャプチャ OCR でエラー: {e}")
 
         cmd.log("OCR テスト完了")
 

@@ -48,10 +48,7 @@ class SampleMacro(MacroBase):
                 cmd.log(f"progress: {index}/{self._cfg.count}", level="INFO")
 
         if self._cfg.capture_after:
-            frame = cmd.try_capture()
-            if frame is None:
-                cmd.log("capture failed", level="WARNING")
-                return
+            frame = cmd.capture()
             cmd.save_img(self._cfg.capture_name, frame)
 
     def finalize(self, cmd: Command) -> None:
@@ -151,7 +148,7 @@ settings = "resource:settings.toml"
 - [ ] `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスが 1 つだけある。
 - [ ] `settings_path = "resource:settings.toml"` と `resources\<macro_id>\settings.toml` が一致している。
 - [ ] 画像資材は `resources\<macro_id>\assets` に置いている。
-- [ ] フレーム未準備を通常分岐として扱う処理では `cmd.try_capture()` の戻り値 `None` を処理している。
+- [ ] `cmd.capture()` の失敗はフレームワーク側の実行失敗として扱い、マクロ側で通常分岐にしていない。
 - [ ] `finalize()` で必要な `cmd.release()` を呼んでいる。
 - [ ] 副作用のない設定変換・判定ロジックをテストしている。
 - [ ] 環境に依存しないパス表記に `\` や絶対パスを書いていない。

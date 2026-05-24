@@ -28,16 +28,6 @@ cmd.save_img("snapshot.png", frame)
 
 `cmd.capture(crop_region=None, grayscale=False)` は、最新フレームを 1280x720 へリサイズして返します。`crop_region` は `(x, y, width, height)` です。範囲外の crop は `ValueError` になります。フレームがまだ取得できない場合は `FrameNotReadyError` を送出します。
 
-フレーム未準備を通常分岐として扱う場合は `cmd.try_capture()` を使います。
-
-```python
-frame = cmd.try_capture()
-if frame is None:
-    cmd.log("capture skipped: frame is not ready", level="WARNING")
-    return
-cmd.save_img("snapshot.png", frame)
-```
-
 3DS の HD キャプチャでは、画面本体を `THREEDS_HD_CONTENT = (340, 0, 600, 720)`、下画面を `THREEDS_HD_BOTTOM_SCREEN = (400, 360, 480, 360)` として扱います。
 
 ## 画像入出力と成果物

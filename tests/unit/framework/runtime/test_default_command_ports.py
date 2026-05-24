@@ -83,12 +83,6 @@ def test_default_command_capture_raises_when_frame_is_not_ready(tmp_path) -> Non
         cmd.capture()
 
 
-def test_default_command_try_capture_returns_none_when_frame_is_not_ready(tmp_path) -> None:
-    cmd = DefaultCommand(context=make_fake_execution_context(tmp_path))
-
-    assert cmd.try_capture() is None
-
-
 def test_default_command_resources_and_artifacts_delegate_to_ports(tmp_path) -> None:
     context = make_fake_execution_context(tmp_path)
     image = np.ones((1, 1, 3), dtype=np.uint8)

@@ -323,10 +323,7 @@ class FrlgInitialSeedMacro(MacroBase):
         cfg = self._cfg
 
         # --- 実数値画面キャプチャ → ROI 保存 → 認識 ---
-        stat_image = cmd.try_capture()
-        if stat_image is None:
-            cmd.log("キャプチャ失敗（実数値）", level="WARNING")
-            return None
+        stat_image = cmd.capture()
 
         for roi, name in zip(ROI_STATS, _STAT_FILE_NAMES):
             cmd.save_img(self._img_dir / f"stat_{name}.png", crop_and_pad(stat_image, roi))
@@ -386,8 +383,5 @@ class FrlgInitialSeedMacro(MacroBase):
             f"初期Seedを{cfg.max_frame}Fまで取得したので、プログラムを終了します。"
         )
         cmd.log(msg, level="INFO")
-        image = cmd.try_capture()
-        if image is not None:
-            cmd.notify(msg, image)
-        else:
-            cmd.notify(msg)
+        image = cmd.capture()
+        cmd.notify(msg, image)

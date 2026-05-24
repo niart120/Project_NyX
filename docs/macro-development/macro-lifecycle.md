@@ -51,13 +51,10 @@ def initialize(self, cmd: Command, args: dict) -> None:
 
 ## run(cmd)
 
-マクロの本処理を実行します。ボタン入力、待機、キャプチャ、画像判定、通知は `Command` を使います。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。フレーム未準備を通常分岐として扱う場合は `cmd.try_capture()` を使います。
+マクロの本処理を実行します。ボタン入力、待機、キャプチャ、画像判定、通知は `Command` を使います。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
 
 ```python
-frame = cmd.try_capture()
-if frame is None:
-    cmd.log("capture failed", level="WARNING")
-    return
+frame = cmd.capture()
 cmd.save_img("snapshot.png", frame)
 ```
 

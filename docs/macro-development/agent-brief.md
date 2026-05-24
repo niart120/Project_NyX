@@ -29,7 +29,7 @@
 - `macros\xxx` から `macros\yyy` を直接インポートしません。
 - 副作用のない処理は純粋関数へ分離し、`Command` なしでテストできるようにします。
 - コントローラー操作、待機、キャプチャ、画像入出力、通知、ログは `Command` 経由で行います。
-- `cmd.capture()` はフレーム未準備時に例外を送出します。フレーム未準備を分岐で扱う場合は `cmd.try_capture()` を使います。
+- `cmd.capture()` はフレーム未準備時に例外を送出します。マクロ側でフレーム未準備を通常分岐にしません。
 - `settings_path` の標準例は `settings_path = "resource:settings.toml"`。
 - `resource:` / `project:` / マニフェスト相対パスなど、環境に依存しないパス表記では `/` を使います。例: `assets/template.png`。
 - 旧 `static\<macro_name>` 配置は標準探索されません。
@@ -82,10 +82,7 @@ class SampleMacro(MacroBase):
         for _ in range(self.count):
             cmd.press(Button.A, dur=0.06, wait=0.08)
 
-        frame = cmd.try_capture()
-        if frame is None:
-            cmd.log("capture failed", level="WARNING")
-            return
+        frame = cmd.capture()
         cmd.save_img("sample_result.png", frame)
 
     def finalize(self, cmd: Command) -> None:
@@ -134,7 +131,6 @@ resources\<macro_id>\
 | `cmd.hold(...)`, `cmd.release(...)` | 押しっぱなしと解放 |
 | `cmd.wait(sec)` | 中断要求を確認しながら待機 |
 | `cmd.capture(crop_region=None, grayscale=False)` | 1280x720 にリサイズしたキャプチャ取得。フレーム未準備時は例外 |
-| `cmd.try_capture(crop_region=None, grayscale=False)` | 取得可能な最新フレーム。フレーム未準備時は `None` |
 | `cmd.load_img(name)`, `cmd.save_img(name, image)` | 資材の読み込み、実行ごとの出力への画像保存 |
 | `cmd.keyboard(text)`, `cmd.type(key)` | キーボード入力 |
 | `cmd.notify(text, img=None)` | 外部通知 |
@@ -165,7 +161,7 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 
 - `macros\<macro_id>` と `resources\<macro_id>` の対応が取れている。
 - `settings_path = "resource:settings.toml"` と `resources\<macro_id>\settings.toml` が一致している。
-- フレーム未準備を通常分岐として扱う処理では `cmd.try_capture()` の `None` を処理している。
+- `cmd.capture()` の失敗をマクロ側の通常分岐として扱っていない。
 - `finalize()` で必要な `cmd.release()` や後片付けを行っている。
 - ロジック関数の単体テストを追加している。
 - `uv run ruff check .` と該当 pytest が通る。

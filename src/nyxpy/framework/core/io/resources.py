@@ -34,7 +34,7 @@ class ResourceSource(StrEnum):
     RUN_OUTPUTS = "run_outputs"
 
 
-class BinaryOutput(Protocol):
+class _BinaryOutput(Protocol):
     """run output の binary write 用 context manager。"""
 
     @property
@@ -46,7 +46,7 @@ class BinaryOutput(Protocol):
 
     def close(self) -> None: ...
 
-    def __enter__(self) -> BinaryOutput:
+    def __enter__(self) -> _BinaryOutput:
         """Context manager に入ります。"""
         ...
 
@@ -298,7 +298,7 @@ class RunArtifactStore(ABC):
         *,
         overwrite: OverwritePolicy = OverwritePolicy.ERROR,
         atomic: bool = True,
-    ) -> BinaryOutput: ...
+    ) -> _BinaryOutput: ...
 
     def close(self) -> None:
         pass
@@ -396,7 +396,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         *,
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
-    ) -> BinaryOutput:
+    ) -> _BinaryOutput:
         """実行成果物ディレクトリ配下の任意バイナリ出力を開きます。"""
         if "b" not in mode:
             raise ResourceConfigurationError("open_output requires a binary mode")
@@ -414,7 +414,7 @@ class LocalRunArtifactStore(RunArtifactStore):
                 raise ResourceAlreadyExistsError(
                     f"output already exists: {final_ref.relative_path}"
                 )
-            return cast(BinaryOutput, final_ref.path.open(open_mode))
+            return cast(_BinaryOutput, final_ref.path.open(open_mode))
 
         if "a" in mode:
             raise ResourceConfigurationError("atomic append output is not supported")

@@ -63,15 +63,14 @@ class SampleTurboMacro(MacroBase):
             if index % 5 == 0:
                 cmd.log(f"progress: {index}/{self.count}", level="INFO")
 
-        frame = cmd.try_capture()
-        if frame is not None:
-            cmd.save_img("sample_turbo_result.png", frame)
+        frame = cmd.capture()
+        cmd.save_img("sample_turbo_result.png", frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()
 ```
 
-`settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はフレーム未準備時に例外を送出します。フレーム未準備を分岐で扱う場合は `cmd.try_capture()` を使います。
+`settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
 
 ## 自動検出の条件
 

@@ -109,19 +109,6 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def try_capture(
-        self, crop_region: tuple[int, int, int, int] | None = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike | None:
-        """取得可能な最新フレームを返し、未準備の場合は None を返します。
-
-        :param crop_region: (optional) クロップする領域の指定 (x, y, width, height)
-        :param grayscale: (optional) グレースケール変換を行うかどうかのフラグ (デフォルト:False)
-        :return result_frame: キャプチャした画像データ。フレームがない場合は None
-        :raises ValueError: クロップ領域がフレームサイズ(1280x720)を超える場合にスローされます。
-        """
-        pass
-
-    @abstractmethod
     def save_img(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
         """画像を指定されたパスに保存します。
 
@@ -284,19 +271,6 @@ class DefaultCommand(Command):
     ) -> cv2.typing.MatLike:
         self._debug_command("Capturing screen...")
         capture_data = self.context.frame_source.latest_frame()
-        frame = self._format_capture(capture_data, crop_region, grayscale)
-        self._debug_command("Capture successful")
-        return frame
-
-    @check_interrupt
-    def try_capture(
-        self, crop_region: tuple[int, int, int, int] | None = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike | None:
-        self._debug_command("Trying to capture screen...")
-        capture_data = self.context.frame_source.try_latest_frame()
-        if capture_data is None:
-            self._debug_command("Capture skipped: frame is not ready")
-            return None
         frame = self._format_capture(capture_data, crop_region, grayscale)
         self._debug_command("Capture successful")
         return frame

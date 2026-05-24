@@ -359,9 +359,7 @@ class FrlgIdRngMacro(MacroBase):
 
         :return: (TID または None, 白パディング付きクロップ画像 または None)
         """
-        image = cmd.try_capture()
-        if image is None:
-            return None, None
+        image = cmd.capture()
 
         # ROI クロップ → 白パディング付与
         x, y, w, h = self._timing.tid_roi
