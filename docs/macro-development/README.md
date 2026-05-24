@@ -1,6 +1,6 @@
 # マクロ開発者向けドキュメント
 
-NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの案内です。現時点の配布パッケージは未公開です。将来の PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` としますが、現在はこのリポジトリをクローンして `uv sync` した環境を前提にします。
+NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの案内です。PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` です。配布パッケージは公開準備中のため、現時点で動作確認する場合はこのリポジトリをクローンして `uv sync` した環境を使います。
 
 ## 関連文書
 
@@ -36,6 +36,24 @@ resources\<macro_id>\
 ```
 
 `examples\macros` と `examples\resources` は参照用サンプルの置き場です。利用者のマクロ配置先ではありません。完成したサンプルを公開するときだけ、実装済みマクロを `examples\` 配下へコピーして、対応する `examples\tests` を追加します。
+
+## workspace 初期化と雛形生成
+
+公開後の主導線は `uv tool install nyxfw` で `nyxpy` を導入し、workspace 内で次のコマンドを使う形です。
+
+```powershell
+nyxpy init --blank
+nyxpy create sample_turbo
+```
+
+リポジトリから実行する場合は `uv run` を付けます。
+
+```powershell
+uv run nyxpy init --blank
+uv run nyxpy create sample_turbo
+```
+
+`nyxpy init` は `sample_macro` も生成します。空の workspace だけを作る場合は `--blank` を使います。`nyxpy create <macro_id>` は既存 workspace の `macros\<macro_id>` と `resources\<macro_id>` に雛形を生成します。
 
 ## 最小構成の例
 

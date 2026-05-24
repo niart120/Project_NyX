@@ -256,7 +256,7 @@ Phase 0 では、以後の docs に影響する前提を確定する。特に Py
 
 ##### 配布名・import 名
 
-現行コードでは、配布名は `pyproject.toml` の `project.name = "project-nyx"`、import 名は `src\nyxpy\` の `nyxpy` である。正式公開時の PyPI 配布名は `nyxfw`、import 名は `nyxpy` とする。`nyxpy` は PyPI 上で既存プロジェクトが使用しているため配布名には使わない。`project-nyx` は未登録で現行設定との整合はあるが、公開パッケージ名としてはリポジトリ内向きに見えるため採用しない。`nyx-automation`、`nyx-switch`、`nyx-framework`、`nyx-fw`、`nyxframework` も未登録だったが、導入コマンドを短く保てる `nyxfw` を採用する。
+現行コードでは、配布名は `pyproject.toml` の `project.name = "nyxfw"`、import 名は `src\nyxpy\` の `nyxpy` である。`nyxpy` は PyPI 上で既存プロジェクトが使用しているため配布名には使わない。`project-nyx` は未登録で旧設定との整合はあったが、公開パッケージ名としてはリポジトリ内向きに見えるため採用しない。`nyx-automation`、`nyx-switch`、`nyx-framework`、`nyx-fw`、`nyxframework` も未登録だったが、導入コマンドを短く保てる `nyxfw` を採用する。
 
 ##### 公開 API 一覧
 

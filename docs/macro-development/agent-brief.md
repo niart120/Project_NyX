@@ -4,7 +4,7 @@
 
 ## 前提
 
-- 現在の PyPI 配布パッケージは未公開です。将来の配布名は `nyxfw`、インポート名は `nyxpy` です。
+- PyPI 配布名は `nyxfw`、インポート名は `nyxpy` です。配布パッケージは公開準備中です。
 - 実装者のマクロ本体は `macros\<macro_id>`、設定・画像資材は `resources\<macro_id>` に置きます。
 - `examples\macros` と `examples\resources` は参照用サンプルの置き場であり、利用者の配置先ではありません。
 - PowerShell コマンドを使います。bash / sh 前提のコマンドは書きません。
@@ -101,6 +101,8 @@ macros\<macro_id>\macro.py
 `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスを 1 つだけ置きます。`macro.py` と `__init__.py` の両方に置くとエントリーポイントが曖昧になり、読み込みに失敗します。インポートした基底クラスや他モジュールのクラスは検出候補に数えられません。
 
 複数のエントリーポイント、単一ファイルのマニフェスト、明示的なメタデータが必要な場合だけ `macro.toml` を使います。
+
+workspace 初期化と雛形生成は `nyxpy` を使います。`nyxpy init` は sample macro も生成し、空 workspace だけが必要な場合は `nyxpy init --blank` を使います。`nyxpy create <macro_id>` は既存 workspace に `macros\<macro_id>` と `resources\<macro_id>` を生成します。
 
 ```toml
 [macro]

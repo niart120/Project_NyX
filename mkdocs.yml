@@ -1,5 +1,5 @@
 site_name: Project NyX
-site_description: Nintendo Switch 自動化フレームワークとマクロ開発者向けドキュメント
+site_description: Nintendo Switch 自動化フレームワークの利用者向け・マクロ開発者向けドキュメント
 site_url: https://niart120.github.io/Project_NyX/
 repo_url: https://github.com/niart120/Project_NyX
 docs_dir: docs
@@ -8,6 +8,14 @@ strict: true
 
 nav:
   - ホーム: index.md
+  - 利用者向けガイド:
+      - 概要: user-guide/README.md
+      - インストール: user-guide/installation.md
+      - デバイス設定: user-guide/device-setup.md
+      - GUI: user-guide/gui.md
+      - CLI: user-guide/cli.md
+      - 通知設定: user-guide/notifications.md
+      - トラブルシューティング: user-guide/troubleshooting.md
   - マクロ開発:
       - 概要: macro-development/README.md
       - Agent brief: macro-development/agent-brief.md

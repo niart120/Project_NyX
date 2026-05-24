@@ -1,14 +1,15 @@
 # マクロの雛形
 
-この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
+この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
 
 ## ディレクトリ
 
 ```text
 macros\sample_macro\
+  __init__.py
   macro.py
   config.py
-  test_config.py
+  test_logic.py
 
 resources\sample_macro\
   settings.toml
@@ -87,7 +88,7 @@ class SampleConfig:
         return cfg
 ```
 
-## test_config.py
+## test_logic.py
 
 ```python
 import pytest
