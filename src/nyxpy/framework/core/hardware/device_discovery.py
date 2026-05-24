@@ -6,7 +6,7 @@ import platform
 import threading
 import time
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import cv2
 import serial.tools.list_ports
@@ -251,8 +251,11 @@ class DeviceDiscoveryService:
 
     def _detect_macos_capture_devices(self) -> list[DeviceInfo]:
         devices: list[DeviceInfo] = []
-        log_level = cv2.getLogLevel()
-        cv2.setLogLevel(0)
+        get_log_level = getattr(cv2, "getLogLevel", None)
+        set_log_level = getattr(cv2, "setLogLevel", None)
+        log_level: Any | None = get_log_level() if callable(get_log_level) else None
+        if callable(set_log_level):
+            set_log_level(0)
         try:
             for index in range(5):
                 cap = cv2.VideoCapture(index)
@@ -266,7 +269,8 @@ class DeviceDiscoveryService:
                     )
                 cap.release()
         finally:
-            cv2.setLogLevel(log_level)
+            if callable(set_log_level) and log_level is not None:
+                    set_log_level(log_level)
         return devices
 
 

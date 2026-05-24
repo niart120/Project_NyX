@@ -126,7 +126,7 @@ class _Win32Rect(ctypes.Structure):
 
 def _list_windows_win32(user32=None) -> tuple[WindowInfo, ...]:
     ensure_capture_coordinate_space()
-    user32 = user32 or ctypes.windll.user32
+    user32 = user32 or _user32()
     windows: list[WindowInfo] = []
 
     enum_windows_proc = _win32_callback_type(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
@@ -146,7 +146,7 @@ def _win32_callback_type(*args):
 
 
 def _window_info_from_hwnd(hwnd: int, user32=None) -> WindowInfo | None:
-    user32 = user32 or ctypes.windll.user32
+    user32 = user32 or _user32()
     if not user32.IsWindowVisible(hwnd):
         return None
     is_iconic = getattr(user32, "IsIconic", None)
@@ -173,6 +173,17 @@ def _window_info_from_hwnd(hwnd: int, user32=None) -> WindowInfo | None:
         rect=client_rect,
         window_rect=window_rect,
     )
+
+
+def _user32():
+    windll = getattr(ctypes, "windll", None)
+    if windll is None:
+        raise ConfigurationError(
+            "ctypes.windll.user32 is required for Win32 window discovery",
+            code="NYX_CAPTURE_WINDOW_DISCOVERY_UNSUPPORTED_PLATFORM",
+            component="WindowDiscovery",
+        )
+    return windll.user32
 
 
 def _window_hwnd(value: object) -> int | None:
