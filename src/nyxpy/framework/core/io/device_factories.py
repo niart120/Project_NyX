@@ -19,7 +19,11 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
-from nyxpy.framework.core.hardware.serial_comm import DummySerialComm, SerialComm
+from nyxpy.framework.core.hardware.serial_comm import (
+    DummySerialComm,
+    SerialComm,
+    SerialCommInterface,
+)
 from nyxpy.framework.core.hardware.window_capture import (
     WindowCaptureBackend,
     WindowCaptureDevice,
@@ -39,13 +43,13 @@ class ControllerOutputPortFactory:
         *,
         discovery: DeviceDiscoveryService,
         protocol: SerialProtocolInterface,
-        serial_factory: Callable[[str], object] = SerialComm,
+        serial_factory: Callable[[str], SerialCommInterface] = SerialComm,
     ) -> None:
         """Device discovery、protocol、serial factory を保持します。"""
         self.discovery = discovery
         self.protocol = protocol
         self.serial_factory = serial_factory
-        self._devices: dict[str, object] = {}
+        self._devices: dict[str, SerialCommInterface] = {}
 
     def create(
         self,
@@ -87,7 +91,7 @@ class ControllerOutputPortFactory:
         if errors:
             raise ExceptionGroup("ControllerOutputPortFactory close failed", errors)
 
-    def _dummy_serial(self) -> object:
+    def _dummy_serial(self) -> SerialCommInterface:
         device = self._devices.get(DUMMY_DEVICE_NAME)
         if device is None:
             device = DummySerialComm("dummy")

@@ -10,7 +10,8 @@ from enum import StrEnum
 from os import PathLike
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import BinaryIO, Protocol
+from types import TracebackType
+from typing import BinaryIO, Protocol, cast
 
 import cv2
 
@@ -31,6 +32,32 @@ class ResourceSource(StrEnum):
     MACRO_PACKAGE = "macro_package"
     PACKAGE_RESOURCE = "package_resource"
     RUN_OUTPUTS = "run_outputs"
+
+
+class _BinaryOutput(Protocol):
+    """run output の binary write 用 context manager。"""
+
+    @property
+    def closed(self) -> bool: ...
+
+    def write(self, data: bytes, /) -> int: ...
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> _BinaryOutput:
+        """Context manager に入ります。"""
+        ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None:
+        """Context manager から出ます。"""
+        ...
 
 
 class OverwritePolicy(StrEnum):
@@ -271,7 +298,7 @@ class RunArtifactStore(ABC):
         *,
         overwrite: OverwritePolicy = OverwritePolicy.ERROR,
         atomic: bool = True,
-    ) -> BinaryIO: ...
+    ) -> _BinaryOutput: ...
 
     def close(self) -> None:
         pass
@@ -369,7 +396,7 @@ class LocalRunArtifactStore(RunArtifactStore):
         *,
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
-    ) -> BinaryIO:
+    ) -> _BinaryOutput:
         """実行成果物ディレクトリ配下の任意バイナリ出力を開きます。"""
         if "b" not in mode:
             raise ResourceConfigurationError("open_output requires a binary mode")
@@ -387,7 +414,7 @@ class LocalRunArtifactStore(RunArtifactStore):
                 raise ResourceAlreadyExistsError(
                     f"output already exists: {final_ref.relative_path}"
                 )
-            return final_ref.path.open(open_mode)
+            return cast(_BinaryOutput, final_ref.path.open(open_mode))
 
         if "a" in mode:
             raise ResourceConfigurationError("atomic append output is not supported")
@@ -477,6 +504,12 @@ class _AtomicOutputFile(AbstractContextManager):
     def __iter__(self) -> Iterator[bytes]:
         return iter(self._file)
 
+    def write(self, data: bytes, /) -> int:
+        return self._file.write(data)
+
+    def flush(self) -> None:
+        self._file.flush()
+
     def close(self) -> None:
         if self._closed:
             return
@@ -493,10 +526,17 @@ class _AtomicOutputFile(AbstractContextManager):
     def closed(self) -> bool:
         return self._closed
 
-    def __enter__(self):
+    def __enter__(self) -> _AtomicOutputFile:
+        """Context manager に入ります。"""
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        """例外時は一時ファイルを削除し、正常時は成果物へ置換します。"""
         if exc_type is not None:
             self._closed = True
             self._file.close()

@@ -1,13 +1,22 @@
 [project]
-name = "project-nyx"
+name = "nyxfw"
 version = "0.1.0"
-description = "NS Automation Framework"
+description = "Nintendo Switch automation framework with macro APIs, CLI, and GUI"
 authors = [
     {name = "niart120",email = "38847256+niart120@users.noreply.github.com"}
 ]
 license = {text = "MIT License"}
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
+keywords = ["automation", "macro", "nintendo-switch", "capture", "serial"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
 dependencies = [
     "pyserial >=3.5,<4.0",
     "pillow>=12.2.0,<13.0.0",
@@ -32,16 +41,29 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-qt>=4.5.0",
     "ruff>=0.15.12",
+    "ty>=0.0.39",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocstrings[python]>=0.29",
+    "ruff>=0.15.12",
 ]
 
 [project.scripts]
-nyx-cli = "nyxpy.cli.run_cli:main"
-nyx-gui = "nyxpy.gui.run_gui:main"
+nyxpy = "nyxpy.__main__:main"
+nyx-cli = "nyxpy.__main__:run_alias_main"
+nyx-gui = "nyxpy.__main__:gui_app"
 
 [project.optional-dependencies]
 windows = [
     "windows-capture>=2.0.0,<3.0.0 ; sys_platform == 'win32'",
 ]
+
+[project.urls]
+Homepage = "https://github.com/niart120/Project_NyX"
+Documentation = "https://niart120.github.io/Project_NyX/"
+Repository = "https://github.com/niart120/Project_NyX"
+Issues = "https://github.com/niart120/Project_NyX/issues"
 
 [build-system]
 requires = ["hatchling>=1.0"]
@@ -113,4 +135,3 @@ convention = "google"
 "conftest.py" = ["D100"]
 "tests/**" = ["D100", "D101", "D103", "D107", "E402"]  # pytest.importorskip / sys.path.insert 後の import を許容
 "examples/tests/**" = ["D100", "D101", "D103", "D107", "E402"]
-

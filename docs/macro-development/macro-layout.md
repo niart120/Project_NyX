@@ -16,9 +16,10 @@ NyX の利用者が実装するマクロは、リポジトリ直下の `macros\`
 
 ```text
 macros\sample_macro\
+  __init__.py
   macro.py
   config.py
-  test_config.py
+  test_logic.py
 
 resources\sample_macro\
   settings.toml
@@ -54,4 +55,3 @@ examples\macros\xxx  -> examples\macros\yyy     NG
 利用者が新規マクロを作る場合は、まず `macros\<macro_id>` と `resources\<macro_id>` に置きます。公開サンプルとして整備する段階で、対応するファイルを `examples\macros`, `examples\resources`, `examples\tests` へ移します。
 
 公開サンプルを読むときは、`examples\macros\shared` を examples 内の共通部品として扱います。ローカルの `macros\` から `examples\macros\shared` を直接インポートする前提にはしません。
-

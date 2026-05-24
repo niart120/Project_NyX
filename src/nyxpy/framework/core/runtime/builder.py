@@ -300,4 +300,4 @@ def _optional_name(value: object) -> str | None:
 def _optional_int(value: object) -> int | None:
     if value is None or value == "":
         return None
-    return int(value)
+    return int(str(value).strip())

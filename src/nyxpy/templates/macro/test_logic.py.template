@@ -1,0 +1,20 @@
+"""Tests for generated macro configuration helpers."""
+
+import pytest
+
+from .config import {class_name}Config
+
+
+def test_{macro_id}_config_from_args() -> None:
+    """Argument values are converted to typed config fields."""
+    cfg = {class_name}Config.from_args({{"count": "3"}})
+
+    assert cfg.count == 3
+    assert cfg.press_seconds == 0.06
+    assert cfg.wait_seconds == 0.08
+
+
+def test_{macro_id}_config_rejects_non_positive_count() -> None:
+    """Non-positive repeat counts are rejected."""
+    with pytest.raises(ValueError, match="count"):
+        {class_name}Config.from_args({{"count": 0}})

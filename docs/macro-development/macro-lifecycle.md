@@ -51,13 +51,11 @@ def initialize(self, cmd: Command, args: dict) -> None:
 
 ## run(cmd)
 
-マクロの本処理を実行します。ボタン入力、待機、キャプチャ、画像判定、通知は `Command` を使います。`cmd.capture()` はフレームがない場合に `None` を返すため、画像処理や保存の前に確認します。
+マクロの本処理を実行します。ボタン入力、待機、キャプチャ、画像判定、通知は `Command` を使います。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
 
 ```python
 frame = cmd.capture()
-if frame is None:
-    cmd.log("capture failed", level="WARNING")
-    return
+cmd.save_img("snapshot.png", frame)
 ```
 
 ## finalize(cmd)
@@ -72,4 +70,3 @@ def finalize(self, cmd: Command) -> None:
 ## 状態の持ち方
 
 インスタンス変数には設定値と最小限の実行状態だけを持たせます。乱数計算、画像判定、設定変換は関数へ分離し、`Command` なしで単体テストできるようにします。
-

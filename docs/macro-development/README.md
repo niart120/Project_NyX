@@ -1,6 +1,6 @@
 # マクロ開発者向けドキュメント
 
-NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの案内です。現時点の配布パッケージは未公開です。将来の PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` としますが、現在はこのリポジトリをクローンして `uv sync` した環境を前提にします。
+NyX でマクロを実装する人と、マクロ実装を担当する AI エージェント向けの案内です。PyPI 配布名は `nyxfw`、Python のインポート名は `nyxpy` です。配布パッケージは公開準備中のため、現時点で動作確認する場合はこのリポジトリをクローンして `uv sync` した環境を使います。
 
 ## 関連文書
 
@@ -17,6 +17,7 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 | [nintendo-3ds.md](nintendo-3ds.md) | 3DS 向け座標、touch、sleep control。 |
 | [image-processing.md](image-processing.md) | テンプレートマッチング、OCR、前処理。 |
 | [sample-macros.md](sample-macros.md) | `examples\macros`, `examples\resources`, `examples\tests` の対応。 |
+| [API reference](../api/framework.md) | `MacroBase`, `Command`, constants, imgproc, resources の docstring / 型ヒントから生成する参照文書。 |
 
 ## 推奨配置
 
@@ -35,6 +36,24 @@ resources\<macro_id>\
 ```
 
 `examples\macros` と `examples\resources` は参照用サンプルの置き場です。利用者のマクロ配置先ではありません。完成したサンプルを公開するときだけ、実装済みマクロを `examples\` 配下へコピーして、対応する `examples\tests` を追加します。
+
+## workspace 初期化と雛形生成
+
+公開後の主導線は `uv tool install nyxfw` で `nyxpy` を導入し、workspace 内で次のコマンドを使う形です。
+
+```powershell
+nyxpy init --blank
+nyxpy create sample_turbo
+```
+
+リポジトリから実行する場合は `uv run` を付けます。
+
+```powershell
+uv run nyxpy init --blank
+uv run nyxpy create sample_turbo
+```
+
+`nyxpy init` は `sample_macro` も生成します。空の workspace だけを作る場合は `--blank` を使います。`nyxpy create <macro_id>` は既存 workspace の `macros\<macro_id>` と `resources\<macro_id>` に雛形を生成します。
 
 ## 最小構成の例
 
@@ -63,14 +82,13 @@ class SampleTurboMacro(MacroBase):
                 cmd.log(f"progress: {index}/{self.count}", level="INFO")
 
         frame = cmd.capture()
-        if frame is not None:
-            cmd.save_img("sample_turbo_result.png", frame)
+        cmd.save_img("sample_turbo_result.png", frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()
 ```
 
-`settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はキャプチャフレームがない場合に `None` を返すため、画像処理や保存の前に必ず確認します。
+`settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
 
 ## 自動検出の条件
 
@@ -94,6 +112,7 @@ class SampleTurboMacro(MacroBase):
 ```powershell
 uv run ruff format .
 uv run ruff check .
+uv run ty check src\nyxpy --output-format concise --no-progress
 uv run pytest tests macros examples/tests
 ```
 
@@ -113,4 +132,3 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 | `examples\macros\nsmb_sort_or_splode` | 3DS touch、テンプレートマッチング、`settings_path = "resource:settings.toml"` |
 | `examples\macros\frlg_initial_seed` | OCR、CSV 出力、認識ロジック分離、実行ごとの出力への保存 |
 | `examples\macros\frlg_id_rng` | キーボード配列、ソフトリセット補助、フレーム走査 |
-

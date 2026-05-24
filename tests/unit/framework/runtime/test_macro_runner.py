@@ -44,7 +44,7 @@ class RecordingCommand(Command):
         self.events.append(sep.join(map(str, values)) + end.rstrip("\n"))
 
     def capture(self, crop_region=None, grayscale: bool = False):
-        return None
+        raise RuntimeError("capture not configured")
 
     def save_img(self, filename, image) -> None:
         self.events.append(f"save:{filename}")

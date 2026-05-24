@@ -6,6 +6,7 @@ import platform
 import sys
 import threading
 from collections.abc import Callable
+from importlib import import_module
 from typing import Any
 
 import cv2
@@ -164,7 +165,7 @@ class WindowsGraphicsCaptureSession(WindowCaptureSession):
 
 def _import_windows_capture() -> type:
     try:
-        from windows_capture import WindowsCapture
+        module = import_module("windows_capture")
     except ImportError as exc:
         raise ConfigurationError(
             "windows-capture optional dependency is required for windows_graphics_capture",
@@ -172,7 +173,14 @@ def _import_windows_capture() -> type:
             component="WindowsGraphicsCaptureBackend",
             cause=exc,
         ) from exc
-    return WindowsCapture
+    windows_capture = getattr(module, "WindowsCapture")
+    if not isinstance(windows_capture, type):
+        raise ConfigurationError(
+            "windows-capture did not expose WindowsCapture class",
+            code="NYX_CAPTURE_WINDOWS_CAPTURE_INVALID",
+            component="WindowsGraphicsCaptureBackend",
+        )
+    return windows_capture
 
 
 def _windows_build() -> int | None:

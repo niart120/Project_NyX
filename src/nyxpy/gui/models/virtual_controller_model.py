@@ -92,10 +92,11 @@ class VirtualControllerModel(QObject):
             self.current_r_stick = RStick.CENTER
 
     def touch_down(self, x: int, y: int) -> None:
-        if not self.supports_touch_input():
+        controller = self.controller
+        if controller is None or not controller.supports_touch:
             return
         try:
-            self.controller.touch_down(x, y)
+            controller.touch_down(x, y)
         except Exception as e:
             self.logger.technical(
                 "ERROR",
@@ -110,10 +111,11 @@ class VirtualControllerModel(QObject):
         self.touch_down(x, y)
 
     def touch_up(self) -> None:
-        if not self.supports_touch_input():
+        controller = self.controller
+        if controller is None or not controller.supports_touch:
             return
         try:
-            self.controller.touch_up()
+            controller.touch_up()
         except Exception as e:
             self.logger.technical(
                 "ERROR",

@@ -1,0 +1,26 @@
+"""Configuration helpers for the generated NyX macro."""
+
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class {class_name}Config:
+    """Validated settings for {class_name}."""
+
+    count: int
+    press_seconds: float
+    wait_seconds: float
+
+    @classmethod
+    def from_args(cls, args: dict[str, Any]) -> "{class_name}Config":
+        cfg = cls(
+            count=int(args.get("count", 10)),
+            press_seconds=float(args.get("press_seconds", 0.06)),
+            wait_seconds=float(args.get("wait_seconds", 0.08)),
+        )
+        if cfg.count <= 0:
+            raise ValueError("count must be greater than 0")
+        if cfg.press_seconds < 0 or cfg.wait_seconds < 0:
+            raise ValueError("press_seconds and wait_seconds must be non-negative")
+        return cfg

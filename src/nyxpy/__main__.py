@@ -4,25 +4,55 @@ import argparse
 import sys
 from pathlib import Path
 
-from nyxpy.cli.run_cli import cli_main
+from nyxpy.cli.run_cli import add_run_arguments, cli_main
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
+from nyxpy.framework.core.macro.scaffold import (
+    MacroScaffoldConflictError,
+    ScaffoldConflictPolicy,
+    create_macro_scaffold,
+)
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.framework.core.settings.workspace import ensure_workspace
-from nyxpy.gui.run_gui import main as gui_main
+
+_DOC_URLS = (
+    ("User guide", "https://niart120.github.io/Project_NyX/user-guide/"),
+    ("Macro development docs", "https://niart120.github.io/Project_NyX/macro-development/"),
+    ("Agent brief", "https://niart120.github.io/Project_NyX/macro-development/agent-brief/"),
+    ("API reference", "https://niart120.github.io/Project_NyX/api/framework/"),
+    ("Local API help", "python -m pydoc nyxpy.framework.core.macro.command"),
+)
 
 
-def init_app() -> int:
-    """Initialize the workspace for GUI/CLI: create macros, snapshots, resources, runs folders."""
-    paths = ensure_workspace(Path.cwd())
+def init_app(
+    *,
+    blank: bool = False,
+    force: bool = False,
+    project_root: Path | None = None,
+) -> int:
+    """Initialize the workspace and optionally create the sample macro scaffold."""
+    paths = ensure_workspace(project_root or Path.cwd())
     GlobalSettings(config_dir=paths.config_dir)
     SecretsSettings(config_dir=paths.config_dir)
     dirs = ["macros", "snapshots", "resources", "runs", "logs"]
     print(f"Initialized directories: {', '.join(dirs)}, .nyxpy")
+    if not blank:
+        result = create_macro_scaffold(
+            macro_id="sample_macro",
+            project_root=paths.project_root,
+            conflict_policy=(
+                ScaffoldConflictPolicy.OVERWRITE if force else ScaffoldConflictPolicy.SKIP
+            ),
+        )
+        _print_scaffold_result(result)
     return 0
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     """NyXアプリケーションのコマンドライン引数を解析します。
+
+    Args:
+        argv: 解析対象の引数列。未指定の場合は `sys.argv` を使います。
 
     Returns:
         解析されたコマンドライン引数
@@ -33,82 +63,103 @@ def parse_arguments() -> argparse.Namespace:
     )
     subparsers = parser.add_subparsers(dest="command", required=True, help="Command to execute")
 
-    # CLIサブコマンドパーサー
-    cli_parser = subparsers.add_parser("cli", help="Run macro via command line interface")
+    run_parser = subparsers.add_parser("run", help="Run macro via command line interface")
+    add_run_arguments(run_parser)
 
-    cli_parser.add_argument(
-        "-s", "--serial", type=str, required=True, help="Serial port name (e.g., COM3)"
-    )
-
-    cli_parser.add_argument(
-        "-c",
-        "--capture",
-        type=str,
-        required=True,
-        help="Capture device name (index or identifier)",
-    )
-
-    cli_parser.add_argument(
-        "-p",
-        "--protocol",
-        type=str,
-        default="CH552",
-        help="Protocol name (default: CH552)",
-    )
-
-    cli_parser.add_argument(
-        "--baud",
-        type=int,
-        default=None,
-        help="Serial baudrate (default: protocol-specific)",
-    )
-
-    cli_parser.add_argument(
-        "-D",
-        "--define",
-        action="append",
-        help="Macro execution argument in key=value format",
-        default=[],
-    )
-
-    cli_parser.add_argument("--silence", action="store_true", help="Disable log output")
-
-    cli_parser.add_argument("--verbose", action="store_true", help="Enable debug logs")
-
-    cli_parser.add_argument("macro_name", help="Name of macro to execute")
-
-    # GUI/CLI 初期化および GUI 起動コマンド
-    subparsers.add_parser(
+    init_parser = subparsers.add_parser(
         "init",
-        help="Initialize workspace (create macros, snapshots, resources, runs folders)",
+        help="Initialize workspace and create sample macro scaffold",
+    )
+    init_parser.add_argument("--blank", action="store_true", help="Skip sample macro scaffold")
+    init_parser.add_argument("--force", action="store_true", help="Overwrite sample macro scaffold")
+
+    create_parser = subparsers.add_parser("create", help="Create a macro scaffold")
+    create_parser.add_argument("macro_id", help="Macro id in lower_snake_case")
+    create_parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    create_parser.add_argument(
+        "--root",
+        type=Path,
+        default=None,
+        help="Workspace root. Defaults to nearest parent containing .nyxpy",
     )
 
-    # GUI 起動サブコマンド
+    subparsers.add_parser("docs", help="Print documentation URLs")
+
     subparsers.add_parser("gui", help="Launch the graphical user interface")
 
-    # 将来: ここに他のサブコマンドを追加（例: server）
-
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
+def docs_app() -> int:
+    """Print public documentation URLs."""
+    for label, value in _DOC_URLS:
+        print(f"{label}: {value}")
+    return 0
+
+
+def create_app(args: argparse.Namespace) -> int:
+    """Create a macro scaffold from CLI arguments."""
+    result = create_macro_scaffold(
+        macro_id=args.macro_id,
+        project_root=args.root,
+        conflict_policy=(
+            ScaffoldConflictPolicy.OVERWRITE if args.force else ScaffoldConflictPolicy.FAIL
+        ),
+    )
+    _print_scaffold_result(result)
+    return 0
+
+
+def gui_app() -> int:
+    """Launch the GUI lazily so non-GUI commands do not import Qt."""
+    from nyxpy.gui.run_gui import main as gui_main
+
+    gui_main()
+    return 0
+
+
+def run_alias_main(argv: list[str] | None = None) -> int:
+    """Run macro execution CLI as the `nyx-cli` alias."""
+    parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
+    add_run_arguments(parser)
+    return cli_main(parser.parse_args(argv))
+
+
+def _print_scaffold_result(result) -> None:
+    print(f"Created macro scaffold: {result.macro_id}")
+    _print_paths("created", result.created, result.project_root)
+    _print_paths("overwritten", result.overwritten, result.project_root)
+    _print_paths("skipped", result.skipped, result.project_root)
+
+
+def _print_paths(label: str, paths: tuple[Path, ...], project_root: Path) -> None:
+    for path in paths:
+        print(f"  {label}: {path.relative_to(project_root)}")
+
+
+def main(argv: list[str] | None = None) -> int:
     """NyXアプリケーションのメインエントリーポイント。
+
+    Args:
+        argv: 解析対象の引数列。未指定の場合は `sys.argv` を使います。
 
     Returns:
         終了コード（0:成功、0以外:失敗）
 
     """
     try:
-        args = parse_arguments()
+        args = parse_arguments(argv)
 
-        if args.command == "cli":
+        if args.command == "run":
             return cli_main(args)
         elif args.command == "init":
-            return init_app()
+            return init_app(blank=args.blank, force=args.force)
+        elif args.command == "create":
+            return create_app(args)
+        elif args.command == "docs":
+            return docs_app()
         elif args.command == "gui":
-            # Launch GUI and start Qt event loop
-            gui_main()
-            return 0
+            return gui_app()
         else:
             # subparsers required のためここは実行されない
             print(f"Unknown command: {args.command}")
@@ -117,8 +168,15 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
         return 130  # Standard exit code for SIGINT
-    except Exception as e:
-        print(f"Unhandled exception: {e}")
+    except MacroScaffoldConflictError as exc:
+        print(f"エラー: {exc.message}")
+        print("Use --force to overwrite existing scaffold files.")
+        return 1
+    except ConfigurationError as exc:
+        print(f"エラー: {exc.message}")
+        return 1
+    except Exception:
+        print("Unexpected error. See logs for details.")
         return 1
 
 

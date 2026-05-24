@@ -23,7 +23,7 @@ cmd.log(f"match={result.confidence:.3f}", level="INFO")
 
 `find_template()` は最良の一致を `MatchResult` として返します。画像が無効な場合は `InvalidImageError`、閾値に届かない場合は `ThresholdNotMetError`、OpenCV 側の失敗は `TemplateMatchingError` です。
 
-単に含まれるかだけを見たい場合は `contains_template()` を使います。閾値未達、無効画像、マッチング失敗は `False` として扱われます。
+単に含まれるかだけを見たい場合は `contains_template()` を使います。閾値未達は `False` として扱われます。無効画像や OpenCV 側の失敗は例外として送出されます。
 
 ## ImageProcessor
 
@@ -43,7 +43,7 @@ text = ocr.get_best_text(frame)
 digits = ocr.extract_digits(frame)
 ```
 
-`OCRProcessor.get_instance(language)` は言語ごとに OCR エンジンをキャッシュします。PaddleOCR は初期化と初回推論に時間がかかるため、同じ言語では `get_instance()` を使います。PaddleOCR が利用できない場合は `OCREngineNotFoundError`、認識処理中の失敗は `OCRProcessingError` です。
+`OCRProcessor.get_instance(language)` は言語ごとに OCR エンジンをキャッシュします。PaddleOCR は初期化と初回推論に時間がかかるため、同じ言語では `get_instance()` を使います。`None` や空画像は `InvalidImageError`、PaddleOCR が利用できない場合は `OCREngineNotFoundError`、認識処理中の失敗は `OCRProcessingError` です。
 
 ## 前処理
 
@@ -59,4 +59,3 @@ digits = ocr.extract_digits(frame)
 | `enhance_for_ocr()` | OCR 向け前処理 |
 
 前処理はゲーム画面の認識を補助するためのものです。認識精度は入力画像、テンプレート、閾値に依存するため、ロジック部分を関数化してテストできる形にします。
-

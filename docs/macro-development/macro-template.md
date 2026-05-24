@@ -1,14 +1,15 @@
 # マクロの雛形
 
-この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
+この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
 
 ## ディレクトリ
 
 ```text
 macros\sample_macro\
+  __init__.py
   macro.py
   config.py
-  test_config.py
+  test_logic.py
 
 resources\sample_macro\
   settings.toml
@@ -49,9 +50,6 @@ class SampleMacro(MacroBase):
 
         if self._cfg.capture_after:
             frame = cmd.capture()
-            if frame is None:
-                cmd.log("capture failed", level="WARNING")
-                return
             cmd.save_img(self._cfg.capture_name, frame)
 
     def finalize(self, cmd: Command) -> None:
@@ -90,7 +88,7 @@ class SampleConfig:
         return cfg
 ```
 
-## test_config.py
+## test_logic.py
 
 ```python
 import pytest
@@ -151,7 +149,7 @@ settings = "resource:settings.toml"
 - [ ] `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスが 1 つだけある。
 - [ ] `settings_path = "resource:settings.toml"` と `resources\<macro_id>\settings.toml` が一致している。
 - [ ] 画像資材は `resources\<macro_id>\assets` に置いている。
-- [ ] `cmd.capture()` の戻り値 `None` を処理している。
+- [ ] `cmd.capture()` の失敗はフレームワーク側の実行失敗として扱い、マクロ側で通常分岐にしていない。
 - [ ] `finalize()` で必要な `cmd.release()` を呼んでいる。
 - [ ] 副作用のない設定変換・判定ロジックをテストしている。
 - [ ] 環境に依存しないパス表記に `\` や絶対パスを書いていない。
@@ -162,4 +160,3 @@ uv run ruff format .
 uv run ruff check .
 uv run pytest tests macros examples/tests
 ```
-

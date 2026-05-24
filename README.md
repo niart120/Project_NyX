@@ -2,7 +2,7 @@
 
 ![Alpha Version Badge](https://img.shields.io/badge/Status-Alpha-orange)
 
-NyX は、Nintendo Switch 向け自動化ツールの開発フレームワークです。PCに接続したキャプチャデバイスからゲーム画面を取得し、シリアル通信デバイスを介してコントローラー操作を自動化できます。
+NyX は、Nintendo Switch 向け自動化ツールの開発フレームワークです。PC に接続したキャプチャデバイスからゲーム画面を取得し、シリアル通信デバイスを介してコントローラー操作を自動化できます。
 
 **注意: このソフトウェアは現在開発中のα版です。機能や設計が頻繁に変更される可能性があります。**
 
@@ -25,7 +25,7 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 - **キャプチャデバイス**: Nintendo Switchの画面を取得するためのキャプチャカード/ボード
 - **シリアル通信デバイス**: CH552プロトコルをサポートするコントロール送信デバイス
 
-## 2. インストール
+## 2. インストールと起動
 
 ### 必要条件
 
@@ -33,84 +33,85 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 - 対応OS: Windows/macOS/Linux
 - 必要なハードウェア接続済み (キャプチャデバイス, シリアルデバイス)
 
-このプロジェクトは Python のパッケージ管理に [uv](https://github.com/astral-sh/uv) を使用しています。
+Python のパッケージ管理には [uv](https://github.com/astral-sh/uv) を使用します。
 
+### 公開後の導入
 
-### 方法1: pip (一般ユーザー向け)
+配布パッケージ `nyxfw` は公開準備中です。公開後は次の導線を使います。
 
-配布パッケージは未公開です。現時点ではリポジトリをクローンし、`uv` で起動してください。
+```powershell
+uv tool install nyxfw
+nyxpy init
+nyxpy gui
+```
 
-### 方法2: uv (フレームワーク開発者向け)
+### リポジトリから起動
 
-1. uvをインストール:
-   ```powershell
-   pip install uv
-   ```
+現時点で動作確認する場合や NyX 本体を修正する場合は、リポジトリをクローンして起動してください。
 
-2. リポジトリをクローン:
-   ```powershell
-   git clone https://github.com/niart120/Project_NyX.git
-   cd Project_NyX
-   ```
+```powershell
+git clone https://github.com/niart120/Project_NyX.git
+Set-Location .\Project_NyX
+uv sync
+uv run nyxpy init
+uv run nyxpy gui
+```
 
-3. 依存関係をインストール:
-   ```powershell
-   uv sync
-   ```
-
-4. GUIアプリケーションを起動:
-   ```powershell
-   uv run nyx-gui
-   ```
-
+詳細は [利用者向けガイド](docs/user-guide/README.md) を参照してください。
 
 ## 3. 使用方法
 
-### GUIアプリケーションの起動
+### GUI アプリケーションの起動
 
 ```powershell
-uv run nyx-gui
+nyxpy gui
 ```
 
-または開発環境でない場合:
+リポジトリから起動する場合:
+
 ```powershell
-nyx-gui
+uv run nyxpy gui
 ```
 
 ### 初回起動時
 
-1. デバイス設定ダイアログが表示されます
-2. キャプチャデバイスとシリアルデバイスを選択
-3. デバイスが検出されない場合は、接続を確認して「Settings」メニューから再設定
+1. `nyxpy init` で workspace を初期化します。
+2. デバイス設定ダイアログでキャプチャデバイスとシリアルデバイスを選択します。
+3. デバイスが検出されない場合は、接続を確認して設定画面から再設定します。
 
 ### マクロの作成と実行
 
-1. `macros/` フォルダにマクロを作成 (詳細は[マクロ開発](docs/macro-development/README.md)参照)
+1. `macros\` と `resources\` にマクロを配置します。
 2. GUIからマクロを選択
 3. 実行ボタンをクリック
 4. 必要に応じてパラメータを設定
 5. ログペインでマクロの進行状況を確認
 
+マクロを新規作成する場合は、`nyxpy create <macro_id>` で雛形を生成できます。詳細は [マクロ開発者向けドキュメント](docs/macro-development/README.md) を参照してください。
+
 ### プレビューとスナップショット
 
 - 右側のペインにゲーム画面のリアルタイムプレビューが表示
-- スナップショットボタンで現在のフレームを `snapshots/` フォルダに保存
+- スナップショットボタンで現在のフレームを `snapshots\` フォルダに保存
 
 ### CLIでの実行
 
 コマンドラインからマクロを直接実行することも可能です:
 
 ```powershell
-uv run nyx-cli sample_macro --serial COM3 --capture 0
+nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 ```
 
 **主なオプション:**
-- `--serial`: シリアルデバイス名 (必須)
-- `--capture`: キャプチャデバイス名/番号 (必須) 
-- `--protocol`: 通信プロトコル (デフォルト: ch552)
-- `--verbose`: 詳細ログ出力
-- `--silence`: ログ出力を最小限に抑制
-- `--define`: マクロ変数の定義 (例: `--define key=value`)
+
+| オプション | 内容 |
+|------------|------|
+| `--serial` | シリアルデバイス名 |
+| `--capture` | キャプチャデバイス名または識別子 |
+| `--protocol` | 通信プロトコル。既定値は `CH552` |
+| `--verbose` | 詳細ログ出力 |
+| `--silence` | ログ出力を最小限に抑制 |
+| `--define` | マクロ変数の定義。例: `--define key=value` |
 
 ### 通知機能
 
@@ -119,7 +120,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 - **Discord**: Webhook経由での通知
 - **Bluesky**: AT Protocolを使用した投稿
 
-通知設定は `.nyxpy/secrets.toml` で設定します。
+通知設定は `.nyxpy\secrets.toml` で設定します。
 
 ### デバイス設定
 
@@ -134,7 +135,7 @@ uv run nyx-cli sample_macro --serial COM3 --capture 0
 
 ## 5. 設定ファイル
 
-`.nyxpy/global.toml` に基本設定が保存されます。GUI上での変更は自動的に保存されます。
+`.nyxpy\global.toml` に基本設定が保存されます。GUI 上での変更は自動的に保存されます。
 
 ### 設定ファイルの構造
 - **global.toml**: デバイス設定、シリアル通信設定など

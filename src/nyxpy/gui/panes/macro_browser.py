@@ -32,7 +32,7 @@ class MacroBrowserPane(QWidget):
             LEFT_PANE_CONTENT_MARGIN,
             LEFT_PANE_CONTENT_MARGIN,
         )
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         header_layout = QHBoxLayout()
         self.title_label = QLabel("マクロ", self)
@@ -47,7 +47,7 @@ class MacroBrowserPane(QWidget):
 
         self.table = QTableWidget(0, 1, self)
         self.table.setHorizontalHeaderLabels(["マクロ名"])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         self.catalog = catalog

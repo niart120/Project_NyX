@@ -1,0 +1,1 @@
+"""Macro scaffold templates."""

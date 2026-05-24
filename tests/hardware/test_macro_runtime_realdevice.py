@@ -42,9 +42,7 @@ class RuntimeRealDeviceMacro(MacroBase):
         pass
 
     def run(self, cmd: Command) -> None:
-        frame = cmd.capture()
-        if frame is None:
-            raise RuntimeError("capture returned None")
+        cmd.capture()
         cmd.press(Button.A, dur=0, wait=0)
 
     def finalize(self, cmd: Command) -> None:

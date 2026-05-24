@@ -23,12 +23,10 @@ cmd.release()
 
 ```python
 frame = cmd.capture()
-if frame is None:
-    cmd.log("capture failed", level="WARNING")
-    return
+cmd.save_img("snapshot.png", frame)
 ```
 
-`cmd.capture(crop_region=None, grayscale=False)` は、最新フレームを 1280x720 へリサイズして返します。`crop_region` は `(x, y, width, height)` です。範囲外の crop は `ValueError` になります。フレームがない場合は `None` を返します。
+`cmd.capture(crop_region=None, grayscale=False)` は、最新フレームを 1280x720 へリサイズして返します。`crop_region` は `(x, y, width, height)` です。範囲外の crop は `ValueError` になります。フレームがまだ取得できない場合は `FrameNotReadyError` を送出します。
 
 3DS の HD キャプチャでは、画面本体を `THREEDS_HD_CONTENT = (340, 0, 600, 720)`、下画面を `THREEDS_HD_BOTTOM_SCREEN = (400, 360, 480, 360)` として扱います。
 
@@ -46,10 +44,11 @@ if frame is None:
 
 ```python
 cmd.log("search started", level="INFO")
-cmd.notify("macro completed", frame)
+cmd.notify("macro completed")
+cmd.notify("macro completed with image", frame)
 ```
 
-`cmd.log()` はユーザ向けログを出します。`level` には `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` を指定できます。`cmd.notify()` は設定済みの外部通知へ送信します。
+`cmd.log()` はユーザ向けログを出します。`level` には `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` を指定できます。`cmd.notify()` は設定済みの外部通知へ送信します。`img=None` は画像添付なしの正常な通知です。
 
 ## キーボード入力
 
@@ -68,4 +67,3 @@ cmd.notify("macro completed", frame)
 | `cmd.disable_sleep(enabled=True)` | 対応プロトコルでスリープ制御を切り替えます。 |
 
 対応していないプロトコルでは `NotImplementedError` が送出されます。
-

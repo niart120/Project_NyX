@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import tomlkit
+from tomlkit.exceptions import ParseError
 
 from nyxpy.framework.core.macro.registry import MacroDefinition, MacroSettingsSource
 from nyxpy.framework.core.settings.exceptions import ConfigurationError
@@ -89,7 +90,7 @@ class MacroSettingsResolver:
                 details={**details, "exception_type": type(exc).__name__},
                 cause=exc,
             ) from exc
-        except tomlkit.exceptions.ParseError as exc:
+        except ParseError as exc:
             raise ConfigurationError(
                 "Failed to parse macro settings: "
                 f"macro_id={definition.id}, settings_path={definition.settings_path!r}, "

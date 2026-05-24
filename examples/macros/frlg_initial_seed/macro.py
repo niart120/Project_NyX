@@ -324,9 +324,6 @@ class FrlgInitialSeedMacro(MacroBase):
 
         # --- 実数値画面キャプチャ → ROI 保存 → 認識 ---
         stat_image = cmd.capture()
-        if stat_image is None:
-            cmd.log("キャプチャ失敗（実数値）", level="WARNING")
-            return None
 
         for roi, name in zip(ROI_STATS, _STAT_FILE_NAMES):
             cmd.save_img(self._img_dir / f"stat_{name}.png", crop_and_pad(stat_image, roi))
@@ -387,7 +384,4 @@ class FrlgInitialSeedMacro(MacroBase):
         )
         cmd.log(msg, level="INFO")
         image = cmd.capture()
-        if image is not None:
-            cmd.notify(msg, image)
-        else:
-            cmd.notify(msg)
+        cmd.notify(msg, image)

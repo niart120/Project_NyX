@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.constants import Button, KeyCode
+from nyxpy.framework.core.io.ports import FrameNotReadyError
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroCancelled
 from nyxpy.framework.core.runtime.context import RuntimeOptions
@@ -73,6 +74,13 @@ def test_default_command_capture_resizes_crops_and_grayscales(tmp_path) -> None:
 
     assert result.shape == (40, 30)
     assert result.dtype == frame.dtype
+
+
+def test_default_command_capture_raises_when_frame_is_not_ready(tmp_path) -> None:
+    cmd = DefaultCommand(context=make_fake_execution_context(tmp_path))
+
+    with pytest.raises(FrameNotReadyError):
+        cmd.capture()
 
 
 def test_default_command_resources_and_artifacts_delegate_to_ports(tmp_path) -> None:

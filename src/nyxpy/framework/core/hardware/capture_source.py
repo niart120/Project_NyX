@@ -167,7 +167,7 @@ def _fps(value: object, default: float) -> float:
     if value in (None, ""):
         return default
     try:
-        fps = float(value)
+        fps = float(str(value).strip())
     except (TypeError, ValueError) as exc:
         raise ConfigurationError(
             "capture_fps must be numeric",
@@ -186,23 +186,29 @@ def _fps(value: object, default: float) -> float:
 
 def _match_mode(value: object) -> WindowMatchMode:
     text = _text(value) or "exact"
-    if text not in ("exact", "contains"):
-        raise ConfigurationError(
-            "invalid capture window match mode",
-            code="NYX_CAPTURE_WINDOW_MATCH_MODE_INVALID",
-            component="CaptureSourceConfig",
-            details={"capture_window_match_mode": text},
-        )
-    return text
+    if text == "exact":
+        return "exact"
+    if text == "contains":
+        return "contains"
+    raise ConfigurationError(
+        "invalid capture window match mode",
+        code="NYX_CAPTURE_WINDOW_MATCH_MODE_INVALID",
+        component="CaptureSourceConfig",
+        details={"capture_window_match_mode": text},
+    )
 
 
 def _backend(value: object) -> CaptureBackendName:
     text = _text(value) or "auto"
-    if text not in ("auto", "mss", "windows_graphics_capture"):
-        raise ConfigurationError(
-            "invalid capture backend",
-            code="NYX_CAPTURE_BACKEND_INVALID",
-            component="CaptureSourceConfig",
-            details={"capture_backend": text},
-        )
-    return text
+    if text == "auto":
+        return "auto"
+    if text == "mss":
+        return "mss"
+    if text == "windows_graphics_capture":
+        return "windows_graphics_capture"
+    raise ConfigurationError(
+        "invalid capture backend",
+        code="NYX_CAPTURE_BACKEND_INVALID",
+        component="CaptureSourceConfig",
+        details={"capture_backend": text},
+    )

@@ -4,6 +4,7 @@
 """
 
 import math
+from typing import ClassVar
 
 
 def _round_axis(value: float) -> int:
@@ -12,6 +13,16 @@ def _round_axis(value: float) -> int:
 
 class LStick:
     """コントローラーの左スティックの位置を表すクラス"""
+
+    RIGHT: ClassVar["LStick"]
+    UPRIGHT: ClassVar["LStick"]
+    UP: ClassVar["LStick"]
+    UPLEFT: ClassVar["LStick"]
+    LEFT: ClassVar["LStick"]
+    DOWNLEFT: ClassVar["LStick"]
+    DOWN: ClassVar["LStick"]
+    DOWNRIGHT: ClassVar["LStick"]
+    CENTER: ClassVar["LStick"]
 
     def __init__(self, rad: float, magnification: float, is_degree=False):
         """左スティックの位置を初期化します
@@ -53,6 +64,16 @@ LStick.CENTER = LStick(0.0, 0.0)
 
 class RStick:
     """コントローラーの右スティックの位置を表すクラス"""
+
+    RIGHT: ClassVar["RStick"]
+    UPRIGHT: ClassVar["RStick"]
+    UP: ClassVar["RStick"]
+    UPLEFT: ClassVar["RStick"]
+    LEFT: ClassVar["RStick"]
+    DOWNLEFT: ClassVar["RStick"]
+    DOWN: ClassVar["RStick"]
+    DOWNRIGHT: ClassVar["RStick"]
+    CENTER: ClassVar["RStick"]
 
     def __init__(self, rad: float, magnification: float, is_degree=False):
         """右スティックの位置を初期化します

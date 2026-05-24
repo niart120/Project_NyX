@@ -332,10 +332,21 @@ def cli_main(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """CLIの引数パーサーを構築します。"""
     parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
+    add_run_arguments(parser)
+    return parser
+
+
+def add_run_arguments(parser: argparse.ArgumentParser) -> None:
+    """マクロ実行 command の共通引数を parser に追加します。"""
     parser.add_argument("macro_name", help="実行するマクロ名")
-    parser.add_argument("--serial", required=True, help="シリアルデバイス名")
-    parser.add_argument("--capture", required=True, help="キャプチャデバイス名")
-    parser.add_argument("--protocol", default="ch552", help="通信プロトコル (default: ch552)")
+    parser.add_argument("-s", "--serial", required=True, help="シリアルデバイス名")
+    parser.add_argument("-c", "--capture", required=True, help="キャプチャデバイス名")
+    parser.add_argument(
+        "-p",
+        "--protocol",
+        default="CH552",
+        help="通信プロトコル (default: CH552)",
+    )
     parser.add_argument("--baud", type=int, default=None, help="シリアルボーレート")
     parser.add_argument("--silence", action="store_true", help="ログ出力を最小限に抑制")
     parser.add_argument("--verbose", action="store_true", help="詳細なログ出力を有効化")
@@ -343,8 +354,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--define",
         action="append",
         help="マクロ実行時の変数定義 (key=value形式)",
+        default=[],
     )
-    return parser
 
 
 def main():

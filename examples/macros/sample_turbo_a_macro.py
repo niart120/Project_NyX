@@ -35,11 +35,8 @@ class SampleTurboAMacro(MacroBase):
 
         if self.capture_after:
             frame = cmd.capture()
-            if frame is not None:
-                cmd.save_img(self.capture_name, frame)
-                cmd.notify(f"SampleTurboAMacro complete: saved {self.capture_name}", frame)
-            else:
-                cmd.notify("SampleTurboAMacro complete: capture failed")
+            cmd.save_img(self.capture_name, frame)
+            cmd.notify(f"SampleTurboAMacro complete: saved {self.capture_name}", frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()

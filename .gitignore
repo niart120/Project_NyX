@@ -51,6 +51,7 @@ coverage.xml
 # build/配布関連
 build/
 dist/
+site/
 *.egg-info/
 *.egg
 MANIFEST

@@ -93,8 +93,8 @@ class Command(ABC):
 
     @abstractmethod
     def capture(
-        self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike | None:
+        self, crop_region: tuple[int, int, int, int] | None = None, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         """キャプチャデバイスからHD解像度(1280x720) にリスケールしたスクリーンショットを取得し、必要に応じてクロップ及びグレースケール変換を行います。
 
         3DS のアスペクトボックス入力では、3DS 画面本体は (x=340, y=0, width=600, height=720) として扱います。
@@ -102,7 +102,8 @@ class Command(ABC):
 
         :param crop_region: (optional) クロップする領域の指定 (x, y, width, height)
         :param grayscale: (optional) グレースケール変換を行うかどうかのフラグ (デフォルト:False)
-        :return result_frame: キャプチャした画像データ。フレームがない場合は None
+        :return result_frame: キャプチャした画像データ
+        :raises FrameNotReadyError: フレームがまだ取得できない場合にスローされます。
         :raises ValueError: クロップ領域がフレームサイズ(1280x720)を超える場合にスローされます。
         """
         pass
@@ -152,7 +153,7 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
+    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         """外部サービスへ通知を送信する"""
         pass
 
@@ -266,13 +267,20 @@ class DefaultCommand(Command):
 
     @check_interrupt
     def capture(
-        self, crop_region: tuple[int, int, int, int] = None, grayscale: bool = False
-    ) -> cv2.typing.MatLike | None:
+        self, crop_region: tuple[int, int, int, int] | None = None, grayscale: bool = False
+    ) -> cv2.typing.MatLike:
         self._debug_command("Capturing screen...")
         capture_data = self.context.frame_source.latest_frame()
-        if capture_data is None:
-            self.log("Capture failed", level="ERROR")
-            return None
+        frame = self._format_capture(capture_data, crop_region, grayscale)
+        self._debug_command("Capture successful")
+        return frame
+
+    def _format_capture(
+        self,
+        capture_data: cv2.typing.MatLike,
+        crop_region: tuple[int, int, int, int] | None,
+        grayscale: bool,
+    ) -> cv2.typing.MatLike:
         target_resolution = (1280, 720)
         frame = cv2.resize(capture_data, target_resolution, interpolation=cv2.INTER_AREA)
         if crop_region is not None:
@@ -282,7 +290,6 @@ class DefaultCommand(Command):
             frame = frame[y : y + h, x : x + w]
         if grayscale:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        self._debug_command("Capture successful")
         return frame
 
     @check_interrupt
@@ -312,7 +319,7 @@ class DefaultCommand(Command):
         self.context.controller.type_key(key)
 
     @check_interrupt
-    def notify(self, text: str, img: cv2.typing.MatLike = None) -> None:
+    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         """外部サービスへ通知を送信する"""
         try:
             self.context.notifications.publish(text, img)

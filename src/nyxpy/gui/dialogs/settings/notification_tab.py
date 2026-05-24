@@ -31,7 +31,7 @@ class NotificationSettingsTab(QWidget):
         self.discord_enable = QCheckBox("Discord通知を有効化")
         self.discord_enable.setChecked(self.secrets.get("notification.discord.enabled", False))
         self.discord_url = QLineEdit()
-        self.discord_url.setEchoMode(QLineEdit.Password)
+        self.discord_url.setEchoMode(QLineEdit.EchoMode.Password)
         self.discord_url.setText(self.secrets.get("notification.discord.webhook_url", ""))
         discord_form.addRow(self.discord_enable)
         discord_form.addRow("Discord Webhook URL:", self.discord_url)
@@ -48,7 +48,7 @@ class NotificationSettingsTab(QWidget):
         self.bluesky_identifier.setText(self.secrets.get("notification.bluesky.identifier", ""))
 
         self.bluesky_password = QLineEdit()
-        self.bluesky_password.setEchoMode(QLineEdit.Password)
+        self.bluesky_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.bluesky_password.setText(self.secrets.get("notification.bluesky.password", ""))
 
         bluesky_form.addRow(self.bluesky_enable)

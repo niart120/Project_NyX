@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import cv2
 
-from .exceptions import OCREngineNotFoundError, OCRProcessingError
+from .exceptions import InvalidImageError, OCREngineNotFoundError, OCRProcessingError
 
 
 @dataclass
@@ -90,7 +90,9 @@ class OCRProcessor:
         :return: 認識結果のリスト
         """
         if image is None or image.size == 0:
-            return []
+            raise InvalidImageError("OCR image is None or empty")
+        if self._ocr_engine is None:
+            raise OCREngineNotFoundError("PaddleOCR is not initialized")
 
         try:
             # 呼び出し時にも向き分類を明示的に無効化する

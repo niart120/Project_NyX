@@ -1,0 +1,49 @@
+site_name: Project NyX
+site_description: Nintendo Switch 自動化フレームワークの利用者向け・マクロ開発者向けドキュメント
+site_url: https://niart120.github.io/Project_NyX/
+repo_url: https://github.com/niart120/Project_NyX
+docs_dir: docs
+site_dir: site
+strict: true
+
+nav:
+  - ホーム: index.md
+  - 利用者向けガイド:
+      - 概要: user-guide/README.md
+      - インストール: user-guide/installation.md
+      - デバイス設定: user-guide/device-setup.md
+      - GUI: user-guide/gui.md
+      - CLI: user-guide/cli.md
+      - 通知設定: user-guide/notifications.md
+      - トラブルシューティング: user-guide/troubleshooting.md
+  - マクロ開発:
+      - 概要: macro-development/README.md
+      - Agent brief: macro-development/agent-brief.md
+      - マクロ雛形: macro-development/macro-template.md
+      - 配置規約: macro-development/macro-layout.md
+      - ライフサイクル: macro-development/macro-lifecycle.md
+      - Command API: macro-development/command-api.md
+      - 設定とリソース: macro-development/settings-and-resources.md
+      - Manifest: macro-development/manifest.md
+      - テスト: macro-development/testing.md
+      - Nintendo 3DS: macro-development/nintendo-3ds.md
+      - 画像処理: macro-development/image-processing.md
+      - サンプルマクロ: macro-development/sample-macros.md
+  - API リファレンス:
+      - フレームワーク API: api/framework.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            filters:
+              - "!^_"
+            members_order: source
+            separate_signature: true
+            show_root_full_path: false
+            show_source: false

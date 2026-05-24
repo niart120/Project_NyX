@@ -1,0 +1,107 @@
+name: Publish Python Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Publish target"
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: PyPI publish は v tag だけ許可
+        if: inputs.target == 'pypi' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "Publishing to PyPI requires running this workflow from a v* tag."
+          exit 1
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python のセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: uv のインストール
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml,uv.lock"
+
+      - name: package build
+        run: uv build
+
+      - name: package metadata check
+        run: uvx twine check --strict dist/*
+
+      - name: dist artifact のアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  publish-testpypi:
+    if: inputs.target == 'testpypi'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    environment:
+      name: testpypi
+
+    steps:
+      - name: dist artifact のダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: TestPyPI へ publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+
+  publish-pypi:
+    if: inputs.target == 'pypi'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    environment:
+      name: pypi
+
+    steps:
+      - name: dist artifact のダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: PyPI へ publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist

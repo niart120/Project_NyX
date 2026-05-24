@@ -168,8 +168,11 @@ class GuiAppServices:
         if builder_needs_update:
             self._replace_runtime_builder()
             builder_replaced = True
+            builder = self.runtime_builder
+            if builder is None:
+                raise RuntimeError("runtime builder was not created")
             try:
-                preview_frame_source = self.runtime_builder.frame_source_for_preview()
+                preview_frame_source = builder.frame_source_for_preview()
             except Exception as exc:
                 preview_error = exc
                 self.logger.technical(
@@ -180,7 +183,7 @@ class GuiAppServices:
                     exc=exc,
                 )
             try:
-                manual_controller = self.runtime_builder.controller_output_for_manual_input()
+                manual_controller = builder.controller_output_for_manual_input()
             except Exception as exc:
                 manual_controller_error = exc
                 self.logger.technical(
