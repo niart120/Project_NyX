@@ -319,8 +319,8 @@ GitHub Pages へ生成 docs を配信する workflow を追加する。公開先
 
 - [x] Phase 3 詳細仕様を作成する
 - [x] Phase 3 の推奨実装順を整理する
-- [ ] `src\nyxpy\py.typed` を追加する
-- [ ] MkDocs + mkdocstrings の構成を追加する
+- [x] `src\nyxpy\py.typed` を追加する
+- [x] MkDocs + mkdocstrings の構成を追加する
 - [ ] GitHub Pages workflow を追加する
 - [ ] scaffold template を package data として追加する
 - [ ] `nyx-cli docs` の導線を追加する

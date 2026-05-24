@@ -17,6 +17,7 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 | [nintendo-3ds.md](nintendo-3ds.md) | 3DS 向け座標、touch、sleep control。 |
 | [image-processing.md](image-processing.md) | テンプレートマッチング、OCR、前処理。 |
 | [sample-macros.md](sample-macros.md) | `examples\macros`, `examples\resources`, `examples\tests` の対応。 |
+| [API reference](../api/framework.md) | `MacroBase`, `Command`, constants, imgproc, resources の docstring / 型ヒントから生成する参照文書。 |
 
 ## 推奨配置
 
@@ -113,4 +114,3 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 | `examples\macros\nsmb_sort_or_splode` | 3DS touch、テンプレートマッチング、`settings_path = "resource:settings.toml"` |
 | `examples\macros\frlg_initial_seed` | OCR、CSV 出力、認識ロジック分離、実行ごとの出力への保存 |
 | `examples\macros\frlg_id_rng` | キーボード配列、ソフトリセット補助、フレーム走査 |
-

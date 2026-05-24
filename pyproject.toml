@@ -33,6 +33,10 @@ dev = [
     "pytest-qt>=4.5.0",
     "ruff>=0.15.12",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocstrings[python]>=0.29",
+]
 
 [project.scripts]
 nyx-cli = "nyxpy.cli.run_cli:main"
