@@ -69,6 +69,18 @@ class SerialProtocolInterface(ABC):
         """
         pass
 
+    def build_touch_down_command(self, x: int, y: int) -> bytes:
+        """Touch down 操作のコマンドデータを生成する。"""
+        raise NotImplementedError("Current serial protocol does not support touch input.")
+
+    def build_touch_up_command(self) -> bytes:
+        """Touch up 操作のコマンドデータを生成する。"""
+        raise NotImplementedError("Current serial protocol does not support touch input.")
+
+    def build_disable_sleep_command(self, enabled: bool) -> bytes:
+        """スリープ制御コマンドを生成する。"""
+        raise NotImplementedError("Current serial protocol does not support sleep control.")
+
 
 class UnsupportedKeyError(ValueError):
     """指定されたキーが対象プロトコルで表現できない場合の例外。"""
@@ -292,10 +304,10 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         # 16進数の改行コード付き文字列をバイト列(UTF-8)に変換
         return hex_string.encode("utf-8")
 
-    def build_keyboard_command(self, key: str) -> bytes:
+    def build_keyboard_command(self, text: str) -> bytes:
         # テキスト入力操作のコマンドを生成する
         # 文字列をバイト列に変換して返す
-        encoded = f'"{key}"'.encode("utf-8", errors="ignore")
+        encoded = f'"{text}"'.encode("utf-8", errors="ignore")
         return encoded + b"\r\n"
 
     def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
@@ -323,7 +335,7 @@ class PokeConSerialProtocol(SerialProtocolInterface):
 
             case KeyboardOp.RELEASE:
                 # PokeConプロトコルは通常のキー操作の解放コマンドを持たないため、ここでは何もしない
-                pass
+                return b""
 
             case KeyboardOp.ALL_RELEASE:
                 # すべてのキー解放操作のコマンドを生成する

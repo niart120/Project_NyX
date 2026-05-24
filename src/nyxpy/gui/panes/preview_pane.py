@@ -49,7 +49,7 @@ class PreviewPane(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.label = AspectRatioLabel(16, 9)
-        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setMouseTracking(True)
         self.label.installEventFilter(self)
         self.setMouseTracking(True)
@@ -57,7 +57,7 @@ class PreviewPane(QWidget):
         self._touch_active = False
         self._last_touch_point: TouchPoint | None = None
         self.label.setFixedSize(*fixed_preview_size)
-        layout.addWidget(self.label, alignment=Qt.AlignCenter)
+        layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.capture_device: CaptureDeviceInterface | None = capture_device
         self.frame_source: FrameSourcePort | None = frame_source
@@ -165,7 +165,7 @@ class PreviewPane(QWidget):
             else cv2.INTER_LINEAR
         )
         resized = cv2.resize(frame, (target_w, target_h), interpolation=interpolation)
-        image = QImage(resized.data, target_w, target_h, target_w * 3, QImage.Format_BGR888)
+        image = QImage(resized.data, target_w, target_h, target_w * 3, QImage.Format.Format_BGR888)
         pix = QPixmap.fromImage(image)
         pix.setDevicePixelRatio(self.devicePixelRatio())
         self.label.setPixmap(pix)

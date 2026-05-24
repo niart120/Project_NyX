@@ -33,7 +33,7 @@ class AnalogStick(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         diameter = min(self.width(), self.height())
         inset = diameter * 5 / 60
@@ -54,7 +54,7 @@ class AnalogStick(QWidget):
         painter.drawEllipse(stick_rect)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = True
             self.updateStickPosition(event.position())
 
@@ -63,7 +63,7 @@ class AnalogStick(QWidget):
             self.updateStickPosition(event.position())
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton and self.dragging:
+        if event.button() == Qt.MouseButton.LeftButton and self.dragging:
             self.dragging = False
             self.position = self._center()
             self.update()

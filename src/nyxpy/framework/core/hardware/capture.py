@@ -47,8 +47,8 @@ class CameraCaptureDevice(CaptureDeviceInterface):
         self.logger = logger or NullLoggerPort()
         self.device_index = device_index
         self.api_pref = api_pref  # API preference
-        self.cap: cv2.VideoCapture = None
-        self.latest_frame: cv2.typing.MatLike = None
+        self.cap: cv2.VideoCapture | None = None
+        self.latest_frame: cv2.typing.MatLike | None = None
         self._running = False
         self.fps = fps  # キャプチャのフレームレート
         self._interval = 1.0 / fps if fps > 0 else 1.0 / 60.0  # キャプチャ間隔（秒）
@@ -110,8 +110,11 @@ class CameraCaptureDevice(CaptureDeviceInterface):
 
     def _capture_loop(self) -> None:
         while self._running:
+            cap = self.cap
+            if cap is None:
+                break
             begin = time.perf_counter()
-            ret, frame = self.cap.read()
+            ret, frame = cap.read()
             if ret:
                 with self._lock:
                     self.latest_frame = frame

@@ -25,13 +25,13 @@ class CustomSplitDropDownButton(QWidget):
 
     def _create_widgets(self):
         self.mainButton = QPushButton(self.main_text, self)
-        self.mainButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.mainButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         # self.mainButton.setStyleSheet("margin-right: 0px; ")
 
         self.dropdownButton = QToolButton(self)
-        self.dropdownButton.setArrowType(Qt.DownArrow)
-        self.dropdownButton.setPopupMode(QToolButton.InstantPopup)
-        self.dropdownButton.setFocusPolicy(Qt.NoFocus)
+        self.dropdownButton.setArrowType(Qt.ArrowType.DownArrow)
+        self.dropdownButton.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.dropdownButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.dropdownButton.setStyleSheet("margin-left: -1px; ")
 
         self.dropdownMenu = QMenu(self)
@@ -74,7 +74,9 @@ class CustomSplitDropDownButton(QWidget):
         super().setEnabled(enabled)
         self.mainButton.setEnabled(enabled)
         self.dropdownButton.setEnabled(enabled)
-        self.dropdownButton.setAttribute(Qt.WA_TransparentForMouseEvents, not enabled)
+        self.dropdownButton.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, not enabled
+        )
 
     def isEnabled(self):
         """Return enabled state of the button"""

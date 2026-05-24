@@ -15,9 +15,9 @@ class SettingsTabWidget(QTabWidget):
 
     def __init__(
         self,
-        parent=None,
-        settings: GlobalSettings = None,
-        secrets: SecretsSettings = None,
+        parent,
+        settings: GlobalSettings,
+        secrets: SecretsSettings,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
     ):

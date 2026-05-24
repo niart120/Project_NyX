@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -13,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from nyxpy.framework.core.logger import LogSinkDispatcher, TechnicalLog, UserEvent
+from nyxpy.framework.core.logger import LogSink, LogSinkDispatcher, TechnicalLog, UserEvent
 from nyxpy.gui.log_sink import GuiLogSink, connect_technical_event, connect_user_event
 from nyxpy.gui.typography import apply_pane_title_font, log_view_font
 
@@ -37,7 +39,7 @@ class LogPane(QWidget):
         self._initial_level = initial_level.upper()
         self.gui_sink = GuiLogSink(self)
         self.gui_sink_id: str | None = self.dispatcher.add_sink(
-            self.gui_sink,
+            cast(LogSink, self.gui_sink),
             level=self._initial_level,
         )
 
@@ -63,7 +65,7 @@ class LogPane(QWidget):
         self.view = QPlainTextEdit(self)
         self.view.setReadOnly(True)
         self.view.setFont(log_view_font())
-        self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.view.setMinimumWidth(0)
         self.setMinimumWidth(0)
         main_layout.addWidget(self.view)

@@ -29,7 +29,7 @@ class SerialComm(SerialCommInterface):
 
     def __init__(self, port: str):
         """接続先 port 名を保持し、open 時に `serial.Serial` を生成します。"""
-        self.ser: serial.Serial = None
+        self.ser: serial.Serial | None = None
         self.port: str = port
 
     def open(self, baudrate: int = 9600) -> None:

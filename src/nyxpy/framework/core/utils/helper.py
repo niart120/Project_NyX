@@ -107,7 +107,7 @@ def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
     return text
 
 
-def extract_macro_tags(macros: dict[str, any]) -> list[str]:
+def extract_macro_tags(macros: dict[str, Any]) -> list[str]:
     """マクロ辞書からユニークなタグリストを抽出します。GUIのタグフィルタ用に利用。"""
     tags = set()
     for m in macros.values():

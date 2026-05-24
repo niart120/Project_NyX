@@ -18,7 +18,7 @@ class DiscordNotification(NotificationInterface):
         self.webhook_url = webhook_url
         self.logger = logger or NullLoggerPort()
 
-    def notify(self, text: str, img: cv2.Mat | None = None) -> None:
+    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         try:
             if img is not None:
                 # 画像をメモリ上でエンコードし、そのまま送信

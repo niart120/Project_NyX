@@ -35,7 +35,7 @@ class DPad(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         unit = min(self.width(), self.height()) / 70
 
         # 基本の十字形を描画
@@ -105,7 +105,7 @@ class DPad(QWidget):
             painter.drawPath(left_path)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.pressed = True
             self.updateDirection(event.position())
 
@@ -114,7 +114,7 @@ class DPad(QWidget):
             self.updateDirection(event.position())
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton and self.pressed:
+        if event.button() == Qt.MouseButton.LeftButton and self.pressed:
             self.pressed = False
             self.current_direction = Hat.CENTER
             self.update()

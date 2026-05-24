@@ -10,7 +10,7 @@
 |------|------|
 | 型検査器 | `ty>=0.0.39` を dev dependency に追加済み |
 | PEP 561 marker | `src\nyxpy\py.typed` を追加済み |
-| 全体 baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` で 89 diagnostics |
+| 全体 baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` で 0 diagnostics |
 | 公開 API 周辺 baseline | macro / constants / imgproc / resources 対象で 0 diagnostics |
 | CI gate | 未適用 |
 
@@ -102,6 +102,6 @@ uv run pytest tests/unit tests/integration
 - [x] `imgproc` の型診断を 0 にする
 - [x] `io.resources` の型診断を 0 にする
 - [x] 公開 API bundle の型診断を 0 にする
-- [ ] `src\nyxpy\framework\core` の型診断を 0 にする
-- [ ] `src\nyxpy` の型診断を 0 にする
+- [x] `src\nyxpy\framework\core` の型診断を 0 にする
+- [x] `src\nyxpy` の型診断を 0 にする
 - [ ] CI gate として `ty check` を追加する

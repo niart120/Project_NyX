@@ -1,6 +1,7 @@
 """Bluesky への外部通知 adapter。"""
 
 from datetime import UTC, datetime
+from typing import Any
 
 import cv2
 import requests
@@ -18,8 +19,8 @@ class BlueskyNotification(NotificationInterface):
         self.identifier = identifier
         self.password = password
         self.logger = logger or NullLoggerPort()
-        self.access_token = None
-        self.refresh_token = None
+        self.access_token: str | None = None
+        self.refresh_token: str | None = None
         self.base_url = "https://bsky.social"
         self._authenticate()
 
@@ -52,7 +53,7 @@ class BlueskyNotification(NotificationInterface):
             self._log_failure("Bluesky token refresh failed", exc)
 
     # 画像をアップロードしてblob情報を返す
-    def _upload_image(self, img: cv2.Mat) -> dict:
+    def _upload_image(self, img: cv2.typing.MatLike) -> dict[str, Any] | None:
         # PNG形式にエンコード
         _, buf = cv2.imencode(".png", img)
 
@@ -66,10 +67,12 @@ class BlueskyNotification(NotificationInterface):
             )
             response.raise_for_status()
             data = response.json()
-            return data.get("blob")
+            blob = data.get("blob")
+            return blob if isinstance(blob, dict) else None
 
         except requests.exceptions.HTTPError as http_err:
-            if http_err.response.status_code == 401:  # トークン期限切れ
+            response = http_err.response
+            if response is not None and response.status_code == 401:  # トークン期限切れ
                 self.logger.technical(
                     "DEBUG",
                     "Bluesky token expired; refreshing",
@@ -80,30 +83,31 @@ class BlueskyNotification(NotificationInterface):
                 return self._upload_image(img)
             else:
                 self._log_failure("Bluesky image upload failed", http_err)
-                if hasattr(http_err.response, "text"):
+                if response is not None:
                     self.logger.technical(
                         "ERROR",
                         "Bluesky image upload response detail",
                         component="BlueskyNotification",
                         event="notification.failed",
-                        extra={"response": http_err.response.text},
+                        extra={"response": response.text},
                     )
                 return None
         except Exception as exc:
             self._log_failure("Bluesky image upload failed", exc)
             return None
 
-    def notify(self, text: str, img: cv2.Mat | None = None) -> None:
+    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         if not self.access_token:
             self._authenticate()
         try:
-            data = {
+            record: dict[str, Any] = {
+                "text": text,
+                "createdAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+            data: dict[str, Any] = {
                 "repo": self.identifier,
                 "collection": "app.bsky.feed.post",
-                "record": {
-                    "text": text,
-                    "createdAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
+                "record": record,
             }
             if img is not None:
                 # 画像がある場合は先にアップロードしてblobを取得
@@ -112,7 +116,7 @@ class BlueskyNotification(NotificationInterface):
                 h, w = img.shape[0], img.shape[1]
                 # 画像のアップロードが成功した場合のみ、embedを追加
                 if blob:
-                    data["record"]["embed"] = {
+                    record["embed"] = {
                         "$type": "app.bsky.embed.images",
                         "images": [
                             {"alt": "", "image": blob, "aspectRatio": {"width": w, "height": h}}
@@ -130,7 +134,8 @@ class BlueskyNotification(NotificationInterface):
             )
             response.raise_for_status()
         except requests.exceptions.HTTPError as http_err:
-            if http_err.response.status_code == 401:  # トークン期限切れ
+            response = http_err.response
+            if response is not None and response.status_code == 401:  # トークン期限切れ
                 self._refresh_token()
                 self.notify(text, img)
             else:

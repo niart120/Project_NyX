@@ -1,6 +1,6 @@
 """Virtual controller の button widget。"""
 
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QPushButton, QWidget
 
 from nyxpy.framework.core.constants import Button
 
@@ -11,13 +11,15 @@ class ControllerButton(QPushButton):
     def __init__(
         self,
         text: str = "",
-        parent: QPushButton | None = None,
+        parent: QWidget | None = None,
         button_type: Button | None = None,
         size: tuple[int, int] = (30, 30),
         radius: int = 15,
         is_rectangular: bool = False,
     ) -> None:
         """Button 種別と表示寸法を設定します。"""
+        if button_type is None:
+            raise ValueError("button_type is required")
         super().__init__(text, parent)
         self.button_type = button_type
         self.is_rectangular = is_rectangular

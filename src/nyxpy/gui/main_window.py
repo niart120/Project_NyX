@@ -280,17 +280,25 @@ class MainWindow(QMainWindow):
         left_width = metrics.allocated_left_width(preset)
         tool_log_width = metrics.allocated_tool_log_width(preset)
         left_center_width = left_width + metrics.gap + metrics.preview_width
-        self.centralWidget().layout().setContentsMargins(
+        central_widget = self.centralWidget()
+        if central_widget is None:
+            return
+        central_layout = central_widget.layout()
+        if central_layout is None:
+            return
+        central_layout.setContentsMargins(
             metrics.margin,
             0,
             metrics.margin,
             0,
         )
-        self.centralWidget().layout().setSpacing(metrics.gap)
+        central_layout.setSpacing(metrics.gap)
         self.left_center_container.setFixedWidth(left_center_width)
         self.left_center_container.setMinimumHeight(metrics.center_height)
         self.left_center_container.setMaximumHeight(_UNBOUNDED_WIDGET_HEIGHT)
         left_center_layout = self.left_center_container.layout()
+        if not isinstance(left_center_layout, QGridLayout):
+            return
         left_center_layout.setSpacing(metrics.gap)
         left_center_layout.setColumnMinimumWidth(0, left_width)
         left_center_layout.setColumnMinimumWidth(1, metrics.preview_width)
@@ -300,7 +308,9 @@ class MainWindow(QMainWindow):
         left_center_layout.setRowMinimumHeight(1, metrics.bottom_macro_log_min_height)
         left_center_layout.setRowStretch(0, 0)
         left_center_layout.setRowStretch(1, 1)
-        self.macro_explorer_panel.layout().setSpacing(metrics.gap)
+        macro_explorer_layout = self.macro_explorer_panel.layout()
+        if macro_explorer_layout is not None:
+            macro_explorer_layout.setSpacing(metrics.gap)
         self.macro_explorer_panel.setFixedSize(left_width, metrics.macro_explorer_height)
         macro_browser_available_height = max(
             0,
@@ -411,7 +421,7 @@ class MainWindow(QMainWindow):
             device_discovery=self.device_discovery,
         )
         dlg.settings_applied.connect(self.apply_app_settings)
-        if dlg.exec() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         self.apply_app_settings()
 
@@ -458,7 +468,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("マクロが選択されていません")
             return
         dlg = MacroParamsDialog(self, macro_name)
-        if dlg.exec() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         # パラメータを解析して実行に渡す
@@ -606,9 +616,11 @@ class MainWindow(QMainWindow):
             dlg = QMessageBox(self)
             dlg.setWindowTitle("エラー")
             dlg.setText(f"マクロ実行中にエラーが発生しました:\n{status}")
-            dlg.setStandardButtons(QMessageBox.Retry | QMessageBox.Close)
+            dlg.setStandardButtons(
+                QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Close
+            )
             ret = dlg.exec()
             # リトライまたは閉じるの選択肢を処理
-            if ret == QMessageBox.Retry:
+            if ret == QMessageBox.StandardButton.Retry:
                 # リトライ時は現在のマクロを再実行
                 self._start_macro({})

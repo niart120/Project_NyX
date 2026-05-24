@@ -8,6 +8,7 @@ from datetime import datetime
 from threading import Event, Thread
 
 from nyxpy.framework.core.io.ports import FrameNotReadyError
+from nyxpy.framework.core.logger.events import LogExtraValue
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import (
     ErrorInfo,
@@ -148,7 +149,7 @@ class MacroRuntime:
             return
 
         error = result.error
-        extra = {
+        extra: dict[str, LogExtraValue] = {
             "status": result.status.value,
             "run_id": result.run_id,
             "macro_id": result.macro_id,
