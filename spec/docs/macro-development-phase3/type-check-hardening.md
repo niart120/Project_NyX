@@ -91,6 +91,7 @@ uv run ty check src\nyxpy --output-format concise --no-progress
 
 ```powershell
 uv run ruff check .
+uv run ty check src\nyxpy --output-format concise --no-progress
 uv run pytest tests/unit tests/integration
 ```
 
@@ -104,4 +105,4 @@ uv run pytest tests/unit tests/integration
 - [x] 公開 API bundle の型診断を 0 にする
 - [x] `src\nyxpy\framework\core` の型診断を 0 にする
 - [x] `src\nyxpy` の型診断を 0 にする
-- [ ] CI gate として `ty check` を追加する
+- [x] CI gate として `ty check` を追加する

@@ -148,6 +148,7 @@ resources\<macro_id>\
 ```powershell
 uv run ruff format .
 uv run ruff check .
+uv run ty check src\nyxpy --output-format concise --no-progress
 uv run pytest tests macros examples/tests
 ```
 
@@ -164,4 +165,4 @@ uv run pytest tests macros examples/tests -m "not realdevice"
 - `cmd.capture()` の失敗をマクロ側の通常分岐として扱っていない。
 - `finalize()` で必要な `cmd.release()` や後片付けを行っている。
 - ロジック関数の単体テストを追加している。
-- `uv run ruff check .` と該当 pytest が通る。
+- `uv run ruff check .`、`uv run ty check src\nyxpy --output-format concise --no-progress`、該当 pytest が通る。
