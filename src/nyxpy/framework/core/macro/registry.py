@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -271,7 +272,7 @@ class MacroRegistry:
         loader,
         source_path: Path,
         definitions: dict[str, MacroDefinition],
-        diagnostics: list[MacroLoadDiagnostic],
+        diagnostics: builtins.list[MacroLoadDiagnostic],
         manifest: bool,
     ) -> None:
         try:

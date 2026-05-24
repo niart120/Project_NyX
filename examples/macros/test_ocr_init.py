@@ -45,7 +45,7 @@ class TestOcrInitMacro(MacroBase):
 
         # --- Step 3: キャプチャ画像で OCR を実行 ---
         cmd.log("Step 3: キャプチャ画像で OCR を実行します...")
-        frame = cmd.capture()
+        frame = cmd.try_capture()
         if frame is not None:
             try:
                 from nyxpy.framework.core.imgproc import ImageProcessor

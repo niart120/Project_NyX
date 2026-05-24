@@ -64,8 +64,6 @@ class NsmbSortOrSplodeMacro(MacroBase):
 
     def run_iteration(self, cmd: Command) -> DetectedBomb | None:
         frame = cmd.capture(crop_region=THREEDS_HD_BOTTOM_SCREEN.tuple)
-        if frame is None:
-            raise RuntimeError("capture failed")
         if frame.shape[:2] != (THREEDS_HD_BOTTOM_SCREEN.height, THREEDS_HD_BOTTOM_SCREEN.width):
             raise RuntimeError(f"unexpected bottom screen shape: {frame.shape}")
 

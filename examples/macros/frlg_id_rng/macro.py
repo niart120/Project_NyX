@@ -359,7 +359,7 @@ class FrlgIdRngMacro(MacroBase):
 
         :return: (TID または None, 白パディング付きクロップ画像 または None)
         """
-        image = cmd.capture()
+        image = cmd.try_capture()
         if image is None:
             return None, None
 

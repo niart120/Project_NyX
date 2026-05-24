@@ -23,10 +23,14 @@ class KeyboardOp(IntEnum):
 class KeyCode(int):
     """キーボードの通常キーのキーコードを表すクラス"""
 
-    def __new__(cls, char: str = None):
+    char: str
+
+    def __new__(cls, char: str = ""):
         """1 文字の ASCII 入力からキーコードを生成します。"""
-        # 空文字又は Noneの時は0x00として扱う
-        if char is None or len(char) == 0:
+        if char is None:
+            raise ValueError("KeyCode char must be a string")
+        # 空文字の時は0x00として扱う
+        if len(char) == 0:
             char = chr(0x00)
         elif len(char) > 1:
             raise ValueError(f"KeyCode must be a single character, got '{char}'")

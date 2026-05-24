@@ -26,6 +26,7 @@ PIL = pytest.importorskip("PIL", reason="Pillow が未インストール")
 
 from PIL import Image, ImageDraw, ImageFont
 
+from nyxpy.framework.core.imgproc import InvalidImageError
 from nyxpy.framework.core.imgproc.ocr_engine import OCRProcessor, OCRResult
 
 # テストに使用するシステムフォント (Windows 環境想定)
@@ -133,10 +134,10 @@ class TestRecognizeText:
         result = ocr_en.recognize_text(img)
         assert result == []
 
-    def test_none_like_empty_array_returns_empty(self, ocr_en):
+    def test_empty_array_raises_invalid_image_error(self, ocr_en):
         img = np.zeros((0, 0, 3), dtype=np.uint8)
-        result = ocr_en.recognize_text(img)
-        assert result == []
+        with pytest.raises(InvalidImageError):
+            ocr_en.recognize_text(img)
 
 
 # ---------------------------------------------------------------------------

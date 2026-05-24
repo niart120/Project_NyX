@@ -95,7 +95,9 @@ class ImagePreprocessor:
             # 固定閾値処理
             if threshold is None:
                 # 大津の方法で自動閾値決定
-                threshold, binary = cv2.threshold(gray, 0, 255, thresh_type | cv2.THRESH_OTSU)
+                _computed_threshold, binary = cv2.threshold(
+                    gray, 0, 255, thresh_type | cv2.THRESH_OTSU
+                )
             else:
                 # 指定閾値で処理
                 _, binary = cv2.threshold(gray, threshold, 255, thresh_type)

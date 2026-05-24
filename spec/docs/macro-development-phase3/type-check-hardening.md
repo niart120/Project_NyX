@@ -10,8 +10,8 @@
 |------|------|
 | 型検査器 | `ty>=0.0.39` を dev dependency に追加済み |
 | PEP 561 marker | `src\nyxpy\py.typed` を追加済み |
-| 全体 baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` で 140 diagnostics |
-| 公開 API 周辺 baseline | macro / constants / imgproc / resources 対象で 45 diagnostics |
+| 全体 baseline | `uv run ty check src\nyxpy --output-format concise --no-progress` で 89 diagnostics |
+| 公開 API 周辺 baseline | macro / constants / imgproc / resources 対象で 0 diagnostics |
 | CI gate | 未適用 |
 
 公開 API 周辺 baseline の取得コマンド:
@@ -56,7 +56,7 @@ uv run ty check src\nyxpy\framework\core\macro src\nyxpy\framework\core\constant
 
 | 分類 | 代表例 | 対応方針 |
 |------|--------|----------|
-| `None` 非許容の型注釈 | `Command.capture(crop_rect=None)`, `Command.notify(img=None)` | 既定値が `None` の引数は `T | None` にする。戻り値が `None` になる関数も docstring と型を揃える |
+| `None` 非許容の型注釈 | `Command.capture(crop_region=None)`, `Command.notify(img=None)` | `None` が既定値や添付なしを表す場合は `T | None` にする。失敗を表す `None` は strict API と `try_*` API に分離する |
 | 動的 class 属性 | `LStick.UP`, `RStick.CENTER` | `ClassVar` 宣言または module-level constant に移す。公開 API と docs を同時に更新する |
 | 外部ライブラリ optional state | `OCRProcessor.ocr` が `None | PaddleOCR` | 初期化後に `None` でないことを guard し、局所変数へ束縛してから使う |
 | OpenCV / NumPy shape 型 | `max_loc` が `Sequence[int]` | 必要なら `tuple[int, int]` へ明示変換する |
@@ -67,8 +67,8 @@ uv run ty check src\nyxpy\framework\core\macro src\nyxpy\framework\core\constant
 
 ## 6. 実装順
 
-1. `constants` を直す。`LStick` / `RStick` の公開定数と `KeyboardOp` の `None` 型を整理する。
-2. `macro.command` を直す。`None` を既定値にする引数と `capture()` の戻り値を docstring と揃える。
+1. `constants` を直す。`LStick` / `RStick` の公開定数と `KeyCode` の `None` 型を整理する。
+2. `macro.command` を直す。`capture()` は strict API、`try_capture()` は optional API として分離し、`None` を既定値にする引数を docstring と揃える。
 3. `macro.exceptions` / `registry` を直す。`**kwargs` と `list` name shadowing を解消する。
 4. `imgproc` を直す。OCR 初期化 guard、OpenCV 戻り値の型変換、前処理値の型を整理する。
 5. `io.resources` を直す。読み書き context manager の型を実装に合わせる。
@@ -97,11 +97,11 @@ uv run pytest tests/unit tests/integration
 ## 8. 完了チェックリスト
 
 - [x] 型検査厳格化仕様を追加する
-- [ ] `constants` の型診断を 0 にする
-- [ ] `macro` の型診断を 0 にする
-- [ ] `imgproc` の型診断を 0 にする
-- [ ] `io.resources` の型診断を 0 にする
-- [ ] 公開 API bundle の型診断を 0 にする
+- [x] `constants` の型診断を 0 にする
+- [x] `macro` の型診断を 0 にする
+- [x] `imgproc` の型診断を 0 にする
+- [x] `io.resources` の型診断を 0 にする
+- [x] 公開 API bundle の型診断を 0 にする
 - [ ] `src\nyxpy\framework\core` の型診断を 0 にする
 - [ ] `src\nyxpy` の型診断を 0 にする
 - [ ] CI gate として `ty check` を追加する

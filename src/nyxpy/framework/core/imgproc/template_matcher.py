@@ -73,9 +73,12 @@ def find_template(
 
         # バウンディングボックス計算
         h, w = template_image.shape[:2]
-        bounding_box = (match_loc[0], match_loc[1], w, h)
+        match_position = (int(match_loc[0]), int(match_loc[1]))
+        bounding_box = (match_position[0], match_position[1], w, h)
 
-        return MatchResult(position=match_loc, confidence=confidence, bounding_box=bounding_box)
+        return MatchResult(
+            position=match_position, confidence=confidence, bounding_box=bounding_box
+        )
 
     except cv2.error as e:
         raise TemplateMatchingError(f"OpenCV template matching failed: {e}")
@@ -93,10 +96,10 @@ def contains_template(
     :param template_image: テンプレート画像
     :param threshold: マッチング閾値（0.0-1.0）
     :param method: マッチング手法（cv2.TM_* 定数）
-    :return: テンプレートが含まれている場合 True。閾値未達や無効画像は False
+    :return: テンプレートが含まれている場合 True。閾値未達は False
     """
     try:
         find_template(source_image, template_image, threshold, method)
         return True
-    except (ThresholdNotMetError, InvalidImageError, TemplateMatchingError):
+    except ThresholdNotMetError:
         return False
