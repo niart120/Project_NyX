@@ -34,9 +34,11 @@ class Command(ABC):
 
         押下時間と待機時間を指定することができます。
 
-        :param keys: 押下するキーのリスト
-        :param dur: 押下時間（秒）
-        :param wait: 押下後の待機時間（秒）
+        Args:
+            keys: 押下するキー。
+            dur: 押下時間（秒）。
+            wait: 押下後の待機時間（秒）。
+
         """
         pass
 
@@ -46,7 +48,9 @@ class Command(ABC):
 
         これは、連続的な入力を必要とする場合に使用されます。
 
-        :param keys: 押し続けるキーのリスト
+        Args:
+            keys: 押し続けるキー。
+
         """
         pass
 
@@ -57,7 +61,9 @@ class Command(ABC):
         これは、押下または保持されたキーを解放するために使用されます。
         すべてのキーを解放する場合は、引数を省略できます。
 
-        :param keys: 解放するキーのリスト
+        Args:
+            keys: 解放するキー。省略時は全解除。
+
         """
         pass
 
@@ -68,7 +74,9 @@ class Command(ABC):
         実装は待機中も中断要求を確認します。長い処理では `time.sleep()` を直接使わず、
         このメソッドを使います。
 
-        :param wait: 待機時間（秒）
+        Args:
+            wait: 待機時間（秒）。
+
         """
         pass
 
@@ -81,13 +89,15 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
+    def log(self, *values: object, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         """ログ出力を行います。
 
-        :param values: ログに出力する値
-        :param sep: 値の区切り文字
-        :param end: ログの末尾に追加する文字列
-        :param level: ログレベル（DEBUG, INFO, WARNING, ERROR, CRITICAL）
+        Args:
+            values: ログに出力する値。
+            sep: 値の区切り文字。
+            end: ログの末尾に追加する文字列。
+            level: ログレベル。`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`。
+
         """
         pass
 
@@ -100,11 +110,17 @@ class Command(ABC):
         3DS のアスペクトボックス入力では、3DS 画面本体は (x=340, y=0, width=600, height=720) として扱います。
         3DS の下画面実領域は (x=400, y=360, width=480, height=360) です。
 
-        :param crop_region: (optional) クロップする領域の指定 (x, y, width, height)
-        :param grayscale: (optional) グレースケール変換を行うかどうかのフラグ (デフォルト:False)
-        :return result_frame: キャプチャした画像データ
-        :raises FrameNotReadyError: フレームがまだ取得できない場合にスローされます。
-        :raises ValueError: クロップ領域がフレームサイズ(1280x720)を超える場合にスローされます。
+        Args:
+            crop_region: クロップする領域の指定 `(x, y, width, height)`。
+            grayscale: グレースケール変換を行うか。
+
+        Returns:
+            キャプチャした画像データ。
+
+        Raises:
+            FrameNotReadyError: フレームがまだ取得できない場合。
+            ValueError: クロップ領域がフレームサイズ (1280x720) を超える場合。
+
         """
         pass
 
@@ -114,8 +130,10 @@ class Command(ABC):
 
         ディレクトリが存在しない場合は作成します。
 
-        :param filename: 保存先のファイル名 （例: "image.png"）
-        :param image: 保存する画像データ
+        Args:
+            filename: 保存先のファイル名。例: `"image.png"`。
+            image: 保存する画像データ。
+
         """
         pass
 
@@ -125,10 +143,14 @@ class Command(ABC):
 
         画像が存在しない場合は例外をスローします。
 
-        :param filename: 読み込む画像のファイル名 （例: "image.png"）
-        :param grayscale: グレースケール変換を行うかどうかのフラグ (デフォルト:False)
-        :raises FileNotFoundError: 画像ファイルが見つからない場合
-        :raises ValueError: filename が空の場合
+        Args:
+            filename: 読み込む画像のファイル名。例: `"image.png"`。
+            grayscale: グレースケール変換を行うか。
+
+        Raises:
+            FileNotFoundError: 画像ファイルが見つからない場合。
+            ValueError: `filename` が空の場合。
+
         """
         pass
 
@@ -138,7 +160,9 @@ class Command(ABC):
 
         プロトコルが対応していない場合は、文字ごとに typekey に委譲されます。
 
-        :param text: 送信するテキスト
+        Args:
+            text: 送信するテキスト。
+
         """
         pass
 
@@ -148,7 +172,9 @@ class Command(ABC):
 
         これは個々のキーの押下・解放操作を表します。
 
-        :param key: 送信する通常キーまたは特殊キーのキーコード
+        Args:
+            key: 送信する通常キーまたは特殊キーのキーコード。
+
         """
         pass
 
@@ -251,7 +277,7 @@ class DefaultCommand(Command):
         self.log("Stopping macro execution", level="INFO")
         self.ct.request_cancel(reason="stop requested", source="macro")
 
-    def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
+    def log(self, *values: object, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
         caller_class = get_caller_class_name()
         self.context.logger.user(

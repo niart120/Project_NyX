@@ -1,6 +1,6 @@
 # マクロの雛形
 
-この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
+この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。
 
 ## ディレクトリ
 
@@ -158,5 +158,5 @@ settings = "resource:settings.toml"
 ```powershell
 uv run ruff format .
 uv run ruff check .
-uv run pytest tests macros examples/tests
+uv run pytest tests macros
 ```

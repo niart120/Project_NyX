@@ -16,7 +16,12 @@ class ImageProcessor:
     """
 
     def __init__(self, image: cv2.typing.MatLike):
-        """:param image: 処理対象の画像（OpenCV形式）"""
+        """処理対象の画像を保持します。
+
+        Args:
+            image: 処理対象の画像。OpenCV 形式。
+
+        """
         if image is None or image.size == 0:
             raise InvalidImageError("画像が無効です")
         self.image = image
@@ -31,11 +36,15 @@ class ImageProcessor:
     ) -> bool:
         """指定されたテンプレートが画像内に含まれるかを判定します。
 
-        :param template: テンプレート画像
-        :param threshold: マッチング閾値
-        :param method: マッチング手法
-        :param preprocess: 前処理を行うか
-        :return: テンプレートが含まれている場合 True
+        Args:
+            template: テンプレート画像。
+            threshold: マッチング閾値。
+            method: マッチング手法。
+            preprocess: 前処理を行うか。
+
+        Returns:
+            テンプレートが含まれている場合は `True`。
+
         """
         source_img = self.image
         template_img = template
@@ -55,11 +64,15 @@ class ImageProcessor:
     ) -> MatchResult:
         """テンプレートマッチングを実行し、最良の一致を返します。
 
-        :param template: テンプレート画像
-        :param threshold: マッチング閾値
-        :param method: マッチング手法
-        :param preprocess: 前処理を行うか
-        :return: マッチング結果
+        Args:
+            template: テンプレート画像。
+            threshold: マッチング閾値。
+            method: マッチング手法。
+            preprocess: 前処理を行うか。
+
+        Returns:
+            マッチング結果。
+
         """
         source_img = self.image
         template_img = template
@@ -78,10 +91,14 @@ class ImageProcessor:
     ) -> str:
         """画像からテキストを認識し、最も信頼度の高い文字列を返します。
 
-        :param language: 認識言語 ('ja', 'en')
-        :param region: 認識領域 (x, y, width, height) - 指定しない場合は全体
-        :param preprocess: OCR用前処理を行うか
-        :return: 認識されたテキスト（見つからない場合は空文字列）
+        Args:
+            language: 認識言語。`"ja"` または `"en"`。
+            region: 認識領域 `(x, y, width, height)`。指定しない場合は全体。
+            preprocess: OCR 用前処理を行うか。
+
+        Returns:
+            認識されたテキスト。見つからない場合は空文字列。
+
         """
         # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
         ocr = OCRProcessor.get_instance(language)
@@ -107,10 +124,14 @@ class ImageProcessor:
     ) -> str:
         """画像から数字のみを認識して返します。
 
-        :param language: 認識言語 ('ja', 'en')
-        :param region: 認識領域 (x, y, width, height)
-        :param preprocess: OCR用前処理を行うか
-        :return: 認識された数字文字列
+        Args:
+            language: 認識言語。`"ja"` または `"en"`。
+            region: 認識領域 `(x, y, width, height)`。指定しない場合は全体。
+            preprocess: OCR 用前処理を行うか。
+
+        Returns:
+            認識された数字文字列。
+
         """
         # OCRプロセッサーの取得（言語ごとにキャッシュされたシングルトン）
         ocr = OCRProcessor.get_instance(language)
@@ -138,12 +159,17 @@ class ImageProcessor:
     ) -> str:
         """テンプレートマッチングでテキスト領域を特定し、OCR を実行します。
 
-        :param template: テンプレート画像
-        :param roi_offset: マッチ位置からの相対オフセット (x_offset, y_offset, w_offset, h_offset)
-        :param language: OCR認識言語
-        :param template_threshold: テンプレートマッチングの閾値
-        :param preprocess: 前処理を行うか
-        :return: 認識されたテキスト
+        Args:
+            template: テンプレート画像。
+            roi_offset: マッチ位置からの相対オフセット
+                `(x_offset, y_offset, w_offset, h_offset)`。
+            language: OCR 認識言語。
+            template_threshold: テンプレートマッチングの閾値。
+            preprocess: 前処理を行うか。
+
+        Returns:
+            認識されたテキスト。
+
         """
         # テンプレートマッチング
         match = self.find_template(template, template_threshold, preprocess=preprocess)

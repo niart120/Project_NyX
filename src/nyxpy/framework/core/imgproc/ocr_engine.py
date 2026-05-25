@@ -37,8 +37,12 @@ class OCRProcessor:
         同じ ``language`` に対しては常に同一インスタンスが返される。
         スレッドセーフ。
 
-        :param language: 認識言語 ('ja', 'en')
-        :return: キャッシュ済みの OCRProcessor
+        Args:
+            language: 認識言語。`"ja"` または `"en"`。
+
+        Returns:
+            キャッシュ済みの `OCRProcessor`。
+
         """
         if language not in cls._instances:
             with cls._lock:
@@ -54,7 +58,12 @@ class OCRProcessor:
             cls._instances.clear()
 
     def __init__(self, language: str = "ja"):
-        """:param language: 認識言語 ('ja', 'en')"""
+        """OCR 処理クラスを初期化します。
+
+        Args:
+            language: 認識言語。`"ja"` または `"en"`。
+
+        """
         self.language = language
         self._ocr_engine = None
         self._init_engine()
@@ -86,8 +95,12 @@ class OCRProcessor:
     def recognize_text(self, image: cv2.typing.MatLike) -> list[OCRResult]:
         """テキスト認識を実行します。
 
-        :param image: 認識対象画像
-        :return: 認識結果のリスト
+        Args:
+            image: 認識対象画像。
+
+        Returns:
+            認識結果のリスト。
+
         """
         if image is None or image.size == 0:
             raise InvalidImageError("OCR image is None or empty")
@@ -121,8 +134,12 @@ class OCRProcessor:
     def get_best_text(self, image: cv2.typing.MatLike) -> str:
         """最も信頼度の高いテキストを取得します。
 
-        :param image: 認識対象画像
-        :return: 最も信頼度の高いテキスト（見つからない場合は空文字列）
+        Args:
+            image: 認識対象画像。
+
+        Returns:
+            最も信頼度の高いテキスト。見つからない場合は空文字列。
+
         """
         results = self.recognize_text(image)
         if results:
@@ -133,8 +150,12 @@ class OCRProcessor:
     def extract_digits(self, image: cv2.typing.MatLike) -> str:
         """画像から数字のみを認識して返します。
 
-        :param image: 認識対象画像
-        :return: 認識された数字文字列
+        Args:
+            image: 認識対象画像。
+
+        Returns:
+            認識された数字文字列。
+
         """
         text = self.get_best_text(image)
         # 数字のみを抽出

@@ -1,12 +1,12 @@
 # NyX マクロ実装エージェント向け要点
 
-この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細は同じディレクトリの各資料と、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
+この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細は同じディレクトリの各資料、現行コード、docstring で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
 
 ## 前提
 
 - PyPI 配布名は `nyxfw`、インポート名は `nyxpy` です。配布パッケージは公開準備中です。
 - 実装者のマクロ本体は `macros\<macro_id>`、設定・画像資材は `resources\<macro_id>` に置きます。
-- `examples\macros` と `examples\resources` は参照用サンプルの置き場であり、利用者の配置先ではありません。
+- `examples\` はフレームワーク開発者が管理する参考実装の置き場であり、利用者の配置先ではありません。
 - PowerShell コマンドを使います。bash / sh 前提のコマンドは書きません。
 
 ## 詳細資料
@@ -21,7 +21,6 @@
 | `testing.md` | テスト配置と実行コマンド |
 | `nintendo-3ds.md` | 3DS 座標と touch |
 | `image-processing.md` | テンプレートマッチング、OCR、前処理 |
-| `sample-macros.md` | 公開サンプル一覧 |
 
 ## 必ず守る制約
 
@@ -144,20 +143,19 @@ resources\<macro_id>\
 
 - 副作用のない計算・判定・設定変換は通常の pytest で単体テストします。
 - 実機が必要なテストには `@pytest.mark.realdevice` を付けます。
-- pytest は `tests`, `macros`, `examples\tests` を収集します。
-- 公開サンプルのテストは `examples\tests` に置きます。
+- 通常の pytest は `tests` と `macros` を収集します。
 
 ```powershell
 uv run ruff format .
 uv run ruff check .
 uv run ty check src\nyxpy --output-format concise --no-progress
-uv run pytest tests macros examples/tests
+uv run pytest tests macros
 ```
 
 実機なしで確認する場合:
 
 ```powershell
-uv run pytest tests macros examples/tests -m "not realdevice"
+uv run pytest tests macros -m "not realdevice"
 ```
 
 ## 完了前チェック

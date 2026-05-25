@@ -8,15 +8,14 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 |------|------|
 | [agent-brief.md](agent-brief.md) | AI エージェントに渡す要点。配置、依存、公開 API、検証コマンドをまとめます。 |
 | [macro-template.md](macro-template.md) | `macros\<macro_id>` と `resources\<macro_id>` に置く雛形、任意の `macro.toml`、完了前確認。 |
-| [macro-layout.md](macro-layout.md) | `macros\`, `resources\`, `examples\` の使い分けと依存方向。 |
+| [macro-layout.md](macro-layout.md) | `macros\`, `resources\` の使い分けと依存方向。 |
 | [macro-lifecycle.md](macro-lifecycle.md) | `MacroBase` のメタデータ、`initialize`, `run`, `finalize` の責務。 |
 | [command-api.md](command-api.md) | `Command` の操作 API、待機、キャプチャ、画像入出力、通知、ログ。 |
 | [settings-and-resources.md](settings-and-resources.md) | `settings_path`, `resource:`, 画像資材、実行ごとの出力。 |
 | [manifest.md](manifest.md) | `macro.toml` が必要な場面、entrypoint、metadata。 |
-| [testing.md](testing.md) | 単体テスト、実機テスト、公開サンプルのテスト配置。 |
+| [testing.md](testing.md) | 単体テスト、実機テスト、検証コマンド。 |
 | [nintendo-3ds.md](nintendo-3ds.md) | 3DS 向け座標、touch、sleep control。 |
 | [image-processing.md](image-processing.md) | テンプレートマッチング、OCR、前処理。 |
-| [sample-macros.md](sample-macros.md) | `examples\macros`, `examples\resources`, `examples\tests` の対応。 |
 | [API reference](../api/framework.md) | `MacroBase`, `Command`, constants, imgproc, resources の docstring / 型ヒントから生成する参照文書。 |
 
 ## 推奨配置
@@ -34,8 +33,6 @@ resources\<macro_id>\
   assets\
     template.png
 ```
-
-`examples\macros` と `examples\resources` は参照用サンプルの置き場です。利用者のマクロ配置先ではありません。完成したサンプルを公開するときだけ、実装済みマクロを `examples\` 配下へコピーして、対応する `examples\tests` を追加します。
 
 ## workspace 初期化と雛形生成
 
@@ -113,22 +110,11 @@ class SampleTurboMacro(MacroBase):
 uv run ruff format .
 uv run ruff check .
 uv run ty check src\nyxpy --output-format concise --no-progress
-uv run pytest tests macros examples/tests
+uv run pytest tests macros
 ```
 
 実機が必要なテストは `@pytest.mark.realdevice` を付けます。実機なしで走らせる場合は次を使います。
 
 ```powershell
-uv run pytest tests macros examples/tests -m "not realdevice"
+uv run pytest tests macros -m "not realdevice"
 ```
-
-## サンプル一覧
-
-代表的なサンプルだけを示します。完全な一覧は [sample-macros.md](sample-macros.md) を参照してください。
-
-| サンプル | 実装内容 |
-|----------|------------|
-| `examples\macros\sample_turbo_a_macro.py` | ボタン入力、ログ、キャプチャ保存、通知の最小例 |
-| `examples\macros\nsmb_sort_or_splode` | 3DS touch、テンプレートマッチング、`settings_path = "resource:settings.toml"` |
-| `examples\macros\frlg_initial_seed` | OCR、CSV 出力、認識ロジック分離、実行ごとの出力への保存 |
-| `examples\macros\frlg_id_rng` | キーボード配列、ソフトリセット補助、フレーム走査 |

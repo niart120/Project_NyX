@@ -28,7 +28,6 @@ nav:
       - テスト: macro-development/testing.md
       - Nintendo 3DS: macro-development/nintendo-3ds.md
       - 画像処理: macro-development/image-processing.md
-      - サンプルマクロ: macro-development/sample-macros.md
   - API リファレンス:
       - フレームワーク API: api/framework.md
 

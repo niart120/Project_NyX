@@ -68,6 +68,8 @@ uv run ruff check macros --no-respect-gitignore
 
 `D415` は有効にしない。Ruff は日本語の `。` を終端句読点として扱わないため、説明として正しい日本語 docstring に不要な修正を強制する。
 
+Ruff / pydocstyle は `docstring_style = "google"` のとき、`Args:`, `Returns:`, `Raises:` などの Google style section が現れた場合の構造を検査する。reStructuredText style の `:param name:` / `:return:` / `:raises:` を Google style 違反として検出するルールはない。そのため、API reference を mkdocstrings の Google style で生成する公開 API では、Ruff だけに頼らず `:param` / `:return` / `:raises` の残存を検索して確認する。
+
 Ruff formatter の docstring 対応は、`format.docstring-code-format` による docstring 内コード例の整形に限られる。NyX では有効化し、doctest、Markdown、reStructuredText の Python コード例を通常の formatter と同じ方針で整形する。JSON や TOML など Python 以外のコードブロックには言語名を明示し、未指定 fenced code block が Python として整形されないようにする。
 
 Google style の section header、section 前後の空行、空 section は formatter では整形しない。Ruff formatter の設定項目にも section 構造を整形する項目はないため、`D405` から `D414` までは lint 側で扱う。
