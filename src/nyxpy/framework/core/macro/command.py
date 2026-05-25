@@ -126,30 +126,33 @@ class Command(ABC):
 
     @abstractmethod
     def save_img(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
-        """画像を指定されたパスに保存します。
+        """画像を実行ごとの出力先へ保存します。
 
-        ディレクトリが存在しない場合は作成します。
+        保存先の親ディレクトリは必要に応じて作成されます。
 
         Args:
-            filename: 保存先のファイル名。例: `"image.png"`。
+            filename: 出力先からの相対パス。例: `"image.png"`。
             image: 保存する画像データ。
+
+        Raises:
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceWriteError: 画像を書き込めない場合。
 
         """
         pass
 
     @abstractmethod
     def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
-        """指定されたパスから画像を読み込みます。
-
-        画像が存在しない場合は例外をスローします。
+        """画像資材を読み込みます。
 
         Args:
-            filename: 読み込む画像のファイル名。例: `"image.png"`。
+            filename: 資材 root からの相対パス。例: `"image.png"`。
             grayscale: グレースケール変換を行うか。
 
         Raises:
-            FileNotFoundError: 画像ファイルが見つからない場合。
-            ValueError: `filename` が空の場合。
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceNotFoundError: 探索 root に画像資材が存在しない場合。
+            ResourceReadError: OpenCV 画像として読み込めない場合。
 
         """
         pass
@@ -185,7 +188,10 @@ class Command(ABC):
 
     @property
     def artifacts(self) -> RunArtifactStore:
-        """実行ごとの出力先へアクセスします。"""
+        """実行ごとの出力先へアクセスします。
+
+        `open_output()` などの成果物操作は `ResourceError` 系の例外を送出します。
+        """
         raise NotImplementedError("Current command does not expose run artifacts.")
 
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:

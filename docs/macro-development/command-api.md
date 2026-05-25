@@ -40,6 +40,8 @@ cmd.save_img("snapshot.png", frame)
 
 `name` はリソース起点または出力先起点の相対パスです。設定ファイルに保存するパス表記では `/` を使います。
 
+画像入出力の失敗は `ResourceError` 系で送出されます。安全でない path は `ResourcePathError`、資材が見つからない場合は `ResourceNotFoundError`、画像として読み込めない場合は `ResourceReadError`、出力を書き込めない場合は `ResourceWriteError` です。
+
 ## ログと通知
 
 ```python

@@ -132,10 +132,10 @@ class MacroBase(ABC):
 
 ## 6. 実装チェックリスト
 
-- [ ] `display_name` と `settings_path` の型を確定する。
-- [ ] `MacroBase` に `display_name` と `settings_path` 属性を追加する。
-- [ ] `MacroBase` の class docstring と属性 docstring を Google style / mkdocstrings 表示に合わせる。
-- [ ] `macro-lifecycle.md` のメタデータ表を docstring と同期する。
-- [ ] ユニットテストを追加・更新する。
-- [ ] `uv run ruff check src\nyxpy\framework\core\macro\base.py tests\unit\framework\macro` を実行する。
-- [ ] `uv run --no-sync mkdocs build --strict` を実行する。
+- [x] `display_name` と `settings_path` の型を確定する。
+- [x] `MacroBase` に `display_name` と `settings_path` 属性を追加する。
+- [x] `MacroBase` の class docstring と属性 docstring を Google style / mkdocstrings 表示に合わせる。
+- [x] `macro-lifecycle.md` のメタデータ表を docstring と同期する。
+- [x] ユニットテストを追加・更新する。
+- [x] `uv run ruff check src\nyxpy\framework\core\macro\base.py tests\unit\framework\macro` を実行する。
+- [x] `uv run --no-sync mkdocs build --strict` を実行する。

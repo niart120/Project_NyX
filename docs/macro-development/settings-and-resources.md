@@ -53,7 +53,8 @@ with cmd.artifacts.open_output("result/data.csv", mode="wb") as file:
 
 ## エラー
 
-設定ファイルが存在しない、読み込めない、TOML として解析できない、許可された root から外れる場合は `ConfigurationError` が送出されます。画像資材が存在しない、読み込めない、または安全でないパスが指定された場合は `ResourceError` 系の例外が送出されます。
+設定ファイルが存在しない、読み込めない、TOML として解析できない、許可された root から外れる場合は `ConfigurationError` が送出されます。
+
+画像資材と出力の失敗は `ResourceError` 系で送出されます。安全でない path は `ResourcePathError`、資材が見つからない場合は `ResourceNotFoundError`、画像として読み込めない場合は `ResourceReadError`、出力を書き込めない場合は `ResourceWriteError` です。通常は `ResourceError` を基点に捕捉し、必要な場合だけ個別の派生例外を扱います。
 
 旧 `static\<macro_name>` は標準探索されません。
-

@@ -1,6 +1,7 @@
 """マクロ実装の基底 class。"""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .command import Command
@@ -13,19 +14,24 @@ class MacroBase(ABC):
     """NyX マクロの基底クラス。
 
     サブクラスは `initialize()`, `run()`, `finalize()` を実装します。
-    `description` と `tags` は一覧表示や検索に使うメタデータです。
-    `args_schema` に `SettingsSchema` を指定すると、実行引数は
-    `initialize()` に渡る前に検証されます。
+    `description`, `display_name`, `tags`, `args_schema`, `settings_path`
+    は一覧表示、検索、設定読み込みに使うメタデータです。
     """
 
     description: str = ""
     """一覧表示向けの短い説明文。"""
+
+    display_name: str | None = None
+    """GUI や一覧表示で使う表示名。未指定の場合はクラス名が使われます。"""
 
     tags: list[str] = []
     """検索・分類用のタグ。"""
 
     args_schema: "SettingsSchema | None" = None
     """実行引数を検証する schema。未指定の場合は raw args が渡ります。"""
+
+    settings_path: Path | str | None = None
+    """マクロごとの設定ファイル path。`str` は `resource:` / `project:` / マクロ本体相対 path、`Path` は絶対 path またはマクロ本体相対 path として扱います。"""
 
     @abstractmethod
     def initialize(self, cmd: Command, args: dict) -> None:

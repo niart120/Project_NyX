@@ -142,10 +142,10 @@ class Command(ABC):
 
 ## 6. 実装チェックリスト
 
-- [ ] `ResourceError` 系を `Command` 画像入出力の公開契約にする判断を確定する。
-- [ ] `Command.load_img` / `save_img` の docstring を Google style で更新する。
-- [ ] `command-api.md` と `settings-and-resources.md` の例外説明を更新する。
-- [ ] resource store の例外 `details` がマクロ実装者の診断に足りるか確認する。
-- [ ] ユニットテストを追加・更新する。
-- [ ] `uv run ruff check src\nyxpy\framework\core\macro\command.py src\nyxpy\framework\core\io\resources.py tests\unit\framework` を実行する。
-- [ ] `uv run --no-sync mkdocs build --strict` を実行する。
+- [x] `ResourceError` 系を `Command` 画像入出力の公開契約にする判断を確定する。
+- [x] `Command.load_img` / `save_img` の docstring を Google style で更新する。
+- [x] `command-api.md` と `settings-and-resources.md` の例外説明を更新する。
+- [x] resource store の例外 `details` がマクロ実装者の診断に足りるか確認する。
+- [x] ユニットテストを追加・更新する。
+- [x] `uv run ruff check src\nyxpy\framework\core\macro\command.py src\nyxpy\framework\core\io\resources.py tests\unit\framework` を実行する。
+- [x] `uv run --no-sync mkdocs build --strict` を実行する。

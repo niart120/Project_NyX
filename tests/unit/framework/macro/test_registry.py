@@ -136,6 +136,7 @@ def test_registry_loads_convention_package_macro(tmp_path: Path) -> None:
     assert definition.display_name == "ConventionPackageMacro"
     assert definition.description == "class description"
     assert definition.tags == ("class-tag",)
+    assert definition.settings_path is None
     assert definition.entrypoint_kind == "convention"
 
 
@@ -148,6 +149,8 @@ def test_registry_loads_convention_single_file_macro(tmp_path: Path) -> None:
 
     definition = registry.resolve("single_file")
     assert definition.class_name == "SingleFileMacro"
+    assert definition.display_name == "SingleFileMacro"
+    assert definition.settings_path is None
     assert definition.macro_root == macros_dir
     assert registry.resolve("SingleFileMacro") == definition
 

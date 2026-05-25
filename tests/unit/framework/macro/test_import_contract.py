@@ -40,7 +40,9 @@ def test_macro_metadata_defaults_are_stable() -> None:
     from nyxpy.framework.core.macro.base import MacroBase
 
     assert MacroBase.description == ""
+    assert MacroBase.display_name is None
     assert MacroBase.tags == []
+    assert MacroBase.settings_path is None
 
 
 def test_command_public_method_names_are_stable() -> None:
