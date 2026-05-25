@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`, `src/nyxpy/framework/core/io/`, `src/nyxpy/framework/core/runtime/`, `src/nyxpy/gui/`
 > **目的**: 保存済み接続先が現在存在しない場合の解決規則を統一し、GUI lifetime port を Dummy device へ安全にフォールバックさせる
-> **関連ドキュメント**: `spec/framework/archive/hardware_design.md`, `spec/framework/archive/protocol_design.md`, `spec/agent/wip/local_013/CONNECTION_MENU.md`
+> **関連ドキュメント**: `spec/framework/archive/hardware_design.md`, `spec/framework/archive/protocol_design.md`, `spec/agent/wip/local_014/CONNECTION_MENU.md`
 > **既存ソース**: `src/nyxpy/framework/core/hardware/device_discovery.py`, `src/nyxpy/framework/core/io/device_factories.py`, `src/nyxpy/framework/core/runtime/builder.py`, `src/nyxpy/gui/app_services.py`
 > **破壊的変更**: あり。GUI と設定ダイアログは切断済みの保存値を現在接続可能な候補として扱わない。
 
@@ -44,7 +44,7 @@
 
 - `DeviceDiscoveryResult` は実デバイスのみを表し、Dummy device を検出結果へ混ぜない方針を維持する。
 - `runtime.allow_dummy` と `RuntimeBuildRequest.allow_dummy` の既存意味を維持する。
-- GUI 接続メニューの構造は `spec/agent/wip/local_013/CONNECTION_MENU.md` で扱う。
+- GUI 接続メニューの構造は `spec/agent/wip/local_014/CONNECTION_MENU.md` で扱う。
 - `uv run pytest tests\unit\framework\hardware tests\unit\framework\io tests\unit\framework\runtime` が着手前に通ること。
 
 ## 2. 対象ファイル
@@ -52,7 +52,7 @@
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `src/nyxpy/framework/core/hardware/device_discovery.py` | 変更 | 現在利用可能な実デバイスの列挙だけを contract 化し、`find_serial()` / `find_capture()` の接続解決責務を移管または削除する。 |
-| `src/nyxpy/framework/core/runtime/device_selection.py` | 新規候補 | requested target と discovery snapshot から selected target を決定する純粋関数と値 object を置く候補。採用可否は「責務再整理と採用判断」で決める。 |
+| `src/nyxpy/framework/core/runtime/device_selection.py` | 新規 | requested target と discovery snapshot から selected target を決定する純粋関数と値 object を置く。追加分と同じ変更内で既存の探索分岐を削減する。 |
 | `src/nyxpy/framework/core/io/device_factories.py` | 変更 | Port adapter の生成と open/initialize 失敗時の処理へ責務を絞り、requested target 探索ロジックを削減する。 |
 | `src/nyxpy/framework/core/runtime/builder.py` | 変更 | GUI lifetime port と macro execution port の fallback policy を明確に分離する。 |
 | `src/nyxpy/gui/app_services.py` | 変更 | device discovery の再読み込み、resolved target の保持、runtime builder 再評価を管理する。 |
@@ -107,10 +107,12 @@
 | A. DiscoveryService に寄せる | `DeviceDiscoveryService.find_*` を拡張し、selected target と Dummy fallback まで返す | 既存 API を活かせる。inventory に近い | Discovery が settings と runtime policy を持ち、hardware support 層が上位方針を知る。メニュー表示時の同期再検出も誘発しやすい | 不採用 |
 | B. device_factories.py に寄せる | Factory 内で requested target、Dummy fallback、Port 生成を完結させる | open/initialize 失敗時の fallback を扱いやすい。変更ファイルが少ない | Factory が selection policy と adapter construction を兼務し続ける。GUI menu が「実効接続だけ知りたい」場合に factory/open へ依存する | 部分採用 |
 | C. RuntimeBuilder に private helper として置く | `MacroRuntimeBuilder` 内で requested target を selected target に変換する | Runtime assembly の責務に近い。新規公開面が少ない | GUI lifetime / connection menu でも同じ判定を使うため、private helper では共有しにくい | 不採用 |
-| D. Runtime assembly の小さな pure module に置く | `core/runtime/device_selection.py` に値 object と `select_*_target()` を置く。状態を持つ service class は作らない | 再設計の Runtime/Ports 境界に合う。GUI/CLI/Factory が同じ selection policy を共有できる。Discovery と Factory の肥大化を避けられる | 新規 module は増える。open/initialize 失敗後の fallback は factory と連携が必要 | 採用候補 |
+| D. Runtime assembly の小さな pure module に置く | `core/runtime/device_selection.py` に値 object と `select_*_target()` を置く。状態を持つ service class は作らない | 再設計の Runtime/Ports 境界に合う。GUI/CLI/Factory が同じ selection policy を共有できる。Discovery と Factory の肥大化を避けられる | 新規 module は増える。open/initialize 失敗後の fallback は factory と連携が必要 | 採用 |
 | E. GUI AppServices に置く | GUI lifetime と menu 表示だけ `GuiAppServices` で解決する | GUI 要件には最短で届く | CLI / macro execution と policy が分岐する。framework core の挙動として固定できない | 不採用 |
 
-採用方針は D 案を基本とする。ただし、`ConnectionResolver` のような状態を持つ新 service class は作らない。まずは `ResolvedConnection` 相当の値 object と `select_serial_target()` / `select_capture_target()` / `select_window_target()` の純粋関数を `src/nyxpy/framework/core/runtime/device_selection.py` へ置く。`ControllerOutputPortFactory` / `FrameSourcePortFactory` は selected target をもとに Port を生成する責務へ寄せ、実デバイスの open/initialize 失敗だけ factory 側で `OPEN_FAILED` fallback として扱う。
+採用方針は D 案とする。ただし、状態を持つ新 service class は作らない。`ResolvedConnection` 相当の値 object と `select_serial_target()` / `select_capture_target()` / `select_window_target()` の純粋関数を `src/nyxpy/framework/core/runtime/device_selection.py` へ置く。`ControllerOutputPortFactory` / `FrameSourcePortFactory` は selected target をもとに Port を生成する責務へ寄せ、実デバイスの open/initialize 失敗だけ factory 側で `OPEN_FAILED` fallback として扱う。
+
+新規 module を追加する分、同じ実装単位で既存コードを削減する。受け入れ条件は、`DeviceDiscoveryService.find_serial()` / `find_capture()` の public 経路を削除または private 化し、`device_factories.py` から requested target 探索、not found 判定、数字 capture index fallback を取り除くことである。機能追加だけで終わらせず、selection policy の一元化によって総分岐数を減らす。
 
 この判断により、既存コンポーネントは次のように削減する。
 
