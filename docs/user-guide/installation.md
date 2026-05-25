@@ -2,26 +2,43 @@
 
 ## 必要なもの
 
-- [uv](https://github.com/astral-sh/uv)
-- キャプチャデバイス
-- CH552 プロトコルなど NyX が対応するシリアル通信デバイス
+| 項目 | 内容 |
+|------|------|
+| uv | [uv 公式のインストール手順](https://docs.astral.sh/uv/getting-started/installation/)に従って導入する |
+| キャプチャデバイス | Switch の映像を PC に取り込む |
+| シリアル通信デバイス | CH552 プロトコルなど NyX が対応する方式で入力を送る |
+| Git | リポジトリの内容を直接使う場合だけ使う |
 
-uv が未導入の場合は、[uv 公式のインストール手順](https://docs.astral.sh/uv/getting-started/installation/)に従って導入します。
+NyX は uv が管理する Python 環境で動作します。Python 本体を個別に導入する手順は不要です。
 
-## 公開後の導入手順
+uv の導入確認:
 
-配布パッケージ `nyxfw` は公開準備中です。公開後は `uv tool install` で CLI / GUI を導入します。
+```console
+uv --version
+```
+
+## パッケージで導入する
+
+配布パッケージ `nyxfw` を使う場合は `uv tool install` で CLI / GUI を導入します。
 
 ```console
 uv tool install nyxfw
 nyxpy --help
 ```
 
+`nyxpy --help` で `run`, `init`, `create`, `docs`, `gui` が表示されれば導入できています。
+
+更新する場合:
+
+```console
+uv tool upgrade nyxfw
+```
+
 マクロが追加の外部ライブラリを必要とする場合、`uv tool install` で作られる隔離環境にもその依存が必要です。必要な依存はマクロ配布元の手順を確認してください。
 
-## リポジトリから使う
+## リポジトリの内容を直接使う
 
-公開前に動作確認する場合や、NyX 本体を修正する場合はリポジトリを取得します。
+リポジトリの内容を直接使う場合は、取得したディレクトリで `uv run nyxpy ...` を実行します。
 
 ```console
 git clone https://github.com/niart120/Project_NyX.git
@@ -36,7 +53,7 @@ GUI を起動します。
 uv run nyxpy gui
 ```
 
-旧来の alias も使えます。
+`uv run nyx-gui` でも同じ GUI を起動できます。
 
 ```console
 uv run nyx-gui
@@ -50,7 +67,7 @@ uv run nyx-gui
 nyxpy init
 ```
 
-リポジトリから起動している場合は `uv run` を付けます。
+リポジトリの内容を直接使う場合は `uv run` を付けます。
 
 ```console
 uv run nyxpy init
@@ -62,10 +79,33 @@ uv run nyxpy init
 nyxpy init --blank
 ```
 
+リポジトリの内容を直接使う場合:
+
+```console
+uv run nyxpy init --blank
+```
+
+初期化後は次のディレクトリが作成されます。
+
+```text
+.nyxpy/
+macros/
+resources/
+logs/
+runs/
+snapshots/
+```
+
 ## ドキュメントを確認する
 
 インストール後は `nyxpy docs` で公開ドキュメントの URL とローカル API 参照方法を確認できます。
 
 ```console
 nyxpy docs
+```
+
+リポジトリの内容を直接使う場合:
+
+```console
+uv run nyxpy docs
 ```
