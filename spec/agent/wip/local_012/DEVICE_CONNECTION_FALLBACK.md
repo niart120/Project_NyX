@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`, `src/nyxpy/framework/core/io/`, `src/nyxpy/framework/core/runtime/`, `src/nyxpy/gui/`
 > **目的**: 保存済み接続先が現在存在しない場合の解決規則を統一し、GUI lifetime port を Dummy device へ安全にフォールバックさせる
-> **関連ドキュメント**: `spec/framework/archive/hardware_design.md`, `spec/framework/archive/protocol_design.md`, `spec/agent/wip/local_014/CONNECTION_MENU.md`
+> **関連ドキュメント**: `spec/framework/archive/hardware_design.md`, `spec/framework/archive/protocol_design.md`, `spec/agent/wip/local_013/CONNECTION_MENU.md`
 > **既存ソース**: `src/nyxpy/framework/core/hardware/device_discovery.py`, `src/nyxpy/framework/core/io/device_factories.py`, `src/nyxpy/framework/core/runtime/builder.py`, `src/nyxpy/gui/app_services.py`
 > **破壊的変更**: あり。GUI と設定ダイアログは切断済みの保存値を現在接続可能な候補として扱わない。
 
@@ -44,7 +44,7 @@
 
 - `DeviceDiscoveryResult` は実デバイスのみを表し、Dummy device を検出結果へ混ぜない方針を維持する。
 - `runtime.allow_dummy` と `RuntimeBuildRequest.allow_dummy` の既存意味を維持する。
-- GUI 接続メニューの構造は `spec/agent/wip/local_014/CONNECTION_MENU.md` で扱う。
+- GUI 接続メニューの構造は `spec/agent/wip/local_013/CONNECTION_MENU.md` で扱う。
 - `uv run pytest tests\unit\framework\hardware tests\unit\framework\io tests\unit\framework\runtime` が着手前に通ること。
 
 ## 2. 対象ファイル

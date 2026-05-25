@@ -496,14 +496,40 @@ def test_connection_status_is_not_rendered_in_macro_explorer(window: MainWindow)
 
 
 def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServices):
-    services.global_settings.set("capture_device", "USB Video Device")
-    services.global_settings.set("serial_device", "COM6")
+    services.global_settings.set("capture_device", "Camera1")
+    services.global_settings.set("serial_device", "COM1")
 
     w = MainWindow(services=services)
     qtbot.addWidget(w)
 
-    assert w.capture_status_label.text() == "映像: USB Video Device 接続中"
-    assert w.serial_status_label.text() == "シリアル: COM6 接続中"
+    assert w.capture_status_label.text() == "映像: Camera1 接続中"
+    assert w.serial_status_label.text() == "シリアル: USB Serial Device (COM1) 接続中"
+    w.preview_pane.timer.stop()
+
+
+def test_status_bar_does_not_mark_missing_saved_devices_as_connected(qtbot, services: FakeServices):
+    services.global_settings.set("capture_device", "Missing Camera")
+    services.global_settings.set("serial_device", "COM9")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_status_label.text() == "映像: Missing Camera 未検出 (ダミーデバイス使用中)"
+    assert w.serial_status_label.text() == "シリアル: COM9 未検出 (ダミーデバイス使用中)"
+    w.preview_pane.timer.stop()
+
+
+def test_status_bar_resolves_window_status_by_title_when_identifier_is_stale(
+    qtbot, services: FakeServices
+):
+    services.global_settings.set("capture_source_type", "window")
+    services.global_settings.set("capture_window_title", "Viewer")
+    services.global_settings.set("capture_window_identifier", "stale-hwnd")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_status_label.text() == "映像: Viewer 接続中"
     w.preview_pane.timer.stop()
 
 

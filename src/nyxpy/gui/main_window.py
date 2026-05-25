@@ -18,10 +18,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.hardware.window_discovery import WindowInfo
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
+from nyxpy.framework.core.runtime.device_selection import (
+    ConnectionFallbackReason,
+    ConnectionRequest,
+    ConnectionResolveStatus,
+    ResolvedConnection,
+    select_capture_target,
+    select_serial_target,
+    select_window_target,
+)
 from nyxpy.framework.core.runtime.handle import RunHandle
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.schema import SettingValue
@@ -563,19 +574,38 @@ class MainWindow(QMainWindow):
 
     def _update_connection_status(self) -> None:
         source_type = self.global_settings.get("capture_source_type", "camera")
+        discovery_snapshot = _device_discovery_snapshot(self.device_discovery)
+        window_snapshot = _window_discovery_snapshot(self.device_discovery)
         if source_type == "window":
-            capture_name = self.global_settings.get("capture_window_title", "") or "window capture"
+            capture_selection = _select_window_connection_status(
+                self.global_settings,
+                window_snapshot,
+            )
         else:
-            capture_name = self.global_settings.get("capture_device", "")
+            capture_selection = select_capture_target(
+                ConnectionRequest(
+                    kind="capture",
+                    requested=str(self.global_settings.get("capture_device", "") or ""),
+                    allow_dummy=True,
+                ),
+                discovery_snapshot,
+            )
         if self.preview_connection_error is not None:
             capture_status = f"映像: 接続失敗 ({self.preview_connection_error})"
         else:
-            capture_status = f"映像: {capture_name} 接続中" if capture_name else "映像: 未接続"
-        serial_name = self._serial_display_name(self.global_settings.get("serial_device", ""))
+            capture_status = _format_connection_status("映像", capture_selection)
+        serial_selection = select_serial_target(
+            ConnectionRequest(
+                kind="serial",
+                requested=str(self.global_settings.get("serial_device", "") or ""),
+                allow_dummy=True,
+            ),
+            discovery_snapshot,
+        )
         if self.manual_controller_error is not None:
             serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
         else:
-            serial_status = f"シリアル: {serial_name} 接続中" if serial_name else "シリアル: 未接続"
+            serial_status = _format_connection_status("シリアル", serial_selection)
         self.capture_status_label.setText(capture_status)
         self.serial_status_label.setText(serial_status)
 
@@ -865,6 +895,77 @@ def _window_discovery_snapshot(discovery: object) -> tuple[WindowInfo, ...]:
     if isinstance(windows, tuple):
         return windows
     return ()
+
+
+def _window_connection_request(settings: object) -> str | None:
+    get_setting = getattr(settings, "get")
+    identifier = str(get_setting("capture_window_identifier", "") or "").strip()
+    if identifier:
+        return identifier
+    title = str(get_setting("capture_window_title", "") or "").strip()
+    return title or None
+
+
+def _select_window_connection_status(
+    settings: object,
+    windows: tuple[WindowInfo, ...],
+) -> ResolvedConnection:
+    get_setting = getattr(settings, "get")
+    identifier = str(get_setting("capture_window_identifier", "") or "").strip()
+    title = str(get_setting("capture_window_title", "") or "").strip()
+    match_mode = str(get_setting("capture_window_match_mode", "exact") or "exact")
+    requested = identifier or title or None
+    if requested is None:
+        return select_window_target(
+            ConnectionRequest(kind="window", requested=None, allow_dummy=True),
+            windows,
+        )
+    try:
+        selected = resolve_window(
+            windows,
+            WindowCaptureSourceConfig(
+                title_pattern=title,
+                identifier=identifier or None,
+                match_mode="contains" if match_mode == "contains" else "exact",
+            ),
+        )
+    except ConfigurationError:
+        return select_window_target(
+            ConnectionRequest(kind="window", requested=requested, allow_dummy=True),
+            windows,
+        )
+    return ResolvedConnection(
+        status=ConnectionResolveStatus.SELECTED,
+        kind="window",
+        requested=requested,
+        selected=selected,
+    )
+
+
+def _format_connection_status(label: str, selection: ResolvedConnection) -> str:
+    if selection.status == ConnectionResolveStatus.SELECTED and selection.selected is not None:
+        return f"{label}: {_selected_display_name(selection.selected)} 接続中"
+    if not selection.uses_dummy:
+        return f"{label}: 未接続"
+    if selection.fallback_reason == ConnectionFallbackReason.USER_SELECTED_DUMMY:
+        return f"{label}: ダミーデバイス使用中"
+    if selection.fallback_reason == ConnectionFallbackReason.NOT_SELECTED:
+        return f"{label}: 未接続 (ダミーデバイス使用中)"
+    requested = selection.requested or "未選択"
+    return f"{label}: {requested} 未検出 (ダミーデバイス使用中)"
+
+
+def _selected_display_name(selected: object) -> str:
+    display_name = getattr(selected, "display_name", None)
+    if display_name:
+        return str(display_name)
+    title = getattr(selected, "title", None)
+    if title:
+        return str(title)
+    name = getattr(selected, "name", None)
+    if name:
+        return str(name)
+    return str(selected)
 
 
 def _same_number_or_none(left: object, right: object) -> bool:
