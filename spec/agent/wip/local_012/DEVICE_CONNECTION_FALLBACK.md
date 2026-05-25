@@ -79,7 +79,7 @@
 | シリアル | `DeviceInfo.identifier` の文字列 | `DeviceInfo.display_name` | `identifier` | 例: `COM3`, `/dev/ttyUSB0`。抜き差しで identifier が変われば missing 扱いである。 |
 | カメラ | `DeviceInfo.name` | `DeviceInfo.display_name` | 原則 `name`、同名衝突時は `identifier` を補助 | 現状は `0: Device Name` のように index を含む name を保存する。 |
 | ウィンドウ | `capture_window_identifier` と `capture_window_title` | `WindowInfo.display_name` | `identifier` 優先、なければ title | 検出できない保存済み window は候補へ再追加しない。 |
-| Dummy | `DUMMY_DEVICE_NAME` | `ダミーデバイス` | sentinel | ユーザーが明示選択した場合だけ設定へ保存する。自動 fallback では保存値を書き換えない。 |
+| Dummy | `DUMMY_DEVICE_NAME` | `ダミーデバイス` | sentinel | ユーザーが明示選択した場合だけ設定へ保存する。検出不能になった過去の接続先は空値へ破棄する。 |
 
 ### 責務再整理と採用判断
 
@@ -213,12 +213,12 @@ def select_window_target(
 | 状態 | requested | resolved | 設定ファイル更新 | UI 表示 |
 |------|-----------|----------|------------------|---------|
 | 実デバイス接続中 | 実デバイス識別子 | 同じ実デバイス | ユーザー選択時に保存 | 実デバイスを現在接続中として表示 |
-| 自動 Dummy fallback | 切断済みまたは未選択 | Dummy | 書き換えない | Dummy と fallback reason を表示 |
+| 自動 Dummy fallback | 未選択 | Dummy | 書き換えない | 未接続と Dummy 使用を表示 |
+| 検出不能設定の破棄 | 切断済みまたは閉じられた接続先 | Dummy | requested を空値へ破棄 | 未検出ではなく未接続として表示 |
 | 明示 Dummy 選択 | `DUMMY_DEVICE_NAME` | Dummy | Dummy を保存 | Dummy を現在接続中として表示 |
-| 再読み込みで実デバイス復帰 | 古い requested が再び検出可能 | 実デバイスへ再解決 | 書き換えない | 実デバイスを現在接続中として表示 |
 | 明示 Dummy 中に実デバイス復帰 | `DUMMY_DEVICE_NAME` | Dummy | 書き換えない | Dummy を維持 |
 
-自動 Dummy fallback 中に同じ requested target が再検出された場合は、再読み込み後に実デバイスへ自動復帰する。ユーザーが明示的に Dummy を選んだ場合は、自動復帰しない。
+接続不能な保存済み target は、GUI 設定反映時に空値へ破棄する。これにより、閉じられた window や取り外された serial device を次回以降の requested target として保持しない。検出処理自体が timeout または例外で失敗した場合は、実デバイス不在と断定せず保存値を維持する。ユーザーが明示的に Dummy を選んだ場合は、自動復帰しない。
 
 ### 実行経路別 fallback policy
 
@@ -233,10 +233,10 @@ def select_window_target(
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
-| `capture_device` | `str` | `""` | カメラ入力の requested target。検出されない場合、GUI lifetime では Dummy fallback する。 |
-| `capture_window_title` | `str` | `""` | window 入力の requested title。候補にない場合は GUI lifetime で Dummy fallback 対象にする。 |
+| `capture_device` | `str` | `""` | カメラ入力の requested target。検出されない場合、GUI 設定反映時に空値へ破棄する。 |
+| `capture_window_title` | `str` | `""` | window 入力の requested title。候補にない場合は GUI 設定反映時に空値へ破棄する。 |
 | `capture_window_identifier` | `str` | `""` | window 入力の requested identifier。title より優先して同一性判定に使う。 |
-| `serial_device` | `str` | `""` | シリアル入力の requested identifier。検出されない場合、GUI lifetime では Dummy fallback する。 |
+| `serial_device` | `str` | `""` | シリアル入力の requested identifier。検出されない場合、GUI 設定反映時に空値へ破棄する。 |
 | `runtime.allow_dummy` | `bool` | `False` | マクロ実行で Dummy fallback を許可するか。GUI lifetime fallback とは別に扱う。 |
 
 ### エラーハンドリング
@@ -261,7 +261,10 @@ Dummy fallback は失敗を隠す成功扱いにしない。`ResolvedConnection.
 | ユニット | `test_select_serial_target_falls_back_to_dummy_when_requested_missing` | `allow_dummy=True` で missing serial が Dummy fallback になる。 |
 | ユニット | `test_select_target_returns_error_when_dummy_not_allowed` | `allow_dummy=False` で missing device が error になる。 |
 | ユニット | `test_select_target_distinguishes_auto_dummy_from_user_selected_dummy` | 自動 fallback と明示 Dummy 選択の reason が分かれる。 |
-| ユニット | `test_select_target_reconnects_requested_device_after_reload` | 自動 Dummy fallback 中に requested device が復帰した場合、実デバイスへ再選択する。 |
+| GUI | `test_app_services_discards_unavailable_serial_setting` | 取り外された serial device の保存値を空値へ破棄する。 |
+| GUI | `test_app_services_discards_unavailable_camera_setting` | 検出不能な camera の保存値を空値へ破棄する。 |
+| GUI | `test_app_services_discards_unavailable_window_setting` | 閉じられた window の title / identifier を空値へ破棄する。 |
+| GUI | `test_app_services_keeps_window_setting_when_window_discovery_failed` | window discovery 失敗時は保存値を破棄しない。 |
 | ユニット | `test_controller_factory_falls_back_to_dummy_on_open_failure_when_allowed` | serial open failure が `allow_dummy=True` で Dummy port になる。 |
 | ユニット | `test_frame_factory_falls_back_to_dummy_when_camera_missing` | camera missing が `allow_dummy=True` で Dummy frame source になる。 |
 | ユニット | `test_window_source_missing_uses_dummy_for_gui_lifetime` | window source missing が GUI lifetime policy で Dummy frame source になる。 |
@@ -276,6 +279,7 @@ Dummy fallback は失敗を隠す成功扱いにしない。`ResolvedConnection.
 - [x] GUI lifetime port の missing / open failed を Dummy fallback へ統一する。
 - [x] Macro execution の `allow_dummy=False` 既定を維持する。
 - [x] Window capture source の missing fallback policy を実装する。
+- [x] 接続不能な保存済み接続先を GUI 設定反映時に破棄する。
 - [x] 数字 capture index fallback を廃止する。
 - [x] `DeviceDiscoveryService.find_serial()` / `find_capture()` を削除する。
 - [x] `device_factories.py` から requested target 探索分岐を削減し、Port 生成と open/initialize failure handling へ寄せる。

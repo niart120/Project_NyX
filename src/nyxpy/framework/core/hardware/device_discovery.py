@@ -52,6 +52,15 @@ class DeviceDiscoveryResult:
         return [device.name for device in self.capture_devices]
 
 
+@dataclass(frozen=True)
+class WindowDiscoveryResult:
+    """Window capture 候補検出の結果。"""
+
+    window_sources: tuple[WindowInfo, ...] = ()
+    failed: bool = False
+    errors: tuple[str, ...] = ()
+
+
 class DeviceDiscoveryService:
     """シリアル、カメラ、window capture 候補を検出します。"""
 
@@ -132,6 +141,12 @@ class DeviceDiscoveryService:
         return self.last_result.capture_names()
 
     def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
+        return self.detect_window_sources_result(timeout_sec=timeout_sec).window_sources
+
+    def detect_window_sources_result(
+        self,
+        timeout_sec: float = 2.0,
+    ) -> WindowDiscoveryResult:
         if timeout_sec < 0:
             raise ValueError("timeout_sec must be greater than or equal to 0")
         started_at = time.perf_counter()
@@ -146,7 +161,10 @@ class DeviceDiscoveryService:
                 extra={"device_type": "window"},
                 exc=exc,
             )
-            return ()
+            return WindowDiscoveryResult(
+                failed=True,
+                errors=(f"window: {type(exc).__name__}: {exc}",),
+            )
         elapsed_sec = time.perf_counter() - started_at
         self.logger.technical(
             "INFO",
@@ -169,7 +187,7 @@ class DeviceDiscoveryService:
             )
         with self._lock:
             self._last_window_sources = detected
-        return detected
+        return WindowDiscoveryResult(window_sources=detected)
 
     def serial_display_name(self, identifier: str) -> str:
         match = next(

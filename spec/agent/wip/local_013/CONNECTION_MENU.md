@@ -181,10 +181,10 @@ class ConnectionMenuController:
 | Menu group | チェック対象 | 判定 |
 |------------|--------------|------|
 | 入力ソース | `camera` / `window` | `capture_source_type` と一致する action。 |
-| キャプチャ入力 > デバイス | Dummy または検出済み camera | `capture_connection` の resolved target。自動 fallback 中は Dummy にチェック。 |
+| キャプチャ入力 > デバイス | Dummy または検出済み camera | `capture_connection` の resolved target。検出不能な保存値は設定反映時に破棄されるため、stale device はチェックしない。 |
 | ウィンドウ | 検出済み window | `capture_window_identifier` 優先、なければ title で一致する action。missing 時はチェックなしまたは Dummy 相当 status を表示する。 |
 | FPS | source default / 15 / 30 / 60 | `capture_fps` が `None` なら source default。 |
-| シリアルデバイス | Dummy または検出済み serial | `serial_connection` の resolved target。自動 fallback 中は Dummy にチェック。 |
+| シリアルデバイス | Dummy または検出済み serial | `serial_connection` の resolved target。検出不能な保存値は設定反映時に破棄されるため、stale serial はチェックしない。 |
 | シリアルデバイス > ボーレート | 現在 protocol の supported baudrate | `serial_baud` と一致する action。非対応値は既定値へ補正してから表示する。 |
 | プロトコル | `ProtocolFactory.get_protocol_names()` | `serial_protocol` と一致する action。 |
 
