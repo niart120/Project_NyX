@@ -49,6 +49,21 @@ class FakeDiscovery:
         return (WindowInfo("Viewer", "hwnd-1", CaptureRect(10, 20, 600, 720)),)
 
 
+class EmptyDiscovery:
+    def detect(self, timeout_sec=2.0):
+        return self
+
+    @property
+    def serial_devices(self):
+        return ()
+
+    def capture_names(self):
+        return []
+
+    def detect_window_sources(self, timeout_sec=2.0):
+        return ()
+
+
 def test_device_tab_protocol_options_include_3ds(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
@@ -163,6 +178,27 @@ def test_device_settings_tab_saves_serial_identifier(qtbot):
     tab.apply()
 
     assert settings.data["serial_device"] == "COM1"
+
+
+def test_device_settings_tab_does_not_list_stale_serial_setting(qtbot):
+    settings = FakeSettings()
+    settings.data["serial_device"] = "COM9"
+    tab = DeviceSettingsTab(settings, None, device_discovery=EmptyDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.ser_device.findText("COM9") < 0
+    assert tab.ser_device.count() == 0
+
+
+def test_device_settings_tab_does_not_list_stale_window_setting(qtbot):
+    settings = FakeSettings()
+    settings.data["capture_window_title"] = "Disconnected Viewer"
+    settings.data["capture_window_identifier"] = "hwnd-old"
+    tab = DeviceSettingsTab(settings, None, device_discovery=EmptyDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.window_source.findText("Disconnected Viewer") < 0
+    assert tab.window_source.count() == 0
 
 
 def test_device_settings_tab_updates_window_size_preset(qtbot):

@@ -153,7 +153,7 @@ DeviceKind = Literal["serial", "capture", "window"]
 
 
 class ConnectionResolveStatus(StrEnum):
-    CONNECTED = "connected"
+    SELECTED = "selected"
     FALLBACK_DUMMY = "fallback_dummy"
     ERROR = "error"
 
@@ -161,8 +161,7 @@ class ConnectionResolveStatus(StrEnum):
 class ConnectionFallbackReason(StrEnum):
     NOT_SELECTED = "not_selected"
     NOT_FOUND = "not_found"
-    OPEN_FAILED = "open_failed"
-    TIMED_OUT = "timed_out"
+    DISCOVERY_TIMED_OUT = "discovery_timed_out"
     USER_SELECTED_DUMMY = "user_selected_dummy"
 
 
@@ -175,13 +174,15 @@ class ConnectionRequest:
 
 @dataclass(frozen=True)
 class ResolvedConnection:
-    kind: DeviceKind
     status: ConnectionResolveStatus
+    kind: DeviceKind
     requested: str | None
-    resolved: DeviceInfo | None
-    uses_dummy: bool
-    reason: ConnectionFallbackReason | None = None
-    message: str = ""
+    selected: DeviceInfo | WindowInfo | None = None
+    fallback_reason: ConnectionFallbackReason | None = None
+
+    @property
+    def uses_dummy(self) -> bool:
+        ...
 
 
 def select_serial_target(
@@ -205,7 +206,7 @@ def select_window_target(
     ...
 ```
 
-`ControllerOutputPortFactory.create()` と `FrameSourcePortFactory.create()` は、selection policy が `FALLBACK_DUMMY` を返した場合に Dummy port を返す。selection policy が `ERROR` を返した場合は `ConfigurationError` を送出し、`details` に `device_type`, `requested`, `available_devices`, `fallback_reason` を含める。実デバイスが見つかった後に `open()` または `initialize()` で失敗した場合、`allow_dummy=True` では Dummy に切り替え、`allow_dummy=False` では原因例外を `cause` に持つ `ConfigurationError` を送出する。
+`ControllerOutputPortFactory.create()` と `FrameSourcePortFactory.create()` は、selection policy が `FALLBACK_DUMMY` を返した場合に Dummy port を返す。selection policy が `ERROR` を返した場合は `ConfigurationError` を送出し、`details` に `device_type`, `requested`, `available_devices`, `fallback_reason` を含める。実デバイスが見つかった後に serial `open()` で失敗した場合、`allow_dummy=True` では Dummy に切り替え、`allow_dummy=False` では原因例外を持つ `ConfigurationError` を送出する。capture/window の `initialize()` 失敗は fallback wrapper が `allow_dummy=True` で Dummy へ切り替え、warning log を残す。
 
 ### 状態モデル
 
@@ -269,16 +270,16 @@ Dummy fallback は失敗を隠す成功扱いにしない。`ResolvedConnection.
 
 ## 6. 実装チェックリスト
 
-- [ ] `device_selection.py` の値 object と純粋関数のシグネチャを確定する。
-- [ ] requested / resolved / fallback reason の状態モデルを実装する。
-- [ ] Discovery 結果へ切断済み保存値を混ぜない contract をテストで固定する。
-- [ ] GUI lifetime port の missing / open failed を Dummy fallback へ統一する。
-- [ ] Macro execution の `allow_dummy=False` 既定を維持する。
-- [ ] Window capture source の missing fallback policy を実装する。
-- [ ] 数字 capture index fallback を廃止するか、GUI 対象外の明示 legacy path として隔離する。
-- [ ] `DeviceDiscoveryService.find_serial()` / `find_capture()` を削除または private 化できるか確認する。
-- [ ] `device_factories.py` から requested target 探索分岐を削減し、Port 生成と open/initialize failure handling へ寄せる。
-- [ ] 設定ダイアログで切断済み保存値を候補へ再追加しない。
-- [ ] ユニットテスト作成・パス。
-- [ ] 実機必要テストに `@pytest.mark.realdevice` を付ける。
-- [ ] `uv run ruff check src\nyxpy tests\unit` を実行する。
+- [x] `device_selection.py` の値 object と純粋関数のシグネチャを確定する。
+- [x] requested / resolved / fallback reason の状態モデルを実装する。
+- [x] Discovery 結果へ切断済み保存値を混ぜない contract をテストで固定する。
+- [x] GUI lifetime port の missing / open failed を Dummy fallback へ統一する。
+- [x] Macro execution の `allow_dummy=False` 既定を維持する。
+- [x] Window capture source の missing fallback policy を実装する。
+- [x] 数字 capture index fallback を廃止する。
+- [x] `DeviceDiscoveryService.find_serial()` / `find_capture()` を削除する。
+- [x] `device_factories.py` から requested target 探索分岐を削減し、Port 生成と open/initialize failure handling へ寄せる。
+- [x] 設定ダイアログで切断済み保存値を候補へ再追加しない。
+- [x] ユニットテスト作成・パス。
+- [x] 実機必要テストに `@pytest.mark.realdevice` を付ける。
+- [x] `uv run ruff check` と `uv run ty check src\nyxpy --output-format concise --no-progress` を実行する。

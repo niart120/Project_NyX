@@ -2,14 +2,20 @@
 
 import pytest
 
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult
+
 
 @pytest.fixture(autouse=True)
 def _no_real_hardware(monkeypatch):
     """GUI テストで実デバイス検出を防止する。"""
 
     class FakeDiscovery:
+        @property
+        def last_result(self):
+            return DeviceDiscoveryResult()
+
         def detect(self, timeout_sec=2.0):
-            return self
+            return self.last_result
 
         def serial_names(self):
             return []
@@ -19,12 +25,6 @@ def _no_real_hardware(monkeypatch):
 
         def detect_window_sources(self, timeout_sec=2.0):
             return ()
-
-        def find_serial(self, name, timeout_sec):
-            return None
-
-        def find_capture(self, name, timeout_sec):
-            return None
 
     monkeypatch.setattr(
         "nyxpy.gui.app_services.DeviceDiscoveryService", lambda **_: FakeDiscovery()

@@ -8,6 +8,8 @@ import pytest
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog
 
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
@@ -59,6 +61,9 @@ class FakeSettings:
             "capture_source_type": "camera",
             "capture_window_title": "",
             "serial_device": "",
+            "serial_protocol": "CH552",
+            "serial_baud": 9600,
+            "capture_fps": None,
         }
 
     def get(self, key: str, default=None):
@@ -111,6 +116,35 @@ class FakeCatalog:
         return next(definition for definition in self.definitions if definition.id == macro_id)
 
 
+class FakeDiscovery:
+    def __init__(self) -> None:
+        self.detect_calls = 0
+        self._last_result = DeviceDiscoveryResult(
+            serial_devices=(
+                DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1"),
+            ),
+            capture_devices=(DeviceInfo(kind="capture", name="Camera1", identifier=1),),
+        )
+        self._last_window_sources = (WindowInfo(title="Viewer", identifier="hwnd-1", rect=None),)
+
+    @property
+    def last_result(self) -> DeviceDiscoveryResult:
+        return self._last_result
+
+    @property
+    def last_window_sources(self) -> tuple[WindowInfo, ...]:
+        return self._last_window_sources
+
+    def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
+        self.detect_calls += 1
+        return self._last_result
+
+    def serial_display_name(self, identifier: object) -> str:
+        if str(identifier) == "COM1":
+            return "USB Serial Device (COM1)"
+        return str(identifier)
+
+
 class FakeBuilder:
     def __init__(self, handle=None) -> None:
         self.handle = handle
@@ -124,7 +158,7 @@ class FakeServices:
         self.logging = FakeLogging(self.logger)
         self.global_settings = FakeSettings()
         self.secrets_settings = FakeSecrets()
-        self.device_discovery = object()
+        self.device_discovery = FakeDiscovery()
         self.macro_catalog = FakeCatalog()
         self.builder = FakeBuilder()
         self.apply_calls = []
@@ -249,6 +283,83 @@ def test_initial_ui_state(window: MainWindow):
     assert not window.control_pane.run_btn.isEnabled()
     assert not window.control_pane.cancel_btn.isEnabled()
     assert window.control_pane.snapshot_btn.isEnabled()
+
+
+def test_main_window_replaces_file_menu_with_connection_menu(window: MainWindow) -> None:
+    top_level_menus = [action.text() for action in window.menuBar().actions()]
+
+    assert "接続" in top_level_menus
+    assert "File" not in top_level_menus
+    assert all(action.text() != "Settings" for action in window.menuBar().actions())
+
+
+def test_connection_menu_has_required_children(window: MainWindow) -> None:
+    assert window.connection_menu is not None
+
+    child_menus = [
+        action.menu().title()
+        for action in window.connection_menu.actions()
+        if action.menu() is not None
+    ]
+
+    assert child_menus[:3] == ["キャプチャ入力", "シリアルデバイス", "プロトコル"]
+
+
+def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) -> None:
+    discovery = window.services.device_discovery
+    assert isinstance(discovery, FakeDiscovery)
+    discovery.detect_calls = 0
+
+    window._refresh_connection_menu()
+
+    assert discovery.detect_calls == 0
+    assert window.capture_input_menu is not None
+    assert window.serial_device_menu is not None
+    assert "Camera1" in [action.text() for action in window.capture_input_menu.actions()]
+    assert "USB Serial Device (COM1)" in [
+        action.text() for action in window.serial_device_menu.actions()
+    ]
+
+
+def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> None:
+    assert window.capture_input_menu is not None
+    action = next(
+        action for action in window.capture_input_menu.actions() if action.text() == "Camera1"
+    )
+
+    action.trigger()
+
+    assert window.global_settings.get("capture_device") == "Camera1"
+    assert window.global_settings.get("capture_source_type") == "camera"
+    assert window.services.apply_calls[-1] is False
+
+
+def test_connection_menu_applies_window_source_setting(window: MainWindow) -> None:
+    assert window.capture_input_menu is not None
+    window_menu = next(
+        action.menu()
+        for action in window.capture_input_menu.actions()
+        if action.menu() is not None and action.menu().title() == "ウィンドウ"
+    )
+    assert window_menu is not None
+    action = next(action for action in window_menu.actions() if "Viewer" in action.text())
+
+    action.trigger()
+
+    assert window.global_settings.get("capture_source_type") == "window"
+    assert window.global_settings.get("capture_window_title") == "Viewer"
+    assert window.global_settings.get("capture_window_identifier") == "hwnd-1"
+
+
+def test_connection_menu_clamps_baudrate_when_protocol_changes(window: MainWindow) -> None:
+    window.global_settings.set("serial_baud", 115200)
+    assert window.protocol_menu is not None
+    action = next(action for action in window.protocol_menu.actions() if action.text() == "CH552")
+
+    action.trigger()
+
+    assert window.global_settings.get("serial_protocol") == "CH552"
+    assert window.global_settings.get("serial_baud") == 9600
 
 
 def test_main_window_wires_preview_touch_to_virtual_controller_model(window: MainWindow) -> None:

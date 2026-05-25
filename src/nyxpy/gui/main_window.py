@@ -11,15 +11,20 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.handle import RunHandle
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
+from nyxpy.framework.core.settings.schema import SettingValue
 from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.app_services import GuiAppServices, SettingsApplyOutcome
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
@@ -42,6 +47,23 @@ from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
 _TOUCH_UNSUPPORTED_STATUS = "現在のプロトコルは 3DS タッチ入力に対応していません"
 _PREVIEW_TOUCH_ENABLED_SETTING = "gui.preview_touch_enabled"
+_CAPTURE_FPS_OPTIONS = (
+    ("source default", None),
+    ("15", 15.0),
+    ("30", 30.0),
+    ("60", 60.0),
+)
+_SERIAL_BAUD_OPTIONS = (
+    "1200",
+    "2400",
+    "4800",
+    "9600",
+    "14400",
+    "19200",
+    "38400",
+    "57600",
+    "115200",
+)
 
 
 class _VirtualControllerPanel(QWidget):
@@ -134,6 +156,19 @@ class MainWindow(QMainWindow):
         self._preview_touch_active = False
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
+        self.connection_menu: QMenu | None = None
+        self.capture_input_menu: QMenu | None = None
+        self.serial_device_menu: QMenu | None = None
+        self.protocol_menu: QMenu | None = None
+        self.capture_source_type_menu: QMenu | None = None
+        self.window_source_menu: QMenu | None = None
+        self.capture_fps_menu: QMenu | None = None
+        self.serial_baud_menu: QMenu | None = None
+        self.capture_device_action_group: QActionGroup | None = None
+        self.capture_fps_action_group: QActionGroup | None = None
+        self.serial_device_action_group: QActionGroup | None = None
+        self.serial_baud_action_group: QActionGroup | None = None
+        self.protocol_action_group: QActionGroup | None = None
         self.current_window_size_preset_key = normalize_window_size_preset_key(
             self.global_settings.get(
                 "gui.window_size_preset",
@@ -156,10 +191,12 @@ class MainWindow(QMainWindow):
         self.apply_app_settings()
 
     def _build_menu_bar(self) -> None:
-        settings_action = QAction("Settings", self)
-        settings_action.triggered.connect(self.open_app_settings)
-        file_menu = self.menuBar().addMenu("File")
-        file_menu.addAction(settings_action)
+        self.connection_menu = self.menuBar().addMenu("接続")
+        self.capture_input_menu = self.connection_menu.addMenu("キャプチャ入力")
+        self.serial_device_menu = self.connection_menu.addMenu("シリアルデバイス")
+        self.protocol_menu = self.connection_menu.addMenu("プロトコル")
+        self.connection_menu.aboutToShow.connect(self._refresh_connection_menu)
+        self._refresh_connection_menu()
 
         view_menu = self.menuBar().addMenu("表示")
         self.window_size_action_group = QActionGroup(self)
@@ -174,6 +211,196 @@ class MainWindow(QMainWindow):
             self.window_size_action_group.addAction(action)
             self.window_size_actions[preset.key] = action
             view_menu.addAction(action)
+
+    def _refresh_connection_menu(self) -> None:
+        snapshot = _device_discovery_snapshot(self.device_discovery)
+        windows = _window_discovery_snapshot(self.device_discovery)
+        if self.capture_input_menu is not None:
+            self._populate_capture_input_menu(
+                self.capture_input_menu,
+                snapshot.capture_devices,
+                windows,
+            )
+        if self.serial_device_menu is not None:
+            self._populate_serial_device_menu(self.serial_device_menu, snapshot.serial_devices)
+        if self.protocol_menu is not None:
+            self._populate_protocol_menu(self.protocol_menu)
+
+    def _populate_capture_input_menu(
+        self,
+        menu: QMenu,
+        devices: tuple[DeviceInfo, ...],
+        windows: tuple[WindowInfo, ...],
+    ) -> None:
+        menu.clear()
+        self.capture_source_type_menu = QMenu("入力ソース", menu)
+        menu.addMenu(self.capture_source_type_menu)
+        self._populate_capture_source_type_menu(self.capture_source_type_menu)
+        menu.addSeparator()
+        self.capture_device_action_group = QActionGroup(self)
+        self.capture_device_action_group.setExclusive(True)
+        current = str(self.global_settings.get("capture_device", "") or "")
+        if not devices:
+            empty_action = QAction("利用可能なキャプチャ入力なし", self)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+        for device in devices:
+            action = QAction(device.display_name, self)
+            action.setCheckable(True)
+            action.setData(device.name)
+            action.setChecked(device.name == current)
+            action.triggered.connect(
+                lambda checked=False, name=device.name: self._apply_connection_settings(
+                    {"capture_source_type": "camera", "capture_device": name}
+                )
+            )
+            self.capture_device_action_group.addAction(action)
+            menu.addAction(action)
+        menu.addSeparator()
+        self.window_source_menu = QMenu("ウィンドウ", menu)
+        menu.addMenu(self.window_source_menu)
+        self._populate_window_source_menu(self.window_source_menu, windows)
+        menu.addSeparator()
+        self.capture_fps_menu = QMenu("FPS", menu)
+        menu.addMenu(self.capture_fps_menu)
+        self.capture_fps_action_group = QActionGroup(self)
+        self.capture_fps_action_group.setExclusive(True)
+        current_fps = self.global_settings.get("capture_fps", None)
+        for label, value in _CAPTURE_FPS_OPTIONS:
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setData(value)
+            action.setChecked(_same_number_or_none(current_fps, value))
+            action.triggered.connect(
+                lambda checked=False, fps=value: self._apply_connection_settings(
+                    {"capture_fps": fps}
+                )
+            )
+            self.capture_fps_action_group.addAction(action)
+            self.capture_fps_menu.addAction(action)
+
+    def _populate_capture_source_type_menu(self, menu: QMenu) -> None:
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        current = str(self.global_settings.get("capture_source_type", "camera") or "camera")
+        for source_type, label in (("camera", "カメラ"), ("window", "ウィンドウ")):
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setData(source_type)
+            action.setChecked(source_type == current)
+            action.triggered.connect(
+                lambda checked=False, value=source_type: self._apply_connection_settings(
+                    {"capture_source_type": value}
+                )
+            )
+            group.addAction(action)
+            menu.addAction(action)
+
+    def _populate_window_source_menu(
+        self,
+        menu: QMenu,
+        windows: tuple[WindowInfo, ...],
+    ) -> None:
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        current_identifier = str(self.global_settings.get("capture_window_identifier", "") or "")
+        current_title = str(self.global_settings.get("capture_window_title", "") or "")
+        if not windows:
+            empty_action = QAction("利用可能なウィンドウなし", self)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+            return
+        for window in windows:
+            identifier = str(window.identifier)
+            action = QAction(window.display_name, self)
+            action.setCheckable(True)
+            action.setData(identifier)
+            action.setChecked(identifier == current_identifier or window.title == current_title)
+            action.triggered.connect(
+                lambda checked=False, selected=window: self._apply_connection_settings(
+                    {
+                        "capture_source_type": "window",
+                        "capture_window_title": selected.title,
+                        "capture_window_identifier": str(selected.identifier),
+                    }
+                )
+            )
+            group.addAction(action)
+            menu.addAction(action)
+
+    def _populate_serial_device_menu(
+        self,
+        menu: QMenu,
+        devices: tuple[DeviceInfo, ...],
+    ) -> None:
+        menu.clear()
+        self.serial_device_action_group = QActionGroup(self)
+        self.serial_device_action_group.setExclusive(True)
+        current = str(self.global_settings.get("serial_device", "") or "")
+        if not devices:
+            empty_action = QAction("利用可能なシリアルデバイスなし", self)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+        for device in devices:
+            identifier = str(device.identifier)
+            action = QAction(device.display_name, self)
+            action.setCheckable(True)
+            action.setData(identifier)
+            action.setChecked(identifier == current)
+            action.triggered.connect(
+                lambda checked=False, serial=identifier: self._apply_connection_settings(
+                    {"serial_device": serial}
+                )
+            )
+            self.serial_device_action_group.addAction(action)
+            menu.addAction(action)
+        menu.addSeparator()
+        self.serial_baud_menu = QMenu("ボーレート", menu)
+        menu.addMenu(self.serial_baud_menu)
+        self.serial_baud_action_group = QActionGroup(self)
+        self.serial_baud_action_group.setExclusive(True)
+        current_baud = str(self.global_settings.get("serial_baud", 9600))
+        protocol_name = str(self.global_settings.get("serial_protocol", "CH552") or "CH552")
+        baud_options = [str(value) for value in _supported_baudrates(protocol_name)]
+        if current_baud not in baud_options:
+            baud_options.append(current_baud)
+        for baud in baud_options:
+            action = QAction(baud, self)
+            action.setCheckable(True)
+            action.setData(int(baud))
+            action.setChecked(baud == current_baud)
+            action.triggered.connect(
+                lambda checked=False, value=int(baud): self._apply_connection_settings(
+                    {"serial_baud": value}
+                )
+            )
+            self.serial_baud_action_group.addAction(action)
+            self.serial_baud_menu.addAction(action)
+
+    def _populate_protocol_menu(self, menu: QMenu) -> None:
+        menu.clear()
+        self.protocol_action_group = QActionGroup(self)
+        self.protocol_action_group.setExclusive(True)
+        current = str(self.global_settings.get("serial_protocol", "CH552") or "CH552")
+        for protocol_name in ProtocolFactory.get_protocol_names():
+            action = QAction(protocol_name, self)
+            action.setCheckable(True)
+            action.setData(protocol_name)
+            action.setChecked(protocol_name == current)
+            action.triggered.connect(
+                lambda checked=False, name=protocol_name: self._apply_connection_settings(
+                    _protocol_setting_updates(name, self.global_settings.get("serial_baud", 9600))
+                )
+            )
+            self.protocol_action_group.addAction(action)
+            menu.addAction(action)
+
+    def _apply_connection_settings(self, updates: dict[str, SettingValue]) -> None:
+        for key, value in updates.items():
+            if self.global_settings.get(key) != value:
+                self.global_settings.set(key, value)
+        self.apply_app_settings()
+        self._refresh_connection_menu()
 
     def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
         preset_key = normalize_window_size_preset_key(key)
@@ -624,3 +851,47 @@ class MainWindow(QMainWindow):
             if ret == QMessageBox.StandardButton.Retry:
                 # リトライ時は現在のマクロを再実行
                 self._start_macro({})
+
+
+def _device_discovery_snapshot(discovery: object) -> DeviceDiscoveryResult:
+    last_result = getattr(discovery, "last_result", None)
+    if isinstance(last_result, DeviceDiscoveryResult):
+        return last_result
+    return DeviceDiscoveryResult()
+
+
+def _window_discovery_snapshot(discovery: object) -> tuple[WindowInfo, ...]:
+    windows = getattr(discovery, "last_window_sources", ())
+    if isinstance(windows, tuple):
+        return windows
+    return ()
+
+
+def _same_number_or_none(left: object, right: object) -> bool:
+    if left in (None, "") and right is None:
+        return True
+    if left in (None, "") or right is None:
+        return False
+    try:
+        return float(str(left)) == float(str(right))
+    except (TypeError, ValueError):
+        return False
+
+
+def _supported_baudrates(protocol_name: str) -> tuple[int, ...]:
+    try:
+        return ProtocolFactory.get_descriptor(protocol_name).supported_baudrates
+    except ValueError:
+        return tuple(int(value) for value in _SERIAL_BAUD_OPTIONS)
+
+
+def _protocol_setting_updates(protocol_name: str, current_baud: object) -> dict[str, SettingValue]:
+    descriptor = ProtocolFactory.get_descriptor(protocol_name)
+    updates: dict[str, SettingValue] = {"serial_protocol": descriptor.name}
+    try:
+        baudrate = int(str(current_baud))
+    except (TypeError, ValueError):
+        baudrate = descriptor.default_baudrate
+    if baudrate not in descriptor.supported_baudrates:
+        updates["serial_baud"] = descriptor.default_baudrate
+    return updates
