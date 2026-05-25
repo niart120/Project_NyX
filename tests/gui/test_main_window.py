@@ -8,7 +8,11 @@ import pytest
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog
 
-from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
+from nyxpy.framework.core.hardware.device_discovery import (
+    DeviceDiscoveryResult,
+    DeviceInfo,
+    WindowDiscoveryResult,
+)
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
@@ -119,6 +123,7 @@ class FakeCatalog:
 class FakeDiscovery:
     def __init__(self) -> None:
         self.detect_calls = 0
+        self.window_detect_calls = 0
         self._last_result = DeviceDiscoveryResult(
             serial_devices=(
                 DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1"),
@@ -126,6 +131,7 @@ class FakeDiscovery:
             capture_devices=(DeviceInfo(kind="capture", name="Camera1", identifier=1),),
         )
         self._last_window_sources = (WindowInfo(title="Viewer", identifier="hwnd-1", rect=None),)
+        self.detected_window_sources = self._last_window_sources
 
     @property
     def last_result(self) -> DeviceDiscoveryResult:
@@ -138,6 +144,14 @@ class FakeDiscovery:
     def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
         self.detect_calls += 1
         return self._last_result
+
+    def detect_window_sources_result(
+        self,
+        timeout_sec: float = 2.0,
+    ) -> WindowDiscoveryResult:
+        self.window_detect_calls += 1
+        self._last_window_sources = self.detected_window_sources
+        return WindowDiscoveryResult(window_sources=self.detected_window_sources)
 
     def serial_display_name(self, identifier: object) -> str:
         if str(identifier) == "COM1":
@@ -321,10 +335,12 @@ def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) ->
     discovery = window.services.device_discovery
     assert isinstance(discovery, FakeDiscovery)
     discovery.detect_calls = 0
+    discovery.window_detect_calls = 0
 
     window._refresh_connection_menu()
 
     assert discovery.detect_calls == 0
+    assert discovery.window_detect_calls == 0
     assert window.capture_input_menu is not None
     assert window.serial_device_menu is not None
     assert window.camera_source_menu is not None
@@ -332,6 +348,25 @@ def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) ->
     assert "USB Serial Device (COM1)" in [
         action.text() for action in window.serial_device_menu.actions()
     ]
+
+
+def test_connection_menu_refresh_detects_window_sources_when_camera_is_active(
+    window: MainWindow,
+) -> None:
+    discovery = window.services.device_discovery
+    assert isinstance(discovery, FakeDiscovery)
+    discovery._last_window_sources = ()
+    discovery.detected_window_sources = (
+        WindowInfo(title="Detected Viewer", identifier="hwnd-2", rect=None),
+    )
+
+    window.global_settings.set("capture_source_type", "camera")
+    window._refresh_connection_menu(refresh_discovery=True)
+
+    assert discovery.detect_calls == 1
+    assert discovery.window_detect_calls == 1
+    assert window.window_source_menu is not None
+    assert "Detected Viewer" in [action.text() for action in window.window_source_menu.actions()]
 
 
 def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> None:

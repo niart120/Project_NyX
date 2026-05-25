@@ -19,7 +19,11 @@ from PySide6.QtWidgets import (
 )
 
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
-from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
+from nyxpy.framework.core.hardware.device_discovery import (
+    DeviceDiscoveryResult,
+    DeviceInfo,
+    WindowDiscoveryResult,
+)
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -207,7 +211,9 @@ class MainWindow(QMainWindow):
         self.capture_input_menu = self.connection_menu.addMenu("キャプチャ入力")
         self.serial_device_menu = self.connection_menu.addMenu("シリアルデバイス")
         self.protocol_menu = self.connection_menu.addMenu("プロトコル")
-        self.connection_menu.aboutToShow.connect(self._refresh_connection_menu)
+        self.connection_menu.aboutToShow.connect(
+            lambda: self._refresh_connection_menu(refresh_discovery=True)
+        )
         self._refresh_connection_menu()
 
         view_menu = self.menuBar().addMenu("表示")
@@ -224,9 +230,15 @@ class MainWindow(QMainWindow):
             self.window_size_actions[preset.key] = action
             view_menu.addAction(action)
 
-    def _refresh_connection_menu(self) -> None:
-        snapshot = _device_discovery_snapshot(self.device_discovery)
-        windows = _window_discovery_snapshot(self.device_discovery)
+    def _refresh_connection_menu(self, *, refresh_discovery: bool = False) -> None:
+        snapshot = _device_discovery_snapshot(
+            self.device_discovery,
+            refresh=refresh_discovery,
+        )
+        windows = _window_discovery_snapshot(
+            self.device_discovery,
+            refresh=refresh_discovery,
+        )
         if self.capture_input_menu is not None:
             self._populate_capture_input_menu(
                 self.capture_input_menu,
@@ -887,14 +899,40 @@ class MainWindow(QMainWindow):
                 self._start_macro({})
 
 
-def _device_discovery_snapshot(discovery: object) -> DeviceDiscoveryResult:
+def _device_discovery_snapshot(
+    discovery: object,
+    *,
+    refresh: bool = False,
+) -> DeviceDiscoveryResult:
+    if refresh:
+        detect = getattr(discovery, "detect", None)
+        if callable(detect):
+            result = detect(timeout_sec=2.0)
+            if isinstance(result, DeviceDiscoveryResult):
+                return result
     last_result = getattr(discovery, "last_result", None)
     if isinstance(last_result, DeviceDiscoveryResult):
         return last_result
     return DeviceDiscoveryResult()
 
 
-def _window_discovery_snapshot(discovery: object) -> tuple[WindowInfo, ...]:
+def _window_discovery_snapshot(
+    discovery: object,
+    *,
+    refresh: bool = False,
+) -> tuple[WindowInfo, ...]:
+    if refresh:
+        detect_with_result = getattr(discovery, "detect_window_sources_result", None)
+        if callable(detect_with_result):
+            result = detect_with_result(timeout_sec=2.0)
+            if isinstance(result, WindowDiscoveryResult):
+                return () if result.failed else result.window_sources
+        else:
+            detect_windows = getattr(discovery, "detect_window_sources", None)
+            if callable(detect_windows):
+                windows = detect_windows(timeout_sec=2.0)
+                if isinstance(windows, tuple):
+                    return windows
     windows = getattr(discovery, "last_window_sources", ())
     if isinstance(windows, tuple):
         return windows
