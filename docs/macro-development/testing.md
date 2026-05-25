@@ -20,7 +20,7 @@ def test_sample_config_from_args() -> None:
     assert cfg.count == 3
 ```
 
-新しい mock 用の公開 helper はまだ用意していないため、`Command` の複雑な偽装を前提にしたテスト設計にはしません。
+`Command` を複雑に偽装する公開 helper は提供しないため、偽装を前提にしたテスト設計にはしません。
 
 ## 実機テスト
 
