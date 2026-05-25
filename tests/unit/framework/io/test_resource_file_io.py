@@ -72,8 +72,12 @@ def test_macro_resource_scope_from_definition(tmp_path: Path) -> None:
 def test_resource_path_guard_rejects_unsafe_paths(tmp_path: Path, name: str) -> None:
     guard = DefaultResourcePathGuard()
 
-    with pytest.raises(ResourcePathError):
+    with pytest.raises(ResourcePathError) as exc_info:
         guard.resolve_under_root(tmp_path, name)
+
+    assert exc_info.value.details["root"] == str(tmp_path)
+    assert exc_info.value.details["name"] == name
+    assert exc_info.value.details["reason"]
 
 
 def test_resource_path_guard_rejects_symlink_escape(tmp_path: Path) -> None:
@@ -124,14 +128,22 @@ def test_local_resource_store_reports_missing_and_corrupt_images(tmp_path: Path)
     scope = MacroResourceScope.from_definition(definition, tmp_path)
     store = LocalResourceStore(scope)
 
-    with pytest.raises(ResourceNotFoundError):
+    with pytest.raises(ResourceNotFoundError) as missing_info:
         store.resolve_asset_path("missing.png")
+
+    assert missing_info.value.details["macro_id"] == "sample"
+    assert missing_info.value.details["name"] == "missing.png"
+    assert len(missing_info.value.details["candidate_paths"]) == 2
 
     corrupt = tmp_path / "resources" / "sample" / "assets" / "corrupt.png"
     corrupt.parent.mkdir(parents=True)
     corrupt.write_text("not an image")
-    with pytest.raises(ResourceReadError):
+    with pytest.raises(ResourceReadError) as read_info:
         store.load_image("corrupt.png")
+
+    assert read_info.value.details["macro_id"] == "sample"
+    assert read_info.value.details["name"] == "corrupt.png"
+    assert read_info.value.details["relative_path"] == "corrupt.png"
 
 
 def test_local_run_artifact_store_saves_outputs_without_stripping_macro_prefix(
@@ -159,8 +171,11 @@ def test_local_run_artifact_store_reports_imwrite_failure(
     image = np.zeros((2, 2, 3), dtype=np.uint8)
     monkeypatch.setattr(cv2, "imwrite", lambda *_args, **_kwargs: False)
 
-    with pytest.raises(ResourceWriteError):
+    with pytest.raises(ResourceWriteError) as exc_info:
         store.save_image("out.png", image)
+
+    assert exc_info.value.details["name"] == "out.png"
+    assert str(exc_info.value.details["path"]).endswith("out.png")
 
 
 def test_local_run_artifact_store_overwrite_policies(tmp_path: Path) -> None:

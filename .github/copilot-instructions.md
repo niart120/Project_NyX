@@ -100,7 +100,7 @@ examples/macros/xxx/  →  examples/macros/yyy/*       NG (マクロ間の直接
 
 ## よく使うコマンド
 
-```powershell
+```console
 uv run nyx-gui                  # GUI 起動
 uv run nyx-cli                  # CLI 起動
 uv run pytest                   # 全テスト
@@ -117,9 +117,3 @@ uv run ruff format .            # フォーマット
 - 許可される type:
   - `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore` / `revert`
 - subject は日本語で記述・末尾句点なし
-
-## シェルの前提
-
-- コマンド例は **PowerShell（pwsh）構文**で書くこと。
-- **bash / zsh / sh 前提のコマンドは出さない**（例: `export`, `VAR=value cmd`, `&&` 連結前提、`sed -i`, `cp -r`, `rm -rf` などのUnix系定番をそのまま出さない）。
-- Windows 組み込みコマンドでも良いが、基本は **PowerShell のコマンドレット**を優先する。

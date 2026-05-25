@@ -85,10 +85,16 @@ def validate_keyboard_text(text: str, allow_special: bool = True) -> str:
     有効な文字は、ASCIIの印刷可能な文字（0x20から0x7F）です。
     特殊キーコードを許可する場合は、allow_specialをTrueに設定します。
 
-    :param text: 検証するテキスト
-    :param allow_special: 特殊キーコードを許可するかどうかのフラグ
-    :return: 検証されたテキスト
-    :raises ValueError: 無効な文字が含まれている場合
+    Args:
+        text: 検証するテキスト。
+        allow_special: 特殊キーコードを許可するかどうか。
+
+    Returns:
+        検証されたテキスト。
+
+    Raises:
+        ValueError: 無効な文字が含まれている場合。
+
     """
     # 入力が空でないことを確認
     if not text:

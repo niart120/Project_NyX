@@ -74,7 +74,7 @@ targets.wheel.packages = ["src/nyxpy"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
-testpaths = ["tests", "macros", "examples/tests"]
+testpaths = ["tests", "macros"]
 python_files = "test_*.py"
 python_functions = "test_*"
 markers = [

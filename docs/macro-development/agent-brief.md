@@ -1,13 +1,13 @@
 # NyX マクロ実装エージェント向け要点
 
-この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細は同じディレクトリの各資料と、現行コード、docstring、`examples\macros`、`examples\tests` で確認してください。`spec\framework\rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
+この文書は、AI エージェントに NyX マクロの新規作成・修正を依頼するときに渡す要点です。詳細は同じディレクトリの各資料、現行コード、docstring で確認してください。`spec/framework/rearchitecture` は移行元の参考資料であり、公開契約の正本として扱いません。
 
 ## 前提
 
 - PyPI 配布名は `nyxfw`、インポート名は `nyxpy` です。配布パッケージは公開準備中です。
-- 実装者のマクロ本体は `macros\<macro_id>`、設定・画像資材は `resources\<macro_id>` に置きます。
-- `examples\macros` と `examples\resources` は参照用サンプルの置き場であり、利用者の配置先ではありません。
-- PowerShell コマンドを使います。bash / sh 前提のコマンドは書きません。
+- 実装者のマクロ本体は `macros/<macro_id>`、設定・画像資材は `resources/<macro_id>` に置きます。
+- `examples/` はフレームワーク開発者が管理する参考実装の置き場であり、利用者の配置先ではありません。
+- コマンド例は `uv` / `nyxpy` の呼び出しをそのまま示し、シェル固有構文に依存させません。
 
 ## 詳細資料
 
@@ -21,18 +21,17 @@
 | `testing.md` | テスト配置と実行コマンド |
 | `nintendo-3ds.md` | 3DS 座標と touch |
 | `image-processing.md` | テンプレートマッチング、OCR、前処理 |
-| `sample-macros.md` | 公開サンプル一覧 |
 
 ## 必ず守る制約
 
 - マクロは `nyxpy.framework.*` と同じマクロ配下、または共有部品だけに依存させます。
-- `macros\xxx` から `macros\yyy` を直接インポートしません。
+- `macros/xxx` から `macros/yyy` を直接インポートしません。
 - 副作用のない処理は純粋関数へ分離し、`Command` なしでテストできるようにします。
 - コントローラー操作、待機、キャプチャ、画像入出力、通知、ログは `Command` 経由で行います。
 - `cmd.capture()` はフレーム未準備時に例外を送出します。マクロ側でフレーム未準備を通常分岐にしません。
 - `settings_path` の標準例は `settings_path = "resource:settings.toml"`。
 - `resource:` / `project:` / マニフェスト相対パスなど、環境に依存しないパス表記では `/` を使います。例: `assets/template.png`。
-- 旧 `static\<macro_name>` 配置は標準探索されません。
+- 旧 `static/<macro_name>` 配置は標準探索されません。
 
 ## 公開 API の基本インポート
 
@@ -94,15 +93,15 @@ class SampleMacro(MacroBase):
 自動検出される配置:
 
 ```text
-macros\<macro_id>.py
-macros\<macro_id>\macro.py
+macros/<macro_id>.py
+macros/<macro_id>/macro.py
 ```
 
 `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスを 1 つだけ置きます。`macro.py` と `__init__.py` の両方に置くとエントリーポイントが曖昧になり、読み込みに失敗します。インポートした基底クラスや他モジュールのクラスは検出候補に数えられません。
 
 複数のエントリーポイント、単一ファイルのマニフェスト、明示的なメタデータが必要な場合だけ `macro.toml` を使います。
 
-workspace 初期化と雛形生成は `nyxpy` を使います。`nyxpy init` は sample macro も生成し、空 workspace だけが必要な場合は `nyxpy init --blank` を使います。`nyxpy create <macro_id>` は既存 workspace に `macros\<macro_id>` と `resources\<macro_id>` を生成します。
+workspace 初期化と雛形生成は `nyxpy` を使います。`nyxpy init` は sample macro も生成し、空 workspace だけが必要な場合は `nyxpy init --blank` を使います。`nyxpy create <macro_id>` は既存 workspace に `macros/<macro_id>` と `resources/<macro_id>` を生成します。
 
 ```toml
 [macro]
@@ -114,14 +113,14 @@ settings = "resource:settings.toml"
 ## 設定・資材・出力
 
 ```text
-resources\<macro_id>\
+resources/<macro_id>/
   settings.toml
-  assets\
+  assets/
     template.png
 ```
 
-- `settings_path = "resource:settings.toml"` は `resources\<macro_id>\settings.toml` を読みます。
-- `cmd.load_img("template.png")` は `resources\<macro_id>\assets\template.png` を優先し、次にマクロパッケージ内の `assets` を探します。
+- `settings_path = "resource:settings.toml"` は `resources/<macro_id>/settings.toml` を読みます。
+- `cmd.load_img("template.png")` は `resources/<macro_id>/assets/template.png` を優先し、次にマクロパッケージ内の `assets` を探します。
 - `cmd.save_img("debug/frame.png", frame)` と `cmd.artifacts.open_output(...)` は実行ごとの出力へ保存します。
 - `cmd.load_img()` / `cmd.save_img()` のファイル名は、リソース起点の相対パスにします。
 
@@ -144,27 +143,26 @@ resources\<macro_id>\
 
 - 副作用のない計算・判定・設定変換は通常の pytest で単体テストします。
 - 実機が必要なテストには `@pytest.mark.realdevice` を付けます。
-- pytest は `tests`, `macros`, `examples\tests` を収集します。
-- 公開サンプルのテストは `examples\tests` に置きます。
+- 通常の pytest は `tests` と `macros` を収集します。
 
-```powershell
+```console
 uv run ruff format .
 uv run ruff check .
-uv run ty check src\nyxpy --output-format concise --no-progress
-uv run pytest tests macros examples/tests
+uv run ty check src/nyxpy --output-format concise --no-progress
+uv run pytest tests macros
 ```
 
 実機なしで確認する場合:
 
-```powershell
-uv run pytest tests macros examples/tests -m "not realdevice"
+```console
+uv run pytest tests macros -m "not realdevice"
 ```
 
 ## 完了前チェック
 
-- `macros\<macro_id>` と `resources\<macro_id>` の対応が取れている。
-- `settings_path = "resource:settings.toml"` と `resources\<macro_id>\settings.toml` が一致している。
+- `macros/<macro_id>` と `resources/<macro_id>` の対応が取れている。
+- `settings_path = "resource:settings.toml"` と `resources/<macro_id>/settings.toml` が一致している。
 - `cmd.capture()` の失敗をマクロ側の通常分岐として扱っていない。
 - `finalize()` で必要な `cmd.release()` や後片付けを行っている。
 - ロジック関数の単体テストを追加している。
-- `uv run ruff check .`、`uv run ty check src\nyxpy --output-format concise --no-progress`、該当 pytest が通る。
+- `uv run ruff check .`、`uv run ty check src/nyxpy --output-format concise --no-progress`、該当 pytest が通る。

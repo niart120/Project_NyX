@@ -12,10 +12,14 @@ class ImagePreprocessor:
     ) -> cv2.typing.MatLike:
         """CLAHE でコントラストを強調します。
 
-        :param image: 入力画像
-        :param clip_limit: クリップ制限値
-        :param tile_grid_size: タイルグリッドサイズ
-        :return: コントラスト強化された画像
+        Args:
+            image: 入力画像。
+            clip_limit: クリップ制限値。
+            tile_grid_size: タイルグリッドサイズ。
+
+        Returns:
+            コントラスト強化された画像。
+
         """
         # グレースケール変換
         if len(image.shape) == 3:
@@ -37,9 +41,13 @@ class ImagePreprocessor:
     def denoise(image: cv2.typing.MatLike, strength: int = 7) -> cv2.typing.MatLike:
         """ノイズを除去します。
 
-        :param image: 入力画像
-        :param strength: ノイズ除去強度
-        :return: ノイズ除去された画像
+        Args:
+            image: 入力画像。
+            strength: ノイズ除去強度。
+
+        Returns:
+            ノイズ除去された画像。
+
         """
         if len(image.shape) == 3:
             return cv2.fastNlMeansDenoisingColored(image, None, strength, strength, 7, 21)
@@ -52,11 +60,15 @@ class ImagePreprocessor:
     ) -> cv2.typing.MatLike:
         """アンシャープマスクで輪郭を強調します。
 
-        :param image: 入力画像
-        :param kernel_size: カーネルサイズ
-        :param sigma: ガウシアンぼかしのシグマ値
-        :param amount: シャープニング強度
-        :return: シャープニングされた画像
+        Args:
+            image: 入力画像。
+            kernel_size: カーネルサイズ。
+            sigma: ガウシアンぼかしのシグマ値。
+            amount: シャープニング強度。
+
+        Returns:
+            シャープニングされた画像。
+
         """
         blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
         sharpened = cv2.addWeighted(image, 1.0 + amount, blurred, -amount, 0)
@@ -71,11 +83,15 @@ class ImagePreprocessor:
     ) -> cv2.typing.MatLike:
         """固定閾値または適応的閾値で二値化します。
 
-        :param image: 入力画像
-        :param threshold: 閾値（Noneの場合は自動決定）
-        :param adaptive: 適応的閾値処理を使用するか
-        :param inverse: 反転するか
-        :return: 二値化された画像
+        Args:
+            image: 入力画像。
+            threshold: 閾値。`None` の場合は自動決定。
+            adaptive: 適応的閾値処理を使用するか。
+            inverse: 反転するか。
+
+        Returns:
+            二値化された画像。
+
         """
         # グレースケール変換
         if len(image.shape) == 3:
@@ -108,8 +124,12 @@ class ImagePreprocessor:
     def enhance_for_template_matching(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
         """テンプレートマッチング向けの前処理を適用します。
 
-        :param image: 入力画像
-        :return: 前処理された画像
+        Args:
+            image: 入力画像。
+
+        Returns:
+            前処理された画像。
+
         """
         # マッチングに適した前処理
         processed = ImagePreprocessor.denoise(image, strength=5)
@@ -120,8 +140,12 @@ class ImagePreprocessor:
     def enhance_for_ocr(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
         """OCR 向けの前処理を適用します。
 
-        :param image: 入力画像
-        :return: 前処理された画像
+        Args:
+            image: 入力画像。
+
+        Returns:
+            前処理された画像。
+
         """
         # OCRに適した前処理
         processed = ImagePreprocessor.denoise(image, strength=5)

@@ -11,6 +11,7 @@ from nyxpy.framework.core.macro.command import Command
 
 
 class SampleMacro(MacroBase):
+    display_name = "Sample Macro"
     description = "Aボタンを指定回数だけ押すサンプル"
     tags = ["sample", "button"]
     settings_path = "resource:settings.toml"
@@ -32,7 +33,8 @@ class SampleMacro(MacroBase):
 
 | 属性 | 役割 |
 |------|------|
-| `description` | GUI や一覧表示に使う説明文です。 |
+| `display_name` | GUI や一覧表示に使う表示名です。未指定の場合はクラス名が使われます。 |
+| `description` | 一覧表示向けの短い説明文です。 |
 | `tags` | 検索・分類用のタグです。 |
 | `args_schema` | 実行引数を `SettingsSchema` で検証する場合に指定します。 |
 | `settings_path` | マクロごとの設定ファイルを読む場合に指定します。標準は `resource:settings.toml` です。 |

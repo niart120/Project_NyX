@@ -25,8 +25,12 @@ class SerialProtocolInterface(ABC):
     def build_press_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー押下操作のコマンドデータを生成する
 
-        :param keys: 押下するキーのタプル
-        :return: コマンドデータ
+        Args:
+            keys: 押下するキーのタプル。
+
+        Returns:
+            コマンドデータ。
+
         """
         pass
 
@@ -34,8 +38,12 @@ class SerialProtocolInterface(ABC):
     def build_hold_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー保持操作のコマンドデータを生成する
 
-        :param keys: ホールドするキーのタプル
-        :return: コマンドデータ
+        Args:
+            keys: ホールドするキーのタプル。
+
+        Returns:
+            コマンドデータ。
+
         """
         pass
 
@@ -43,8 +51,12 @@ class SerialProtocolInterface(ABC):
     def build_release_command(self, keys: tuple[KeyType, ...]) -> bytes:
         """キー解放操作のコマンドデータを生成する
 
-        :param keys: 解放するキーのタプル
-        :return: コマンドデータ
+        Args:
+            keys: 解放するキーのタプル。
+
+        Returns:
+            コマンドデータ。
+
         """
         pass
 
@@ -52,9 +64,15 @@ class SerialProtocolInterface(ABC):
     def build_keyboard_command(self, text: str) -> bytes:
         """キーボード文字列入力操作のコマンドデータを生成する
 
-        :param text: 入力する文字列
-        :return: コマンドデータ
-        :raises NotImplementedError: プロトコルが対応していない場合
+        Args:
+            text: 入力する文字列。
+
+        Returns:
+            コマンドデータ。
+
+        Raises:
+            NotImplementedError: プロトコルが対応していない場合。
+
         """
         pass
 
@@ -62,10 +80,16 @@ class SerialProtocolInterface(ABC):
     def build_keytype_command(self, key: KeyCode | SpecialKeyCode, op: KeyboardOp) -> bytes:
         """キーボード個別キー操作のコマンドデータを生成する
 
-        :param key: 操作するキーの文字
-        :param op: KeyboardOp キーボード操作の種類
-        :return: コマンドデータ
-        :raises NotImplementedError: プロトコルが対応していない場合
+        Args:
+            key: 操作するキーの文字。
+            op: キーボード操作の種類。
+
+        Returns:
+            コマンドデータ。
+
+        Raises:
+            NotImplementedError: プロトコルが対応していない場合。
+
         """
         pass
 

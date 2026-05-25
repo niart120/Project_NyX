@@ -1,23 +1,23 @@
 # マクロの雛形
 
-この雛形は、ローカル作業用の `macros\<macro_id>` と `resources\<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。公開サンプルとして見せる段階になったら、同じ構成を `examples\macros` / `examples\resources` / `examples\tests` に整理して移します。
+この雛形は、ローカル作業用の `macros/<macro_id>` と `resources/<macro_id>` にマクロを作るための最小構成です。通常は `nyxpy create <macro_id>` で生成します。
 
 ## ディレクトリ
 
 ```text
-macros\sample_macro\
+macros/sample_macro/
   __init__.py
   macro.py
   config.py
   test_logic.py
 
-resources\sample_macro\
+resources/sample_macro/
   settings.toml
-  assets\
+  assets/
     template.png
 ```
 
-`macro.toml` は必須ではありません。`macros\sample_macro\macro.py` に `MacroBase` 派生クラスを 1 つだけ置く場合、自動検出されます。
+`macro.toml` は必須ではありません。`macros/sample_macro/macro.py` に `MacroBase` 派生クラスを 1 つだけ置く場合、自動検出されます。
 
 ## macro.py
 
@@ -108,7 +108,7 @@ def test_sample_config_rejects_non_positive_count() -> None:
         SampleConfig.from_args({"count": 0})
 ```
 
-## resources\sample_macro\settings.toml
+## resources/sample_macro/settings.toml
 
 ```toml
 count = 10
@@ -126,7 +126,7 @@ template_path = "assets/template.png"
 
 ## 任意: macro.toml
 
-次のいずれかに当てはまる場合だけ `macros\sample_macro\macro.toml` を追加します。
+次のいずれかに当てはまる場合だけ `macros/sample_macro/macro.toml` を追加します。
 
 - エントリーポイントを明示したい。
 - 複数のエントリーポイントを持つ構成から 1 つを選びたい。
@@ -142,21 +142,21 @@ tags = ["sample", "button"]
 settings = "resource:settings.toml"
 ```
 
-`macro.toml` で環境に依存しないパスを書く場合も `/` を使います。`settings = "resource:settings.toml"` は `resources\sample_macro\settings.toml` を参照します。
+`macro.toml` で環境に依存しないパスを書く場合も `/` を使います。`settings = "resource:settings.toml"` は `resources/sample_macro/settings.toml` を参照します。
 
 ## 完了前確認
 
 - [ ] `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスが 1 つだけある。
-- [ ] `settings_path = "resource:settings.toml"` と `resources\<macro_id>\settings.toml` が一致している。
-- [ ] 画像資材は `resources\<macro_id>\assets` に置いている。
+- [ ] `settings_path = "resource:settings.toml"` と `resources/<macro_id>/settings.toml` が一致している。
+- [ ] 画像資材は `resources/<macro_id>/assets` に置いている。
 - [ ] `cmd.capture()` の失敗はフレームワーク側の実行失敗として扱い、マクロ側で通常分岐にしていない。
 - [ ] `finalize()` で必要な `cmd.release()` を呼んでいる。
 - [ ] 副作用のない設定変換・判定ロジックをテストしている。
 - [ ] 環境に依存しないパス表記に `\` や絶対パスを書いていない。
 - [ ] 次のコマンドで確認している。
 
-```powershell
+```console
 uv run ruff format .
 uv run ruff check .
-uv run pytest tests macros examples/tests
+uv run pytest tests macros
 ```

@@ -4,13 +4,13 @@
 
 `nyxpy run` は workspace 内のマクロを実行します。
 
-```powershell
+```console
 nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 ```
 
 リポジトリから起動する場合:
 
-```powershell
+```console
 uv run nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 ```
 
@@ -32,7 +32,7 @@ uv run nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 
 `--define` は複数回指定できます。
 
-```powershell
+```console
 nyxpy run sample_macro --serial COM3 --capture "Capture Device" --define count=30 --define capture_name=debug/result.png
 ```
 
@@ -40,9 +40,9 @@ nyxpy run sample_macro --serial COM3 --capture "Capture Device" --define count=3
 
 ## workspace が見つからない場合
 
-`nyxpy run` は `.nyxpy\` があるディレクトリを workspace として使います。見つからない場合は、対象ディレクトリで初期化します。
+`nyxpy run` は `.nyxpy/` があるディレクトリを workspace として使います。見つからない場合は、対象ディレクトリで初期化します。
 
-```powershell
+```console
 nyxpy init
 ```
 
@@ -50,7 +50,7 @@ nyxpy init
 
 自分でマクロを作る場合は、workspace 初期化後に `nyxpy create` を使います。
 
-```powershell
+```console
 nyxpy create sample_turbo
 ```
 

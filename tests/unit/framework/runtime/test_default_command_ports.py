@@ -3,6 +3,7 @@ import pytest
 
 from nyxpy.framework.core.constants import Button, KeyCode
 from nyxpy.framework.core.io.ports import FrameNotReadyError
+from nyxpy.framework.core.io.resources import ResourceNotFoundError, ResourceWriteError
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroCancelled
 from nyxpy.framework.core.runtime.context import RuntimeOptions
@@ -11,6 +12,8 @@ from tests.support.fakes import (
     FakeControllerOutputPort,
     FakeFullCapabilityController,
     FakeNotificationPort,
+    FakeResourceStore,
+    FakeRunArtifactStore,
 )
 
 
@@ -100,6 +103,49 @@ def test_default_command_resources_and_artifacts_delegate_to_ports(tmp_path) -> 
         ]
         == 1
     )
+
+
+def test_default_command_load_img_propagates_resource_errors(tmp_path) -> None:
+    context = make_fake_execution_context(tmp_path)
+    error = ResourceNotFoundError("missing", details={"name": "template.png"})
+
+    class FailingResourceStore(FakeResourceStore):
+        def load_image(self, name, grayscale=False):
+            raise error
+
+    object.__setattr__(context, "resources", FailingResourceStore(context.resources.scope))
+    cmd = DefaultCommand(context=context)
+
+    with pytest.raises(ResourceNotFoundError) as exc_info:
+        cmd.load_img("template.png")
+
+    assert exc_info.value is error
+
+
+def test_default_command_save_img_propagates_resource_errors(tmp_path) -> None:
+    context = make_fake_execution_context(tmp_path)
+    image = np.zeros((1, 1, 3), dtype=np.uint8)
+    error = ResourceWriteError("write failed", details={"name": "out.png"})
+
+    class FailingArtifactStore(FakeRunArtifactStore):
+        def save_image(self, name, image, *, overwrite=None, atomic=None):
+            raise error
+
+    object.__setattr__(
+        context,
+        "artifacts",
+        FailingArtifactStore(
+            tmp_path / "runs" / context.run_id / "outputs",
+            macro_id=context.macro_id,
+            run_id=context.run_id,
+        ),
+    )
+    cmd = DefaultCommand(context=context)
+
+    with pytest.raises(ResourceWriteError) as exc_info:
+        cmd.save_img("out.png", image)
+
+    assert exc_info.value is error
 
 
 def test_default_command_keyboard_type_notify_and_log_delegate_to_ports(tmp_path) -> None:

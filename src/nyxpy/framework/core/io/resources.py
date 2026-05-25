@@ -220,37 +220,94 @@ class DefaultResourcePathGuard:
 
     def resolve_under_root(self, root: Path, name: str | Path) -> Path:
         """資材名を root 配下の安全な絶対パスへ解決します。"""
-        if not isinstance(name, (str, PathLike)):
-            raise ResourcePathError("resource path must be str or Path")
         root_path = Path(root)
+        if not isinstance(name, (str, PathLike)):
+            raise self._path_error(
+                "resource path must be str or Path",
+                root=root_path,
+                name=name,
+                reason="invalid_type",
+            )
         root_resolved = root_path.resolve(strict=root_path.exists())
         name_text = str(name)
         if not name_text or name_text in {".", ""}:
-            raise ResourcePathError("resource path is empty")
+            raise self._path_error(
+                "resource path is empty",
+                root=root_path,
+                name=name,
+                reason="empty",
+            )
         if name_text.startswith("\\\\") or name_text.startswith(("\\", "/")):
-            raise ResourcePathError("resource path must be relative")
+            raise self._path_error(
+                "resource path must be relative",
+                root=root_path,
+                name=name,
+                reason="absolute",
+            )
         if len(name_text) >= 2 and name_text[1] == ":":
-            raise ResourcePathError("resource path must not contain a drive")
+            raise self._path_error(
+                "resource path must not contain a drive",
+                root=root_path,
+                name=name,
+                reason="drive",
+            )
 
         raw_parts = tuple(name_text.replace("\\", "/").split("/"))
         if not raw_parts or any(part in {"", ".", ".."} for part in raw_parts):
-            raise ResourcePathError("resource path must not escape the resource root")
+            raise self._path_error(
+                "resource path must not escape the resource root",
+                root=root_path,
+                name=name,
+                reason="path_traversal",
+            )
         if any(self._is_reserved_windows_name(part) for part in raw_parts):
-            raise ResourcePathError("resource path contains a reserved name")
+            raise self._path_error(
+                "resource path contains a reserved name",
+                root=root_path,
+                name=name,
+                reason="reserved_name",
+            )
 
         relative_path = Path(*raw_parts)
         if relative_path.is_absolute():
-            raise ResourcePathError("resource path must be relative")
+            raise self._path_error(
+                "resource path must be relative",
+                root=root_path,
+                name=name,
+                reason="absolute",
+            )
 
         candidate = (root_resolved / relative_path).resolve(strict=False)
         try:
             candidate.relative_to(root_resolved)
         except ValueError as exc:
-            raise ResourcePathError("resource path escapes the resource root") from exc
+            raise self._path_error(
+                "resource path escapes the resource root",
+                root=root_path,
+                name=name,
+                reason="root_escape",
+            ) from exc
         return candidate
 
     def _is_reserved_windows_name(self, part: str) -> bool:
         return part.split(".", maxsplit=1)[0].upper() in self._RESERVED_WINDOWS_NAMES
+
+    def _path_error(
+        self,
+        message: str,
+        *,
+        root: Path,
+        name: object,
+        reason: str,
+    ) -> ResourcePathError:
+        return ResourcePathError(
+            message,
+            details={
+                "root": str(root),
+                "name": str(name),
+                "reason": reason,
+            },
+        )
 
 
 class ResourceStorePort(ABC):
@@ -318,8 +375,10 @@ class LocalResourceStore(ResourceStorePort):
 
     def resolve_asset_path(self, name: str | Path) -> ResourceRef:
         """探索順に資材を解決し、見つからない場合は `ResourceNotFoundError` にします。"""
+        candidate_paths: list[str] = []
         for index, root in enumerate(self.scope.assets_roots):
             candidate = self.guard.resolve_under_root(root, name)
+            candidate_paths.append(str(candidate))
             if candidate.exists():
                 return ResourceRef(
                     kind=ResourceKind.ASSET,
@@ -334,7 +393,14 @@ class LocalResourceStore(ResourceStorePort):
                     ),
                     macro_id=self.scope.macro_id,
                 )
-        raise ResourceNotFoundError(f"resource not found: {name}")
+        raise ResourceNotFoundError(
+            f"resource not found: {name}",
+            details={
+                "macro_id": self.scope.macro_id,
+                "name": str(name),
+                "candidate_paths": candidate_paths,
+            },
+        )
 
     def load_image(self, name: str | Path, grayscale: bool = False) -> cv2.typing.MatLike:
         """画像資材を OpenCV 画像として読み込みます。"""
@@ -342,7 +408,16 @@ class LocalResourceStore(ResourceStorePort):
         flag = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         image = cv2.imread(str(ref.path), flag)
         if image is None:
-            raise ResourceReadError(f"failed to read image: {ref.relative_path}")
+            raise ResourceReadError(
+                f"failed to read image: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "name": str(name),
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                    "source": str(ref.source),
+                },
+            )
         return image
 
 
@@ -412,7 +487,13 @@ class LocalRunArtifactStore(RunArtifactStore):
                 open_mode = open_mode.replace("x", "w")
             if "x" in open_mode and final_ref.path.exists():
                 raise ResourceAlreadyExistsError(
-                    f"output already exists: {final_ref.relative_path}"
+                    f"output already exists: {final_ref.relative_path}",
+                    details={
+                        "macro_id": final_ref.macro_id,
+                        "run_id": final_ref.run_id,
+                        "path": str(final_ref.path),
+                        "relative_path": str(final_ref.relative_path),
+                    },
                 )
             return cast(_BinaryOutput, final_ref.path.open(open_mode))
 
@@ -427,7 +508,15 @@ class LocalRunArtifactStore(RunArtifactStore):
         ref.path.parent.mkdir(parents=True, exist_ok=True)
         guarded_path = self.guard.resolve_under_root(self.output_root, ref.relative_path)
         if policy is OverwritePolicy.ERROR and guarded_path.exists():
-            raise ResourceAlreadyExistsError(f"output already exists: {ref.relative_path}")
+            raise ResourceAlreadyExistsError(
+                f"output already exists: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "run_id": ref.run_id,
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                },
+            )
         if policy is OverwritePolicy.UNIQUE:
             guarded_path = self._unique_path(guarded_path)
         return self._ref(guarded_path)
@@ -438,20 +527,29 @@ class LocalRunArtifactStore(RunArtifactStore):
             self._write_image(temp_path, image)
             temp_path.replace(final_path)
             if not final_path.exists():
-                raise ResourceWriteError(f"output was not created: {final_path.name}")
+                raise ResourceWriteError(
+                    f"output was not created: {final_path.name}",
+                    details={"path": str(final_path), "name": final_path.name},
+                )
         except Exception as exc:
             self._cleanup_temp(temp_path)
-            if isinstance(exc, ResourceWriteError):
-                raise
             raise ResourceWriteError(
-                f"failed to write output: {final_path.name}", cause=exc
+                f"failed to write output: {final_path.name}",
+                details={"path": str(final_path), "name": final_path.name},
+                cause=exc,
             ) from exc
 
     def _write_image(self, path: Path, image: cv2.typing.MatLike) -> None:
         if not cv2.imwrite(str(path), image):
-            raise ResourceWriteError(f"failed to write output: {path.name}")
+            raise ResourceWriteError(
+                f"failed to write output: {path.name}",
+                details={"path": str(path), "name": path.name},
+            )
         if not path.exists():
-            raise ResourceWriteError(f"output was not created: {path.name}")
+            raise ResourceWriteError(
+                f"output was not created: {path.name}",
+                details={"path": str(path), "name": path.name},
+            )
 
     def _create_temp_path(self, final_path: Path) -> Path:
         final_path.parent.mkdir(parents=True, exist_ok=True)
@@ -470,7 +568,10 @@ class LocalRunArtifactStore(RunArtifactStore):
             candidate = path.with_name(f"{path.stem}_{index}{path.suffix}")
             if not candidate.exists():
                 return candidate
-        raise ResourceWriteError(f"failed to find unique output path: {path.name}")
+        raise ResourceWriteError(
+            f"failed to find unique output path: {path.name}",
+            details={"path": str(path), "name": path.name},
+        )
 
     def _cleanup_temp(self, temp_path: Path) -> None:
         try:
