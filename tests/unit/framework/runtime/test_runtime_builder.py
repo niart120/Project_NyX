@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
-from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.io.adapters import NoopNotificationAdapter, NotificationHandlerAdapter
 from nyxpy.framework.core.io.device_factories import (
     ControllerOutputPortFactory,
@@ -45,18 +45,24 @@ class Discovery:
         self.capture_devices = {
             name: DeviceInfo(kind="capture", name=name, identifier=0) for name in capture_names
         }
+        self.detect_calls = 0
+
+    @property
+    def last_result(self) -> DeviceDiscoveryResult:
+        return DeviceDiscoveryResult(
+            serial_devices=tuple(self.serial_devices.values()),
+            capture_devices=tuple(self.capture_devices.values()),
+        )
+
+    def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
+        self.detect_calls += 1
+        return self.last_result
 
     def serial_names(self) -> list[str]:
         return list(self.serial_devices)
 
     def capture_names(self) -> list[str]:
         return list(self.capture_devices)
-
-    def find_serial(self, name: str, timeout_sec: float):
-        return self.serial_devices.get(name)
-
-    def find_capture(self, name: str, timeout_sec: float):
-        return self.capture_devices.get(name)
 
 
 class SerialDevice:

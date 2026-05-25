@@ -4,7 +4,11 @@ from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
-from nyxpy.framework.core.hardware.device_discovery import DUMMY_DEVICE_NAME, DeviceInfo
+from nyxpy.framework.core.hardware.device_discovery import (
+    DUMMY_DEVICE_NAME,
+    DeviceDiscoveryResult,
+    DeviceInfo,
+)
 from nyxpy.framework.core.hardware.window_capture import WindowCaptureBackend, WindowCaptureSession
 from nyxpy.framework.core.io.device_factories import (
     ControllerOutputPortFactory,
@@ -18,17 +22,18 @@ class Discovery:
         self.serial = DeviceInfo(kind="serial", name="USB Serial Device (COM1)", identifier="COM1")
         self.capture = DeviceInfo(kind="capture", name="Camera1", identifier=1)
 
+    @property
+    def last_result(self) -> DeviceDiscoveryResult:
+        return DeviceDiscoveryResult(
+            serial_devices=(self.serial,),
+            capture_devices=(self.capture,),
+        )
+
     def serial_names(self) -> list[str]:
         return [self.serial.name]
 
     def capture_names(self) -> list[str]:
         return [self.capture.name]
-
-    def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self.serial if name == self.serial.identifier else None
-
-    def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self.capture if name == self.capture.name else None
 
 
 class SerialDevice:
@@ -158,6 +163,27 @@ def test_frame_source_factory_recreates_device_when_key_changes() -> None:
     assert first.capture_device is not second.capture_device
 
 
+def test_frame_source_factory_falls_back_to_dummy_when_capture_initialize_fails() -> None:
+    class FailingCaptureDevice(CaptureDevice):
+        def initialize(self) -> None:
+            raise RuntimeError("capture unavailable")
+
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        capture_factory=FailingCaptureDevice,
+    )
+
+    port = factory.create(
+        source=CameraCaptureSourceConfig(device_name="Camera1"),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+
+    port.initialize()
+
+    assert port.capture_device.get_frame() is not None
+
+
 def test_frame_source_factory_creates_window_source() -> None:
     backend = Backend()
     factory = FrameSourcePortFactory(
@@ -172,6 +198,19 @@ def test_frame_source_factory_creates_window_source() -> None:
     )
 
     assert port.capture_device is not None
+
+
+def test_frame_source_factory_falls_back_to_dummy_when_window_not_selected() -> None:
+    factory = FrameSourcePortFactory(discovery=Discovery())
+
+    port = factory.create(
+        source=WindowCaptureSourceConfig(title_pattern=""),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+    port.initialize()
+
+    assert port.capture_device.get_frame() is not None
 
 
 def test_controller_factory_uses_serial_identifier() -> None:
@@ -197,3 +236,19 @@ def test_controller_factory_rejects_dummy_without_explicit_permission(name) -> N
 
     with pytest.raises(ConfigurationError):
         factory.create(name=name, baudrate=None, allow_dummy=False, timeout_sec=0)
+
+
+def test_controller_factory_falls_back_to_dummy_when_open_fails_and_dummy_allowed() -> None:
+    class FailingSerialDevice(SerialDevice):
+        def open(self, baudrate: int) -> None:
+            raise OSError("port unavailable")
+
+    factory = ControllerOutputPortFactory(
+        discovery=Discovery(),
+        protocol=Protocol(),
+        serial_factory=FailingSerialDevice,
+    )
+
+    port = factory.create(name="COM1", baudrate=9600, allow_dummy=True, timeout_sec=0)
+
+    assert port.serial_device.__class__.__name__ == "DummySerialComm"

@@ -7,7 +7,7 @@ import pytest
 
 from nyxpy.framework.core.api.notification_handler import NotificationHandler
 from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
-from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
+from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
 from nyxpy.framework.core.io.device_factories import (
@@ -57,17 +57,21 @@ class StaticDiscovery:
         self.serial = DeviceInfo(kind="serial", name=serial_port, identifier=serial_port)
         self.capture = DeviceInfo(kind="capture", name=str(capture_index), identifier=capture_index)
 
+    @property
+    def last_result(self) -> DeviceDiscoveryResult:
+        return DeviceDiscoveryResult(
+            serial_devices=(self.serial,),
+            capture_devices=(self.capture,),
+        )
+
+    def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
+        return self.last_result
+
     def serial_names(self) -> list[str]:
         return [self.serial.name]
 
     def capture_names(self) -> list[str]:
         return [self.capture.name]
-
-    def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self.serial if name == self.serial.name else None
-
-    def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self.capture if name == self.capture.name else None
 
 
 @pytest.mark.realdevice

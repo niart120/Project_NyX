@@ -9,14 +9,22 @@ from pathlib import Path
 from typing import Any
 
 from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
-from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
+from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
+from nyxpy.framework.core.hardware.device_discovery import (
+    DUMMY_DEVICE_NAME,
+    DeviceDiscoveryResult,
+    DeviceDiscoveryService,
+    WindowDiscoveryResult,
+)
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.device_factories import (
     ControllerOutputPortFactory,
     FrameSourcePortFactory,
 )
 from nyxpy.framework.core.io.ports import ControllerOutputPort, FrameSourcePort
 from nyxpy.framework.core.logger import create_default_logging
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroRegistry
 from nyxpy.framework.core.runtime.builder import (
     MacroRuntimeBuilder,
@@ -131,6 +139,7 @@ class GuiAppServices:
         return self.runtime_builder
 
     def apply_settings(self, *, is_run_active: bool = False) -> SettingsApplyOutcome:
+        self._discard_unavailable_connection_settings()
         current_settings = deepcopy(self.global_settings.data)
         current_secrets = deepcopy(self.secrets_settings.data)
         changed_keys = _changed_keys(self._last_settings, current_settings) | _changed_keys(
@@ -290,6 +299,108 @@ class GuiAppServices:
                 exc=exc,
             )
 
+    def _discard_unavailable_connection_settings(self) -> None:
+        discovery = getattr(self, "device_discovery", None)
+        detect = getattr(discovery, "detect", None)
+        if not callable(detect):
+            return
+        result = detect(timeout_sec=2.0)
+        if not isinstance(result, DeviceDiscoveryResult):
+            return
+
+        discarded_keys: list[str] = []
+        serial_device = str(self.global_settings.get("serial_device", "") or "").strip()
+        if (
+            serial_device
+            and serial_device != DUMMY_DEVICE_NAME
+            and not result.timed_out
+            and not _has_discovery_error(result, "serial")
+            and not _serial_exists(result, serial_device)
+        ):
+            self.global_settings.set("serial_device", "")
+            discarded_keys.append("serial_device")
+
+        source_type = str(self.global_settings.get("capture_source_type", "camera") or "camera")
+        if source_type == "window":
+            discarded_keys.extend(self._discard_unavailable_window_settings())
+        else:
+            capture_device = str(self.global_settings.get("capture_device", "") or "").strip()
+            if (
+                capture_device
+                and capture_device != DUMMY_DEVICE_NAME
+                and not result.timed_out
+                and not _has_discovery_error(result, "capture")
+                and not _capture_exists(result, capture_device)
+            ):
+                self.global_settings.set("capture_device", "")
+                discarded_keys.append("capture_device")
+
+        if discarded_keys:
+            self.logger.user(
+                "INFO",
+                f"利用できない接続設定を破棄しました: {', '.join(discarded_keys)}",
+                component="GuiAppServices",
+                event="configuration.connection_discarded",
+                extra={"keys": ", ".join(discarded_keys)},
+            )
+
+    def _discard_unavailable_window_settings(self) -> list[str]:
+        title = str(self.global_settings.get("capture_window_title", "") or "").strip()
+        identifier = str(self.global_settings.get("capture_window_identifier", "") or "").strip()
+        if not title and not identifier:
+            return []
+        windows_result = self._detect_window_sources_for_stale_check()
+        if windows_result is None or windows_result.failed:
+            return []
+        windows = windows_result.window_sources
+        if _window_exists(
+            windows,
+            title=title,
+            identifier=identifier,
+            match_mode=str(
+                self.global_settings.get("capture_window_match_mode", "exact") or "exact"
+            ),
+        ):
+            return []
+        discarded_keys: list[str] = []
+        if title:
+            self.global_settings.set("capture_window_title", "")
+            discarded_keys.append("capture_window_title")
+        if identifier:
+            self.global_settings.set("capture_window_identifier", "")
+            discarded_keys.append("capture_window_identifier")
+        return discarded_keys
+
+    def _detect_window_sources_for_stale_check(self) -> WindowDiscoveryResult | None:
+        detect_with_result = getattr(self.device_discovery, "detect_window_sources_result", None)
+        if callable(detect_with_result):
+            try:
+                return detect_with_result(timeout_sec=2.0)
+            except Exception as exc:
+                self.logger.technical(
+                    "WARNING",
+                    "Window source discovery failed while checking stale settings.",
+                    component="GuiAppServices",
+                    event="configuration.connection_discovery_failed",
+                    exc=exc,
+                )
+                return WindowDiscoveryResult(failed=True)
+        detect_windows = getattr(self.device_discovery, "detect_window_sources", None)
+        if not callable(detect_windows):
+            return None
+        try:
+            windows = detect_windows(timeout_sec=2.0)
+        except Exception as exc:
+            self.logger.technical(
+                "WARNING",
+                "Window source discovery failed while checking stale settings.",
+                component="GuiAppServices",
+                event="configuration.connection_discovery_failed",
+                exc=exc,
+            )
+            return WindowDiscoveryResult(failed=True)
+        return WindowDiscoveryResult(window_sources=windows)
+
     def _log_setting_changes(self, changed_keys: set[str]) -> None:
         if {"serial_device", "serial_baud"} & changed_keys:
             serial_identifier = str(self.global_settings.get("serial_device", "") or "")
@@ -353,6 +464,39 @@ def _changed_keys(previous: Mapping[str, Any] | None, current: Mapping[str, Any]
         return set(_flatten_keys(current))
     keys = set(_flatten_keys(previous)) | set(_flatten_keys(current))
     return {key for key in keys if _dotted_get(previous, key) != _dotted_get(current, key)}
+
+
+def _serial_exists(result: DeviceDiscoveryResult, identifier: str) -> bool:
+    return any(str(device.identifier) == identifier for device in result.serial_devices)
+
+
+def _capture_exists(result: DeviceDiscoveryResult, name: str) -> bool:
+    return any(device.name == name for device in result.capture_devices)
+
+
+def _window_exists(
+    windows: tuple[WindowInfo, ...],
+    *,
+    title: str,
+    identifier: str,
+    match_mode: str,
+) -> bool:
+    try:
+        resolve_window(
+            windows,
+            WindowCaptureSourceConfig(
+                title_pattern=title,
+                identifier=identifier or None,
+                match_mode="contains" if match_mode == "contains" else "exact",
+            ),
+        )
+    except ConfigurationError:
+        return False
+    return True
+
+
+def _has_discovery_error(result: DeviceDiscoveryResult, device_type: str) -> bool:
+    return any(error.startswith(f"{device_type}:") for error in result.errors)
 
 
 def _flatten_keys(mapping: Mapping[str, Any], prefix: str = "") -> set[str]:

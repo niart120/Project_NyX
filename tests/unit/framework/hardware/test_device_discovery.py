@@ -81,11 +81,14 @@ def test_device_discovery_lists_capture_target_windows_separately() -> None:
     assert window_locator.calls == 1
 
 
-def test_device_discovery_finds_serial_by_identifier() -> None:
+def test_device_discovery_keeps_serial_identifier_in_snapshot() -> None:
     discovery = Discovery()
-    discovery.detect(timeout_sec=1.0)
+    result = discovery.detect(timeout_sec=1.0)
 
-    found = discovery.find_serial("COM1", timeout_sec=0)
+    found = next(
+        (device for device in result.serial_devices if str(device.identifier) == "COM1"),
+        None,
+    )
 
     assert found is not None
     assert found.display_name == "USB Serial Device (COM1)"

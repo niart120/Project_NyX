@@ -52,6 +52,15 @@ class DeviceDiscoveryResult:
         return [device.name for device in self.capture_devices]
 
 
+@dataclass(frozen=True)
+class WindowDiscoveryResult:
+    """Window capture 候補検出の結果。"""
+
+    window_sources: tuple[WindowInfo, ...] = ()
+    failed: bool = False
+    errors: tuple[str, ...] = ()
+
+
 class DeviceDiscoveryService:
     """シリアル、カメラ、window capture 候補を検出します。"""
 
@@ -60,12 +69,19 @@ class DeviceDiscoveryService:
         self.logger = logger or NullLoggerPort()
         self.window_locator = DefaultWindowLocatorBackend()
         self._last_result = DeviceDiscoveryResult()
+        self._last_window_sources: tuple[WindowInfo, ...] = ()
         self._lock = threading.Lock()
 
     @property
     def last_result(self) -> DeviceDiscoveryResult:
         with self._lock:
             return self._last_result
+
+    @property
+    def last_window_sources(self) -> tuple[WindowInfo, ...]:
+        """直近に検出した window capture 候補を返します。"""
+        with self._lock:
+            return self._last_window_sources
 
     def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
         if timeout_sec < 0:
@@ -125,6 +141,12 @@ class DeviceDiscoveryService:
         return self.last_result.capture_names()
 
     def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
+        return self.detect_window_sources_result(timeout_sec=timeout_sec).window_sources
+
+    def detect_window_sources_result(
+        self,
+        timeout_sec: float = 2.0,
+    ) -> WindowDiscoveryResult:
         if timeout_sec < 0:
             raise ValueError("timeout_sec must be greater than or equal to 0")
         started_at = time.perf_counter()
@@ -139,7 +161,10 @@ class DeviceDiscoveryService:
                 extra={"device_type": "window"},
                 exc=exc,
             )
-            return ()
+            return WindowDiscoveryResult(
+                failed=True,
+                errors=(f"window: {type(exc).__name__}: {exc}",),
+            )
         elapsed_sec = time.perf_counter() - started_at
         self.logger.technical(
             "INFO",
@@ -160,13 +185,9 @@ class DeviceDiscoveryService:
                 event="device.window_discovery_slow",
                 extra={"timeout_sec": timeout_sec, "elapsed_sec": elapsed_sec},
             )
-        return detected
-
-    def find_serial(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self._find_serial_by_identifier(name, timeout_sec)
-
-    def find_capture(self, name: str, timeout_sec: float) -> DeviceInfo | None:
-        return self._find(name, "capture", timeout_sec)
+        with self._lock:
+            self._last_window_sources = detected
+        return WindowDiscoveryResult(window_sources=detected)
 
     def serial_display_name(self, identifier: str) -> str:
         match = next(
@@ -178,38 +199,6 @@ class DeviceDiscoveryService:
             None,
         )
         return match.display_name if match is not None else identifier
-
-    def _find_serial_by_identifier(self, identifier: str, timeout_sec: float) -> DeviceInfo | None:
-        result = self.last_result
-        match = next(
-            (
-                device
-                for device in result.serial_devices
-                if str(device.identifier) == str(identifier)
-            ),
-            None,
-        )
-        if match is not None:
-            return match
-        result = self.detect(timeout_sec)
-        return next(
-            (
-                device
-                for device in result.serial_devices
-                if str(device.identifier) == str(identifier)
-            ),
-            None,
-        )
-
-    def _find(self, name: str, kind: DeviceKind, timeout_sec: float) -> DeviceInfo | None:
-        result = self.last_result
-        devices = result.serial_devices if kind == "serial" else result.capture_devices
-        match = next((device for device in devices if device.name == name), None)
-        if match is not None:
-            return match
-        result = self.detect(timeout_sec)
-        devices = result.serial_devices if kind == "serial" else result.capture_devices
-        return next((device for device in devices if device.name == name), None)
 
     def _detect_serial_devices(self) -> list[DeviceInfo]:
         return [
@@ -270,7 +259,7 @@ class DeviceDiscoveryService:
                 cap.release()
         finally:
             if callable(set_log_level) and log_level is not None:
-                    set_log_level(log_level)
+                set_log_level(log_level)
         return devices
 
 

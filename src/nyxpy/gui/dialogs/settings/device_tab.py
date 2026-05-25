@@ -209,15 +209,6 @@ class DeviceSettingsTab(QWidget):
             if data.get("identifier") == current_identifier or data.get("title") == current_title:
                 self.window_source.setCurrentIndex(index)
                 return
-        if current_title:
-            self.window_source.addItem(
-                current_title,
-                {
-                    "title": current_title,
-                    "identifier": current_identifier,
-                },
-            )
-            self.window_source.setCurrentIndex(self.window_source.count() - 1)
 
     def refresh_serial_devices(self):
         serials = self.device_discovery.detect(timeout_sec=2.0).serial_devices
@@ -229,9 +220,6 @@ class DeviceSettingsTab(QWidget):
             if self.ser_device.itemData(index) == current_ser:
                 self.ser_device.setCurrentIndex(index)
                 return
-        if current_ser:
-            self.ser_device.addItem(current_ser, current_ser)
-            self.ser_device.setCurrentIndex(self.ser_device.count() - 1)
 
     def apply(self):
         self.settings.set("capture_source_type", self.capture_source_type.currentText())

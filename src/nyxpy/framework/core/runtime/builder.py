@@ -206,6 +206,7 @@ def create_device_runtime_builder(
     )
     lifetime_request = RuntimeBuildRequest(macro_id="__gui_lifetime__")
     discovery = device_discovery or DeviceDiscoveryService(logger=logger)
+    discovery.detect(detection_timeout_sec)
     controller_factory = controller_output_factory or ControllerOutputPortFactory(
         discovery=discovery,
         protocol=protocol,
