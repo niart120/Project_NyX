@@ -1,6 +1,6 @@
 # 利用者向けガイド
 
-NyX を使って既存マクロを実行する人向けの入口です。Python のコードを書く手順は [マクロ開発者向けドキュメント](../macro-development/README.md) に分けています。
+NyX を使って既存マクロを実行する人向けの入口です。マクロを実装する手順は [マクロ開発者向けドキュメント](../macro-development/README.md) に分けています。
 
 ## 最短手順
 
@@ -28,7 +28,7 @@ uv run nyxpy gui
 
 | 文書 | 内容 |
 |------|------|
-| [インストール](installation.md) | Python / uv、公開後の `uv tool install`、リポジトリ取得、初回起動 |
+| [インストール](installation.md) | uv、公開後の `uv tool install`、リポジトリ取得、初回起動 |
 | [デバイス設定](device-setup.md) | キャプチャデバイス、シリアルデバイス、プロトコル、設定ファイル |
 | [GUI の使い方](gui.md) | GUI 起動、マクロ選択、プレビュー、スナップショット |
 | [CLI の使い方](cli.md) | `nyxpy run`、`--serial`、`--capture`、`--define` |

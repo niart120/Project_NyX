@@ -2,16 +2,11 @@
 
 ## 必要なもの
 
-- Python 3.12 以上、3.14 未満
 - [uv](https://github.com/astral-sh/uv)
 - キャプチャデバイス
 - CH552 プロトコルなど NyX が対応するシリアル通信デバイス
 
-uv が未導入の場合は、pip などでインストールします。
-
-```console
-pip install uv
-```
+uv が未導入の場合は、[uv 公式のインストール手順](https://docs.astral.sh/uv/getting-started/installation/)に従って導入します。
 
 ## 公開後の導入手順
 

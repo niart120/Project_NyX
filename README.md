@@ -13,13 +13,12 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 - PySide6 による GUI と `nyxpy` CLI
 - キャプチャデバイスのリアルタイムプレビュー
 - シリアル通信デバイス経由のコントローラー操作
-- Python で書くマクロ実行基盤
+- マクロ実行基盤
 - 実行ログ、スナップショット、実行成果物の保存
 - Discord / Bluesky への外部通知
 
 ## 必要なもの
 
-- Python 3.12 以上、3.14 未満
 - [uv](https://github.com/astral-sh/uv)
 - 対応 OS: Windows / macOS / Linux
 - キャプチャデバイス
