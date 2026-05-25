@@ -9,6 +9,7 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog
 
 from nyxpy.framework.core.hardware.device_discovery import (
+    DUMMY_DEVICE_NAME,
     DeviceDiscoveryResult,
     DeviceInfo,
     WindowDiscoveryResult,
@@ -64,6 +65,7 @@ class FakeSettings:
             "capture_device": "",
             "capture_source_type": "camera",
             "capture_window_title": "",
+            "capture_window_identifier": "",
             "serial_device": "",
             "serial_protocol": "CH552",
             "serial_baud": 9600,
@@ -380,6 +382,93 @@ def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> N
     assert window.global_settings.get("capture_device") == "Camera1"
     assert window.global_settings.get("capture_source_type") == "camera"
     assert window.services.apply_calls[-1] is False
+
+
+def test_connection_menu_checks_explicit_dummy_actions(window: MainWindow) -> None:
+    window.global_settings.set("capture_device", DUMMY_DEVICE_NAME)
+    window.global_settings.set("serial_device", DUMMY_DEVICE_NAME)
+
+    window._refresh_connection_menu()
+
+    assert window.camera_source_menu is not None
+    capture_dummy = next(
+        action
+        for action in window.camera_source_menu.actions()
+        if action.text() == DUMMY_DEVICE_NAME
+    )
+    assert capture_dummy.isChecked()
+    assert window.serial_device_menu is not None
+    serial_dummy = next(
+        action
+        for action in window.serial_device_menu.actions()
+        if action.text() == DUMMY_DEVICE_NAME
+    )
+    assert serial_dummy.isChecked()
+
+
+def test_connection_menu_applies_dummy_device_setting(window: MainWindow) -> None:
+    assert window.camera_source_menu is not None
+    capture_dummy = next(
+        action
+        for action in window.camera_source_menu.actions()
+        if action.text() == DUMMY_DEVICE_NAME
+    )
+
+    capture_dummy.trigger()
+
+    assert window.global_settings.get("capture_source_type") == "camera"
+    assert window.global_settings.get("capture_device") == DUMMY_DEVICE_NAME
+    assert window.serial_device_menu is not None
+    serial_dummy = next(
+        action
+        for action in window.serial_device_menu.actions()
+        if action.text() == DUMMY_DEVICE_NAME
+    )
+
+    serial_dummy.trigger()
+
+    assert window.global_settings.get("serial_device") == DUMMY_DEVICE_NAME
+
+
+def test_connection_menu_shows_auto_fallback_without_checking_dummy(
+    window: MainWindow,
+) -> None:
+    window.global_settings.set("capture_device", "Missing Camera")
+    window.global_settings.set("serial_device", "COM9")
+
+    window._refresh_connection_menu()
+
+    assert window.camera_source_menu is not None
+    capture_actions = window.camera_source_menu.actions()
+    capture_dummy = next(action for action in capture_actions if action.text() == DUMMY_DEVICE_NAME)
+    assert not capture_dummy.isChecked()
+    assert any(
+        action.text() == "自動フォールバック中: Missing Camera 未検出" and not action.isEnabled()
+        for action in capture_actions
+    )
+    assert window.serial_device_menu is not None
+    serial_actions = window.serial_device_menu.actions()
+    serial_dummy = next(action for action in serial_actions if action.text() == DUMMY_DEVICE_NAME)
+    assert not serial_dummy.isChecked()
+    assert any(
+        action.text() == "自動フォールバック中: COM9 未検出" and not action.isEnabled()
+        for action in serial_actions
+    )
+
+
+def test_connection_menu_shows_window_auto_fallback_status(
+    window: MainWindow,
+) -> None:
+    window.global_settings.set("capture_window_identifier", "missing-hwnd")
+    window.global_settings.set("capture_window_title", "Missing Viewer")
+
+    window._refresh_connection_menu()
+
+    assert window.window_source_menu is not None
+    assert any(
+        action.text() == "自動フォールバック中: missing-hwnd 未検出" and not action.isEnabled()
+        for action in window.window_source_menu.actions()
+    )
 
 
 def test_connection_menu_applies_window_source_setting(window: MainWindow) -> None:

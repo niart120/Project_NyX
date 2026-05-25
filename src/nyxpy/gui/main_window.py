@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.device_discovery import (
+    DUMMY_DEVICE_NAME,
     DeviceDiscoveryResult,
     DeviceInfo,
     WindowDiscoveryResult,
@@ -306,6 +307,24 @@ class MainWindow(QMainWindow):
         self.capture_device_action_group = QActionGroup(self)
         self.capture_device_action_group.setExclusive(True)
         current = str(self.global_settings.get("capture_device", "") or "")
+        selection = select_capture_target(
+            ConnectionRequest(kind="capture", requested=current, allow_dummy=True),
+            DeviceDiscoveryResult(capture_devices=devices),
+        )
+        dummy_action = QAction(DUMMY_DEVICE_NAME, self)
+        dummy_action.setCheckable(True)
+        dummy_action.setData(DUMMY_DEVICE_NAME)
+        dummy_action.setChecked(
+            selection.fallback_reason == ConnectionFallbackReason.USER_SELECTED_DUMMY
+        )
+        dummy_action.triggered.connect(
+            lambda checked=False: self._apply_connection_settings(
+                {"capture_source_type": "camera", "capture_device": DUMMY_DEVICE_NAME}
+            )
+        )
+        self.capture_device_action_group.addAction(dummy_action)
+        menu.addAction(dummy_action)
+        _add_auto_dummy_status_action(menu, selection, self)
         if not devices:
             empty_action = QAction("利用可能なキャプチャ入力なし", self)
             empty_action.setEnabled(False)
@@ -314,7 +333,7 @@ class MainWindow(QMainWindow):
             action = QAction(device.display_name, self)
             action.setCheckable(True)
             action.setData(device.name)
-            action.setChecked(device.name == current)
+            action.setChecked(selection.selected == device)
             action.triggered.connect(
                 lambda checked=False, name=device.name: self._apply_connection_settings(
                     {"capture_source_type": "camera", "capture_device": name}
@@ -330,8 +349,8 @@ class MainWindow(QMainWindow):
     ) -> None:
         group = QActionGroup(self)
         group.setExclusive(True)
-        current_identifier = str(self.global_settings.get("capture_window_identifier", "") or "")
-        current_title = str(self.global_settings.get("capture_window_title", "") or "")
+        selection = _select_window_connection_status(self.global_settings, windows)
+        _add_auto_dummy_status_action(menu, selection, self)
         if not windows:
             empty_action = QAction("利用可能なウィンドウなし", self)
             empty_action.setEnabled(False)
@@ -342,7 +361,7 @@ class MainWindow(QMainWindow):
             action = QAction(window.display_name, self)
             action.setCheckable(True)
             action.setData(identifier)
-            action.setChecked(identifier == current_identifier or window.title == current_title)
+            action.setChecked(selection.selected == window)
             action.triggered.connect(
                 lambda checked=False, selected=window: self._apply_connection_settings(
                     {
@@ -364,6 +383,24 @@ class MainWindow(QMainWindow):
         self.serial_device_action_group = QActionGroup(self)
         self.serial_device_action_group.setExclusive(True)
         current = str(self.global_settings.get("serial_device", "") or "")
+        selection = select_serial_target(
+            ConnectionRequest(kind="serial", requested=current, allow_dummy=True),
+            DeviceDiscoveryResult(serial_devices=devices),
+        )
+        dummy_action = QAction(DUMMY_DEVICE_NAME, self)
+        dummy_action.setCheckable(True)
+        dummy_action.setData(DUMMY_DEVICE_NAME)
+        dummy_action.setChecked(
+            selection.fallback_reason == ConnectionFallbackReason.USER_SELECTED_DUMMY
+        )
+        dummy_action.triggered.connect(
+            lambda checked=False: self._apply_connection_settings(
+                {"serial_device": DUMMY_DEVICE_NAME}
+            )
+        )
+        self.serial_device_action_group.addAction(dummy_action)
+        menu.addAction(dummy_action)
+        _add_auto_dummy_status_action(menu, selection, self)
         if not devices:
             empty_action = QAction("利用可能なシリアルデバイスなし", self)
             empty_action.setEnabled(False)
@@ -373,7 +410,7 @@ class MainWindow(QMainWindow):
             action = QAction(device.display_name, self)
             action.setCheckable(True)
             action.setData(identifier)
-            action.setChecked(identifier == current)
+            action.setChecked(selection.selected == device)
             action.triggered.connect(
                 lambda checked=False, serial=identifier: self._apply_connection_settings(
                     {"serial_device": serial}
@@ -995,6 +1032,21 @@ def _format_connection_status(label: str, selection: ResolvedConnection) -> str:
         return f"{label}: 未接続 (ダミーデバイス使用中)"
     requested = selection.requested or "未選択"
     return f"{label}: {requested} 未検出 (ダミーデバイス使用中)"
+
+
+def _add_auto_dummy_status_action(
+    menu: QMenu,
+    selection: ResolvedConnection,
+    parent: QMainWindow,
+) -> None:
+    if selection.uses_dummy and selection.fallback_reason not in {
+        ConnectionFallbackReason.NOT_SELECTED,
+        ConnectionFallbackReason.USER_SELECTED_DUMMY,
+    }:
+        requested = selection.requested or "未選択"
+        action = QAction(f"自動フォールバック中: {requested} 未検出", parent)
+        action.setEnabled(False)
+        menu.addAction(action)
 
 
 def _selected_display_name(selected: object) -> str:
