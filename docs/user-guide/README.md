@@ -6,7 +6,7 @@ NyX を使って既存マクロを実行する人向けの入口です。Python 
 
 配布パッケージ `nyxfw` は公開準備中です。公開後は次の流れを主導線にします。
 
-```powershell
+```console
 uv tool install nyxfw
 nyxpy init
 nyxpy gui
@@ -14,15 +14,15 @@ nyxpy gui
 
 現時点で動作確認する場合は、リポジトリを取得して次のように起動します。
 
-```powershell
+```console
 git clone https://github.com/niart120/Project_NyX.git
-Set-Location .\Project_NyX
+cd Project_NyX
 uv sync
 uv run nyxpy init
 uv run nyxpy gui
 ```
 
-`nyxpy init` は `.nyxpy\`, `macros\`, `resources\`, `logs\`, `runs\`, `snapshots\` を用意し、確認用の `sample_macro` も生成します。空の作業領域だけを作る場合は `nyxpy init --blank` を使います。
+`nyxpy init` は `.nyxpy/`, `macros/`, `resources/`, `logs/`, `runs/`, `snapshots/` を用意し、確認用の `sample_macro` も生成します。空の作業領域だけを作る場合は `nyxpy init --blank` を使います。
 
 ## 目的別のページ
 
@@ -37,18 +37,18 @@ uv run nyxpy gui
 
 ## 作業ディレクトリ
 
-NyX は、コマンドを実行したディレクトリまたは親ディレクトリから `.nyxpy\` を探して workspace を決めます。マクロを実行する前に、対象 workspace の中で `nyxpy init` を済ませてください。
+NyX は、コマンドを実行したディレクトリまたは親ディレクトリから `.nyxpy/` を探して workspace を決めます。マクロを実行する前に、対象 workspace の中で `nyxpy init` を済ませてください。
 
 ```text
-your-workspace\
-  .nyxpy\
+your-workspace/
+  .nyxpy/
     global.toml
     secrets.toml
-  macros\
-  resources\
-  logs\
-  runs\
-  snapshots\
+  macros/
+  resources/
+  logs/
+  runs/
+  snapshots/
 ```
 
-既存マクロを追加する場合は、マクロ配布元の手順に従って `macros\` と `resources\` へ配置します。自分でマクロを作る場合は、`nyxpy create <macro_id>` で雛形を生成できます。
+既存マクロを追加する場合は、マクロ配布元の手順に従って `macros/` と `resources/` へ配置します。自分でマクロを作る場合は、`nyxpy create <macro_id>` で雛形を生成できます。

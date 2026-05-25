@@ -4,13 +4,13 @@
 
 配布パッケージを使う場合:
 
-```powershell
+```console
 nyxpy gui
 ```
 
 リポジトリから起動する場合:
 
-```powershell
+```console
 uv run nyxpy gui
 ```
 
@@ -26,21 +26,21 @@ uv run nyxpy gui
 
 ## マクロの配置
 
-利用者が実行するマクロは workspace の `macros\` と `resources\` に置きます。
+利用者が実行するマクロは workspace の `macros/` と `resources/` に置きます。
 
 ```text
-macros\sample_macro\
+macros/sample_macro/
   macro.py
 
-resources\sample_macro\
+resources/sample_macro/
   settings.toml
-  assets\
+  assets/
 ```
 
-`examples\macros` と `examples\resources` は参照用サンプルです。利用者の配置先ではありません。
+`examples/macros` と `examples/resources` は参照用サンプルです。利用者の配置先ではありません。
 
 ## プレビューとスナップショット
 
-GUI のプレビュー領域にキャプチャ中の画面が表示されます。スナップショットは workspace の `snapshots\` に保存されます。
+GUI のプレビュー領域にキャプチャ中の画面が表示されます。スナップショットは workspace の `snapshots/` に保存されます。
 
 プレビューが表示されない場合は、[トラブルシューティング](troubleshooting.md) の「プレビューが表示されない」を確認してください。

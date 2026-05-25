@@ -7,8 +7,8 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 | 文書 | 用途 |
 |------|------|
 | [agent-brief.md](agent-brief.md) | AI エージェントに渡す要点。配置、依存、公開 API、検証コマンドをまとめます。 |
-| [macro-template.md](macro-template.md) | `macros\<macro_id>` と `resources\<macro_id>` に置く雛形、任意の `macro.toml`、完了前確認。 |
-| [macro-layout.md](macro-layout.md) | `macros\`, `resources\` の使い分けと依存方向。 |
+| [macro-template.md](macro-template.md) | `macros/<macro_id>` と `resources/<macro_id>` に置く雛形、任意の `macro.toml`、完了前確認。 |
+| [macro-layout.md](macro-layout.md) | `macros/`, `resources/` の使い分けと依存方向。 |
 | [macro-lifecycle.md](macro-lifecycle.md) | `MacroBase` のメタデータ、`initialize`, `run`, `finalize` の責務。 |
 | [command-api.md](command-api.md) | `Command` の操作 API、待機、キャプチャ、画像入出力、通知、ログ。 |
 | [settings-and-resources.md](settings-and-resources.md) | `settings_path`, `resource:`, 画像資材、実行ごとの出力。 |
@@ -23,14 +23,14 @@ NyX でマクロを実装する人と、マクロ実装を担当する AI エー
 実装者が編集するマクロ本体と資材は、リポジトリ直下のローカル作業領域に置きます。
 
 ```text
-macros\<macro_id>\
+macros/<macro_id>/
   macro.py
   config.py              # 任意。設定値や純粋ロジックを分離する場合に使う
   test_logic.py          # 任意。Command に依存しないロジックの単体テスト
 
-resources\<macro_id>\
+resources/<macro_id>/
   settings.toml
-  assets\
+  assets/
     template.png
 ```
 
@@ -38,23 +38,23 @@ resources\<macro_id>\
 
 公開後の主導線は `uv tool install nyxfw` で `nyxpy` を導入し、workspace 内で次のコマンドを使う形です。
 
-```powershell
+```console
 nyxpy init --blank
 nyxpy create sample_turbo
 ```
 
 リポジトリから実行する場合は `uv run` を付けます。
 
-```powershell
+```console
 uv run nyxpy init --blank
 uv run nyxpy create sample_turbo
 ```
 
-`nyxpy init` は `sample_macro` も生成します。空の workspace だけを作る場合は `--blank` を使います。`nyxpy create <macro_id>` は既存 workspace の `macros\<macro_id>` と `resources\<macro_id>` に雛形を生成します。
+`nyxpy init` は `sample_macro` も生成します。空の workspace だけを作る場合は `--blank` を使います。`nyxpy create <macro_id>` は既存 workspace の `macros/<macro_id>` と `resources/<macro_id>` に雛形を生成します。
 
 ## 最小構成の例
 
-`macros\sample_turbo\macro.py`:
+`macros/sample_turbo/macro.py`:
 
 ```python
 from nyxpy.framework.core.constants import Button
@@ -85,36 +85,36 @@ class SampleTurboMacro(MacroBase):
         cmd.release()
 ```
 
-`settings_path = "resource:settings.toml"` は `resources\sample_turbo\settings.toml` を参照します。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
+`settings_path = "resource:settings.toml"` は `resources/sample_turbo/settings.toml` を参照します。`cmd.capture()` はフレーム未準備時に `FrameNotReadyError` を送出します。
 
 ## 自動検出の条件
 
 軽量マクロは、次のどちらかに `MacroBase` 派生クラスを 1 つだけ置くと自動検出されます。
 
-- `macros\<macro_id>.py`
-- `macros\<macro_id>\macro.py`
+- `macros/<macro_id>.py`
+- `macros/<macro_id>/macro.py`
 
-`macros\<macro_id>\__init__.py` にも `MacroBase` 派生クラスを置く場合、`macro.py` と両方に置くとエントリーポイントが曖昧になり、読み込みに失敗します。複数のエントリーポイント、明示的なメタデータ、設定ファイル指定が必要な場合だけ `macro.toml` を使います。
+`macros/<macro_id>/__init__.py` にも `MacroBase` 派生クラスを置く場合、`macro.py` と両方に置くとエントリーポイントが曖昧になり、読み込みに失敗します。複数のエントリーポイント、明示的なメタデータ、設定ファイル指定が必要な場合だけ `macro.toml` を使います。
 
 ## 実装時の制約
 
 - マクロは `nyxpy.framework.*` と、同じマクロ配下または共有部品だけへ依存させます。
-- `macros\xxx` から `macros\yyy` を直接インポートしません。複数マクロで使う処理は共有部品へ切り出します。
+- `macros/xxx` から `macros/yyy` を直接インポートしません。複数マクロで使う処理は共有部品へ切り出します。
 - コントローラー操作、待機、キャプチャ、通知、ログは `Command` 経由に集約します。
 - 乱数計算、画像判定、設定変換などの副作用がない処理は関数へ分離し、`Command` なしで単体テストできるようにします。
-- `macro.toml` や設定ファイルに保存する環境に依存しないパス表記では `/` を使います。Windows のファイル表示例では `\` を使ってよいですが、設定値には `assets/template.png` のように書きます。
+- `macro.toml` や設定ファイルに保存する環境に依存しないパス表記では `/` を使います。設定値には `assets/template.png` のように書きます。
 
 ## 検証コマンド
 
-```powershell
+```console
 uv run ruff format .
 uv run ruff check .
-uv run ty check src\nyxpy --output-format concise --no-progress
+uv run ty check src/nyxpy --output-format concise --no-progress
 uv run pytest tests macros
 ```
 
 実機が必要なテストは `@pytest.mark.realdevice` を付けます。実機なしで走らせる場合は次を使います。
 
-```powershell
+```console
 uv run pytest tests macros -m "not realdevice"
 ```

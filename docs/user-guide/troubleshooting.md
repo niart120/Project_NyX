@@ -11,7 +11,7 @@
 
 CLI では指定値を明示します。
 
-```powershell
+```console
 nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 ```
 
@@ -26,22 +26,22 @@ nyxpy run sample_macro --serial COM3 --capture "Capture Device"
 
 ## マクロが見つからない
 
-`macros\` 配下にマクロがあるか確認します。
+`macros/` 配下にマクロがあるか確認します。
 
 ```text
-macros\sample_macro\
+macros/sample_macro/
   macro.py
 ```
 
 workspace が未初期化の場合:
 
-```powershell
+```console
 nyxpy init
 ```
 
 新規雛形を作る場合:
 
-```powershell
+```console
 nyxpy create sample_macro
 ```
 
@@ -49,18 +49,18 @@ nyxpy create sample_macro
 
 確認するもの:
 
-- マクロに必要な `resources\<macro_id>\settings.toml` や画像資材がある。
+- マクロに必要な `resources/<macro_id>/settings.toml` や画像資材がある。
 - `--define key=value` の key と値がマクロの説明と一致している。
 - 実機が必要なマクロを dummy 設定で実行していない。
 - ログに表示されたエラーが設定値、デバイス、画像資材のどれに関係しているか。
 
-ログは workspace の `logs\` と `runs\` に保存されます。
+ログは workspace の `logs/` と `runs/` に保存されます。
 
 ## 通知が届かない
 
 確認するもの:
 
-- `.nyxpy\secrets.toml` の `enabled` が `true`。
+- `.nyxpy/secrets.toml` の `enabled` が `true`。
 - webhook URL や password が正しい。
 - ネットワークが外部サービスへ接続できる。
 - マクロ側が `cmd.notify(...)` を呼んでいる。

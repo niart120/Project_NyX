@@ -12,7 +12,7 @@
 ## パッケージマクロ
 
 ```text
-macros\sample_macro\
+macros/sample_macro/
   macro.py
   macro.toml
 ```
@@ -30,8 +30,8 @@ settings = "resource:settings.toml"
 ## 単一ファイルマクロ
 
 ```text
-macros\sample_macro.py
-macros\sample_macro.toml
+macros/sample_macro.py
+macros/sample_macro.toml
 ```
 
 ```toml

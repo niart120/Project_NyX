@@ -7,9 +7,9 @@
 - キャプチャデバイス
 - CH552 プロトコルなど NyX が対応するシリアル通信デバイス
 
-uv が未導入の場合は、PowerShell でインストールします。
+uv が未導入の場合は、pip などでインストールします。
 
-```powershell
+```console
 pip install uv
 ```
 
@@ -17,7 +17,7 @@ pip install uv
 
 配布パッケージ `nyxfw` は公開準備中です。公開後は `uv tool install` で CLI / GUI を導入します。
 
-```powershell
+```console
 uv tool install nyxfw
 nyxpy --help
 ```
@@ -28,22 +28,22 @@ nyxpy --help
 
 公開前に動作確認する場合や、NyX 本体を修正する場合はリポジトリを取得します。
 
-```powershell
+```console
 git clone https://github.com/niart120/Project_NyX.git
-Set-Location .\Project_NyX
+cd Project_NyX
 uv sync
 uv run nyxpy --help
 ```
 
 GUI を起動します。
 
-```powershell
+```console
 uv run nyxpy gui
 ```
 
 旧来の alias も使えます。
 
-```powershell
+```console
 uv run nyx-gui
 ```
 
@@ -51,19 +51,19 @@ uv run nyx-gui
 
 マクロを実行する作業ディレクトリで workspace を初期化します。
 
-```powershell
+```console
 nyxpy init
 ```
 
 リポジトリから起動している場合は `uv run` を付けます。
 
-```powershell
+```console
 uv run nyxpy init
 ```
 
 `nyxpy init` は確認用の `sample_macro` も生成します。サンプルなしの空 workspace にする場合:
 
-```powershell
+```console
 nyxpy init --blank
 ```
 
@@ -71,6 +71,6 @@ nyxpy init --blank
 
 インストール後は `nyxpy docs` で公開ドキュメントの URL とローカル API 参照方法を確認できます。
 
-```powershell
+```console
 nyxpy docs
 ```

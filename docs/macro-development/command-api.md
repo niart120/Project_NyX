@@ -34,7 +34,7 @@ cmd.save_img("snapshot.png", frame)
 
 | API | 説明 |
 |-----|------|
-| `cmd.load_img(name, grayscale=False)` | `resources\<macro_id>\assets` を優先して画像を読み込みます。 |
+| `cmd.load_img(name, grayscale=False)` | `resources/<macro_id>/assets` を優先して画像を読み込みます。 |
 | `cmd.save_img(name, image)` | 実行ごとの出力先へ画像を保存します。 |
 | `cmd.artifacts.open_output(name, ...)` | 実行ごとの出力先に任意のバイナリファイルを書きます。 |
 
