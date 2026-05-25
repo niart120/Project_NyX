@@ -172,6 +172,7 @@ class MainWindow(QMainWindow):
         self.serial_device_menu: QMenu | None = None
         self.protocol_menu: QMenu | None = None
         self.capture_source_type_menu: QMenu | None = None
+        self.camera_source_menu: QMenu | None = None
         self.window_source_menu: QMenu | None = None
         self.capture_fps_menu: QMenu | None = None
         self.serial_baud_menu: QMenu | None = None
@@ -246,31 +247,11 @@ class MainWindow(QMainWindow):
         menu.clear()
         self.capture_source_type_menu = QMenu("入力ソース", menu)
         menu.addMenu(self.capture_source_type_menu)
-        self._populate_capture_source_type_menu(self.capture_source_type_menu)
-        menu.addSeparator()
-        self.capture_device_action_group = QActionGroup(self)
-        self.capture_device_action_group.setExclusive(True)
-        current = str(self.global_settings.get("capture_device", "") or "")
-        if not devices:
-            empty_action = QAction("利用可能なキャプチャ入力なし", self)
-            empty_action.setEnabled(False)
-            menu.addAction(empty_action)
-        for device in devices:
-            action = QAction(device.display_name, self)
-            action.setCheckable(True)
-            action.setData(device.name)
-            action.setChecked(device.name == current)
-            action.triggered.connect(
-                lambda checked=False, name=device.name: self._apply_connection_settings(
-                    {"capture_source_type": "camera", "capture_device": name}
-                )
-            )
-            self.capture_device_action_group.addAction(action)
-            menu.addAction(action)
-        menu.addSeparator()
-        self.window_source_menu = QMenu("ウィンドウ", menu)
-        menu.addMenu(self.window_source_menu)
-        self._populate_window_source_menu(self.window_source_menu, windows)
+        self._populate_capture_source_type_menu(
+            self.capture_source_type_menu,
+            devices,
+            windows,
+        )
         menu.addSeparator()
         self.capture_fps_menu = QMenu("FPS", menu)
         menu.addMenu(self.capture_fps_menu)
@@ -290,21 +271,44 @@ class MainWindow(QMainWindow):
             self.capture_fps_action_group.addAction(action)
             self.capture_fps_menu.addAction(action)
 
-    def _populate_capture_source_type_menu(self, menu: QMenu) -> None:
-        group = QActionGroup(self)
-        group.setExclusive(True)
-        current = str(self.global_settings.get("capture_source_type", "camera") or "camera")
-        for source_type, label in (("camera", "カメラ"), ("window", "ウィンドウ")):
-            action = QAction(label, self)
+    def _populate_capture_source_type_menu(
+        self,
+        menu: QMenu,
+        devices: tuple[DeviceInfo, ...],
+        windows: tuple[WindowInfo, ...],
+    ) -> None:
+        menu.clear()
+        self.camera_source_menu = QMenu("カメラ", menu)
+        self.window_source_menu = QMenu("ウィンドウ", menu)
+        menu.addMenu(self.camera_source_menu)
+        menu.addMenu(self.window_source_menu)
+        self._populate_camera_source_menu(self.camera_source_menu, devices)
+        self._populate_window_source_menu(self.window_source_menu, windows)
+
+    def _populate_camera_source_menu(
+        self,
+        menu: QMenu,
+        devices: tuple[DeviceInfo, ...],
+    ) -> None:
+        menu.clear()
+        self.capture_device_action_group = QActionGroup(self)
+        self.capture_device_action_group.setExclusive(True)
+        current = str(self.global_settings.get("capture_device", "") or "")
+        if not devices:
+            empty_action = QAction("利用可能なキャプチャ入力なし", self)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+        for device in devices:
+            action = QAction(device.display_name, self)
             action.setCheckable(True)
-            action.setData(source_type)
-            action.setChecked(source_type == current)
+            action.setData(device.name)
+            action.setChecked(device.name == current)
             action.triggered.connect(
-                lambda checked=False, value=source_type: self._apply_connection_settings(
-                    {"capture_source_type": value}
+                lambda checked=False, name=device.name: self._apply_connection_settings(
+                    {"capture_source_type": "camera", "capture_device": name}
                 )
             )
-            group.addAction(action)
+            self.capture_device_action_group.addAction(action)
             menu.addAction(action)
 
     def _populate_window_source_menu(

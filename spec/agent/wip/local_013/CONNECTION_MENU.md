@@ -138,12 +138,10 @@ class ConnectionMenuController:
 ├─ キャプチャ入力
 │  ├─ 入力ソース
 │  │  ├─ カメラ
+│  │  │  ├─ ダミーデバイス
+│  │  │  └─ <現在検出できるカメラ...>
 │  │  └─ ウィンドウ
-│  ├─ デバイス
-│  │  ├─ ダミーデバイス
-│  │  └─ <現在検出できるカメラ...>
-│  ├─ ウィンドウ
-│  │  └─ <現在検出できるウィンドウ...>
+│  │     └─ <現在検出できるウィンドウ...>
 │  ├─ FPS
 │  │  ├─ source default
 │  │  ├─ 15
@@ -170,7 +168,7 @@ class ConnectionMenuController:
 |------|----------|----------|----------------|------|
 | メニューを開く | しない | しない | しない | `last_result` と resolved snapshot だけで表示する。 |
 | 再読み込み | worker で実行 | しない | 実行中でなければ再評価して必要時に再作成 | タイムアウト時は既存 resolved を維持し、status を表示する。 |
-| 実デバイス選択 | しない | requested を保存 | 実行中でなければ即時再作成 | 選択肢は検出済み device のみ。 |
+| 実デバイス選択 | しない | requested を保存 | 実行中でなければ即時再作成 | カメラは `キャプチャ入力 > 入力ソース > カメラ`、window は `キャプチャ入力 > 入力ソース > ウィンドウ` から選ぶ。 |
 | Dummy 選択 | しない | `DUMMY_DEVICE_NAME` を保存 | 実行中でなければ即時再作成 | 明示 Dummy として自動復帰しない。 |
 | Protocol 選択 | しない | protocol を保存 | 実行中でなければ即時再作成 | `接続 > プロトコル` から選ぶ。baudrate が非対応なら protocol 既定値へ補正する。 |
 | Baudrate 選択 | しない | baudrate を保存 | 実行中でなければ即時再作成 | `接続 > シリアルデバイス > ボーレート` から選ぶ。候補は protocol の `supported_baudrates` のみ。 |
@@ -181,8 +179,8 @@ class ConnectionMenuController:
 | Menu group | チェック対象 | 判定 |
 |------------|--------------|------|
 | 入力ソース | `camera` / `window` | `capture_source_type` と一致する action。 |
-| キャプチャ入力 > デバイス | Dummy または検出済み camera | `capture_connection` の resolved target。検出不能な保存値は設定反映時に破棄されるため、stale device はチェックしない。 |
-| ウィンドウ | 検出済み window | `capture_window_identifier` 優先、なければ title で一致する action。missing 時はチェックなしまたは Dummy 相当 status を表示する。 |
+| キャプチャ入力 > 入力ソース > カメラ | Dummy または検出済み camera | `capture_connection` の resolved target。検出不能な保存値は設定反映時に破棄されるため、stale device はチェックしない。 |
+| キャプチャ入力 > 入力ソース > ウィンドウ | 検出済み window | `capture_window_identifier` 優先、なければ title で一致する action。missing 時はチェックなしまたは Dummy 相当 status を表示する。 |
 | FPS | source default / 15 / 30 / 60 | `capture_fps` が `None` なら source default。 |
 | シリアルデバイス | Dummy または検出済み serial | `serial_connection` の resolved target。検出不能な保存値は設定反映時に破棄されるため、stale serial はチェックしない。 |
 | シリアルデバイス > ボーレート | 現在 protocol の supported baudrate | `serial_baud` と一致する action。非対応値は既定値へ補正してから表示する。 |

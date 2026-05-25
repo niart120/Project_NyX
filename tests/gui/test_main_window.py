@@ -305,6 +305,18 @@ def test_connection_menu_has_required_children(window: MainWindow) -> None:
     assert child_menus[:3] == ["キャプチャ入力", "シリアルデバイス", "プロトコル"]
 
 
+def test_capture_input_menu_nests_candidates_under_input_source(window: MainWindow) -> None:
+    assert window.capture_source_type_menu is not None
+
+    source_menus = [
+        action.menu().title()
+        for action in window.capture_source_type_menu.actions()
+        if action.menu() is not None
+    ]
+
+    assert source_menus == ["カメラ", "ウィンドウ"]
+
+
 def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) -> None:
     discovery = window.services.device_discovery
     assert isinstance(discovery, FakeDiscovery)
@@ -315,16 +327,17 @@ def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) ->
     assert discovery.detect_calls == 0
     assert window.capture_input_menu is not None
     assert window.serial_device_menu is not None
-    assert "Camera1" in [action.text() for action in window.capture_input_menu.actions()]
+    assert window.camera_source_menu is not None
+    assert "Camera1" in [action.text() for action in window.camera_source_menu.actions()]
     assert "USB Serial Device (COM1)" in [
         action.text() for action in window.serial_device_menu.actions()
     ]
 
 
 def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> None:
-    assert window.capture_input_menu is not None
+    assert window.camera_source_menu is not None
     action = next(
-        action for action in window.capture_input_menu.actions() if action.text() == "Camera1"
+        action for action in window.camera_source_menu.actions() if action.text() == "Camera1"
     )
 
     action.trigger()
@@ -335,14 +348,10 @@ def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> N
 
 
 def test_connection_menu_applies_window_source_setting(window: MainWindow) -> None:
-    assert window.capture_input_menu is not None
-    window_menu = next(
-        action.menu()
-        for action in window.capture_input_menu.actions()
-        if action.menu() is not None and action.menu().title() == "ウィンドウ"
+    assert window.window_source_menu is not None
+    action = next(
+        action for action in window.window_source_menu.actions() if "Viewer" in action.text()
     )
-    assert window_menu is not None
-    action = next(action for action in window_menu.actions() if "Viewer" in action.text())
 
     action.trigger()
 
