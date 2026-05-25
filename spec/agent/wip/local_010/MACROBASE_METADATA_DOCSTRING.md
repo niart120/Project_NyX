@@ -10,7 +10,7 @@
 
 ### 1.1 目的
 
-`MacroBase` のメタデータ属性を公開 API として明示し、API reference、エディタ補完、`pydoc` から最低限の使い方へ到達できる状態にする。特に `settings_path` は Markdown docs で標準例として案内しているため、基底クラス側の型ヒントと docstring に追加する。
+`MacroBase` のメタデータ属性を公開 API として明示し、API reference、エディタ補完、`pydoc` から最低限の使い方へ到達できる状態にする。特に `display_name` と `settings_path` は loader が読み取るクラス属性でありながら基底クラス側にないため、型ヒントと docstring に追加する。
 
 ### 1.2 用語定義
 
@@ -20,18 +20,19 @@
 | メタデータ属性 | マクロ一覧表示、検索、設定読み込みなどに使うクラス属性。 |
 | settings_path | マクロごとの設定ファイルの場所を示す属性。標準例は `resource:settings.toml`。 |
 | args_schema | 実行引数を `SettingsSchema` で検証するための属性。 |
+| display_name | GUI や一覧表示で使う表示名。未指定の場合はクラス名が使われる。 |
 
 ### 1.3 背景・問題
 
-`docs/macro-development/macro-lifecycle.md` は `description`, `tags`, `args_schema`, `settings_path` を `MacroBase` のメタデータとして説明している。一方で `src/nyxpy/framework/core/macro/base.py` には `settings_path` 属性がなく、API reference では `description`, `tags`, `args_schema` までしか確認できない。`EntryPointLoader` は `getattr(macro_cls, "settings_path", None)` で読み取っているため、実装上は利用可能だが公開 API としての近接説明が不足している。
+`docs/macro-development/macro-lifecycle.md` は `description`, `tags`, `args_schema`, `settings_path` を `MacroBase` のメタデータとして説明している。一方で `EntryPointLoader` は `display_name` もクラス属性から読み取る。`src/nyxpy/framework/core/macro/base.py` には `display_name` と `settings_path` 属性がなく、API reference では `description`, `tags`, `args_schema` までしか確認できない。実装上は利用可能だが公開 API としての近接説明が不足している。
 
 ### 1.4 期待効果
 
 | 指標 | 現状 | 目標 |
 |------|------|------|
-| API reference から確認できる `MacroBase` メタデータ属性 | 3 件 | 4 件 |
-| `settings_path` の説明到達経路 | Markdown docs のみ | Markdown docs、docstring、型ヒント |
-| Markdown docs と docstring の矛盾 | `settings_path` が docstring 側にない | 同じ属性集合を説明する |
+| API reference から確認できる `MacroBase` メタデータ属性 | 3 件 | 5 件 |
+| `display_name` / `settings_path` の説明到達経路 | 一部 Markdown docs または loader 実装のみ | Markdown docs、docstring、型ヒント |
+| Markdown docs と docstring の矛盾 | loader が読む属性集合と docstring がずれている | 同じ属性集合を説明する |
 
 ### 1.5 着手条件
 
@@ -43,10 +44,11 @@
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `src/nyxpy/framework/core/macro/base.py` | 変更 | `settings_path` 属性と各メタデータ属性の docstring を整備する。 |
+| `src/nyxpy/framework/core/macro/base.py` | 変更 | `display_name`, `settings_path` 属性と各メタデータ属性の docstring を整備する。 |
 | `docs/macro-development/macro-lifecycle.md` | 変更 | `MacroBase` docstring と同じ属性集合・説明へ揃える。 |
-| `tests/unit/framework/macro/test_registry.py` | 変更 | `settings_path` が基底クラス属性として存在しても convention 検出に影響しないことを確認する。 |
-| `docs/api/framework.md` | 変更なし | mkdocstrings 生成結果で `settings_path` が表示されることを確認する。 |
+| `tests/unit/framework/macro/test_registry.py` | 変更 | `display_name`, `settings_path` が基底クラス属性として存在しても convention 検出に影響しないことを確認する。 |
+| `tests/unit/framework/macro/test_import_contract.py` | 変更 | `MacroBase` のメタデータ既定値を更新する。 |
+| `docs/api/framework.md` | 変更なし | mkdocstrings 生成結果で `display_name`, `settings_path` が表示されることを確認する。 |
 
 ## 3. 設計方針
 
@@ -56,7 +58,7 @@
 
 ### 公開 API 方針
 
-`settings_path` を `MacroBase` のクラス属性として追加する。値は `str | Path | None` とし、文字列では `resource:` / `project:` / manifest 相対 path を受け付ける現行仕様を説明する。`Path` を許可する場合はマクロ本体ディレクトリ基準または絶対パスとして扱われることも docstring に含める。
+`display_name` と `settings_path` を `MacroBase` のクラス属性として追加する。`display_name` は `str | None` とし、未指定の場合は loader がクラス名へフォールバックする。`settings_path` は `str | Path | None` とし、文字列では `resource:` / `project:` / manifest 相対 path を受け付ける現行仕様を説明する。`Path` を許可する場合はマクロ本体ディレクトリ基準または絶対パスとして扱われることも docstring に含める。
 
 ### 後方互換性
 
@@ -88,6 +90,9 @@ class MacroBase(ABC):
     description: str = ""
     """一覧表示向けの短い説明文。"""
 
+    display_name: str | None = None
+    """GUI や一覧表示で使う表示名。未指定の場合はクラス名が使われる。"""
+
     tags: list[str] = []
     """検索・分類用のタグ。"""
 
@@ -102,6 +107,7 @@ class MacroBase(ABC):
 
 | パラメータ | 型 | デフォルト | 説明 |
 |------------|-----|-----------|------|
+| `display_name` | `str | None` | `None` | GUI や一覧表示で使う表示名。未指定の場合はクラス名が使われる。 |
 | `settings_path` | `str | Path | None` | `None` | マクロ設定ファイルの場所。`resource:` は `resources\<macro_id>`、`project:` はプロジェクトルート、接頭辞なし文字列はマクロ本体ディレクトリを基準にする。 |
 
 ### エラーハンドリング
@@ -118,14 +124,16 @@ class MacroBase(ABC):
 
 | テスト種別 | テスト名 | 検証内容 |
 |------------|----------|----------|
+| ユニット | `test_macro_metadata_defaults_are_stable` | `MacroBase.display_name` と `MacroBase.settings_path` の既定値が `None` である。 |
+| ユニット | `test_convention_definition_uses_class_name_when_display_name_default_none` | `MacroBase.display_name` の既定値が convention 検出後の `MacroDefinition.display_name` でクラス名へフォールバックする。 |
 | ユニット | `test_convention_definition_inherits_settings_path_default_none` | `MacroBase.settings_path` の既定値が convention 検出後の `MacroDefinition.settings_path` で `None` になる。 |
 | ユニット | `test_convention_definition_uses_subclass_settings_path` | サブクラスで指定した `settings_path` が従来通り `MacroDefinition` へ反映される。 |
 | ドキュメント | `uv run --no-sync mkdocs build --strict` | API reference に `settings_path` が表示され、Markdown docs と矛盾しない。 |
 
 ## 6. 実装チェックリスト
 
-- [ ] `settings_path` の型を確定する。
-- [ ] `MacroBase` に `settings_path` 属性を追加する。
+- [ ] `display_name` と `settings_path` の型を確定する。
+- [ ] `MacroBase` に `display_name` と `settings_path` 属性を追加する。
 - [ ] `MacroBase` の class docstring と属性 docstring を Google style / mkdocstrings 表示に合わせる。
 - [ ] `macro-lifecycle.md` のメタデータ表を docstring と同期する。
 - [ ] ユニットテストを追加・更新する。

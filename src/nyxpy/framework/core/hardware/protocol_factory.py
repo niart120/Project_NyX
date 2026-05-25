@@ -54,7 +54,9 @@ class ProtocolFactory:
     def get_protocol_names(cls) -> list[str]:
         """利用可能なプロトコル名のリストを取得する。
 
-        :return: プロトコル名のリスト
+        Returns:
+            プロトコル名のリスト。
+
         """
         return list(cls._descriptors.keys())
 
@@ -62,9 +64,15 @@ class ProtocolFactory:
     def get_descriptor(cls, protocol_name: str) -> ProtocolDescriptor:
         """指定されたプロトコル名のメタデータを取得する。
 
-        :param protocol_name: プロトコル名
-        :return: プロトコルメタデータ
-        :raises ValueError: 未知のプロトコル名を指定した場合
+        Args:
+            protocol_name: プロトコル名。
+
+        Returns:
+            プロトコルメタデータ。
+
+        Raises:
+            ValueError: 未知のプロトコル名を指定した場合。
+
         """
         if not protocol_name:
             raise ValueError("Protocol name cannot be empty")
@@ -80,8 +88,12 @@ class ProtocolFactory:
     def get_default_baudrate(cls, protocol_name: str) -> int:
         """指定されたプロトコルの既定ボーレートを取得する。
 
-        :param protocol_name: プロトコル名
-        :return: 既定ボーレート
+        Args:
+            protocol_name: プロトコル名。
+
+        Returns:
+            既定ボーレート。
+
         """
         return cls.get_descriptor(protocol_name).default_baudrate
 
@@ -89,10 +101,16 @@ class ProtocolFactory:
     def resolve_baudrate(cls, protocol_name: str, baudrate: int | None = None) -> int:
         """明示ボーレートまたはプロトコル既定値から接続ボーレートを決定する。
 
-        :param protocol_name: プロトコル名
-        :param baudrate: 明示ボーレート。None の場合は既定値を返す
-        :return: 接続ボーレート
-        :raises ValueError: プロトコルが対応しないボーレートを指定した場合
+        Args:
+            protocol_name: プロトコル名。
+            baudrate: 明示ボーレート。`None` の場合は既定値を返す。
+
+        Returns:
+            接続ボーレート。
+
+        Raises:
+            ValueError: プロトコルが対応しないボーレートを指定した場合。
+
         """
         descriptor = cls.get_descriptor(protocol_name)
         resolved = descriptor.default_baudrate if baudrate is None else baudrate
@@ -108,8 +126,14 @@ class ProtocolFactory:
     def create_protocol(cls, protocol_name: str) -> SerialProtocolInterface:
         """指定されたプロトコル名に対応するプロトコルのインスタンスを生成する。
 
-        :param protocol_name: プロトコル名
-        :return: シリアルプロトコルインターフェースの実装
-        :raises ValueError: 未知のプロトコル名を指定した場合
+        Args:
+            protocol_name: プロトコル名。
+
+        Returns:
+            シリアルプロトコルインターフェースの実装。
+
+        Raises:
+            ValueError: 未知のプロトコル名を指定した場合。
+
         """
         return cls.get_descriptor(protocol_name).protocol_cls()
