@@ -308,7 +308,7 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 | `resource.artifact_dir_name_format` | `str` | `{timestamp}_{short_id}` | helper が返す directory segment の形式 |
 | `resource.artifact_timestamp_format` | `str` | `%Y%m%dT%H%M%S` | helper に使う開始時刻の形式 |
 | `resource.short_id_length` | `int` | `4` | helper に含める短縮 ID の長さ |
-| `resource.tracked_artifact_limit` | `int` | `1000` | `RunResult.artifacts` に保持する最大件数 |
+| `resource.tracked_artifact_limit` | `int` | `65535` | `RunResult.artifacts` に保持する最大件数 |
 | `resource.overwrite_policy` | `OverwritePolicy` | `REPLACE` | `save_artifact_*()` で `overwrite=None` の場合に使う同名 artifact 処理 |
 | `resource.atomic_write` | `bool` | `True` | artifact 保存に atomic write を使うか |
 
