@@ -1,6 +1,6 @@
 # Command Artifact Output API 仕様書
 
-> **文書種別**: WIP 仕様書。`Command` API から生成ファイルを保存・読み戻す公開 API と、`resources` 配下への集約方針を扱う。
+> **文書種別**: 完了仕様書。`Command` API から生成ファイルを保存・読み戻す公開 API と、`resources` 配下への集約方針を扱う。
 > **対象モジュール**: `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\runtime\`
 > **目的**: マクロ実行中に生成した画像・blob を、実行中および実行後に再利用しやすい形で保存する。
 > **関連ドキュメント**: `spec\framework\rearchitecture\RESOURCE_FILE_IO.md`, `spec\framework\rearchitecture\RUNTIME_AND_IO_PORTS.md`, `docs\macro-development\*.md`
