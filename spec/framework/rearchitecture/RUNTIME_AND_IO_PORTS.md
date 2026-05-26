@@ -4,7 +4,7 @@
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\hardware\`  
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。  
 > **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `FOLLOWUP_FIXES.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `TEST_STRATEGY.md`
-> **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\notifications\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
+> **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\camera_capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\notifications\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
 > **破壊的変更**: 破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書では Runtime / Port / `DefaultCommand(context=...)` に影響する制約だけを定義する。
 
 ## 1. 概要
@@ -104,7 +104,7 @@
 | `src\nyxpy\framework\core\io\notification.py` | 新規 | `NotificationHandler` の Port adapter を実装 |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | `DefaultCommand` を `ExecutionContext` と Ports へ接続する実装へ移行 |
 | `src\nyxpy\framework\core\hardware\serial_comm.py` | 変更 | 既存 API は維持し、Runtime 経路では暗黙 dummy fallback を使わない。明示的な検出完了待ち API を追加 |
-| `src\nyxpy\framework\core\hardware\capture.py` | 変更 | 既存 API は維持し、Runtime 経路で使う検出完了待ち、frame readiness、release join timeout を追加 |
+| `src\nyxpy\framework\core\hardware\camera_capture.py` | 変更 | 既存 API は維持し、Runtime 経路で使う検出完了待ち、frame readiness、release join timeout を追加 |
 | `src\nyxpy\framework\core\hardware\resource.py` | 変更 | `StaticResourceIO` を Resource File I/O の legacy adapter へ移行 |
 | `src\nyxpy\framework\core\notifications\notification_handler.py` | 変更 | `NotificationPort` adapter から使える失敗ログ方針を整理 |
 | `src\nyxpy\framework\core\singletons.py` | 変更 | Runtime/Port 関連シングルトンが必要な場合のみ登録し、`reset_for_testing()` で初期化 |

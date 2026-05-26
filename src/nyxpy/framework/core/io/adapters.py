@@ -15,7 +15,7 @@ from nyxpy.framework.core.io.ports import (
     FrameSourcePort,
     NotificationPort,
 )
-from nyxpy.framework.core.utils.helper import validate_keyboard_text
+from nyxpy.framework.core.macro.text_input import validate_keyboard_text
 
 
 class SerialControllerOutputPort(ControllerOutputPort):

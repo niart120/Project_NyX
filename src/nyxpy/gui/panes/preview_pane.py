@@ -16,10 +16,10 @@ from nyxpy.framework.core.constants import (
     preview_point_to_3ds_touch,
     try_preview_point_to_hd_capture,
 )
-from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
+from nyxpy.framework.core.hardware.camera_capture import CaptureDeviceInterface
 from nyxpy.framework.core.io.adapters import CaptureFrameSourcePort
 from nyxpy.framework.core.io.ports import FrameSourcePort
-from nyxpy.framework.core.utils.helper import calc_aspect_size
+from nyxpy.gui.layout import calc_aspect_size
 from nyxpy.gui.widgets import AspectRatioLabel
 
 SNAPSHOT_DIR = "snapshots"

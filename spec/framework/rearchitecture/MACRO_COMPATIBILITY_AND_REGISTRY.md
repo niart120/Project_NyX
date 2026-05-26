@@ -4,7 +4,7 @@
 > **対象モジュール**: `src/nyxpy/framework/core/macro/`  
 > **目的**: 既存マクロの import / lifecycle 互換を維持しつつ、ロード・識別・実行基盤をレジストリ中心へ再設計する
 > **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
-> **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/utils/helper.py`  
+> **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/macro/settings_resolver.py`
 > **破壊的変更**: 維持する既存マクロ互換契約は本書を正とする。互換契約外の破壊的変更、削除条件、代替 API、テストゲートは `DEPRECATION_AND_MIGRATION.md` を正とする。
 
 ## 1. 概要
@@ -73,7 +73,7 @@
 | `src/nyxpy/framework/core/macro/registry.py` | 新規 | `MacroRegistry`, `MacroDefinition`, `MacroFactory`, `MacroLoadDiagnostic` を定義する正配置 |
 | `src/nyxpy/framework/core/macro/settings_resolver.py` | 新規 | `MacroSettingsResolver` を定義し、settings TOML 解決を `ResourceStorePort` から分離 |
 | `src/nyxpy/framework/core/macro/entrypoint_loader.py` | 新規 | manifest / class metadata / convention から package / single-file macro を解決する |
-| `src/nyxpy/framework/core/utils/helper.py` | 変更 | `load_macro_settings()` の旧 fallback を削除し、必要なら `MacroSettingsResolver` へ委譲 |
+| `src/nyxpy/framework/core/macro/settings_resolver.py` | 変更 | 設定読み込みの旧 fallback を削除し、必要なら `MacroSettingsResolver` へ委譲 |
 | `tests/unit/executor/test_executor.py` | 変更 | 既存テストを維持し、衝突・失敗診断・実行ごとの新規インスタンス生成のテストを追加 |
 | `tests/gui/test_macro_reload.py` | 変更 | 存在する場合、追加・削除リロード互換とロード失敗表示を検証 |
 | `tests/unit/framework/macro/test_registry.py` | 新規 | レジストリ、manifest 任意採用、class metadata、convention discovery の純粋ロジックを検証 |

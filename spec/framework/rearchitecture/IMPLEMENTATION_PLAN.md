@@ -102,7 +102,7 @@
 | `src\nyxpy\framework\core\io\resources.py` | 新規 | `ResourceStorePort`、`RunArtifactStore`、`ResourceRef`、`MacroResourceScope`、path guard を定義 |
 | `src\nyxpy\framework\core\io\adapters.py` | 新規 | 既存 serial/capture/resource/notification への adapter を実装 |
 | `src\nyxpy\framework\core\utils\cancellation.py` | 変更 | 理由、要求元、時刻、`throw_if_requested()`、即時 wait を追加 |
-| `src\nyxpy\framework\core\utils\helper.py` | 変更 | `load_macro_settings()` と `parse_define_args()` を新 resolver / error へ接続 |
+| `src\nyxpy\framework\core\macro\settings_resolver.py`, `src\nyxpy\framework\core\runtime\exec_args.py` | 変更 | 設定 resolver と `parse_define_args()` を新 error へ接続 |
 | `src\nyxpy\framework\core\logger\dispatcher.py` | 新規 | `LogSinkDispatcher` と sink 配信を実装 |
 | `src\nyxpy\framework\core\logger\backend.py` | 新規 | 技術ログ backend と file/console 出力を実装 |
 | `src\nyxpy\framework\core\logger\sanitizer.py` | 新規 | secret mask と JSON 化不能値の縮退を実装 |
@@ -231,7 +231,7 @@
 | 項目 | 内容 |
 |------|------|
 | 目的 | マクロ発見、ID、別名、ロード診断、settings 解決、実行ごとのインスタンス生成を `MacroExecutor` から分離する |
-| 対象ファイル | `src\nyxpy\framework\core\macro\registry.py`, `entrypoint_loader.py`, `settings_resolver.py`, `utils\helper.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\runtime\test_macro_factory.py` |
+| 対象ファイル | `src\nyxpy\framework\core\macro\registry.py`, `entrypoint_loader.py`, `settings_resolver.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\runtime\test_macro_factory.py` |
 | 完了条件 | manifest entrypoint または convention discovery で package / single-file マクロを `MacroDefinition` として登録でき、`definition.factory.create()` が毎回新しい `MacroBase` インスタンスを返す |
 | テスト | `test_registry_loads_manifest_package_macro`, `test_registry_loads_manifest_single_file_macro`, `test_registry_rejects_missing_entrypoint`, `test_class_name_collision_requires_qualified_id`, `test_load_failure_is_reported_without_stopping_reload`, `test_execute_creates_new_instance_each_time` |
 | リスク | `sys.path` 依存、相対 import、クラス名衝突、ロード失敗時の継続処理が既存挙動とずれる |
@@ -283,7 +283,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 項目 | 内容 |
 |------|------|
 | 目的 | manifest / class metadata settings 解決と画像リソース保存・読み込みを分離し、path escape と書き込み失敗を検出する |
-| 対象ファイル | `src\nyxpy\framework\core\macro\settings_resolver.py`, `src\nyxpy\framework\core\utils\helper.py`, `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\settings\global_settings.py`, `secrets_settings.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\io\test_ports.py` |
+| 対象ファイル | `src\nyxpy\framework\core\macro\settings_resolver.py`, `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\settings\global_settings.py`, `secrets_settings.py`, `tests\unit\framework\macro\test_registry.py`, `tests\unit\framework\io\test_ports.py` |
 | 完了条件 | 明示 settings source と `exec_args` 優先マージが維持され、`ResourceStorePort` は settings TOML を探索しない |
 | テスト | `test_macro_settings_resolver_loads_manifest_settings`, `test_macro_settings_resolver_does_not_read_legacy_static_settings`, `test_exec_args_override_file_settings`, `test_manifest_settings_path_resolution`, `test_macro_settings_resolver_is_separate_from_resource_store`, `test_resource_store_rejects_path_escape`, `test_resource_store_raises_when_imwrite_returns_false` |
 | リスク | settings path と resource root の混同、既存 TOML 破損時の上書き、secret 値のログ露出 |
@@ -315,7 +315,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | リスク | 旧 `log_manager.log()` / `add_handler()` 利用箇所、ログファイル path 変更、sink 例外の再帰記録、GUI close 時の解除漏れ |
 | ロールバック方針 | `LoggerPort` と test sink は残し、backend 構成だけを差し戻す。旧文字列 handler adapter と `log_manager.log()` 互換は戻さない |
 
-本フェーズは `ERROR_CANCELLATION_LOGGING.md` と `OBSERVABILITY_AND_GUI_CLI.md` の詳細ロギング実装を置き換える参照先である。異常・中断 event 名、sink、backend、ファイル配置、保持期間は `LOGGING_FRAMEWORK.md` を正とする。`src\nyxpy\gui\main_window.py`、`src\nyxpy\cli\run_cli.py`、`src\nyxpy\framework\core\hardware\capture.py`、通知実装、既存 logger テストは `LoggerPort` / `LogSink` / `TestLogSink` へ置換してから旧 API を削除する。
+本フェーズは `ERROR_CANCELLATION_LOGGING.md` と `OBSERVABILITY_AND_GUI_CLI.md` の詳細ロギング実装を置き換える参照先である。異常・中断 event 名、sink、backend、ファイル配置、保持期間は `LOGGING_FRAMEWORK.md` を正とする。`src\nyxpy\gui\main_window.py`、`src\nyxpy\cli\run_cli.py`、`src\nyxpy\framework\core\hardware\camera_capture.py`、通知実装、既存 logger テストは `LoggerPort` / `LogSink` / `TestLogSink` へ置換してから旧 API を削除する。
 
 ### 4.8 フェーズ 8: Ports/Adapters 導入
 
@@ -335,7 +335,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 項目 | 内容 |
 |------|------|
 | 目的 | CLI を `MacroRuntimeBuilder` と `RunResult` ベースへ移行し、デバイス検出、通知設定、終了コードを統一する |
-| 対象ファイル | `src\nyxpy\cli\run_cli.py`, `src\nyxpy\framework\core\runtime\builder.py`, `src\nyxpy\framework\core\utils\helper.py`, `tests\integration\test_cli_runtime_adapter.py` |
+| 対象ファイル | `src\nyxpy\cli\run_cli.py`, `src\nyxpy\framework\core\runtime\builder.py`, `src\nyxpy\framework\core\runtime\exec_args.py`, `tests\integration\test_cli_runtime_adapter.py` |
 | 完了条件 | CLI は `DefaultCommand` を直接構築せず、Runtime 経由で実行し、成功 0、中断 130、失敗 非 0 の終了コードを `RunResult` から決める |
 | テスト | `test_cli_uses_runtime_and_run_result`, `test_execute_macro_success`, `test_cli_notification_settings_source_is_secrets_store`, `test_cli_presenter_exit_codes`, `test_cli_does_not_accept_notification_secret_args` |
 | リスク | CLI 引数互換、`-D` 解析、通知設定ソース、デバイス検出待ち、既存コマンド出力が変わる |

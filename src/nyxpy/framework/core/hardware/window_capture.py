@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-from nyxpy.framework.core.hardware.capture import CaptureDeviceInterface
+from nyxpy.framework.core.hardware.camera_capture import CaptureDeviceInterface
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
 from nyxpy.framework.core.hardware.platform_capture import ensure_capture_coordinate_space

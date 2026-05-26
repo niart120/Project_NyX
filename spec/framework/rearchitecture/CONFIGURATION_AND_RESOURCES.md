@@ -61,7 +61,7 @@
 | `src\nyxpy\framework\core\settings\global_settings.py` | 変更 | `SettingsStore` schema、既定値、型検証、破損 TOML 保護を実装。既存クラスは互換 shim に限定 |
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | `SecretsStore` schema、秘密値マスク、通知設定の正配置を実装。既存クラスは互換 shim に限定 |
 | `src\nyxpy\framework\core\macro\settings_resolver.py` | 新規 | `MacroSettingsResolver` と manifest / class metadata settings 解決を実装 |
-| `src\nyxpy\framework\core\utils\helper.py` | 変更 | `load_macro_settings()` を `MacroSettingsResolver` へ接続 |
+| `src\nyxpy\framework\core\macro\settings_resolver.py` | 変更 | macro 設定読み込みを `MacroSettingsResolver` へ接続 |
 | `src\nyxpy\framework\core\runtime\builder.py` | 新規 | `RUNTIME_AND_IO_PORTS.md` が正本。本書の settings snapshot と `MacroSettingsResolver` を呼び出して Runtime 入力を構築 |
 | `tests\unit\framework\settings\test_settings_schema.py` | 新規 | 通常設定と秘密設定の schema 検証を確認 |
 | `tests\unit\framework\macro\test_settings_resolver.py` | 新規 | manifest / class metadata settings の解決と旧 fallback 不使用を確認 |

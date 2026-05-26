@@ -38,10 +38,10 @@ from nyxpy.framework.core.runtime.device_selection import (
     select_serial_target,
     select_window_target,
 )
+from nyxpy.framework.core.runtime.exec_args import parse_define_args
 from nyxpy.framework.core.runtime.handle import RunHandle
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.schema import SettingValue
-from nyxpy.framework.core.utils.helper import parse_define_args
 from nyxpy.gui.app_services import GuiAppServices, SettingsApplyOutcome
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from threading import Lock
 from typing import Any
 
-from nyxpy.framework.core.hardware.capture import CameraCaptureDevice, DummyCaptureDevice
+from nyxpy.framework.core.hardware.camera_capture import CameraCaptureDevice, DummyCaptureDevice
 from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     CaptureSourceConfig,

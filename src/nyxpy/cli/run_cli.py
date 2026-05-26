@@ -21,11 +21,11 @@ from nyxpy.framework.core.notifications.notification_handler import (
 )
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_device_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
+from nyxpy.framework.core.runtime.exec_args import parse_define_args
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.global_settings import SettingsStore
 from nyxpy.framework.core.settings.secrets_settings import SecretsStore
 from nyxpy.framework.core.settings.workspace import ensure_workspace, resolve_project_root
-from nyxpy.framework.core.utils.helper import parse_define_args
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
+from nyxpy.framework.core.hardware.camera_capture import CameraCaptureDevice
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
