@@ -56,8 +56,13 @@ def test_command_public_method_names_are_stable() -> None:
         "stop",
         "log",
         "capture",
-        "save_img",
         "load_img",
+        "load_blob",
+        "save_artifact_img",
+        "save_artifact_blob",
+        "load_artifact_img",
+        "load_artifact_blob",
+        "artifact_dir_name",
         "keyboard",
         "type",
         "notify",
@@ -92,15 +97,38 @@ def test_command_core_signatures_are_stable() -> None:
     assert capture.parameters["crop_region"].default is None
     assert capture.parameters["grayscale"].default is False
 
-    save_img = inspect.signature(Command.save_img)
-    assert _parameter_names(Command.save_img) == ["self", "filename", "image"]
-    assert save_img.parameters["filename"].default is inspect.Parameter.empty
-    assert save_img.parameters["image"].default is inspect.Parameter.empty
-
     load_img = inspect.signature(Command.load_img)
     assert _parameter_names(Command.load_img) == ["self", "filename", "grayscale"]
     assert load_img.parameters["filename"].default is inspect.Parameter.empty
     assert load_img.parameters["grayscale"].default is False
+
+    load_blob = inspect.signature(Command.load_blob)
+    assert _parameter_names(Command.load_blob) == ["self", "filename"]
+    assert load_blob.parameters["filename"].default is inspect.Parameter.empty
+
+    save_artifact_img = inspect.signature(Command.save_artifact_img)
+    assert _parameter_names(Command.save_artifact_img) == [
+        "self",
+        "filename",
+        "image",
+        "scope",
+        "overwrite",
+        "atomic",
+    ]
+    assert save_artifact_img.parameters["filename"].default is inspect.Parameter.empty
+    assert save_artifact_img.parameters["image"].default is inspect.Parameter.empty
+
+    save_artifact_blob = inspect.signature(Command.save_artifact_blob)
+    assert _parameter_names(Command.save_artifact_blob) == [
+        "self",
+        "filename",
+        "data",
+        "scope",
+        "overwrite",
+        "atomic",
+    ]
+    assert save_artifact_blob.parameters["filename"].default is inspect.Parameter.empty
+    assert save_artifact_blob.parameters["data"].default is inspect.Parameter.empty
 
 
 def test_command_optional_capability_signatures_are_stable() -> None:

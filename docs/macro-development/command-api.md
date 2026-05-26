@@ -23,7 +23,7 @@ cmd.release()
 
 ```python
 frame = cmd.capture()
-cmd.save_img("snapshot.png", frame)
+cmd.save_artifact_img("snapshot.png", frame)
 ```
 
 `cmd.capture(crop_region=None, grayscale=False)` は、最新フレームを 1280x720 へリサイズして返します。`crop_region` は `(x, y, width, height)` です。範囲外の crop は `ValueError` になります。フレームがまだ取得できない場合は `FrameNotReadyError` を送出します。
@@ -34,13 +34,16 @@ cmd.save_img("snapshot.png", frame)
 
 | API | 説明 |
 |-----|------|
-| `cmd.load_img(name, grayscale=False)` | `resources/<macro_id>/assets` を優先して画像を読み込みます。 |
-| `cmd.save_img(name, image)` | 実行ごとの出力先へ画像を保存します。 |
-| `cmd.artifacts.open_output(name, ...)` | 実行ごとの出力先に任意のバイナリファイルを書きます。 |
+| `cmd.load_img(name, grayscale=False)` | `resources/<macro_id>/assets` を優先して画像 asset を読み込みます。 |
+| `cmd.load_blob(name)` | `resources/<macro_id>/assets` から任意 bytes asset を読み込みます。 |
+| `cmd.save_artifact_img(name, image)` | `resources/<macro_id>/artifacts/<artifact_dir_name>` へ画像 artifact を保存します。 |
+| `cmd.save_artifact_blob(name, data)` | `resources/<macro_id>/artifacts/<artifact_dir_name>` へ任意 bytes artifact を保存します。 |
+| `cmd.load_artifact_img(ref_or_name)` | 保存済み画像 artifact を読み戻します。 |
+| `cmd.load_artifact_blob(ref_or_name)` | 保存済み bytes artifact を読み戻します。 |
 
-`name` はリソース起点または出力先起点の相対パスです。設定ファイルに保存するパス表記では `/` を使います。
+`name` は assets root または artifact scope からの相対パスです。固定して再利用したい生成物は `scope=ArtifactScope.STABLE` を指定して `resources/<macro_id>/artifacts/stable` に保存します。設定ファイルに保存するパス表記では `/` を使います。
 
-画像入出力の失敗は `ResourceError` 系で送出されます。安全でない path は `ResourcePathError`、資材が見つからない場合は `ResourceNotFoundError`、画像として読み込めない場合は `ResourceReadError`、出力を書き込めない場合は `ResourceWriteError` です。
+画像入出力の失敗は `ResourceError` 系で送出されます。安全でない path は `ResourcePathError`、資材や artifact が見つからない場合は `ResourceNotFoundError`、画像や bytes として読み込めない場合は `ResourceReadError`、artifact を書き込めない場合は `ResourceWriteError` です。
 
 ## ログと通知
 

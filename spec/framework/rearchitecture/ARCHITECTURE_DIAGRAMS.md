@@ -287,7 +287,7 @@ flowchart TB
         Controller["ControllerOutputPort<br/>press / hold / release / keyboard / type_key<br/>touch / sleep optional methods"]
         Capture["FrameSourcePort<br/>initialize / await_ready / latest_frame / try_latest_frame"]
         Resource["ResourceStorePort<br/>resolve_asset_path / load_image"]
-        Artifact["RunArtifactStore<br/>resolve_output_path / save_image / open_output"]
+        Artifact["RunArtifactStore<br/>save_image / save_blob / load_image / load_blob"]
         Notify["NotificationPort<br/>publish"]
         Logger["LoggerPort<br/>log"]
     end

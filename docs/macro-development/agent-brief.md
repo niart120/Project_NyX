@@ -82,7 +82,7 @@ class SampleMacro(MacroBase):
             cmd.press(Button.A, dur=0.06, wait=0.08)
 
         frame = cmd.capture()
-        cmd.save_img("sample_result.png", frame)
+        cmd.save_artifact_img("sample_result.png", frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()
@@ -121,8 +121,8 @@ resources/<macro_id>/
 
 - `settings_path = "resource:settings.toml"` は `resources/<macro_id>/settings.toml` を読みます。
 - `cmd.load_img("template.png")` は `resources/<macro_id>/assets/template.png` を優先し、次にマクロパッケージ内の `assets` を探します。
-- `cmd.save_img("debug/frame.png", frame)` と `cmd.artifacts.open_output(...)` は実行ごとの出力へ保存します。
-- `cmd.load_img()` / `cmd.save_img()` のファイル名は、リソース起点の相対パスにします。
+- `cmd.save_artifact_img("debug/frame.png", frame)` と `cmd.save_artifact_blob(...)` は artifact へ保存します。
+- `cmd.load_img()` / `cmd.load_blob()` は assets、`cmd.load_artifact_img()` / `cmd.load_artifact_blob()` は artifact を読みます。
 
 ## Command の主な用途
 
@@ -132,7 +132,8 @@ resources/<macro_id>/
 | `cmd.hold(...)`, `cmd.release(...)` | 押しっぱなしと解放 |
 | `cmd.wait(sec)` | 中断要求を確認しながら待機 |
 | `cmd.capture(crop_region=None, grayscale=False)` | 1280x720 にリサイズしたキャプチャ取得。フレーム未準備時は例外 |
-| `cmd.load_img(name)`, `cmd.save_img(name, image)` | 資材の読み込み、実行ごとの出力への画像保存 |
+| `cmd.load_img(name)`, `cmd.load_blob(name)` | assets の読み込み |
+| `cmd.save_artifact_img(name, image)`, `cmd.save_artifact_blob(name, data)` | artifact の保存 |
 | `cmd.keyboard(text)`, `cmd.type(key)` | キーボード入力 |
 | `cmd.notify(text, img=None)` | 外部通知 |
 | `cmd.log(message, level="INFO")` | ユーザ向けログ |

@@ -1,9 +1,15 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from nyxpy.framework.core.constants import Button, KeyCode
 from nyxpy.framework.core.io.ports import FrameNotReadyError
-from nyxpy.framework.core.io.resources import ResourceNotFoundError, ResourceWriteError
+from nyxpy.framework.core.io.resources import (
+    ArtifactScope,
+    ResourceNotFoundError,
+    ResourceWriteError,
+)
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import MacroCancelled
 from nyxpy.framework.core.runtime.context import RuntimeOptions
@@ -91,18 +97,23 @@ def test_default_command_resources_and_artifacts_delegate_to_ports(tmp_path) -> 
     image = np.ones((1, 1, 3), dtype=np.uint8)
     asset_path = context.resources.scope.candidate_asset_paths("template.png")[0]
     context.resources.images[asset_path] = image
+    context.resources.blobs[context.resources.scope.candidate_asset_paths("data.bin")[0]] = b"asset"
     cmd = DefaultCommand(context=context)
 
     loaded = cmd.load_img("template.png")
-    cmd.save_img("out.png", image)
+    blob = cmd.load_blob("data.bin")
+    image_ref = cmd.save_artifact_img("out.png", image)
+    blob_ref = cmd.save_artifact_blob("out.bin", b"artifact")
 
+    assert cmd.artifact_dir_name == context.artifact_dir_name
     assert np.array_equal(loaded, image)
-    assert (
-        context.artifacts.saved_images[context.artifacts.resolve_output_path("out.png").path][
-            0, 0, 0
-        ]
-        == 1
-    )
+    assert blob == b"asset"
+    assert context.artifacts.saved_images[image_ref.path][0, 0, 0] == 1
+    assert context.artifacts.saved_blobs[blob_ref.path] == b"artifact"
+    assert np.array_equal(cmd.load_artifact_img(image_ref), image)
+    assert cmd.load_artifact_blob(blob_ref) == b"artifact"
+    stable_ref = cmd.save_artifact_blob("stable.bin", b"stable", scope=ArtifactScope.STABLE)
+    assert stable_ref.relative_path == Path("stable") / "stable.bin"
 
 
 def test_default_command_load_img_propagates_resource_errors(tmp_path) -> None:
@@ -122,28 +133,29 @@ def test_default_command_load_img_propagates_resource_errors(tmp_path) -> None:
     assert exc_info.value is error
 
 
-def test_default_command_save_img_propagates_resource_errors(tmp_path) -> None:
+def test_default_command_save_artifact_img_propagates_resource_errors(tmp_path) -> None:
     context = make_fake_execution_context(tmp_path)
     image = np.zeros((1, 1, 3), dtype=np.uint8)
     error = ResourceWriteError("write failed", details={"name": "out.png"})
 
     class FailingArtifactStore(FakeRunArtifactStore):
-        def save_image(self, name, image, *, overwrite=None, atomic=None):
+        def save_image(self, name, image, *, scope=ArtifactScope.RUN, overwrite=None, atomic=None):
             raise error
 
     object.__setattr__(
         context,
         "artifacts",
         FailingArtifactStore(
-            tmp_path / "runs" / context.run_id / "outputs",
+            tmp_path / "resources" / context.macro_id / "artifacts",
             macro_id=context.macro_id,
             run_id=context.run_id,
+            artifact_dir_name=context.artifact_dir_name,
         ),
     )
     cmd = DefaultCommand(context=context)
 
     with pytest.raises(ResourceWriteError) as exc_info:
-        cmd.save_img("out.png", image)
+        cmd.save_artifact_img("out.png", image)
 
     assert exc_info.value is error
 

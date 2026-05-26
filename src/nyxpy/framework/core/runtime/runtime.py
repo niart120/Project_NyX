@@ -59,6 +59,8 @@ class MacroRuntime:
                 started_at=started_at,
                 cancellation_token=context.cancellation_token,
                 logger=context.logger,
+                artifacts_snapshot=context.artifacts.snapshot,
+                artifacts_overflow_count=lambda: context.artifacts.artifacts_overflow_count,
             )
             result = self.runner.run(macro, cmd, context.exec_args, run_context)
         except MacroStopException as exc:
@@ -119,6 +121,8 @@ class MacroRuntime:
             started_at=started_at,
             finished_at=datetime.now(),
             error=error,
+            artifacts=context.artifacts.snapshot(),
+            artifacts_overflow_count=context.artifacts.artifacts_overflow_count,
         )
 
     def _error_info(self, exc: Exception) -> ErrorInfo:

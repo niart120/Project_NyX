@@ -46,11 +46,45 @@ class RecordingCommand(Command):
     def capture(self, crop_region=None, grayscale: bool = False):
         raise RuntimeError("capture not configured")
 
-    def save_img(self, filename, image) -> None:
-        self.events.append(f"save:{filename}")
-
-    def load_img(self, filename, grayscale: bool = False):
+    def load_img(self, filename, *, grayscale: bool = False):
         return None
+
+    def load_blob(self, filename) -> bytes:
+        return b""
+
+    def save_artifact_img(
+        self,
+        filename,
+        image,
+        *,
+        scope=None,
+        overwrite=None,
+        atomic=True,
+    ):
+        self.events.append(f"save_image:{filename}")
+        return None
+
+    def save_artifact_blob(
+        self,
+        filename,
+        data,
+        *,
+        scope=None,
+        overwrite=None,
+        atomic=True,
+    ):
+        self.events.append(f"save_blob:{filename}")
+        return None
+
+    def load_artifact_img(self, artifact, *, scope=None, grayscale: bool = False):
+        return None
+
+    def load_artifact_blob(self, artifact, *, scope=None) -> bytes:
+        return b""
+
+    @property
+    def artifact_dir_name(self) -> str:
+        return "20260526T235245_run1"
 
     def keyboard(self, text: str) -> None:
         self.events.append(f"keyboard:{text}")

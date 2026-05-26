@@ -23,6 +23,7 @@ def make_fake_execution_context(
     run_id: str = "run-1",
     macro_id: str = "sample",
     macro_name: str = "Sample",
+    artifact_dir_name: str = "20260526T235245_run1",
     exec_args: dict | None = None,
     metadata: dict | None = None,
     controller: FakeControllerOutputPort | None = None,
@@ -49,6 +50,7 @@ def make_fake_execution_context(
         run_id=run_id,
         macro_id=macro_id,
         macro_name=macro_name,
+        artifact_dir_name=artifact_dir_name,
         run_log_context=log_context,
         exec_args=exec_args or {},
         metadata=metadata or {},
@@ -57,7 +59,10 @@ def make_fake_execution_context(
         frame_source=frame_source or FakeFrameSourcePort(),
         resources=FakeResourceStore(scope),
         artifacts=FakeRunArtifactStore(
-            tmp_path / "runs" / run_id / "outputs", macro_id=macro_id, run_id=run_id
+            tmp_path / "resources" / macro_id / "artifacts",
+            macro_id=macro_id,
+            run_id=run_id,
+            artifact_dir_name=artifact_dir_name,
         ),
         notifications=FakeNotificationPort(),
         logger=base_logger.bind_context(log_context),

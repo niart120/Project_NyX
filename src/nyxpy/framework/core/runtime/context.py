@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
 
 from nyxpy.framework.core.io.ports import ControllerOutputPort, FrameSourcePort, NotificationPort
-from nyxpy.framework.core.io.resources import ResourceStorePort, RunArtifactStore
+from nyxpy.framework.core.io.resources import ResourceRef, ResourceStorePort, RunArtifactStore
 from nyxpy.framework.core.logger.ports import LoggerPort, RunLogContext
 from nyxpy.framework.core.macro.exceptions import FrameworkValue
 from nyxpy.framework.core.utils.cancellation import CancellationToken
@@ -35,6 +35,7 @@ class ExecutionContext:
     run_id: str
     macro_id: str
     macro_name: str
+    artifact_dir_name: str
     run_log_context: RunLogContext
     exec_args: Mapping[str, RuntimeValue]
     metadata: Mapping[str, RuntimeValue]
@@ -63,6 +64,8 @@ class RunContext:
     started_at: datetime
     cancellation_token: CancellationToken
     logger: LoggerPort | None = None
+    artifacts_snapshot: Callable[[], tuple[ResourceRef, ...]] | None = None
+    artifacts_overflow_count: Callable[[], int] | None = None
 
 
 @dataclass(frozen=True)

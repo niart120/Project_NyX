@@ -81,7 +81,9 @@ def _fake_builder(project_root: Path, registry: MacroRegistry) -> MacroRuntimeBu
         controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
         frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
         resource_store_factory=lambda _request, _definition: base_context.resources,
-        artifact_store_factory=lambda _request, _definition, _run_id: base_context.artifacts,
+        artifact_store_factory=lambda _request, _definition, _run_id, _artifact_dir_name: (
+            base_context.artifacts
+        ),
         notification_factory=lambda _request, _definition: FakeNotificationPort(),
         logger_factory=lambda _request, _definition: FakeLoggerPort(),
     )

@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import StrEnum
 from os import PathLike
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from types import TracebackType
-from typing import BinaryIO, Protocol, cast
+from typing import Protocol
 
 import cv2
 
@@ -22,7 +19,7 @@ class ResourceKind(StrEnum):
     """資材参照の用途種別。"""
 
     ASSET = "asset"
-    OUTPUT = "output"
+    ARTIFACT = "artifact"
 
 
 class ResourceSource(StrEnum):
@@ -31,33 +28,8 @@ class ResourceSource(StrEnum):
     STANDARD_ASSETS = "standard_assets"
     MACRO_PACKAGE = "macro_package"
     PACKAGE_RESOURCE = "package_resource"
-    RUN_OUTPUTS = "run_outputs"
-
-
-class _BinaryOutput(Protocol):
-    """run output の binary write 用 context manager。"""
-
-    @property
-    def closed(self) -> bool: ...
-
-    def write(self, data: bytes, /) -> int: ...
-
-    def flush(self) -> None: ...
-
-    def close(self) -> None: ...
-
-    def __enter__(self) -> _BinaryOutput:
-        """Context manager に入ります。"""
-        ...
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool | None:
-        """Context manager から出ます。"""
-        ...
+    ARTIFACT_RUN = "artifact_run"
+    ARTIFACT_STABLE = "artifact_stable"
 
 
 class OverwritePolicy(StrEnum):
@@ -66,6 +38,13 @@ class OverwritePolicy(StrEnum):
     ERROR = "error"
     REPLACE = "replace"
     UNIQUE = "unique"
+
+
+class ArtifactScope(StrEnum):
+    """Artifact の保存・読み戻し基準。"""
+
+    RUN = "run"
+    STABLE = "stable"
 
 
 class ResourcePathError(ResourceError):
@@ -186,6 +165,11 @@ class MacroResourceScope:
         """資材名に対応する候補パスを探索順に返します。"""
         path_guard = guard or DefaultResourcePathGuard()
         return tuple(path_guard.resolve_under_root(root, name) for root in self.assets_roots)
+
+    @property
+    def artifacts_root(self) -> Path:
+        """標準 resource root 配下の artifact 保存 root を返します。"""
+        return self.assets_roots[0].parent / "artifacts"
 
 
 @dataclass(frozen=True)
@@ -323,19 +307,32 @@ class ResourceStorePort(ABC):
     @abstractmethod
     def load_image(self, name: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
 
+    @abstractmethod
+    def load_blob(self, name: str | Path) -> bytes: ...
+
     def close(self) -> None:
         pass
 
 
 class RunArtifactStore(ABC):
-    """マクロ実行ごとの出力成果物 store です。
+    """マクロ実行ごとの artifact store です。
 
-    保存先は run outputs 配下に限定します。実装は親ディレクトリ作成、
-    上書き方針、atomic write、path guard を扱います。
+    保存先は resources/<macro_id>/artifacts 配下に限定します。
+    実装は scope 解決、親ディレクトリ作成、上書き方針、atomic write、
+    path guard、保存済み参照の記録を扱います。
     """
 
+    @property
     @abstractmethod
-    def resolve_output_path(self, name: str | Path) -> ResourceRef: ...
+    def artifact_dir_name(self) -> str: ...
+
+    @abstractmethod
+    def resolve_artifact_path(
+        self,
+        name: str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> ResourceRef: ...
 
     @abstractmethod
     def save_image(
@@ -343,19 +340,45 @@ class RunArtifactStore(ABC):
         name: str | Path,
         image: cv2.typing.MatLike,
         *,
-        overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
-        atomic: bool = True,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
     ) -> ResourceRef: ...
 
     @abstractmethod
-    def open_output(
+    def save_blob(
         self,
         name: str | Path,
-        mode: str = "xb",
+        data: bytes,
         *,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
-        atomic: bool = True,
-    ) -> _BinaryOutput: ...
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef: ...
+
+    @abstractmethod
+    def load_image(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike: ...
+
+    @abstractmethod
+    def load_blob(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes: ...
+
+    @abstractmethod
+    def snapshot(self) -> tuple[ResourceRef, ...]: ...
+
+    @property
+    @abstractmethod
+    def artifacts_overflow_count(self) -> int: ...
 
     def close(self) -> None:
         pass
@@ -420,96 +443,207 @@ class LocalResourceStore(ResourceStorePort):
             )
         return image
 
+    def load_blob(self, name: str | Path) -> bytes:
+        """任意 bytes 資材を読み込みます。"""
+        ref = self.resolve_asset_path(name)
+        try:
+            return ref.path.read_bytes()
+        except OSError as exc:
+            raise ResourceReadError(
+                f"failed to read blob: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "name": str(name),
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                    "source": str(ref.source),
+                },
+                cause=exc,
+            ) from exc
+
 
 class LocalRunArtifactStore(RunArtifactStore):
-    """ローカルファイルシステム上の run outputs store です。"""
+    """ローカルファイルシステム上の artifact store です。"""
 
     def __init__(
         self,
-        output_root: Path,
+        artifacts_root: Path,
         *,
         macro_id: str,
         run_id: str,
+        artifact_dir_name: str,
         overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
         atomic: bool = True,
+        tracked_limit: int = 65535,
         guard: ResourcePathGuard | None = None,
     ) -> None:
-        """出力 root、run 情報、上書き方針、path guard を保持します。"""
-        self.output_root = Path(output_root).resolve(strict=False)
+        """Artifact root、run 情報、上書き方針、path guard を保持します。"""
+        if tracked_limit < 0:
+            raise ResourceConfigurationError(
+                "tracked artifact limit must be greater than or equal to 0"
+            )
+        _validate_artifact_dir_name(artifact_dir_name)
+        self.artifacts_root = Path(artifacts_root).resolve(strict=False)
         self.macro_id = macro_id
         self.run_id = run_id
+        self._artifact_dir_name = artifact_dir_name
         self.overwrite = overwrite
         self.atomic = atomic
+        self.tracked_limit = tracked_limit
         self.guard = guard or DefaultResourcePathGuard()
+        self._tracked_refs: list[ResourceRef] = []
+        self._tracked_paths: dict[Path, ResourceRef] = {}
+        self._artifacts_overflow_count = 0
+
+    @property
+    def artifact_dir_name(self) -> str:
+        """実行ごとの artifact directory 名を返します。"""
+        return self._artifact_dir_name
+
+    @property
+    def artifacts_overflow_count(self) -> int:
+        """保持上限を超えて `RunResult.artifacts` から落とした件数を返します。"""
+        return self._artifacts_overflow_count
+
+    def snapshot(self) -> tuple[ResourceRef, ...]:
+        """保存済み artifact 参照の現在の snapshot を返します。"""
+        return tuple(self._tracked_refs)
+
+    def resolve_artifact_path(
+        self,
+        name: str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> ResourceRef:
+        """Artifact 名を scope 配下の安全なパスへ解決します。"""
+        path = self.guard.resolve_under_root(self._scope_root(scope), name)
+        return self._ref(path, scope)
 
     def resolve_output_path(self, name: str | Path) -> ResourceRef:
-        """出力名を run outputs 配下の安全なパスへ解決します。"""
-        path = self.guard.resolve_under_root(self.output_root, name)
-        return self._ref(path)
+        """内部移行用に run-scoped artifact path を解決します。"""
+        return self.resolve_artifact_path(name)
 
     def save_image(
         self,
         name: str | Path,
         image: cv2.typing.MatLike,
         *,
+        scope: ArtifactScope = ArtifactScope.RUN,
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
     ) -> ResourceRef:
-        """画像を run outputs 配下に保存し、保存後の参照情報を返します。"""
-        final_ref = self._prepare_output(name, overwrite or self.overwrite)
+        """画像を artifact root 配下に保存し、保存後の参照情報を返します。"""
+        final_ref = self._prepare_artifact(name, scope, overwrite or self.overwrite)
         use_atomic = self.atomic if atomic is None else atomic
         if use_atomic:
             self._write_image_atomic(final_ref.path, image)
         else:
             self._write_image(final_ref.path, image)
+        self._record(final_ref)
         return final_ref
 
-    def open_output(
+    def save_blob(
         self,
         name: str | Path,
-        mode: str = "xb",
+        data: bytes,
         *,
+        scope: ArtifactScope = ArtifactScope.RUN,
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
-    ) -> _BinaryOutput:
-        """実行成果物ディレクトリ配下の任意バイナリ出力を開きます。"""
-        if "b" not in mode:
-            raise ResourceConfigurationError("open_output requires a binary mode")
-        if not any(flag in mode for flag in ("w", "x", "a")):
-            raise ResourceConfigurationError("open_output requires a writable mode")
-
-        policy = overwrite or OverwritePolicy.ERROR
-        final_ref = self._prepare_output(name, policy)
+    ) -> ResourceRef:
+        """任意 bytes を artifact root 配下に保存します。"""
+        final_ref = self._prepare_artifact(name, scope, overwrite or self.overwrite)
         use_atomic = self.atomic if atomic is None else atomic
-        if not use_atomic:
-            open_mode = mode
-            if "x" in open_mode and policy is OverwritePolicy.REPLACE:
-                open_mode = open_mode.replace("x", "w")
-            if "x" in open_mode and final_ref.path.exists():
-                raise ResourceAlreadyExistsError(
-                    f"output already exists: {final_ref.relative_path}",
-                    details={
-                        "macro_id": final_ref.macro_id,
-                        "run_id": final_ref.run_id,
-                        "path": str(final_ref.path),
-                        "relative_path": str(final_ref.relative_path),
-                    },
-                )
-            return cast(_BinaryOutput, final_ref.path.open(open_mode))
+        if use_atomic:
+            self._write_blob_atomic(final_ref.path, data)
+        else:
+            self._write_blob(final_ref.path, data)
+        self._record(final_ref)
+        return final_ref
 
-        if "a" in mode:
-            raise ResourceConfigurationError("atomic append output is not supported")
-        temp_path = self._create_temp_path(final_ref.path)
-        temp_mode = "w+b" if "+" in mode else "wb"
-        return _AtomicOutputFile(temp_path.open(temp_mode), temp_path, final_ref.path)
+    def load_image(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
+        """画像 artifact を OpenCV 画像として読み戻します。"""
+        ref = self._resolve_artifact_for_read(artifact, scope)
+        flag = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+        image = cv2.imread(str(ref.path), flag)
+        if image is None:
+            raise ResourceReadError(
+                f"failed to read artifact image: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "run_id": ref.run_id,
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                    "source": str(ref.source),
+                },
+            )
+        return image
 
-    def _prepare_output(self, name: str | Path, policy: OverwritePolicy) -> ResourceRef:
-        ref = self.resolve_output_path(name)
+    def load_blob(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes:
+        """任意 bytes artifact を読み戻します。"""
+        ref = self._resolve_artifact_for_read(artifact, scope)
+        try:
+            return ref.path.read_bytes()
+        except OSError as exc:
+            raise ResourceReadError(
+                f"failed to read artifact blob: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "run_id": ref.run_id,
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                    "source": str(ref.source),
+                },
+                cause=exc,
+            ) from exc
+
+    def _resolve_artifact_for_read(
+        self,
+        artifact: ResourceRef | str | Path,
+        scope: ArtifactScope,
+    ) -> ResourceRef:
+        if isinstance(artifact, ResourceRef):
+            ref = self._guard_ref(artifact)
+        else:
+            ref = self.resolve_artifact_path(artifact, scope=scope)
+        if not ref.path.exists():
+            raise ResourceNotFoundError(
+                f"artifact not found: {ref.relative_path}",
+                details={
+                    "macro_id": ref.macro_id,
+                    "run_id": ref.run_id,
+                    "path": str(ref.path),
+                    "relative_path": str(ref.relative_path),
+                    "source": str(ref.source),
+                },
+            )
+        return ref
+
+    def _prepare_artifact(
+        self,
+        name: str | Path,
+        scope: ArtifactScope,
+        policy: OverwritePolicy,
+    ) -> ResourceRef:
+        ref = self.resolve_artifact_path(name, scope=scope)
         ref.path.parent.mkdir(parents=True, exist_ok=True)
-        guarded_path = self.guard.resolve_under_root(self.output_root, ref.relative_path)
+        scope_root = self._scope_root(scope)
+        relative_to_scope = ref.path.relative_to(scope_root.resolve(strict=False))
+        guarded_path = self.guard.resolve_under_root(scope_root, relative_to_scope)
         if policy is OverwritePolicy.ERROR and guarded_path.exists():
             raise ResourceAlreadyExistsError(
-                f"output already exists: {ref.relative_path}",
+                f"artifact already exists: {ref.relative_path}",
                 details={
                     "macro_id": ref.macro_id,
                     "run_id": ref.run_id,
@@ -519,7 +653,35 @@ class LocalRunArtifactStore(RunArtifactStore):
             )
         if policy is OverwritePolicy.UNIQUE:
             guarded_path = self._unique_path(guarded_path)
-        return self._ref(guarded_path)
+        return self._ref(guarded_path, scope)
+
+    def _write_blob_atomic(self, final_path: Path, data: bytes) -> None:
+        temp_path = self._create_temp_path(final_path)
+        try:
+            temp_path.write_bytes(data)
+            temp_path.replace(final_path)
+            if not final_path.exists():
+                raise ResourceWriteError(
+                    f"artifact was not created: {final_path.name}",
+                    details={"path": str(final_path), "name": final_path.name},
+                )
+        except Exception as exc:
+            self._cleanup_temp(temp_path)
+            raise ResourceWriteError(
+                f"failed to write artifact: {final_path.name}",
+                details={"path": str(final_path), "name": final_path.name},
+                cause=exc,
+            ) from exc
+
+    def _write_blob(self, path: Path, data: bytes) -> None:
+        try:
+            path.write_bytes(data)
+        except OSError as exc:
+            raise ResourceWriteError(
+                f"failed to write artifact: {path.name}",
+                details={"path": str(path), "name": path.name},
+                cause=exc,
+            ) from exc
 
     def _write_image_atomic(self, final_path: Path, image: cv2.typing.MatLike) -> None:
         temp_path = self._create_temp_path(final_path)
@@ -528,13 +690,13 @@ class LocalRunArtifactStore(RunArtifactStore):
             temp_path.replace(final_path)
             if not final_path.exists():
                 raise ResourceWriteError(
-                    f"output was not created: {final_path.name}",
+                    f"artifact was not created: {final_path.name}",
                     details={"path": str(final_path), "name": final_path.name},
                 )
         except Exception as exc:
             self._cleanup_temp(temp_path)
             raise ResourceWriteError(
-                f"failed to write output: {final_path.name}",
+                f"failed to write artifact: {final_path.name}",
                 details={"path": str(final_path), "name": final_path.name},
                 cause=exc,
             ) from exc
@@ -542,12 +704,12 @@ class LocalRunArtifactStore(RunArtifactStore):
     def _write_image(self, path: Path, image: cv2.typing.MatLike) -> None:
         if not cv2.imwrite(str(path), image):
             raise ResourceWriteError(
-                f"failed to write output: {path.name}",
+                f"failed to write artifact: {path.name}",
                 details={"path": str(path), "name": path.name},
             )
         if not path.exists():
             raise ResourceWriteError(
-                f"output was not created: {path.name}",
+                f"artifact was not created: {path.name}",
                 details={"path": str(path), "name": path.name},
             )
 
@@ -569,7 +731,7 @@ class LocalRunArtifactStore(RunArtifactStore):
             if not candidate.exists():
                 return candidate
         raise ResourceWriteError(
-            f"failed to find unique output path: {path.name}",
+            f"failed to find unique artifact path: {path.name}",
             details={"path": str(path), "name": path.name},
         )
 
@@ -580,74 +742,78 @@ class LocalRunArtifactStore(RunArtifactStore):
         except OSError:
             pass
 
-    def _ref(self, path: Path) -> ResourceRef:
-        output_root = self.output_root.resolve(strict=self.output_root.exists())
+    def _scope_root(self, scope: ArtifactScope) -> Path:
+        if scope is ArtifactScope.RUN:
+            return self.artifacts_root / self._artifact_dir_name
+        if scope is ArtifactScope.STABLE:
+            return self.artifacts_root / "stable"
+        raise ResourceConfigurationError(f"unsupported artifact scope: {scope!r}")
+
+    def _ref(self, path: Path, scope: ArtifactScope) -> ResourceRef:
+        artifacts_root = self.artifacts_root.resolve(strict=self.artifacts_root.exists())
+        source = (
+            ResourceSource.ARTIFACT_RUN
+            if scope is ArtifactScope.RUN
+            else ResourceSource.ARTIFACT_STABLE
+        )
         return ResourceRef(
-            kind=ResourceKind.OUTPUT,
-            source=ResourceSource.RUN_OUTPUTS,
+            kind=ResourceKind.ARTIFACT,
+            source=source,
             path=path,
-            relative_path=path.relative_to(output_root),
+            relative_path=path.relative_to(artifacts_root),
             macro_id=self.macro_id,
             run_id=self.run_id,
         )
 
-
-class _AtomicOutputFile(AbstractContextManager):
-    def __init__(self, file: BinaryIO, temp_path: Path, final_path: Path) -> None:
-        self._file = file
-        self._temp_path = temp_path
-        self._final_path = final_path
-        self._closed = False
-
-    def __getattr__(self, name: str):
-        return getattr(self._file, name)
-
-    def __iter__(self) -> Iterator[bytes]:
-        return iter(self._file)
-
-    def write(self, data: bytes, /) -> int:
-        return self._file.write(data)
-
-    def flush(self) -> None:
-        self._file.flush()
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
+    def _guard_ref(self, ref: ResourceRef) -> ResourceRef:
+        artifacts_root = self.artifacts_root.resolve(strict=self.artifacts_root.exists())
+        path = Path(ref.path).resolve(strict=False)
         try:
-            self._file.close()
-            self._temp_path.replace(self._final_path)
-        except Exception:
-            if self._temp_path.exists():
-                self._temp_path.unlink()
-            raise
+            path.relative_to(artifacts_root)
+        except ValueError as exc:
+            raise ResourcePathError(
+                "artifact path escapes the artifacts root",
+                details={
+                    "macro_id": ref.macro_id,
+                    "run_id": ref.run_id,
+                    "path": str(ref.path),
+                    "artifacts_root": str(artifacts_root),
+                },
+            ) from exc
+        return ResourceRef(
+            kind=ResourceKind.ARTIFACT,
+            source=ref.source,
+            path=path,
+            relative_path=path.relative_to(artifacts_root),
+            macro_id=ref.macro_id,
+            run_id=ref.run_id,
+        )
 
-    @property
-    def closed(self) -> bool:
-        return self._closed
-
-    def __enter__(self) -> _AtomicOutputFile:
-        """Context manager に入ります。"""
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool:
-        """例外時は一時ファイルを削除し、正常時は成果物へ置換します。"""
-        if exc_type is not None:
-            self._closed = True
-            self._file.close()
-            if self._temp_path.exists():
-                self._temp_path.unlink()
-            return False
-        self.close()
-        return False
+    def _record(self, ref: ResourceRef) -> None:
+        path_key = ref.path.resolve(strict=False)
+        if path_key in self._tracked_paths:
+            self._tracked_refs = [
+                existing
+                for existing in self._tracked_refs
+                if existing.path.resolve(strict=False) != path_key
+            ]
+        self._tracked_paths[path_key] = ref
+        self._tracked_refs.append(ref)
+        while len(self._tracked_refs) > self.tracked_limit:
+            removed = self._tracked_refs.pop(0)
+            self._tracked_paths.pop(removed.path.resolve(strict=False), None)
+            self._artifacts_overflow_count += 1
 
 
 def _validate_resource_identifier(value: str) -> None:
     if not value or any(separator in value for separator in ("\\", "/", ":")):
         raise ResourceConfigurationError(f"invalid macro resource id: {value!r}")
+
+
+def _validate_artifact_dir_name(value: str) -> None:
+    if not value or any(separator in value for separator in ("\\", "/", ":")):
+        raise ResourceConfigurationError(f"invalid artifact directory name: {value!r}")
+    try:
+        DefaultResourcePathGuard().resolve_under_root(Path("."), value)
+    except ResourcePathError as exc:
+        raise ResourceConfigurationError(f"invalid artifact directory name: {value!r}") from exc

@@ -35,7 +35,7 @@ class SampleTurboAMacro(MacroBase):
 
         if self.capture_after:
             frame = cmd.capture()
-            cmd.save_img(self.capture_name, frame)
+            cmd.save_artifact_img(self.capture_name, frame)
             cmd.notify(f"SampleTurboAMacro complete: saved {self.capture_name}", frame)
 
     def finalize(self, cmd: Command) -> None:

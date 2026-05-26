@@ -183,7 +183,7 @@ class NsmbSortOrSplodeMacro(MacroBase):
             1,
             cv2.LINE_AA,
         )
-        cmd.save_img(_DEBUG_DETECTED_FRAME_PATH, debug)
+        cmd.save_artifact_img(_DEBUG_DETECTED_FRAME_PATH, debug)
 
     def _log_detected_bomb(self, cmd: Command, bomb: DetectedBomb) -> None:
         features = bomb.color_features

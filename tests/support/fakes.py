@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from threading import Lock
 
@@ -16,6 +15,7 @@ from nyxpy.framework.core.io.ports import (
     NotificationPort,
 )
 from nyxpy.framework.core.io.resources import (
+    ArtifactScope,
     DefaultResourcePathGuard,
     MacroResourceScope,
     OverwritePolicy,
@@ -125,11 +125,12 @@ class FakeResourceStore(ResourceStorePort):
         self.scope = scope
         self.guard = DefaultResourcePathGuard()
         self.images: dict[Path, cv2.typing.MatLike] = {}
+        self.blobs: dict[Path, bytes] = {}
 
     def resolve_asset_path(self, name: str | Path) -> ResourceRef:
         for index, root in enumerate(self.scope.assets_roots):
             candidate = self.guard.resolve_under_root(root, name)
-            if candidate in self.images or candidate.exists():
+            if candidate in self.images or candidate in self.blobs or candidate.exists():
                 return ResourceRef(
                     kind=ResourceKind.ASSET,
                     source=(
@@ -155,57 +156,139 @@ class FakeResourceStore(ResourceStorePort):
             return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return image.copy()
 
+    def load_blob(self, name: str | Path) -> bytes:
+        ref = self.resolve_asset_path(name)
+        blob = self.blobs.get(ref.path)
+        if blob is not None:
+            return blob
+        try:
+            return ref.path.read_bytes()
+        except OSError as exc:
+            raise ResourceNotFoundError(f"resource not found: {name}") from exc
+
 
 class FakeRunArtifactStore(RunArtifactStore):
-    def __init__(self, output_root: Path, *, macro_id: str, run_id: str) -> None:
-        self.output_root = output_root
+    def __init__(
+        self,
+        artifacts_root: Path,
+        *,
+        macro_id: str,
+        run_id: str,
+        artifact_dir_name: str = "20260526T235245_run1",
+        tracked_limit: int = 65535,
+    ) -> None:
+        self.artifacts_root = artifacts_root
         self.macro_id = macro_id
         self.run_id = run_id
+        self._artifact_dir_name = artifact_dir_name
+        self.tracked_limit = tracked_limit
         self.guard = DefaultResourcePathGuard()
         self.saved_images: dict[Path, cv2.typing.MatLike] = {}
-        self.outputs: dict[Path, bytes] = {}
+        self.saved_blobs: dict[Path, bytes] = {}
+        self._tracked_refs: list[ResourceRef] = []
+        self._overflow_count = 0
 
-    def resolve_output_path(self, name: str | Path) -> ResourceRef:
-        path = self.guard.resolve_under_root(self.output_root, name)
+    @property
+    def artifact_dir_name(self) -> str:
+        return self._artifact_dir_name
+
+    @property
+    def artifacts_overflow_count(self) -> int:
+        return self._overflow_count
+
+    def snapshot(self) -> tuple[ResourceRef, ...]:
+        return tuple(self._tracked_refs)
+
+    def resolve_artifact_path(
+        self, name: str | Path, *, scope: ArtifactScope = ArtifactScope.RUN
+    ) -> ResourceRef:
+        root = self._scope_root(scope)
+        path = self.guard.resolve_under_root(root, name)
         return ResourceRef(
-            kind=ResourceKind.OUTPUT,
-            source=ResourceSource.RUN_OUTPUTS,
+            kind=ResourceKind.ARTIFACT,
+            source=(
+                ResourceSource.ARTIFACT_RUN
+                if scope is ArtifactScope.RUN
+                else ResourceSource.ARTIFACT_STABLE
+            ),
             path=path,
-            relative_path=path.relative_to(self.output_root.resolve(strict=False)),
+            relative_path=path.relative_to(self.artifacts_root.resolve(strict=False)),
             macro_id=self.macro_id,
             run_id=self.run_id,
         )
+
+    def resolve_output_path(self, name: str | Path) -> ResourceRef:
+        return self.resolve_artifact_path(name)
 
     def save_image(
         self,
         name: str | Path,
         image: cv2.typing.MatLike,
         *,
-        overwrite: OverwritePolicy = OverwritePolicy.REPLACE,
-        atomic: bool = True,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
     ) -> ResourceRef:
-        ref = self.resolve_output_path(name)
+        ref = self.resolve_artifact_path(name, scope=scope)
         self.saved_images[ref.path] = image.copy()
+        self._record(ref)
         return ref
 
-    def open_output(
+    def save_blob(
         self,
         name: str | Path,
-        mode: str = "xb",
+        data: bytes,
         *,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
-        atomic: bool = True,
-    ) -> BytesIO:
-        ref = self.resolve_output_path(name)
-        buffer = BytesIO()
-        original_close = buffer.close
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef:
+        ref = self.resolve_artifact_path(name, scope=scope)
+        self.saved_blobs[ref.path] = bytes(data)
+        self._record(ref)
+        return ref
 
-        def close_and_store() -> None:
-            self.outputs[ref.path] = buffer.getvalue()
-            original_close()
+    def load_image(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
+        ref = (
+            artifact
+            if isinstance(artifact, ResourceRef)
+            else self.resolve_artifact_path(artifact, scope=scope)
+        )
+        image = self.saved_images[ref.path]
+        if grayscale and len(image.shape) == 3:
+            return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        return image.copy()
 
-        buffer.close = close_and_store  # type: ignore[method-assign]
-        return buffer
+    def load_blob(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes:
+        ref = (
+            artifact
+            if isinstance(artifact, ResourceRef)
+            else self.resolve_artifact_path(artifact, scope=scope)
+        )
+        return self.saved_blobs[ref.path]
+
+    def _scope_root(self, scope: ArtifactScope) -> Path:
+        if scope is ArtifactScope.RUN:
+            return self.artifacts_root / self._artifact_dir_name
+        return self.artifacts_root / "stable"
+
+    def _record(self, ref: ResourceRef) -> None:
+        self._tracked_refs = [saved for saved in self._tracked_refs if saved.path != ref.path]
+        self._tracked_refs.append(ref)
+        while len(self._tracked_refs) > self.tracked_limit:
+            self._tracked_refs.pop(0)
+            self._overflow_count += 1
 
 
 class FakeLoggerPort(LoggerPort):

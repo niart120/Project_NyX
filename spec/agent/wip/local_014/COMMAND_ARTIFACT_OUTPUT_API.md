@@ -215,7 +215,7 @@ class Command(ABC):
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
         overwrite: OverwritePolicy | None = None,
-        atomic: bool = True,
+        atomic: bool | None = None,
     ) -> ResourceRef:
         """resources/<macro_id>/artifacts 配下へ画像 artifact を保存する。"""
         ...
@@ -228,7 +228,7 @@ class Command(ABC):
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
         overwrite: OverwritePolicy | None = None,
-        atomic: bool = True,
+        atomic: bool | None = None,
     ) -> ResourceRef: ...
 
     @abstractmethod
@@ -287,7 +287,7 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 
 `ResourceRef.run_id` は、その artifact を保存した実行の ID とする。`ArtifactScope.STABLE` で保存した場合も provenance として保存時の `run_id` を保持するが、パス解決には使わない。
 
-`save_artifact_*()` の `overwrite=None` は artifact store の既定値を使う。標準設定では `resource.overwrite_policy=REPLACE` とし、同一 path の artifact を更新できるようにする。呼び出し単位で `OverwritePolicy.ERROR` などを明示した場合は、その指定を優先する。
+`save_artifact_*()` の `overwrite=None` と `atomic=None` は artifact store の既定値を使う。標準設定では `resource.overwrite_policy=REPLACE`、`resource.atomic_write=True` とし、同一 path の artifact を更新できるようにする。呼び出し単位で `OverwritePolicy.ERROR` や `atomic=False` などを明示した場合は、その指定を優先する。
 
 ### artifact_dir_name
 
@@ -356,12 +356,12 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 - [x] 命名は assets 読み込みを `load_img()` / `load_blob()`、artifact 操作を `save_artifact_*()` / `load_artifact_*()` に統一する
 - [x] `RunResult` は保存済み `ResourceRef` 一覧を持つ案を採用
 - [x] `artifacts/stable` は `scope=ArtifactScope.STABLE` で明示する
-- [ ] `cmd.artifacts` を削除
-- [ ] `cmd.load_blob()` / `cmd.save_artifact_blob()` / `cmd.load_artifact_blob()` を実装
-- [ ] `cmd.save_artifact_img()` / `cmd.load_artifact_img()` を実装
-- [ ] `cmd.save_img()` を完全削除し、`macros\` / `examples\macros\` の呼び出し元を更新
-- [ ] `cmd.artifact_dir_name` helper を実装
-- [ ] `RunResult.artifacts` と `artifacts_overflow_count` を実装
-- [ ] 既存 tests / docs / specs を新 API と新配置へ更新
-- [ ] `uv run ruff check .` がパス
-- [ ] 関連 pytest がパス
+- [x] `cmd.artifacts` を削除
+- [x] `cmd.load_blob()` / `cmd.save_artifact_blob()` / `cmd.load_artifact_blob()` を実装
+- [x] `cmd.save_artifact_img()` / `cmd.load_artifact_img()` を実装
+- [x] `cmd.save_img()` を完全削除し、`macros\` / `examples\macros\` の呼び出し元を更新
+- [x] `cmd.artifact_dir_name` helper を実装
+- [x] `RunResult.artifacts` と `artifacts_overflow_count` を実装
+- [x] 既存 tests / docs / specs を新 API と新配置へ更新
+- [x] `uv run ruff check .` がパス
+- [x] 関連 pytest がパス

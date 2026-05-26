@@ -85,6 +85,7 @@ class MacroRunner:
         result: RunResult,
         run_context: RunContext,
     ) -> RunResult:
+        result = self._with_current_artifacts(result, run_context)
         try:
             if isinstance(macro, SupportsFinalizeOutcome):
                 macro.finalize_with_outcome(cmd, result)
@@ -99,18 +100,23 @@ class MacroRunner:
                     error=self._macro_error_info(exc, component="MacroRunner.finalize"),
                 )
             if result.error is None:
-                return result
+                return self._with_current_artifacts(result, run_context)
             finalize_error = {
                 "exception_type": type(exc).__name__,
                 "message": str(exc),
             }
             details = {**result.error.details, "finalize_error": finalize_error}
-            return replace(
-                result,
-                finished_at=datetime.now(),
-                error=replace(result.error, details=details),
+            return self._with_current_artifacts(
+                replace(
+                    result,
+                    finished_at=datetime.now(),
+                    error=replace(result.error, details=details),
+                ),
+                run_context,
             )
-        return replace(result, finished_at=datetime.now())
+        return self._with_current_artifacts(
+            replace(result, finished_at=datetime.now()), run_context
+        )
 
     def _validate_exec_args(
         self,
@@ -158,6 +164,25 @@ class MacroRunner:
             started_at=started_at,
             finished_at=datetime.now(),
             error=error,
+            artifacts=(
+                run_context.artifacts_snapshot()
+                if run_context.artifacts_snapshot is not None
+                else ()
+            ),
+            artifacts_overflow_count=(
+                run_context.artifacts_overflow_count()
+                if run_context.artifacts_overflow_count is not None
+                else 0
+            ),
+        )
+
+    def _with_current_artifacts(self, result: RunResult, run_context: RunContext) -> RunResult:
+        if run_context.artifacts_snapshot is None or run_context.artifacts_overflow_count is None:
+            return result
+        return replace(
+            result,
+            artifacts=run_context.artifacts_snapshot(),
+            artifacts_overflow_count=run_context.artifacts_overflow_count(),
         )
 
     def _error_info(self, exc: FrameworkError) -> ErrorInfo:

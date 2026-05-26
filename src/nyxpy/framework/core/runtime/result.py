@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from nyxpy.framework.core.io.resources import ResourceRef
 from nyxpy.framework.core.macro.exceptions import ErrorInfo
 
 
@@ -44,6 +45,8 @@ class RunResult:
     finished_at: datetime
     error: ErrorInfo | None = None
     cleanup_warnings: tuple[CleanupWarning, ...] = ()
+    artifacts: tuple[ResourceRef, ...] = ()
+    artifacts_overflow_count: int = 0
 
     @property
     def ok(self) -> bool:
