@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 class Command(ABC):
     """マクロから実行環境を操作するための公開 API。
 
-    コントローラー操作、待機、ログ、キャプチャ、画像入出力、通知は
-    このインターフェース経由で行います。
+    コントローラー操作、待機、ログ、キャプチャ、asset 読み込み、
+    artifact 保存・読み戻し、通知はこのインターフェース経由で行います。
     """
 
     @abstractmethod
@@ -134,10 +134,15 @@ class Command(ABC):
         """画像 asset を読み込みます。
 
         読み込み対象は `resources/<macro_id>/assets` とマクロパッケージ内 assets です。
+        実行中に生成した画像 artifact は探索しません。生成物の読み戻しには
+        `load_artifact_img()` を使います。
 
         Args:
             filename: 資材 root からの相対パス。例: `"image.png"`。
             grayscale: グレースケール変換を行うか。
+
+        Returns:
+            読み込んだ画像データ。
 
         Raises:
             ResourcePathError: `filename` が不正な path の場合。
@@ -151,8 +156,15 @@ class Command(ABC):
     def load_blob(self, filename: str | pathlib.Path) -> bytes:
         """任意 bytes asset を読み込みます。
 
+        読み込み対象は `resources/<macro_id>/assets` とマクロパッケージ内 assets です。
+        実行中に生成した bytes artifact は探索しません。生成物の読み戻しには
+        `load_artifact_blob()` を使います。
+
         Args:
-            filename: 資材 root からの相対パス。例: `"image.png"`。
+            filename: 資材 root からの相対パス。例: `"data.bin"`。
+
+        Returns:
+            読み込んだ bytes。
 
         Raises:
             ResourcePathError: `filename` が不正な path の場合。
@@ -175,13 +187,23 @@ class Command(ABC):
         """画像 artifact を保存します。
 
         既定では `resources/<macro_id>/artifacts/<artifact_dir_name>` 配下へ保存します。
+        実行をまたいで固定名で再利用したい場合は `scope=ArtifactScope.STABLE`
+        を指定します。
 
         Args:
-            filename: artifact scope からの相対パス。
+            filename: artifact scope からの相対パス。例: `"debug/frame.png"`。
             image: 保存する画像データ。
             scope: 保存先 scope。
             overwrite: 既存ファイル処理。`None` は store の既定値を使う。
             atomic: atomic write を使うか。`None` は store の既定値を使う。
+
+        Returns:
+            保存した artifact の参照。
+
+        Raises:
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceAlreadyExistsError: 上書き禁止の保存先が既に存在する場合。
+            ResourceWriteError: 画像を書き込めない場合。
 
         """
         pass
@@ -196,7 +218,28 @@ class Command(ABC):
         overwrite: OverwritePolicy | None = None,
         atomic: bool | None = None,
     ) -> ResourceRef:
-        """任意 bytes artifact を保存します。"""
+        """任意 bytes artifact を保存します。
+
+        テキストや JSON も、呼び出し側で encoding または serialize 済みの
+        bytes として渡します。既定では
+        `resources/<macro_id>/artifacts/<artifact_dir_name>` 配下へ保存します。
+
+        Args:
+            filename: artifact scope からの相対パス。例: `"result/data.csv"`。
+            data: 保存する bytes。
+            scope: 保存先 scope。
+            overwrite: 既存ファイル処理。`None` は store の既定値を使う。
+            atomic: atomic write を使うか。`None` は store の既定値を使う。
+
+        Returns:
+            保存した artifact の参照。
+
+        Raises:
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceAlreadyExistsError: 上書き禁止の保存先が既に存在する場合。
+            ResourceWriteError: bytes を書き込めない場合。
+
+        """
         pass
 
     @abstractmethod
@@ -207,7 +250,26 @@ class Command(ABC):
         scope: ArtifactScope = ArtifactScope.RUN,
         grayscale: bool = False,
     ) -> cv2.typing.MatLike:
-        """画像 artifact を読み戻します。"""
+        """画像 artifact を読み戻します。
+
+        `artifact` に `ResourceRef` を渡した場合は、その参照が持つ path を読みます。
+        文字列または `Path` を渡した場合だけ `scope` に基づいて現在の実行中
+        artifact または stable artifact を解決します。
+
+        Args:
+            artifact: 保存時に返された `ResourceRef`、または artifact scope からの相対パス。
+            scope: `artifact` が相対パスの場合の読み込み元 scope。
+            grayscale: グレースケール変換を行うか。
+
+        Returns:
+            読み込んだ画像データ。
+
+        Raises:
+            ResourcePathError: artifact path が不正な場合。
+            ResourceNotFoundError: artifact が存在しない場合。
+            ResourceReadError: OpenCV 画像として読み込めない場合。
+
+        """
         pass
 
     @abstractmethod
@@ -217,13 +279,40 @@ class Command(ABC):
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
     ) -> bytes:
-        """任意 bytes artifact を読み戻します。"""
+        """任意 bytes artifact を読み戻します。
+
+        `artifact` に `ResourceRef` を渡した場合は、その参照が持つ path を読みます。
+        文字列または `Path` を渡した場合だけ `scope` に基づいて現在の実行中
+        artifact または stable artifact を解決します。
+
+        Args:
+            artifact: 保存時に返された `ResourceRef`、または artifact scope からの相対パス。
+            scope: `artifact` が相対パスの場合の読み込み元 scope。
+
+        Returns:
+            読み込んだ bytes。
+
+        Raises:
+            ResourcePathError: artifact path が不正な場合。
+            ResourceNotFoundError: artifact が存在しない場合。
+            ResourceReadError: bytes として読み込めない場合。
+
+        """
         pass
 
     @property
     @abstractmethod
     def artifact_dir_name(self) -> str:
-        """実行ごとの artifact 保存先切り替えに使う directory segment。"""
+        """実行ごとの artifact 保存先切り替えに使う directory segment。
+
+        `ArtifactScope.RUN` の保存先 directory 名です。値は
+        `{timestamp}_{short_id}` 形式で、マクロ側で追加のサブディレクトリを
+        作りたい場合の名前生成にも使えます。
+
+        Returns:
+            現在の実行に対応する artifact directory 名。
+
+        """
         pass
 
     @abstractmethod
