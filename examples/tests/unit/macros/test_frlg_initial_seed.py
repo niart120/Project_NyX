@@ -526,7 +526,22 @@ from examples.macros.frlg_initial_seed.csv_helper import (
     build_debug_image_dir,
     build_detail_csv_path,
 )
-from nyxpy.framework.core.io.resources import LocalRunArtifactStore
+from nyxpy.framework.core.io.resources import ResourceNotFoundError
+
+
+class FakeArtifactCommand:
+    def __init__(self) -> None:
+        self.blobs: dict[Path, bytes] = {}
+
+    def load_artifact_blob(self, artifact, *, scope=None) -> bytes:
+        path = Path(artifact)
+        try:
+            return self.blobs[path]
+        except KeyError as exc:
+            raise ResourceNotFoundError(f"artifact not found: {path}") from exc
+
+    def save_artifact_blob(self, filename, data: bytes, *, scope=None, overwrite=None, atomic=True):
+        self.blobs[Path(filename)] = data
 
 
 class TestCSVHelper:
@@ -545,7 +560,7 @@ class TestCSVHelper:
         assert path == Path(CSV_DETAIL_FILENAME)
 
     def test_build_output_paths_respect_relative_output_dir(self):
-        """output_dir は run outputs 配下の相対ディレクトリとして扱う"""
+        """output_dir は artifact 配下の相対ディレクトリとして扱う"""
         cfg = FrlgInitialSeedConfig(output_dir="reports")
 
         assert build_csv_path(cfg) == Path("reports") / CSV_FILENAME
@@ -646,18 +661,14 @@ class TestCSVHelper:
         # ヘッダー 1 行 + データ 2 行
         assert len(lines) == 3
 
-    def test_append_csv_artifact_writes_under_run_outputs(self, tmp_path):
-        """成果物 store 経由で run outputs に CSV を追記する"""
-        store = LocalRunArtifactStore(
-            tmp_path / "runs" / "run-1" / "outputs",
-            macro_id="frlg_initial_seed",
-            run_id="run-1",
-        )
+    def test_append_csv_artifact_writes_artifact_blob(self, tmp_path):
+        """Command 経由で artifact CSV を追記する"""
+        cmd = FakeArtifactCommand()
         output_path = build_csv_path(FrlgInitialSeedConfig())
 
         for seed in ("AAAA", "BBBB"):
             append_csv_artifact(
-                store,
+                cmd,
                 output_path,
                 {
                     "frame": "2120",
@@ -674,9 +685,7 @@ class TestCSVHelper:
                 },
             )
 
-        csv_path = tmp_path / "runs" / "run-1" / "outputs" / CSV_FILENAME
-        with open(csv_path, encoding="utf-8") as f:
-            rows = list(csv.DictReader(f))
+        rows = list(csv.DictReader(cmd.blobs[Path(CSV_FILENAME)].decode("utf-8").splitlines()))
         assert [row["seed"] for row in rows] == ["AAAA", "BBBB"]
 
     def test_csv_contains_metadata_columns(self, tmp_path):

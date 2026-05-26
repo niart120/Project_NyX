@@ -59,7 +59,7 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 #### 現行コードから確認した事実
 
 - `MacroBase` は `description` / `tags` のメタデータと、`initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)` の抽象メソッドを持つ。
-- `Command` は `press`、`hold`、`release`、`wait`、`stop`、`log`、`capture`、`save_img`、`load_img`、`keyboard`、`type`、`notify`、`touch`、`touch_down`、`touch_up`、`disable_sleep` を公開している。
+- `Command` は `press`、`hold`、`release`、`wait`、`stop`、`log`、`capture`、`load_img`、`load_blob`、`save_artifact_img`、`save_artifact_blob`、`load_artifact_img`、`load_artifact_blob`、`artifact_dir_name`、`keyboard`、`type`、`notify`、`touch`、`touch_down`、`touch_up`、`disable_sleep` を公開している。
 - `DefaultCommand` は `ExecutionContext` を受け取り、controller、frame source、resource store、artifact store、notification、logger の各 Port へ委譲する。
 - `MacroRegistry` は明示 `project_root` 配下の `macros` を探索し、`MacroDefinition` と `MacroDefinition.factory` を保持する。
 - `MacroRuntimeBuilder` は `MacroRegistry.get_settings()` の結果と実行引数をマージし、`ExecutionContext` を生成する。
@@ -113,7 +113,7 @@ NyX フレームワークのマクロ実行基盤を、既存マクロが import
 
 ### 1.7 パス表記規則
 
-Markdown リンクとリポジトリ内の参照 path は `/` を使う。Windows 配置例や PowerShell コマンド例では `\` を使う。`macro.toml`、class metadata、settings などファイル内に永続化する path 文字列は portable path として `/` を使い、実ファイルパスへの変換は resolver が担当する。`Command.load_img()` / `save_img()` など実行時 Resource File I/O の path 引数は Windows path を許容し、path guard で root 外参照、drive 指定、UNC、予約名を拒否する。
+Markdown リンクとリポジトリ内の参照 path は `/` を使う。Windows 配置例や PowerShell コマンド例では `\` を使う。`macro.toml`、class metadata、settings などファイル内に永続化する path 文字列は portable path として `/` を使い、実ファイルパスへの変換は resolver が担当する。`Command.load_img()` / `save_artifact_img()` など実行時 Resource File I/O の path 引数は Windows path を許容し、path guard で root 外参照、drive 指定、UNC、予約名を拒否する。
 
 ## 2. 対象ファイル
 
@@ -378,7 +378,13 @@ class Command(ABC):
         ...
 
     @abstractmethod
-    def save_img(self, filename: str | Path, image: cv2.typing.MatLike) -> None:
+    def save_artifact_img(
+        self,
+        filename: str | Path,
+        image: cv2.typing.MatLike,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> ResourceRef:
         ...
 
     @abstractmethod

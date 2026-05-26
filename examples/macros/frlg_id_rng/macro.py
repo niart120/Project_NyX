@@ -192,7 +192,7 @@ class FrlgIdRngMacro(MacroBase):
                 ts = datetime.now().strftime("%Y%m%d%H%M%S")
                 tid_str = f"{tid:05d}" if tid is not None else "xxxxx"
                 filename = f"frlg_id_rng/img/{ts}_{tid_str}_{int(current_f1)}_{int(current_f2)}.png"
-                cmd.save_img(filename, cropped_img)
+                cmd.save_artifact_img(filename, cropped_img)
 
             if tid is None:
                 cmd.log("TID 認識失敗 — リトライ", level="WARNING")

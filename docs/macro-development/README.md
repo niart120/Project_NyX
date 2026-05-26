@@ -79,7 +79,7 @@ class SampleTurboMacro(MacroBase):
                 cmd.log(f"progress: {index}/{self.count}", level="INFO")
 
         frame = cmd.capture()
-        cmd.save_img("sample_turbo_result.png", frame)
+        cmd.save_artifact_img("sample_turbo_result.png", frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()

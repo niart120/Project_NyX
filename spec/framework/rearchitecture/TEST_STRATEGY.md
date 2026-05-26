@@ -106,7 +106,7 @@ import/signature 互換テストは最初の保護線である。既存ユーザ
 | 対象 | 互換条件 |
 |------|----------|
 | `nyxpy.framework.core.macro.base.MacroBase` | import でき、`initialize(self, cmd, args)`, `run(self, cmd)`, `finalize(self, cmd)` を持つ |
-| `nyxpy.framework.core.macro.command.Command` | 既存 `press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `save_img`, `load_img`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` を持つ |
+| `nyxpy.framework.core.macro.command.Command` | `press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `load_img`, `load_blob`, `save_artifact_img`, `save_artifact_blob`, `load_artifact_img`, `load_artifact_blob`, `artifact_dir_name`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` を持つ |
 | `nyxpy.framework.core.macro.command.DefaultCommand` | import path を維持し、`DefaultCommand(context=...)` のみ受け付ける |
 | `nyxpy.framework.core.constants` | `Button`, `Hat`, `LStick`, `RStick`, `KeyType` を import できる |
 
@@ -114,7 +114,7 @@ import/signature 互換テストは最初の保護線である。既存ユーザ
 
 ### 後方互換性
 
-マクロ fixture はフレームワーク公開面だけに依存し、`Command.log()`、`Command.save_img()`、`MacroStopException`、`finalize(cmd)` の維持対象を固定する。settings は manifest または class metadata settings path、リソースは `resources\<macro_id>\assets` / `runs\<run_id>\outputs` へ移行した状態で検証する。
+マクロ fixture はフレームワーク公開面だけに依存し、`Command.log()`、`Command.save_artifact_img()`、`MacroStopException`、`finalize(cmd)` の維持対象を固定する。settings は manifest または class metadata settings path、リソースは `resources\<macro_id>\assets` / `resources\<macro_id>\artifacts` へ移行した状態で検証する。
 
 リポジトリ内の既存マクロを直接実行する結合テストでは、実ファイルを変更しない。必要な場合は `tmp_path` にコピーし、`monkeypatch.syspath_prepend()` と明示 `project_root` で探索させる。
 
@@ -300,7 +300,7 @@ Port fake adapter は「テストを通すだけの mock」ではなく、契約
 |--------------|------------|-----------------|----------------|
 | `FakeControllerOutputPort` | `press` / `hold` / `release` / `keyboard` / `type_key` の呼び出しと key tuple | `DefaultCommand.press()` が press → wait(dur) → release → wait(wait) の順に展開される | 送信例外は `DeviceError` / `ErrorInfo.kind=device` に正規化 |
 | `FakeFrameSourcePort` | `initialize`、`await_ready(timeout)`、`latest_frame()`、`try_latest_frame()`、返却 frame copy | Runtime は initialize → await_ready → macro lifecycle の順に呼ぶ。GUI preview は `try_latest_frame()` で待たずに取得する | readiness timeout は `FrameNotReadyError`、read 失敗は `FrameReadError`。busy preview は `None` |
-| `FakeResourceStorePort` / `FakeRunArtifactStore` | 解決した相対 path、保存先 `ResourceRef`、overwrite policy | `load_img()` は assets、`save_img()` は artifacts へ委譲。Windows 相対 path は許容する | path escape、drive、UNC は `ResourcePathError`、write 失敗は `ResourceWriteError` |
+| `FakeResourceStorePort` / `FakeRunArtifactStore` | 解決した相対 path、保存先 `ResourceRef`、overwrite policy | `load_img()` / `load_blob()` は assets、`save_artifact_*()` は artifacts へ委譲。Windows 相対 path は許容する | path escape、drive、UNC は `ResourcePathError`、write 失敗は `ResourceWriteError` |
 | `FakeNotificationPort` | 通知本文、添付有無、secret mask 済み metadata | マクロ本体の成功・失敗判定とは独立して呼ぶ。本文と metadata に webhook、password、token、平文 URL が含まれないことを検証する | 通知失敗は warning log だけで `RunResult.status` を変えない |
 | `FakeLoggerPort` / `TestLogSink` | event、level、`run_id`、`macro_id`、mask 済み extra | user / technical event が同一 context で記録される | sink 例外は `sink.emit_failed` に変換し後続 sink 継続 |
 

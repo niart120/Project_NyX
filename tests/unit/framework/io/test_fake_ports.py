@@ -118,20 +118,22 @@ def test_macro_settings_resolver_is_separate_from_resource_store(tmp_path: Path)
 
 def test_run_artifact_store_contract(tmp_path: Path) -> None:
     store = FakeRunArtifactStore(
-        tmp_path / "runs" / "run-1" / "outputs", macro_id="sample", run_id="run-1"
+        tmp_path / "resources" / "sample" / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
     )
     image = np.full((1, 1, 3), 3, dtype=np.uint8)
 
     ref = store.save_image("images/result.png", image)
-    output = store.open_output("logs/out.txt", mode="wb")
-    output.write(b"hello")
-    output.close()
+    blob_ref = store.save_blob("logs/out.txt", b"hello")
 
-    assert ref.kind is ResourceKind.OUTPUT
-    assert ref.source is ResourceSource.RUN_OUTPUTS
-    assert ref.relative_path == Path("images") / "result.png"
+    assert ref.kind is ResourceKind.ARTIFACT
+    assert ref.source is ResourceSource.ARTIFACT_RUN
+    assert ref.relative_path == Path("20260526T235245_run1") / "images" / "result.png"
     assert np.array_equal(store.saved_images[ref.path], image)
-    assert store.outputs[store.resolve_output_path("logs/out.txt").path] == b"hello"
+    assert store.saved_blobs[blob_ref.path] == b"hello"
+    assert store.snapshot() == (ref, blob_ref)
 
 
 def test_logger_port_contract_uses_user_and_technical() -> None:

@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.io.resources import (
+    ArtifactScope,
     DefaultResourcePathGuard,
     LocalResourceStore,
     LocalRunArtifactStore,
@@ -146,28 +147,56 @@ def test_local_resource_store_reports_missing_and_corrupt_images(tmp_path: Path)
     assert read_info.value.details["relative_path"] == "corrupt.png"
 
 
-def test_local_run_artifact_store_saves_outputs_without_stripping_macro_prefix(
+def test_local_resource_store_load_blob_reads_assets(tmp_path: Path) -> None:
+    definition = make_definition(tmp_path, "sample")
+    scope = MacroResourceScope.from_definition(definition, tmp_path)
+    blob = tmp_path / "resources" / "sample" / "assets" / "data.bin"
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(b"payload")
+
+    assert LocalResourceStore(scope).load_blob("data.bin") == b"payload"
+
+
+def test_local_run_artifact_store_saves_run_artifacts_without_stripping_macro_prefix(
     tmp_path: Path,
 ) -> None:
     store = LocalRunArtifactStore(
-        tmp_path / "runs" / "run-1" / "outputs", macro_id="sample", run_id="run-1"
+        tmp_path / "resources" / "sample" / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
     )
     image = np.zeros((2, 2, 3), dtype=np.uint8)
 
     ref = store.save_image("sample/img/out.png", image)
 
-    assert ref.relative_path == Path("sample") / "img" / "out.png"
+    assert ref.source is ResourceSource.ARTIFACT_RUN
+    assert ref.relative_path == Path("20260526T235245_run1") / "sample" / "img" / "out.png"
     assert ref.path.exists()
     assert (
         ref.path
-        == (tmp_path / "runs" / "run-1" / "outputs" / "sample" / "img" / "out.png").resolve()
+        == (
+            tmp_path
+            / "resources"
+            / "sample"
+            / "artifacts"
+            / "20260526T235245_run1"
+            / "sample"
+            / "img"
+            / "out.png"
+        ).resolve()
     )
 
 
 def test_local_run_artifact_store_reports_imwrite_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    store = LocalRunArtifactStore(tmp_path / "outputs", macro_id="sample", run_id="run-1")
+    store = LocalRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
+    )
     image = np.zeros((2, 2, 3), dtype=np.uint8)
     monkeypatch.setattr(cv2, "imwrite", lambda *_args, **_kwargs: False)
 
@@ -179,7 +208,12 @@ def test_local_run_artifact_store_reports_imwrite_failure(
 
 
 def test_local_run_artifact_store_overwrite_policies(tmp_path: Path) -> None:
-    store = LocalRunArtifactStore(tmp_path / "outputs", macro_id="sample", run_id="run-1")
+    store = LocalRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
+    )
     image = np.zeros((2, 2, 3), dtype=np.uint8)
     store.save_image("out.png", image)
 
@@ -188,44 +222,68 @@ def test_local_run_artifact_store_overwrite_policies(tmp_path: Path) -> None:
 
     ref = store.save_image("out.png", image, overwrite=OverwritePolicy.UNIQUE)
 
-    assert ref.relative_path == Path("out_1.png")
+    assert ref.relative_path == Path("20260526T235245_run1") / "out_1.png"
     assert ref.path.exists()
 
 
-def test_local_run_artifact_store_open_output_atomic(tmp_path: Path) -> None:
-    store = LocalRunArtifactStore(tmp_path / "outputs", macro_id="sample", run_id="run-1")
+def test_local_run_artifact_store_save_and_load_blob(tmp_path: Path) -> None:
+    store = LocalRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
+    )
 
-    with store.open_output("data.bin", mode="wb", atomic=True) as file:
-        file.write(b"payload")
+    ref = store.save_blob("data.bin", b"payload")
 
-    assert (tmp_path / "outputs" / "data.bin").read_bytes() == b"payload"
-    assert not list((tmp_path / "outputs").glob(".data.*"))
+    assert ref.relative_path == Path("20260526T235245_run1") / "data.bin"
+    assert store.load_blob(ref) == b"payload"
+    assert store.load_blob("data.bin") == b"payload"
+    assert not list((tmp_path / "artifacts" / "20260526T235245_run1").glob(".data.*"))
 
     with pytest.raises(ResourceAlreadyExistsError):
-        store.open_output("data.bin", mode="xb", atomic=True)
+        store.save_blob("data.bin", b"payload", overwrite=OverwritePolicy.ERROR)
 
 
-def test_local_run_artifact_store_rejects_text_and_atomic_append(tmp_path: Path) -> None:
-    store = LocalRunArtifactStore(tmp_path / "outputs", macro_id="sample", run_id="run-1")
+def test_local_run_artifact_store_stable_scope_and_ref_readback(tmp_path: Path) -> None:
+    store = LocalRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
+    )
 
+    ref = store.save_blob("data.bin", b"stable", scope=ArtifactScope.STABLE)
+
+    assert ref.source is ResourceSource.ARTIFACT_STABLE
+    assert ref.relative_path == Path("stable") / "data.bin"
+    assert store.load_blob("data.bin", scope=ArtifactScope.STABLE) == b"stable"
+    assert store.load_blob(ref, scope=ArtifactScope.RUN) == b"stable"
+
+
+def test_local_run_artifact_store_tracks_dedupe_and_overflow(tmp_path: Path) -> None:
+    store = LocalRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-1",
+        artifact_dir_name="20260526T235245_run1",
+        tracked_limit=2,
+    )
+
+    store.save_blob("first.bin", b"1")
+    store.save_blob("second.bin", b"2")
+    first_updated = store.save_blob("first.bin", b"updated")
+    third = store.save_blob("third.bin", b"3")
+
+    assert store.snapshot() == (first_updated, third)
+    assert store.artifacts_overflow_count == 1
+
+
+def test_local_run_artifact_store_rejects_invalid_configuration(tmp_path: Path) -> None:
     with pytest.raises(ResourceConfigurationError):
-        store.open_output("data.txt", mode="w")
-    with pytest.raises(ResourceConfigurationError):
-        store.open_output("data.bin", mode="ab", atomic=True)
-
-
-def test_local_run_artifact_store_open_output_replace_non_atomic(tmp_path: Path) -> None:
-    store = LocalRunArtifactStore(tmp_path / "outputs", macro_id="sample", run_id="run-1")
-    output = tmp_path / "outputs" / "data.bin"
-    output.parent.mkdir()
-    output.write_bytes(b"old")
-
-    with store.open_output(
-        "data.bin",
-        mode="xb",
-        overwrite=OverwritePolicy.REPLACE,
-        atomic=False,
-    ) as file:
-        file.write(b"new")
-
-    assert output.read_bytes() == b"new"
+        LocalRunArtifactStore(
+            tmp_path / "artifacts",
+            macro_id="sample",
+            run_id="run-1",
+            artifact_dir_name="..",
+        )

@@ -30,7 +30,7 @@ class SavingMacro(MacroBase):
 
     def run(self, cmd: Command) -> None:
         image = np.zeros((2, 2, 3), dtype=np.uint8)
-        cmd.save_img("sample/img/out.png", image)
+        cmd.save_artifact_img("sample/img/out.png", image)
 
     def finalize(self, cmd: Command) -> None:
         pass
@@ -88,10 +88,13 @@ def make_builder(tmp_path: Path, definition: MacroDefinition) -> MacroRuntimeBui
         resource_store_factory=lambda _request, macro_definition: LocalResourceStore(
             MacroResourceScope.from_definition(macro_definition, tmp_path)
         ),
-        artifact_store_factory=lambda _request, _definition, run_id: LocalRunArtifactStore(
-            tmp_path / "runs" / run_id / "outputs",
-            macro_id="sample",
-            run_id=run_id,
+        artifact_store_factory=lambda _request, macro_definition, run_id, artifact_dir_name: (
+            LocalRunArtifactStore(
+                MacroResourceScope.from_definition(macro_definition, tmp_path).artifacts_root,
+                macro_id=macro_definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
         ),
         notification_factory=lambda _request, _definition: FakeNotificationPort(),
         logger_factory=lambda _request, _definition: FakeLoggerPort(),
@@ -99,16 +102,19 @@ def make_builder(tmp_path: Path, definition: MacroDefinition) -> MacroRuntimeBui
     return builder
 
 
-def test_runtime_saves_command_images_to_run_outputs(tmp_path: Path) -> None:
+def test_runtime_saves_command_images_to_resource_artifacts(tmp_path: Path) -> None:
     builder = make_builder(tmp_path, make_definition(tmp_path))
 
     result = builder.run(RuntimeBuildRequest(macro_id="sample", entrypoint="test"))
 
     assert result.status is RunStatus.SUCCESS
-    assert (tmp_path / "runs" / result.run_id / "outputs" / "sample" / "img" / "out.png").exists()
+    assert result.artifacts
+    assert (
+        tmp_path / "resources" / "sample" / "artifacts" / result.artifacts[0].relative_path
+    ).exists()
 
 
-def test_sample_turbo_macro_saves_capture_to_run_outputs_without_prefix_stripping(
+def test_sample_turbo_macro_saves_capture_to_resource_artifacts_without_prefix_stripping(
     tmp_path: Path,
 ) -> None:
     definition = make_definition(
@@ -134,12 +140,16 @@ def test_sample_turbo_macro_saves_capture_to_run_outputs_without_prefix_strippin
     )
 
     assert result.status is RunStatus.SUCCESS
+    assert result.artifacts
     assert (
         tmp_path
-        / "runs"
-        / result.run_id
-        / "outputs"
+        / "resources"
         / "sample_turbo_a_macro"
-        / "img"
-        / "result.png"
+        / "artifacts"
+        / result.artifacts[0].relative_path
     ).exists()
+    assert result.artifacts[0].relative_path.parts[-3:] == (
+        "sample_turbo_a_macro",
+        "img",
+        "result.png",
+    )

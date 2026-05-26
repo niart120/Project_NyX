@@ -57,7 +57,7 @@ class FakeCommand:
     def notify(self, text: str, img=None) -> None:
         self.events.append(("notify", text))
 
-    def save_img(self, filename, image) -> None:
+    def save_artifact_img(self, filename, image) -> None:
         self.saved_images[str(filename)] = image.copy()
 
     def log(self, *values, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:

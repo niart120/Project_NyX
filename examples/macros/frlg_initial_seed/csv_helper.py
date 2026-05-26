@@ -12,10 +12,11 @@
 from __future__ import annotations
 
 import csv
-from io import TextIOWrapper
+from io import StringIO
 from pathlib import Path
 
-from nyxpy.framework.core.io.resources import OverwritePolicy, RunArtifactStore
+from nyxpy.framework.core.io.resources import ResourceNotFoundError
+from nyxpy.framework.core.macro.command import Command
 
 from .config import FrlgInitialSeedConfig
 
@@ -67,17 +68,17 @@ CSV_DETAIL_FILENAME = "initial_seeds_details.csv"
 
 
 def build_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
-    """共有用 CSV の run outputs 相対パスを返す。"""
+    """共有用 CSV の artifact 相対パスを返す。"""
     return _build_output_path(cfg, CSV_FILENAME)
 
 
 def build_detail_csv_path(cfg: FrlgInitialSeedConfig) -> Path:
-    """詳細ログ CSV の run outputs 相対パスを返す。"""
+    """詳細ログ CSV の artifact 相対パスを返す。"""
     return _build_output_path(cfg, CSV_DETAIL_FILENAME)
 
 
 def build_debug_image_dir(cfg: FrlgInitialSeedConfig) -> Path:
-    """デバッグ画像の run outputs 相対ディレクトリを返す。"""
+    """デバッグ画像の artifact 相対ディレクトリを返す。"""
     return _build_output_path(cfg, "img")
 
 
@@ -108,41 +109,34 @@ def append_detail_csv_row(csv_path: Path, row: dict[str, str]) -> None:
     _append_row(csv_path, CSV_DETAIL_FIELDNAMES, row)
 
 
-def append_csv_artifact(
-    artifacts: RunArtifactStore, output_path: Path, row: dict[str, str]
-) -> None:
-    """共有用 CSV を run outputs に追記する。"""
-    _append_artifact_row(artifacts, output_path, CSV_FIELDNAMES, row)
+def append_csv_artifact(cmd: Command, output_path: Path, row: dict[str, str]) -> None:
+    """共有用 CSV を artifact に追記する。"""
+    _append_artifact_row(cmd, output_path, CSV_FIELDNAMES, row)
 
 
-def append_detail_csv_artifact(
-    artifacts: RunArtifactStore, output_path: Path, row: dict[str, str]
-) -> None:
-    """詳細 CSV を run outputs に追記する。"""
-    _append_artifact_row(artifacts, output_path, CSV_DETAIL_FIELDNAMES, row)
+def append_detail_csv_artifact(cmd: Command, output_path: Path, row: dict[str, str]) -> None:
+    """詳細 CSV を artifact に追記する。"""
+    _append_artifact_row(cmd, output_path, CSV_DETAIL_FIELDNAMES, row)
 
 
 def _append_artifact_row(
-    artifacts: RunArtifactStore,
+    cmd: Command,
     output_path: Path,
     fieldnames: list[str],
     row: dict[str, str],
 ) -> None:
-    ref = artifacts.resolve_output_path(output_path)
-    write_header = not ref.path.exists() or ref.path.stat().st_size == 0
-
-    with artifacts.open_output(
-        output_path,
-        mode="ab",
-        overwrite=OverwritePolicy.REPLACE,
-        atomic=False,
-    ) as raw:
-        text = TextIOWrapper(raw, encoding="utf-8", newline="")
-        try:
-            writer = csv.DictWriter(text, fieldnames=fieldnames)
-            if write_header:
-                writer.writeheader()
-            writer.writerow(row)
-            text.flush()
-        finally:
-            text.detach()
+    try:
+        existing = cmd.load_artifact_blob(output_path)
+    except ResourceNotFoundError:
+        existing = b""
+    text = StringIO(newline="")
+    if existing:
+        current = existing.decode("utf-8")
+        text.write(current)
+        if not current.endswith(("\n", "\r")):
+            text.write("\n")
+    writer = csv.DictWriter(text, fieldnames=fieldnames)
+    if not existing:
+        writer.writeheader()
+    writer.writerow(row)
+    cmd.save_artifact_blob(output_path, text.getvalue().encode("utf-8"), atomic=False)

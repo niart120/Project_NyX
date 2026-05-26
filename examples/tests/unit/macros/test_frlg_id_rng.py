@@ -194,7 +194,7 @@ def _make_cmd_mock() -> MagicMock:
     cmd.press = MagicMock()
     cmd.wait = MagicMock()
     cmd.capture = MagicMock(return_value=None)
-    cmd.save_img = MagicMock()
+    cmd.save_artifact_img = MagicMock()
     cmd.notify = MagicMock()
     cmd.log = MagicMock()
     cmd.release = MagicMock()

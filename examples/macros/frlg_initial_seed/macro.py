@@ -97,15 +97,15 @@ class FrlgInitialSeedMacro(MacroBase):
         )
 
         self._img_dir = build_debug_image_dir(cfg)
-        cmd.log(f"デバッグ画像保存先(run outputs相対): {self._img_dir}", level="DEBUG")
+        cmd.log(f"デバッグ画像保存先(artifact相対): {self._img_dir}", level="DEBUG")
 
         self._csv_path = build_csv_path(cfg)
         self._detail_csv_path = build_detail_csv_path(cfg)
         cmd.log(
-            f"CSV 出力先(run outputs相対): {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
+            f"CSV 出力先(artifact相対): {self._csv_path} — Frame {cfg.min_frame + cfg.frame1_offset} から開始",
             level="INFO",
         )
-        cmd.log(f"詳細CSV 出力先(run outputs相対): {self._detail_csv_path}", level="INFO")
+        cmd.log(f"詳細CSV 出力先(artifact相対): {self._detail_csv_path}", level="INFO")
 
         # OCR ウォームアップ (ステータス認識は en を使用)
         warmup_ocr(cmd, language="en")
@@ -174,11 +174,11 @@ class FrlgInitialSeedMacro(MacroBase):
                 else:
                     for k in ("hp", "atk", "def", "spa", "spd", "spe"):
                         detail_row[k] = ""
-                append_detail_csv_artifact(cmd.artifacts, self._detail_csv_path, detail_row)
+                append_detail_csv_artifact(cmd, self._detail_csv_path, detail_row)
 
                 # 共有用 (Seed 特定成功行のみ)
                 if seed_result not in ("MULT", "False"):
-                    append_csv_artifact(cmd.artifacts, self._csv_path, {**meta, "note": ""})
+                    append_csv_artifact(cmd, self._csv_path, {**meta, "note": ""})
 
                 adv_str = str(advance) if advance is not None else "-"
                 cmd.log(
@@ -326,7 +326,7 @@ class FrlgInitialSeedMacro(MacroBase):
         stat_image = cmd.capture()
 
         for roi, name in zip(ROI_STATS, _STAT_FILE_NAMES):
-            cmd.save_img(self._img_dir / f"stat_{name}.png", crop_and_pad(stat_image, roi))
+            cmd.save_artifact_img(self._img_dir / f"stat_{name}.png", crop_and_pad(stat_image, roi))
 
         stat_raw = get_stat_digits(stat_image)
         cmd.log(

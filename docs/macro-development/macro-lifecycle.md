@@ -57,7 +57,7 @@ def initialize(self, cmd: Command, args: dict) -> None:
 
 ```python
 frame = cmd.capture()
-cmd.save_img("snapshot.png", frame)
+cmd.save_artifact_img("snapshot.png", frame)
 ```
 
 ## finalize(cmd)

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import cv2
 
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.io.resources import ArtifactScope, OverwritePolicy, ResourceRef
 from nyxpy.framework.core.macro.decorators import check_interrupt
 from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
 from nyxpy.framework.core.utils.helper import (
@@ -17,15 +18,14 @@ from nyxpy.framework.core.utils.helper import (
 )
 
 if TYPE_CHECKING:
-    from nyxpy.framework.core.io.resources import RunArtifactStore
     from nyxpy.framework.core.runtime.context import ExecutionContext
 
 
 class Command(ABC):
     """マクロから実行環境を操作するための公開 API。
 
-    コントローラー操作、待機、ログ、キャプチャ、画像入出力、通知は
-    このインターフェース経由で行います。
+    コントローラー操作、待機、ログ、キャプチャ、asset の読み込み、
+    artifact の保存と読み戻し、通知はこのインターフェース経由で行います。
     """
 
     @abstractmethod
@@ -125,34 +125,191 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def save_img(self, filename: str | pathlib.Path, image: cv2.typing.MatLike) -> None:
-        """画像を実行ごとの出力先へ保存します。
+    def load_img(
+        self,
+        filename: str | pathlib.Path,
+        *,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
+        """画像 asset を読み込みます。
 
-        保存先の親ディレクトリは必要に応じて作成されます。
+        読み込み対象は `resources/<macro_id>/assets` とマクロパッケージ内 assets です。
+        実行中に生成した画像 artifact は探索しません。生成物を読み戻す場合は
+        `load_artifact_img()` を使います。
 
         Args:
-            filename: 出力先からの相対パス。例: `"image.png"`。
-            image: 保存する画像データ。
+            filename: 資材 root からの相対パス。例: `"image.png"`。
+            grayscale: グレースケール変換を行うか。
+
+        Returns:
+            読み込んだ画像データ。
 
         Raises:
             ResourcePathError: `filename` が不正な path の場合。
+            ResourceNotFoundError: 探索 root に画像資材が存在しない場合。
+            ResourceReadError: OpenCV 画像として読み込めない場合。
+
+        """
+        pass
+
+    @abstractmethod
+    def load_blob(self, filename: str | pathlib.Path) -> bytes:
+        """バイナリ asset を読み込みます。
+
+        読み込み対象は `resources/<macro_id>/assets` とマクロパッケージ内 assets です。
+        実行中に生成した bytes 形式の artifact は探索しません。生成物を読み戻す場合は
+        `load_artifact_blob()` を使います。
+
+        Args:
+            filename: 資材 root からの相対パス。例: `"data.bin"`。
+
+        Returns:
+            読み込んだ bytes データ。
+
+        Raises:
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceNotFoundError: 探索 root に資材が存在しない場合。
+            ResourceReadError: bytes データを読み込めない場合。
+
+        """
+        pass
+
+    @abstractmethod
+    def save_artifact_img(
+        self,
+        filename: str | pathlib.Path,
+        image: cv2.typing.MatLike,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef:
+        """画像 artifact を保存します。
+
+        保存先の既定は `resources/<macro_id>/artifacts/<artifact_dir_name>` 配下です。
+        実行をまたいで同じ名前の artifact を再利用したい場合は `scope=ArtifactScope.STABLE`
+        を指定します。
+
+        Args:
+            filename: artifact scope を基準にした相対パス。例: `"debug/frame.png"`。
+            image: 保存する画像データ。
+            scope: 保存先 scope。
+            overwrite: 同名ファイルがある場合の処理。`None` は store の既定値を使う。
+            atomic: atomic write を使うかどうか。`None` は store の既定値を使う。
+
+        Returns:
+            保存した artifact の参照。
+
+        Raises:
+            ResourcePathError: `filename` が不正な path の場合。
+            ResourceAlreadyExistsError: 上書き禁止の保存先が既に存在する場合。
             ResourceWriteError: 画像を書き込めない場合。
 
         """
         pass
 
     @abstractmethod
-    def load_img(self, filename: str | pathlib.Path, grayscale: bool = False) -> cv2.typing.MatLike:
-        """画像資材を読み込みます。
+    def save_artifact_blob(
+        self,
+        filename: str | pathlib.Path,
+        data: bytes,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef:
+        """バイナリ artifact を保存します。
+
+        テキストはエンコード済み、JSON はシリアライズ済みの bytes として渡します。
+        保存先の既定は `resources/<macro_id>/artifacts/<artifact_dir_name>` 配下です。
 
         Args:
-            filename: 資材 root からの相対パス。例: `"image.png"`。
-            grayscale: グレースケール変換を行うか。
+            filename: artifact scope を基準にした相対パス。例: `"result/data.csv"`。
+            data: 保存する bytes データ。
+            scope: 保存先 scope。
+            overwrite: 同名ファイルがある場合の処理。`None` は store の既定値を使う。
+            atomic: atomic write を使うかどうか。`None` は store の既定値を使う。
+
+        Returns:
+            保存した artifact の参照。
 
         Raises:
             ResourcePathError: `filename` が不正な path の場合。
-            ResourceNotFoundError: 探索 root に画像資材が存在しない場合。
+            ResourceAlreadyExistsError: 上書き禁止の保存先が既に存在する場合。
+            ResourceWriteError: bytes データを書き込めない場合。
+
+        """
+        pass
+
+    @abstractmethod
+    def load_artifact_img(
+        self,
+        artifact: ResourceRef | str | pathlib.Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
+        """画像 artifact を読み戻します。
+
+        `artifact` に `ResourceRef` を渡した場合は、その参照が示す path を読み込みます。
+        文字列または `Path` の場合のみ、`scope` に応じて現在実行中の
+        artifact または stable artifact を解決します。
+
+        Args:
+            artifact: 保存時に返された `ResourceRef`、または artifact scope を基準にした相対パス。
+            scope: `artifact` が相対パスの場合の読み込み元 scope。
+            grayscale: グレースケール変換を行うか。
+
+        Returns:
+            読み込んだ画像データ。
+
+        Raises:
+            ResourcePathError: `artifact` の path が不正な場合。
+            ResourceNotFoundError: artifact が存在しない場合。
             ResourceReadError: OpenCV 画像として読み込めない場合。
+
+        """
+        pass
+
+    @abstractmethod
+    def load_artifact_blob(
+        self,
+        artifact: ResourceRef | str | pathlib.Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes:
+        """バイナリ artifact を読み戻します。
+
+        `artifact` に `ResourceRef` を渡した場合は、その参照が示す path を読み込みます。
+        文字列または `Path` の場合のみ、`scope` に応じて現在実行中の
+        artifact または stable artifact を解決します。
+
+        Args:
+            artifact: 保存時に返された `ResourceRef`、または artifact scope を基準にした相対パス。
+            scope: `artifact` が相対パスの場合の読み込み元 scope。
+
+        Returns:
+            読み込んだ bytes データ。
+
+        Raises:
+            ResourcePathError: `artifact` の path が不正な場合。
+            ResourceNotFoundError: artifact が存在しない場合。
+            ResourceReadError: bytes データとして読み込めない場合。
+
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def artifact_dir_name(self) -> str:
+        """実行ごとの artifact 保存先を切り替えるための directory segment。
+
+        `ArtifactScope.RUN` の保存先ディレクトリ名です。値は
+        `{timestamp}_{short_id}` 形式です。マクロ側で実行ごとの
+        サブディレクトリ名を組み立てる場合にも使えます。
+
+        Returns:
+            現在の実行に対応する artifact ディレクトリ名。
 
         """
         pass
@@ -186,14 +343,6 @@ class Command(ABC):
         """外部サービスへ通知を送信する"""
         pass
 
-    @property
-    def artifacts(self) -> RunArtifactStore:
-        """実行ごとの出力先へアクセスします。
-
-        `open_output()` などの成果物操作は `ResourceError` 系の例外を送出します。
-        """
-        raise NotImplementedError("Current command does not expose run artifacts.")
-
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
         """3DS touch 対応プロトコルで touch down / wait / touch up を行います。"""
         raise NotImplementedError("Current serial protocol does not support touch input.")
@@ -225,10 +374,6 @@ class DefaultCommand(Command):
         """実行 context を受け取り、controller と cancellation token へ接続します。"""
         self.context = context
         self.ct: CancellationToken = context.cancellation_token
-
-    @property
-    def artifacts(self) -> RunArtifactStore:
-        return self.context.artifacts
 
     @check_interrupt
     def press(self, *keys: KeyType, dur: float = 0.1, wait: float = 0.1) -> None:
@@ -325,14 +470,82 @@ class DefaultCommand(Command):
         return frame
 
     @check_interrupt
-    def save_img(self, filename, image) -> None:
-        self._debug_command(f"Saving image to {filename}")
-        self.context.artifacts.save_image(filename, image)
-
-    @check_interrupt
-    def load_img(self, filename, grayscale: bool = False) -> cv2.typing.MatLike:
+    def load_img(
+        self,
+        filename: str | pathlib.Path,
+        *,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
         self._debug_command(f"Loading image from {filename}")
         return self.context.resources.load_image(filename, grayscale=grayscale)
+
+    @check_interrupt
+    def load_blob(self, filename: str | pathlib.Path) -> bytes:
+        self._debug_command(f"Loading blob from {filename}")
+        return self.context.resources.load_blob(filename)
+
+    @check_interrupt
+    def save_artifact_img(
+        self,
+        filename: str | pathlib.Path,
+        image: cv2.typing.MatLike,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef:
+        self._debug_command(f"Saving artifact image to {filename}")
+        return self.context.artifacts.save_image(
+            filename,
+            image,
+            scope=scope,
+            overwrite=overwrite,
+            atomic=atomic,
+        )
+
+    @check_interrupt
+    def save_artifact_blob(
+        self,
+        filename: str | pathlib.Path,
+        data: bytes,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef:
+        self._debug_command(f"Saving artifact blob to {filename}")
+        return self.context.artifacts.save_blob(
+            filename,
+            data,
+            scope=scope,
+            overwrite=overwrite,
+            atomic=atomic,
+        )
+
+    @check_interrupt
+    def load_artifact_img(
+        self,
+        artifact: ResourceRef | str | pathlib.Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike:
+        self._debug_command(f"Loading artifact image from {artifact}")
+        return self.context.artifacts.load_image(artifact, scope=scope, grayscale=grayscale)
+
+    @check_interrupt
+    def load_artifact_blob(
+        self,
+        artifact: ResourceRef | str | pathlib.Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes:
+        self._debug_command(f"Loading artifact blob from {artifact}")
+        return self.context.artifacts.load_blob(artifact, scope=scope)
+
+    @property
+    def artifact_dir_name(self) -> str:
+        return self.context.artifact_dir_name
 
     @check_interrupt
     def keyboard(self, text: str) -> None:

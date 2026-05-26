@@ -50,7 +50,7 @@ class SampleMacro(MacroBase):
 
         if self._cfg.capture_after:
             frame = cmd.capture()
-            cmd.save_img(self._cfg.capture_name, frame)
+            cmd.save_artifact_img(self._cfg.capture_name, frame)
 
     def finalize(self, cmd: Command) -> None:
         cmd.release()

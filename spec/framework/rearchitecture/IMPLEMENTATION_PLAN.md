@@ -18,7 +18,7 @@
 |------|------|
 | Compatibility Contract | 既存マクロが依存している import path、ライフサイクル、Command API、例外捕捉を維持する契約 |
 | MacroBase | ユーザー定義マクロの抽象基底クラス。`initialize(cmd, args)` / `run(cmd)` / `finalize(cmd)` を維持する |
-| Command | マクロから見える操作 API。`press`、`wait`、`capture`、`save_img`、`notify` などの既存メソッドを維持する |
+| Command | マクロから見える操作 API。`press`、`wait`、`capture`、`load_img`、`save_artifact_img`、`notify` などのメソッドを提供する |
 | MacroExecutor | 既存 GUI/CLI とテストの旧入口。再設計後の公開 API・互換契約・移行 adapter には含めず削除する |
 | MacroRegistry | マクロの発見、安定 ID、別名、診断、設定解決を管理し、実行インスタンスを保持しないコンポーネント |
 | MacroFactory | `MacroDefinition` が所有する生成責務。実行ごとに新しい `MacroBase` インスタンスを返す |
@@ -45,7 +45,7 @@
 | 指標 | 現状 | 目標 |
 |------|------|------|
 | 維持対象 import / lifecycle に起因するマクロ本体変更 | 内部改修次第で必要化する恐れがある | 0 件 |
-| マクロ配置・リソース移行 | `static` と旧 discovery に依存 | 任意 `macro.toml` / class metadata / convention discovery、明示 settings source、assets root、run outputs へ移行 |
+| マクロ配置・リソース移行 | `static` と旧 discovery に依存 | 任意 `macro.toml` / class metadata / convention discovery、明示 settings source、assets root、artifacts root へ移行 |
 | 互換契約の検証 | 一部の executor テストと暗黙の import 維持に依存 | import、シグネチャ、Command API、明示 settings source、代表マクロロードをゲート化 |
 | 実行ごとの状態分離 | reload 時に生成したインスタンスを再利用 | `definition.factory.create()` で毎回新規生成 |
 | GUI/CLI の Command 構築 | CLI と GUI に重複 | `MacroRuntimeBuilder` と Ports/Adapters に集約 |
@@ -295,10 +295,10 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 
 | 項目 | 内容 |
 |------|------|
-| 目的 | read-only assets と writable outputs を分離し、`cmd.load_img()` / `cmd.save_img()` のメソッド名互換を保ったまま `MacroResourceScope` と `RunArtifactStore` へ移行する |
+| 目的 | read-only assets と writable artifacts を分離し、`cmd.load_img()` / `cmd.load_blob()` と `cmd.save_artifact_*()` / `cmd.load_artifact_*()` を `MacroResourceScope` と `RunArtifactStore` へ接続する |
 | 対象ファイル | `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\runtime\context.py`, `src\nyxpy\framework\core\runtime\builder.py`, `tests\unit\framework\io\test_resource_file_io.py`, `tests\integration\test_resource_file_io_migration.py` |
-| 完了条件 | `resources\<macro_id>\assets` を読み込み、`runs\<run_id>\outputs` へ保存できる。旧 `static\<macro_name>` 互換を残さず、path traversal 防止、atomic write、overwrite policy がテストで固定される |
-| テスト | `test_resource_path_guard_rejects_parent_escape`, `test_command_load_img_uses_resource_store`, `test_command_save_img_uses_run_artifact_store`, `test_command_save_img_does_not_strip_macro_id_prefix`, `test_save_image_atomic_replace`, `test_migrated_representative_macro_save_img_outputs` |
+| 完了条件 | `resources\<macro_id>\assets` を読み込み、`resources\<macro_id>\artifacts` へ保存・読み戻しできる。旧 `static\<macro_name>` 互換を残さず、path traversal 防止、atomic write、overwrite policy がテストで固定される |
+| テスト | `test_resource_path_guard_rejects_parent_escape`, `test_default_command_resources_and_artifacts_delegate_to_ports`, `test_local_run_artifact_store_save_and_load_blob`, `test_local_run_artifact_store_tracks_dedupe_and_overflow`, `test_runtime_saves_command_images_to_resource_artifacts` |
 | リスク | `static` 直下へ保存していたデバッグ画像の場所が変わる、直接 `Path(cfg.output_dir)` を使う既存マクロとの移行差分、OpenCV 書き込みと atomic replace の組み合わせ |
 | ロールバック方針 | `RunArtifactStore` への標準保存は維持し、`Command` 側の呼び出しだけ段階戻しする。旧 static adapter は戻さない。path guard と書き込み失敗検出のテストは残す |
 

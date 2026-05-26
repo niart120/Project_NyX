@@ -23,23 +23,23 @@
 | entrypoint | `module:ClassName` 形式のマクロクラス参照。manifest を使う場合に明示する |
 | standard assets | `resources\<macro_id>\assets` 配下の read-only 画像リソース |
 | macro package assets | `macros\<macro_id>\assets` 配下の read-only 画像リソース |
-| run outputs | `runs\<run_id>\outputs` 配下の実行ごとの出力先 |
+| artifacts | `resources\<macro_id>\artifacts` 配下の生成物保存先 |
 | explicit settings source | `macro.toml [macro].settings` または class metadata `settings_path` で明示する settings TOML の場所 |
 
 ### 1.3 背景・問題
 
 旧仕様では `static\<macro_name>` が settings、画像リソース、出力の境界を兼ねていた。`Path.cwd()` を前提にした暗黙探索、ファイル名 prefix 除去、旧 single-file auto discovery も混在し、GUI/CLI、テスト、マクロ作者が同じパス規則を共有しづらい状態だった。
 
-再設計では、read-only assets、writable outputs、settings、entrypoint を分離する。互換モードを残すと実装とテストが二重化するため、マクロ側移行を要求する。
+再設計では、read-only assets、writable artifacts、settings、entrypoint を分離する。互換モードを残すと実装とテストが二重化するため、マクロ側移行を要求する。
 
 ### 1.4 期待効果
 
 | 指標 | 現状 | 目標 |
 |------|------|------|
 | settings 探索 | `static\<macro_name>` と `cwd` fallback が混在 | manifest または class metadata の明示 settings source |
-| 画像リソース | 読み込み元と保存先が `static` に混在 | assets と outputs を分離 |
+| 画像リソース | 読み込み元と保存先が `static` に混在 | assets と artifacts を分離 |
 | マクロ発見 | 旧 auto discovery と manifest が混在 | manifest / class metadata / convention discovery |
-| 出力追跡 | 実行単位の出力先が曖昧 | `run_id` ごとの outputs へ保存 |
+| 出力追跡 | 実行単位の出力先が曖昧 | `RunResult.artifacts` に保存済み `ResourceRef` を記録 |
 
 ### 1.5 着手条件
 
@@ -58,7 +58,7 @@
 | `macros\<macro_id>\assets\**` | 新規 | マクロ同梱 assets の移動先 |
 | `resources\<macro_id>\assets\**` | 新規 | プロジェクト標準 assets の移動先 |
 | `resources\<macro_id>\settings.toml` | 新規 | 明示 settings source の推奨配置 |
-| `static\<macro_name>\**` | 削除 | 旧 settings / assets / outputs 配置。移行後は標準探索しない |
+| `static\<macro_name>\**` | 削除 | 旧 settings / assets / artifacts 配置。移行後は標準探索しない |
 
 ## 3. 設計方針
 
@@ -70,13 +70,13 @@
 |------|--------------|------------------|
 | import | `MacroBase`, `Command`, `DefaultCommand`, constants, `MacroStopException` | `MacroExecutor` 直接 import |
 | lifecycle | `initialize(cmd, args)`, `run(cmd)`, `finalize(cmd)` | 発見時インスタンス保持に依存する処理 |
-| Command API | `cmd.load_img()`, `cmd.save_img()` などのメソッド名 | 旧 `static` 前提の path、ファイル名 prefix 除去前提 |
+| Command API | `cmd.load_img()`, `cmd.load_blob()`, `cmd.save_artifact_*()`, `cmd.load_artifact_*()` | 旧 `static` 前提の path、ファイル名 prefix 除去前提 |
 | settings | `exec_args` による上書き | `static\<macro_name>\settings.toml` と `Path.cwd()` fallback |
 | entrypoint | package / single-file の実行 | 曖昧な旧 auto discovery。軽量マクロは convention discovery へ移行 |
 
 ### 3.2 移行単位
 
-移行はマクロごとに完結させる。1 つのマクロで発見方式、settings、assets、outputs の期待値を揃えてからテストを通す。旧配置と新配置を同時に標準探索させる中間状態は作らない。
+移行はマクロごとに完結させる。1 つのマクロで発見方式、settings、assets、artifacts の期待値を揃えてからテストを通す。旧配置と新配置を同時に標準探索させる中間状態は作らない。
 
 ### 3.3 single-file macro の扱い
 
@@ -92,7 +92,7 @@ settings = "project:resources/sample_single_file/settings.toml"
 
 ### 3.4 パス方針
 
-`cmd.load_img()` は assets を読み込む API、`cmd.save_img()` は run outputs へ書き込む API として扱う。settings は `MacroSettingsResolver` が解決し、Resource Store は settings TOML を探索しない。
+`cmd.load_img()` / `cmd.load_blob()` は assets を読み込む API、`cmd.save_artifact_img()` / `cmd.save_artifact_blob()` は artifacts へ書き込む API として扱う。settings は `MacroSettingsResolver` が解決し、Resource Store は settings TOML を探索しない。
 
 Markdown の説明文では Windows 配置例として `\` を使う。`macro.toml` の `entrypoint` と `settings` など、ファイル内に永続化する path 文字列は portable path として `/` を使う。
 
@@ -219,12 +219,12 @@ template = cmd.load_img("frlg_id_rng/templates/title.png")
 template = cmd.load_img("templates/title.png")
 ```
 
-### 4.5 outputs の移行
+### 4.5 artifacts の移行
 
-`cmd.save_img("result.png", image)` の保存先は次に固定する。
+`cmd.save_artifact_img("result.png", image)` の既定保存先は次に固定する。
 
 ```text
-runs\<run_id>\outputs\result.png
+resources\<macro_id>\artifacts\<artifact_dir_name>\result.png
 ```
 
 旧 `static\<macro_name>` への保存、`legacy_static_write=True`、`resource.write_mode = "legacy_static"` は定義しない。ファイル名先頭の macro ID prefix は除去しない。
@@ -236,19 +236,11 @@ output_path.write_text(csv_text, encoding="utf-8")
 ```
 
 ```python
-# 移行後: run outputs へ成果物として保存する
-from nyxpy.framework.core.io.resources import OverwritePolicy
-
-
-with cmd.artifacts.open_output(
-    "result.csv",
-    mode="wb",
-    overwrite=OverwritePolicy.REPLACE,
-) as fp:
-    fp.write(csv_text.encode("utf-8"))
+# 移行後: artifact として保存する
+cmd.save_artifact_blob("result.csv", csv_text.encode("utf-8"))
 ```
 
-`RunArtifactStore.open_output()` は binary mode のみを受け付ける。テキストを保存する場合は呼び出し側で `bytes` へ変換する。
+テキストを保存する場合は呼び出し側で `bytes` へ変換する。
 
 ### 4.6 `DefaultCommand` 直接生成の修正
 
@@ -305,7 +297,7 @@ cmd.wait(0)
 | `MacroLoadError` | module import に失敗、class が `MacroBase` でない、convention discovery が曖昧、manifest entrypoint が不正 |
 | `ConfigurationError` | settings path が root 外参照、絶対パス、空 path、存在しない必須 file |
 | `ResourcePathError` | assets / outputs の root 外参照、未許可拡張子、ディレクトリ指定 |
-| `ResourceWriteError` | `cmd.save_img()` の書き込みまたは atomic replace に失敗 |
+| `ResourceWriteError` | `cmd.save_artifact_*()` の書き込みまたは atomic replace に失敗 |
 
 ### 4.10 移行対象代表マクロ
 
@@ -313,7 +305,7 @@ cmd.wait(0)
 
 | macro_id | 採用理由 | 必要な移行項目 | 必須テスト |
 |----------|----------|----------------|------------|
-| `frlg_id_rng` | settings、画像リソース、output 保存を含む代表例 | 明示 settings source、assets root 相対 path、run outputs 保存 | `test_sample_turbo_macro_saves_capture_to_run_outputs_without_prefix_stripping`, `test_file_settings_and_exec_args_are_merged_with_exec_args_precedence` |
+| `frlg_id_rng` | settings、画像リソース、artifact 保存を含む代表例 | 明示 settings source、assets root 相対 path、artifacts 保存 | `test_sample_turbo_macro_saves_capture_to_resource_artifacts_without_prefix_stripping`, `test_file_settings_and_exec_args_are_merged_with_exec_args_precedence` |
 | `sample_turbo_a_macro` | single-file convention discovery の最小例 | manifest なし discovery、公開 import 契約 | `test_registry_loads_convention_single_file_macro` |
 | `frlg_initial_seed` | package 型 macro の代表例 | package entrypoint、class metadata、settings 未指定時の `{}` | `test_repository_representative_macros_keep_lifecycle_contract` |
 
@@ -327,7 +319,7 @@ cmd.wait(0)
 | ユニット | `test_macro_settings_resolver_loads_explicit_settings` | manifest または class metadata settings path から settings を読む |
 | ユニット | `test_macro_settings_resolver_does_not_read_legacy_static_settings` | 旧 `static` settings を暗黙探索しない |
 | ユニット | `test_command_load_img_uses_resource_store` | `cmd.load_img()` が assets root から読む |
-| ユニット | `test_command_save_img_uses_run_artifact_store` | `cmd.save_img()` が run outputs へ保存する |
+| ユニット | `test_default_command_resources_and_artifacts_delegate_to_ports` | `cmd.save_artifact_*()` が artifacts へ保存する |
 | ユニット | `test_default_command_rejects_legacy_constructor_args` | 旧具象引数コンストラクタを受け付けない |
 | 結合 | `test_convention_package_and_single_file_macros_load_without_manifest` | 移行後代表マクロが manifest なしでもロードされる |
 | 結合 | `test_optional_manifest_file_does_not_break_package_macro_load` | manifest ありの package macro をロードできる |
@@ -340,7 +332,7 @@ cmd.wait(0)
 - [x] `static\<macro_name>\settings.toml` を manifest または class metadata settings path へ移動
 - [x] 読み込み専用画像を `resources\<macro_id>\assets` または `macros\<macro_id>\assets` へ移動
 - [x] `cmd.load_img()` に渡す path を assets root 相対へ修正
-- [x] `cmd.save_img()` の保存先が `runs\<run_id>\outputs` になる前提へ修正
+- [x] artifact 保存先が `resources\<macro_id>\artifacts` になる前提へ修正
 - [x] ファイル名先頭の macro ID prefix 除去に依存する処理を削除
 - [x] `DefaultCommand(serial_device=..., capture_device=..., ...)` の直接生成を削除
 - [x] single-file macro は convention discovery で一意にロードできることを確認し、曖昧な場合だけ manifest entrypoint を追加

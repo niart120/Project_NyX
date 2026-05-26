@@ -182,7 +182,7 @@ GUI/CLI
 |----------|------|
 | `from nyxpy.framework.core.macro.command import Command` | 維持 |
 | `from nyxpy.framework.core.macro.command import DefaultCommand` | 維持 |
-| `Command.press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `save_img`, `load_img`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` | メソッド名、引数名、既定値を維持 |
+| `Command.press`, `hold`, `release`, `wait`, `stop`, `log`, `capture`, `load_img`, `load_blob`, `save_artifact_img`, `save_artifact_blob`, `load_artifact_img`, `load_artifact_blob`, `artifact_dir_name`, `keyboard`, `type`, `notify`, `touch`, `touch_down`, `touch_up`, `disable_sleep` | メソッド名、引数名、既定値を維持 |
 | 既存マクロの `initialize(cmd, args)`, `run(cmd)`, `finalize(cmd)` | 維持 |
 | `MacroExecutor.execute(cmd, exec_args)` | 公開互換契約から外す。例外再送出、`None` 戻り値、`macros` / `macro` 属性は保証せず、GUI/CLI/テスト移行後に削除する |
 | Dummy 実装 | テスト・明示指定用途として維持。本番 Runtime の暗黙 fallback は廃止 |
@@ -515,8 +515,41 @@ class DefaultCommand(Command):
         crop_region: tuple[int, int, int, int] | None = None,
         grayscale: bool = False,
     ) -> cv2.typing.MatLike: ...
-    def save_img(self, filename: str | Path, image: cv2.typing.MatLike) -> None: ...
-    def load_img(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
+    def load_img(self, filename: str | Path, *, grayscale: bool = False) -> cv2.typing.MatLike: ...
+    def load_blob(self, filename: str | Path) -> bytes: ...
+    def save_artifact_img(
+        self,
+        filename: str | Path,
+        image: cv2.typing.MatLike,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef: ...
+    def save_artifact_blob(
+        self,
+        filename: str | Path,
+        data: bytes,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        overwrite: OverwritePolicy | None = None,
+        atomic: bool | None = None,
+    ) -> ResourceRef: ...
+    def load_artifact_img(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+        grayscale: bool = False,
+    ) -> cv2.typing.MatLike: ...
+    def load_artifact_blob(
+        self,
+        artifact: ResourceRef | str | Path,
+        *,
+        scope: ArtifactScope = ArtifactScope.RUN,
+    ) -> bytes: ...
+    @property
+    def artifact_dir_name(self) -> str: ...
     def keyboard(self, text: str) -> None: ...
     def type(self, key: KeyCode | SpecialKeyCode) -> None: ...
     def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None: ...
@@ -578,8 +611,9 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 | `wait(wait)` | `CancellationToken` aware wait | `safe_point_latency` を 100 ms 未満にする |
 | `stop()` | `cancellation_token.request_cancel(reason="stop requested", source="macro")` | 停止要求だけを登録し、即時例外は送出しない。`raise_immediately` 互換引数は提供しない |
 | `capture(crop_region, grayscale)` | `frame_source.latest_frame()` | 1280x720 resize、crop、grayscale は `DefaultCommand` で互換維持 |
-| `save_img()` | `artifacts.save_image()` | outputs 保存。詳細な保存先と overwrite policy は `RESOURCE_FILE_IO.md` |
-| `load_img()` | `resources.load_image()` | assets 読み込み。探索順序は `RESOURCE_FILE_IO.md` |
+| `load_img()` / `load_blob()` | `resources.load_image()` / `resources.load_blob()` | assets 読み込み。探索順序は `RESOURCE_FILE_IO.md` |
+| `save_artifact_img()` / `save_artifact_blob()` | `artifacts.save_image()` / `artifacts.save_blob()` | artifacts 保存。詳細な保存先と overwrite policy は `RESOURCE_FILE_IO.md` |
+| `load_artifact_img()` / `load_artifact_blob()` | `artifacts.load_image()` / `artifacts.load_blob()` | artifacts 読み戻し。`ResourceRef` 指定時はその path を正とする |
 | `keyboard()` / `type()` | `controller.keyboard()` / `controller.type_key()` | `keyboard(text: str)` は文字列入力、`type(key: KeyCode \| SpecialKeyCode)` は通常キー・特殊キーの単キー入力を担当する |
 | `notify()` | `notifications.publish()` | 通知失敗はログ化し、マクロ失敗にしない |
 | `log()` | `logger.user()` | component は既存同様 caller class 名を既定にする。対応する技術ログ生成は `LOGGING_FRAMEWORK.md` の `LoggerPort.user()` に従う |
@@ -611,9 +645,9 @@ GUI は `RunHandle` を保持する。Qt signal が必要な場合は GUI 層で
 
 #### ResourceStorePort / RunArtifactStore
 
-`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable outputs の保存を担当する。manifest または class metadata の settings source と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
+`ResourceStorePort` は read-only assets の読み込みを担当し、`RunArtifactStore` は writable artifacts の保存・読み戻しを担当する。manifest または class metadata の settings source と project root 明示設定は `MacroSettingsResolver` が担当し、Resource File I/O と settings lookup を混同しない。
 
-標準配置、path traversal 防止、atomic write、overwrite policy、`ResourceStorePort` / `RunArtifactStore` の公開シグネチャは `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `ResourceStorePort` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `save_img()` がそれらへ委譲することだけを定義する。
+標準配置、path traversal 防止、atomic write、overwrite policy、`ResourceStorePort` / `RunArtifactStore` の公開シグネチャは `RESOURCE_FILE_IO.md` を正とする。Runtime 本仕様では `ExecutionContext` に `ResourceStorePort` と `RunArtifactStore` を注入し、`DefaultCommand.load_img()` / `load_blob()` / `save_artifact_*()` / `load_artifact_*()` がそれらへ委譲することだけを定義する。
 
 Port close は `controller`、`frame_source`、`resources`、`artifacts` の順に全件試行する。各 `close()` の例外は `CleanupWarning(port_name, exception_type, message)` として `cleanup_warnings` へ追加し、後続 Port の close を継続する。複数 Port が失敗した場合も全件を発生順に保持し、close 失敗だけで `RunResult.status` と `RunResult.error` は変更しない。
 

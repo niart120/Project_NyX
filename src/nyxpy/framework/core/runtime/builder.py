@@ -28,6 +28,7 @@ from nyxpy.framework.core.io.resources import (
     LocalResourceStore,
     LocalRunArtifactStore,
     MacroResourceScope,
+    OverwritePolicy,
     ResourceStorePort,
     RunArtifactStore,
 )
@@ -50,7 +51,9 @@ from nyxpy.framework.core.utils.cancellation import CancellationToken
 
 type PortFactory[T] = Callable[[RuntimeBuildRequest, MacroDefinition], T]
 type LifetimePortFactory[T] = Callable[[], T]
-type ArtifactStoreFactory = Callable[[RuntimeBuildRequest, MacroDefinition, str], RunArtifactStore]
+type ArtifactStoreFactory = Callable[
+    [RuntimeBuildRequest, MacroDefinition, str, str], RunArtifactStore
+]
 type ShutdownCallback = Callable[[], None]
 
 
@@ -95,6 +98,7 @@ class MacroRuntimeBuilder:
         definition = self.registry.resolve(request.macro_id)
         started_at = datetime.now()
         run_id = uuid4().hex
+        artifact_dir_name = _artifact_dir_name(started_at, run_id, self.settings)
         file_args = self.registry.get_settings(definition)
         exec_args = {**file_args, **dict(request.exec_args or {})}
         run_log_context = RunLogContext(
@@ -110,6 +114,7 @@ class MacroRuntimeBuilder:
             run_id=run_id,
             macro_id=definition.id,
             macro_name=definition.display_name,
+            artifact_dir_name=artifact_dir_name,
             run_log_context=run_log_context,
             exec_args=exec_args,
             metadata=metadata,
@@ -117,7 +122,7 @@ class MacroRuntimeBuilder:
             controller=self._controller_factory(request, definition),
             frame_source=self._frame_source_factory(request, definition),
             resources=self._resource_store_factory(request, definition),
-            artifacts=self._artifact_store_factory(request, definition, run_id),
+            artifacts=self._artifact_store_factory(request, definition, run_id, artifact_dir_name),
             notifications=self._notification_factory(request, definition),
             logger=logger,
             options=RuntimeOptions(
@@ -242,10 +247,16 @@ def create_device_runtime_builder(
         resource_store_factory=lambda _request, definition: LocalResourceStore(
             MacroResourceScope.from_definition(definition, project_root)
         ),
-        artifact_store_factory=lambda _request, definition, run_id: LocalRunArtifactStore(
-            Path(project_root) / "runs" / run_id / "outputs",
-            macro_id=definition.id,
-            run_id=run_id,
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            LocalRunArtifactStore(
+                MacroResourceScope.from_definition(definition, project_root).artifacts_root,
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+                tracked_limit=_resource_tracked_artifact_limit(settings_snapshot),
+                overwrite=_resource_overwrite_policy(settings_snapshot),
+                atomic=_resource_atomic_write(settings_snapshot),
+            )
         ),
         notification_factory=lambda _request, _definition: (
             NoopNotificationAdapter()
@@ -272,6 +283,30 @@ def _allow_dummy(settings: dict[str, Any], request: RuntimeBuildRequest) -> bool
     if request.allow_dummy is not None:
         return request.allow_dummy
     return bool(settings.get("runtime.allow_dummy", False))
+
+
+def _artifact_dir_name(started_at: datetime, run_id: str, settings: Mapping[str, Any]) -> str:
+    timestamp_format = str(settings.get("resource.artifact_timestamp_format", "%Y%m%dT%H%M%S"))
+    name_format = str(settings.get("resource.artifact_dir_name_format", "{timestamp}_{short_id}"))
+    short_id_length = int(settings.get("resource.short_id_length", 4))
+    if short_id_length <= 0:
+        raise ValueError("resource.short_id_length must be greater than 0")
+    timestamp = started_at.strftime(timestamp_format)
+    short_id = run_id[:short_id_length]
+    return name_format.format(timestamp=timestamp, short_id=short_id, run_id=run_id)
+
+
+def _resource_tracked_artifact_limit(settings: Mapping[str, Any]) -> int:
+    return int(settings.get("resource.tracked_artifact_limit", 65535))
+
+
+def _resource_overwrite_policy(settings: Mapping[str, Any]) -> OverwritePolicy:
+    value = settings.get("resource.overwrite_policy", OverwritePolicy.REPLACE)
+    return value if isinstance(value, OverwritePolicy) else OverwritePolicy(str(value))
+
+
+def _resource_atomic_write(settings: Mapping[str, Any]) -> bool:
+    return bool(settings.get("resource.atomic_write", True))
 
 
 def _command_debug_enabled(

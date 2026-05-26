@@ -313,10 +313,13 @@ def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path
         resource_store_factory=lambda _request, definition: FakeResourceStore(
             MacroResourceScope.from_definition(definition, tmp_path)
         ),
-        artifact_store_factory=lambda _request, definition, run_id: FakeRunArtifactStore(
-            tmp_path / "runs" / run_id / "outputs",
-            macro_id=definition.id,
-            run_id=run_id,
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
         ),
         notification_factory=lambda _request, _definition: FakeNotificationPort(),
         logger_factory=lambda _request, _definition: FakeLoggerPort(),
@@ -352,10 +355,13 @@ def test_runtime_builder_does_not_cache_failed_preview_source(tmp_path: Path) ->
         resource_store_factory=lambda _request, definition: FakeResourceStore(
             MacroResourceScope.from_definition(definition, tmp_path)
         ),
-        artifact_store_factory=lambda _request, definition, run_id: FakeRunArtifactStore(
-            tmp_path / "runs" / run_id / "outputs",
-            macro_id=definition.id,
-            run_id=run_id,
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
         ),
         notification_factory=lambda _request, _definition: FakeNotificationPort(),
         logger_factory=lambda _request, _definition: FakeLoggerPort(),
