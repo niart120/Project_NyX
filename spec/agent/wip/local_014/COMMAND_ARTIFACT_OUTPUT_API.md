@@ -26,9 +26,10 @@
 | Blob | 任意のバイナリデータ。テキストや JSON も encoding 済み bytes として扱える |
 | ArtifactScope | artifact の保存・読み戻し基準。既定は `RUN`、固定再利用用に `STABLE` を持つ |
 | Artifact readback | 保存済み artifact を `cmd.load_artifact_*()` で読み戻す操作 |
-| artifact_dir_name | 実行ごとの保存先切り替えに使う helper 値。例: `20260526T221417_a1b2c3` |
+| artifact_dir_name | 実行ごとの保存先切り替えに使う helper 値。例: `20260526T221417_a1b2` |
 | ResourceRef | 保存・解決済みファイルの参照。kind、source、path、relative_path、macro_id、run_id を持つ |
 | RunResult.artifacts | `cmd.save_artifact_*()` 経由で保存された `ResourceRef` 一覧 |
+| RunResult.artifacts_overflow_count | `RunResult.artifacts` の上限を超えて記録しなかった artifact 件数 |
 
 ### 1.3 背景・問題
 
@@ -64,7 +65,7 @@
 | `src\nyxpy\framework\core\io\resources.py` | 変更 | artifact root を `resources\<macro_id>\artifacts` へ変更し、保存済み `ResourceRef` の記録を実装する |
 | `src\nyxpy\framework\core\runtime\builder.py` | 変更 | 実行ごとの `artifact_dir_name` と artifact store を構築する |
 | `src\nyxpy\framework\core\runtime\context.py` | 変更 | `artifact_dir_name` と artifact store を `ExecutionContext` から参照できるようにする |
-| `src\nyxpy\framework\core\runtime\result.py` | 変更 | `RunResult.artifacts: tuple[ResourceRef, ...]` を追加する |
+| `src\nyxpy\framework\core\runtime\result.py` | 変更 | `RunResult.artifacts: tuple[ResourceRef, ...]` と `RunResult.artifacts_overflow_count: int` を追加する |
 | `docs\**\*.md` | 変更 | `cmd.save_img()` / `cmd.artifacts` 前提の説明と例を新 API・新配置へ更新する。設計経緯や WIP 仕様への言及は含めない |
 | `spec\framework\rearchitecture\RESOURCE_FILE_IO.md` | 変更 | `runs` 標準保存先から `resources\<macro_id>\artifacts` へ正本を更新する |
 | `macros\**\*.py` | 変更 | 実装済みローカルマクロの `cmd.save_img()` / `cmd.artifacts` 呼び出しを新 API へ更新する |
@@ -113,7 +114,7 @@ resources
     assets
       marker.png
     artifacts
-      20260526T221417_a1b2c3
+      20260526T221417_a1b2
         debug
           frame.png
       stable
@@ -141,11 +142,11 @@ artifact scope の初期案は次の通りである。
 | runs + macro_id | `runs\<macro_id>\<timestamp>_<short_id>\files` | 実行ごとの管理はしやすいが、結局 resources へ移すまたは promote する手順が必要になる |
 | run directory 直下に成果物 | `runs\<macro_id>\<timestamp>_<short_id>\debug\frame.png` | `run.json` など framework metadata とユーザー成果物が混ざる |
 | `outputs` 階層維持 | `runs\<macro_id>\<timestamp>_<short_id>\outputs` | `outputs` は内部用語寄りで、資材として再利用するファイル群という意味が弱い |
-| `run slug` 概念 | `20260526T221417_a1b2c3` を公開用語化 | directory segment として足り、API 名や metadata key として独立させる意味が薄い |
+| `run slug` 概念 | `20260526T221417_a1b2` を公開用語化 | directory segment として足り、API 名や metadata key として独立させる意味が薄い |
 
 ### RunResult 方針
 
-resources 集約案では、単一の標準成果物 root を `RunResult` に載せても情報が弱い。`cmd.save_artifact_*()` が返した `ResourceRef` を store が記録し、`RunResult.artifacts` に含める方式を採用する。
+resources 集約案では、単一の標準成果物 root を `RunResult` に載せても情報が弱い。`cmd.save_artifact_*()` が返した `ResourceRef` を store が記録し、`RunResult.artifacts` に含める方式を採用する。`ArtifactScope.RUN` と `ArtifactScope.STABLE` のどちらで保存した artifact も記録対象にする。
 
 | 案 | 内容 | 判定 |
 |----|------|------|
@@ -153,7 +154,7 @@ resources 集約案では、単一の標準成果物 root を `RunResult` に載
 | 保存済み `ResourceRef` 一覧 | `cmd.save_artifact_*()` 経由の保存を `RunResult.artifacts` に含める | 採用 |
 | 明示登録方式 | `track=True` や `cmd.register_artifact()` だけを載せる | 初期実装では不採用。大量ファイル生成時の拡張候補 |
 
-`RunResult.artifacts` は上限を設ける。上限超過時は先頭または末尾の代表値と超過数を別途保持するか、technical log に記録する。詳細は実装時に決める。
+`RunResult.artifacts` は上限を設ける。同一 absolute path への保存は最後の 1 件だけを記録し、同じ path の既存 `ResourceRef` を置き換えて末尾へ移動する。新規 path の追加で上限を超えた場合は古いものから削除し、削除した件数を `RunResult.artifacts_overflow_count` に加算する。上限超過はマクロ実行失敗にしない。
 
 ### 後方互換性
 
@@ -213,7 +214,7 @@ class Command(ABC):
         image: cv2.typing.MatLike,
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
+        overwrite: OverwritePolicy | None = None,
         atomic: bool = True,
     ) -> ResourceRef:
         """resources/<macro_id>/artifacts 配下へ画像 artifact を保存する。"""
@@ -226,7 +227,7 @@ class Command(ABC):
         data: bytes,
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
-        overwrite: OverwritePolicy = OverwritePolicy.ERROR,
+        overwrite: OverwritePolicy | None = None,
         atomic: bool = True,
     ) -> ResourceRef: ...
 
@@ -282,6 +283,12 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 
 `cmd.load_blob()` は静的資材として同梱または配置された任意 bytes を読む。artifact の読み戻しは `cmd.load_artifact_blob()` に限定し、asset と artifact の探索範囲を混ぜない。
 
+`load_artifact_*()` に `ResourceRef` を渡した場合は、`ResourceRef.path` を正とし、`scope` は解決に使わない。`str` または `Path` を渡した場合だけ、`scope` に基づいて現在実行中の `artifacts\<artifact_dir_name>` または `artifacts\stable` から解決する。過去実行の run-scoped artifact を読み戻す場合は、保存時に得た `ResourceRef` を渡す。
+
+`ResourceRef.run_id` は、その artifact を保存した実行の ID とする。`ArtifactScope.STABLE` で保存した場合も provenance として保存時の `run_id` を保持するが、パス解決には使わない。
+
+`save_artifact_*()` の `overwrite=None` は artifact store の既定値を使う。標準設定では `resource.overwrite_policy=REPLACE` とし、同一 path の artifact を更新できるようにする。呼び出し単位で `OverwritePolicy.ERROR` などを明示した場合は、その指定を優先する。
+
 ### artifact_dir_name
 
 | 項目 | 規則 |
@@ -302,7 +309,7 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 | `resource.artifact_timestamp_format` | `str` | `%Y%m%dT%H%M%S` | helper に使う開始時刻の形式 |
 | `resource.short_id_length` | `int` | `4` | helper に含める短縮 ID の長さ |
 | `resource.tracked_artifact_limit` | `int` | `1000` | `RunResult.artifacts` に保持する最大件数 |
-| `resource.overwrite_policy` | `OverwritePolicy` | `REPLACE` | `save_artifact_*()` の同名 artifact 処理 |
+| `resource.overwrite_policy` | `OverwritePolicy` | `REPLACE` | `save_artifact_*()` で `overwrite=None` の場合に使う同名 artifact 処理 |
 | `resource.atomic_write` | `bool` | `True` | artifact 保存に atomic write を使うか |
 
 ### エラーハンドリング
@@ -328,12 +335,16 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 | ユニット | `test_command_save_artifact_blob_delegates_to_artifact_store` | `DefaultCommand.save_artifact_blob()` が artifact store へ委譲する |
 | ユニット | `test_command_load_artifact_blob_reads_saved_blob` | `cmd.save_artifact_blob()` が返した `ResourceRef` を `cmd.load_artifact_blob()` で読み戻せる |
 | ユニット | `test_command_load_artifact_img_reads_saved_image` | `cmd.save_artifact_img()` が返した `ResourceRef` を `cmd.load_artifact_img()` で読み戻せる |
+| ユニット | `test_load_artifact_ref_ignores_scope` | `ResourceRef` で読み戻す場合は `scope` ではなく `ResourceRef.path` を使う |
 | ユニット | `test_command_load_artifact_does_not_use_assets` | `load_artifact_blob()` と `load_artifact_img()` が `assets` を探索しない |
 | ユニット | `test_command_does_not_expose_artifacts_property` | `cmd.artifacts` が公開 API から消えている |
 | ユニット | `test_artifact_dir_name_uses_timestamp_and_short_id` | helper が `{timestamp}_{short_id}` を返す |
 | ユニット | `test_artifact_scope_defaults_to_run_directory` | scope 未指定時は `artifacts\<artifact_dir_name>` 配下へ保存する |
 | ユニット | `test_artifact_scope_stable_uses_fixed_directory` | `scope=ArtifactScope.STABLE` で `artifacts\stable` 配下へ保存する |
+| ユニット | `test_artifact_scope_stable_is_recorded_in_run_result` | `ArtifactScope.STABLE` の保存も `RunResult.artifacts` に含める |
 | ユニット | `test_artifact_store_records_saved_refs` | `save_artifact_*()` 経由の `ResourceRef` が記録される |
+| ユニット | `test_artifact_tracking_dedupes_same_path` | 同一 absolute path の保存は最後の `ResourceRef` だけを記録する |
+| ユニット | `test_artifact_tracking_keeps_latest_refs_on_overflow` | 上限超過時は最新の `ResourceRef` を保持し、削除件数を `RunResult.artifacts_overflow_count` に記録する |
 | 結合 | `test_runtime_result_includes_saved_artifacts` | Runtime 経由で `RunResult.artifacts` に保存済み `ResourceRef` が入る |
 | 結合 | `test_runtime_saves_artifacts_under_resources` | `cmd.save_artifact_img()` が `resources\<macro_id>\artifacts` 配下に保存する |
 | ハードウェア | `test_realdevice_artifact_save_image` | `@pytest.mark.realdevice`。実キャプチャ画像を artifact として保存できる |
@@ -350,7 +361,7 @@ cmd.save_artifact_img("marker.png", frame, scope=ArtifactScope.STABLE)
 - [ ] `cmd.save_artifact_img()` / `cmd.load_artifact_img()` を実装
 - [ ] `cmd.save_img()` を完全削除し、`macros\` / `examples\macros\` の呼び出し元を更新
 - [ ] `cmd.artifact_dir_name` helper を実装
-- [ ] `RunResult.artifacts` と追跡上限を実装
+- [ ] `RunResult.artifacts` と `artifacts_overflow_count` を実装
 - [ ] 既存 tests / docs / specs を新 API と新配置へ更新
 - [ ] `uv run ruff check .` がパス
 - [ ] 関連 pytest がパス
