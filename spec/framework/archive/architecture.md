@@ -302,13 +302,13 @@ CH552デバイス向けの具体的なプロトコル実装です。
 ### 6.4 通知システム拡張（実装済み）
 外部通知システムが実装され、以下の機能を提供:
 
-- **NotificationInterface**: 通知システムの抽象インターフェース
+- **Notifier**: 通知 adapter の抽象基底
 - **Discord通知**: Webhook経由での通知送信
 - **Bluesky通知**: AT Protocolを使用した投稿機能
 - **NotificationHandler**: 複数通知サービスの統合管理
 
 **拡張ポイント:**
-- 新しい通知プラットフォームは `NotificationInterface` を実装することで追加可能
+- 新しい通知プラットフォームは `Notifier` を実装することで追加可能
 - 認証情報は `SecretsSettings` で安全に管理
 
 ## 7. 参考資料

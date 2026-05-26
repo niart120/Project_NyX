@@ -9,7 +9,7 @@ from nyxpy.framework.core.settings.schema import SettingValue
 
 from .bluesky_notification import BlueskyNotification
 from .discord_notification import DiscordNotification
-from .notification_interface import NotificationInterface
+from .notifier import Notifier
 
 
 class NotificationHandler:
@@ -17,14 +17,14 @@ class NotificationHandler:
 
     def __init__(
         self,
-        notifiers: list[NotificationInterface] | None = None,
+        notifiers: list[Notifier] | None = None,
         logger: LoggerPort | None = None,
     ):
         """通知 adapter 群と失敗時ログ出力先を保持します。"""
         self.notifiers = notifiers or []
         self.logger = logger or NullLoggerPort()
 
-    def add_notifier(self, notifier: NotificationInterface):
+    def add_notifier(self, notifier: Notifier):
         self.notifiers.append(notifier)
 
     def publish(self, text: str, img: cv2.typing.MatLike | None = None) -> None:

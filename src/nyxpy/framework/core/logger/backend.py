@@ -1,7 +1,5 @@
 """JSONL 形式の技術ログ backend。"""
 
-from __future__ import annotations
-
 import json
 from dataclasses import asdict
 from pathlib import Path

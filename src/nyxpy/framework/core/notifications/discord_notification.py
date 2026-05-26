@@ -7,10 +7,10 @@ import requests
 
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
-from .notification_interface import NotificationInterface
+from .notifier import Notifier
 
 
-class DiscordNotification(NotificationInterface):
+class DiscordNotification(Notifier):
     """Discord webhook へテキストと任意画像を送る通知 adapter。"""
 
     def __init__(self, webhook_url: str, logger: LoggerPort | None = None):

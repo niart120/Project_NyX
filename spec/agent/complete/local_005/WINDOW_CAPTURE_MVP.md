@@ -54,7 +54,7 @@
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `pyproject.toml` | 変更 | `mss` を依存に追加する |
-| `src/nyxpy/framework/core/hardware/capture.py` | 変更 | `AsyncCaptureDevice` をカメラ専用名へ整理し、共通インターフェースを維持する |
+| `src/nyxpy/framework/core/hardware/camera_capture.py` | 変更 | `AsyncCaptureDevice` をカメラ専用名へ整理し、共通インターフェースを維持する |
 | `src/nyxpy/framework/core/hardware/capture_source.py` | 新規 | `CaptureSourceConfig`、`CaptureSourceKey`、`CaptureRect` を定義する |
 | `src/nyxpy/framework/core/hardware/frame_transform.py` | 新規 | `FrameTransformConfig` と 16:9 アスペクトボックス用 `FrameTransformer` を実装する |
 | `src/nyxpy/framework/core/hardware/platform_capture.py` | 新規 | Windows DPI awareness など OS 別の capture 前処理を実装する |

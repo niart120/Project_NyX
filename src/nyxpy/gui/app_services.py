@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.device_discovery import (
     DUMMY_DEVICE_NAME,
@@ -26,6 +25,9 @@ from nyxpy.framework.core.io.ports import ControllerOutputPort, FrameSourcePort
 from nyxpy.framework.core.logger import create_default_logging
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.notifications.notification_handler import (
+    create_notification_handler_from_settings,
+)
 from nyxpy.framework.core.runtime.builder import (
     MacroRuntimeBuilder,
     create_device_runtime_builder,

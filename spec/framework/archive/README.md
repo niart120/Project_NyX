@@ -27,7 +27,7 @@
 | 画像処理・OCR | `src/nyxpy/framework/core/imgproc/` |
 | ログ管理 | `src/nyxpy/framework/core/logger/log_manager.py` |
 | 設定永続化 | `src/nyxpy/framework/core/settings/` |
-| 外部通知 | `src/nyxpy/framework/core/api/` |
+| 外部通知 | `src/nyxpy/framework/core/notifications/` |
 | GUI | `src/nyxpy/gui/` |
 
 ## 再設計時の注意点

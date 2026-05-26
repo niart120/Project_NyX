@@ -1,7 +1,5 @@
 """MacroRegistry と RuntimeBuilder を束ねる runtime facade。"""
 
-from __future__ import annotations
-
 import traceback
 from dataclasses import replace
 from datetime import datetime

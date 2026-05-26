@@ -9,6 +9,8 @@ from PySide6.QtGui import QPixmap
 from nyxpy.framework.core.constants import ScreenPoint
 from nyxpy.gui.panes.preview_pane import PreviewPane
 
+pytestmark = pytest.mark.usefixtures("tmp_cwd")
+
 
 @pytest.fixture
 def tmp_cwd(monkeypatch, tmp_path):
@@ -18,6 +20,7 @@ def tmp_cwd(monkeypatch, tmp_path):
 
 @pytest.fixture
 def preview_pane(qtbot, tmp_cwd):
+    _ = tmp_cwd
     pane = PreviewPane()
     qtbot.addWidget(pane)
     pane.show()
@@ -85,7 +88,7 @@ def test_update_preview_failure(preview_pane: PreviewPane, qtbot):
         assert after_pix.cacheKey() == before_key
 
 
-def test_preview_keeps_fixed_16_9_size_for_preset(qtbot, tmp_cwd):
+def test_preview_keeps_fixed_16_9_size_for_preset(qtbot):
     pane = PreviewPane(fixed_preview_size=(640, 360))
     qtbot.addWidget(pane)
 
@@ -101,7 +104,7 @@ def test_preview_keeps_fixed_16_9_size_for_preset(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_scales_frame_to_fixed_size_without_crop(qtbot, tmp_cwd):
+def test_preview_scales_frame_to_fixed_size_without_crop(qtbot):
     pane = PreviewPane(fixed_preview_size=(640, 360))
     qtbot.addWidget(pane)
     pane.show()
@@ -125,7 +128,7 @@ def test_preview_scales_frame_to_fixed_size_without_crop(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_maps_widget_point_to_hd_capture_point(qtbot, tmp_cwd):
+def test_preview_maps_widget_point_to_hd_capture_point(qtbot):
     pane = PreviewPane(fixed_preview_size=(768, 432))
     qtbot.addWidget(pane)
 
@@ -134,7 +137,7 @@ def test_preview_maps_widget_point_to_hd_capture_point(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_touch_mapping_handles_letterboxed_widget(qtbot, tmp_cwd):
+def test_preview_touch_mapping_handles_letterboxed_widget(qtbot):
     pane = PreviewPane(fixed_preview_size=(800, 432))
     qtbot.addWidget(pane)
 
@@ -144,7 +147,7 @@ def test_preview_touch_mapping_handles_letterboxed_widget(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_touch_ignores_pillarbox_press(qtbot, tmp_cwd):
+def test_preview_touch_ignores_pillarbox_press(qtbot):
     pane = PreviewPane(fixed_preview_size=(640, 360))
     qtbot.addWidget(pane)
     events = []
@@ -156,7 +159,7 @@ def test_preview_touch_ignores_pillarbox_press(qtbot, tmp_cwd):
     pane.timer.stop()
 
 
-def test_preview_touch_events_use_resized_preview_mapping(qtbot, tmp_cwd):
+def test_preview_touch_events_use_resized_preview_mapping(qtbot):
     pane = PreviewPane(fixed_preview_size=(768, 432))
     qtbot.addWidget(pane)
     events = []

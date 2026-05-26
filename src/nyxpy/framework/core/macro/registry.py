@@ -254,7 +254,7 @@ class MacroRegistry:
     def create(self, name_or_id: str) -> MacroBase:
         return self.resolve(name_or_id).factory.create()
 
-    def list(self, include_failed: bool = False) -> Sequence[MacroDefinition]:
+    def list(self) -> Sequence[MacroDefinition]:
         with self._lock:
             return tuple(self._definitions.values())
 

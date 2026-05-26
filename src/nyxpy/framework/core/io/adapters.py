@@ -1,7 +1,5 @@
 """Runtime port を既存 framework 実装へ接続する adapter。"""
 
-from __future__ import annotations
-
 import time
 from threading import Lock
 
@@ -17,7 +15,7 @@ from nyxpy.framework.core.io.ports import (
     FrameSourcePort,
     NotificationPort,
 )
-from nyxpy.framework.core.utils.helper import validate_keyboard_text
+from nyxpy.framework.core.macro.text_input import validate_keyboard_text
 
 
 class SerialControllerOutputPort(ControllerOutputPort):

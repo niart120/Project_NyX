@@ -14,9 +14,7 @@ class MacroCatalog:
 
     def reload_macros(self) -> None:
         self.registry.reload()
-        self.definitions_by_id = {
-            definition.id: definition for definition in self.registry.list(include_failed=False)
-        }
+        self.definitions_by_id = {definition.id: definition for definition in self.registry.list()}
 
     def list(self) -> list[MacroDefinition]:
         return sorted(

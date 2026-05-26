@@ -1,7 +1,5 @@
 """MacroBase lifecycle を実行する runner。"""
 
-from __future__ import annotations
-
 import traceback
 from collections.abc import Mapping
 from dataclasses import replace

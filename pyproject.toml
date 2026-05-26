@@ -42,6 +42,7 @@ dev = [
     "pytest-qt>=4.5.0",
     "ruff>=0.15.12",
     "ty>=0.0.39",
+    "vulture>=2.16",
 ]
 docs = [
     "mkdocs>=1.6",

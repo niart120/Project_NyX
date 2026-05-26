@@ -8,10 +8,10 @@ import requests
 
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
-from .notification_interface import NotificationInterface
+from .notifier import Notifier
 
 
-class BlueskyNotification(NotificationInterface):
+class BlueskyNotification(Notifier):
     """Bluesky の atproto API へテキストと画像を投稿する通知 adapter。"""
 
     def __init__(self, identifier: str, password: str, logger: LoggerPort | None = None):

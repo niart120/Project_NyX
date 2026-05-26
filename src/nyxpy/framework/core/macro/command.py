@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import pathlib
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
@@ -11,14 +12,21 @@ import cv2
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.io.resources import ArtifactScope, OverwritePolicy, ResourceRef
 from nyxpy.framework.core.macro.decorators import check_interrupt
+from nyxpy.framework.core.macro.text_input import validate_keyboard_text
 from nyxpy.framework.core.utils.cancellation import CancellationToken, cancellation_aware_wait
-from nyxpy.framework.core.utils.helper import (
-    get_caller_class_name,
-    validate_keyboard_text,
-)
 
 if TYPE_CHECKING:
     from nyxpy.framework.core.runtime.context import ExecutionContext
+
+
+def _get_caller_class_name() -> str | None:
+    frame = inspect.currentframe()
+    try:
+        caller = frame.f_back.f_back if frame and frame.f_back else None
+        self_obj = caller.f_locals.get("self") if caller is not None else None
+        return type(self_obj).__name__ if self_obj is not None else None
+    finally:
+        del frame
 
 
 class Command(ABC):
@@ -430,7 +438,7 @@ class DefaultCommand(Command):
 
     def log(self, *values: object, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
         message = sep.join(map(str, values)) + end.rstrip("\n")
-        caller_class = get_caller_class_name()
+        caller_class = _get_caller_class_name() or "Command"
         self.context.logger.user(
             level,
             message,

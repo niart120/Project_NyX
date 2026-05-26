@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`, `src/nyxpy/framework/core/io/`
 > **目的**: カメラデバイス以外の画面取得経路として、PC 上の既存ウィンドウまたは画面領域をフレーム入力ソースにする。
-> **関連ドキュメント**: `src/nyxpy/framework/core/hardware/capture.py`, `src/nyxpy/framework/core/io/device_factories.py`
+> **関連ドキュメント**: `src/nyxpy/framework/core/hardware/camera_capture.py`, `src/nyxpy/framework/core/io/device_factories.py`
 
 ## 1. 概要
 
@@ -65,7 +65,7 @@
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `pyproject.toml` | 変更 | 汎用キャプチャ候補ライブラリを追加する。MVP では `mss` を第一候補とし、OS 専用バックエンドは任意依存として扱う |
-| `src/nyxpy/framework/core/hardware/capture.py` | 変更 | カメラ実装と入力ソース共通抽象を分離し、既存 `AsyncCaptureDevice` の責務を明確化する |
+| `src/nyxpy/framework/core/hardware/camera_capture.py` | 変更 | カメラ実装と入力ソース共通抽象を分離し、既存 `AsyncCaptureDevice` の責務を明確化する |
 | `src/nyxpy/framework/core/hardware/window_capture.py` | 新規 | ウィンドウ・画面領域キャプチャデバイスとバックエンド抽象を実装する |
 | `src/nyxpy/framework/core/hardware/frame_transform.py` | 新規 | 入力フレームへ 16:9 の黒帯を追加するアスペクトボックス処理を実装する |
 | `src/nyxpy/framework/core/hardware/window_discovery.py` | 新規 | ウィンドウ列挙、タイトル照合、クライアント領域解決を実装する |

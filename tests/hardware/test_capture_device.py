@@ -4,7 +4,7 @@ import time
 import numpy as np
 import pytest
 
-from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
+from nyxpy.framework.core.hardware.camera_capture import CameraCaptureDevice
 
 
 @pytest.mark.realdevice

@@ -1,7 +1,5 @@
 """マクロ設定ファイル path の解決と読み込み。"""
 
-from __future__ import annotations
-
 from pathlib import Path, PurePosixPath
 from typing import Any
 

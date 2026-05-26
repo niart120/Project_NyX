@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pytest
 
-from nyxpy.framework.core.hardware.capture import (
+from nyxpy.framework.core.hardware.camera_capture import (
     CameraCaptureDevice,
     DummyCaptureDevice,
 )
@@ -35,7 +35,9 @@ class DummyVideoCapture:
 
 # テストケース１: CameraCaptureDevice の正常な初期化、フレーム取得、クローズ
 def test_async_capture_device_initialize_and_get_frame():
-    with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
+    with patch(
+        "nyxpy.framework.core.hardware.camera_capture.cv2.VideoCapture", new=DummyVideoCapture
+    ):
         device = CameraCaptureDevice(device_index=5, fps=100.0)
         device.initialize()
 
@@ -73,7 +75,7 @@ class DummyVideoCaptureNotOpened:
 
 def test_async_capture_device_initialize_failure():
     with patch(
-        "nyxpy.framework.core.hardware.capture.cv2.VideoCapture",
+        "nyxpy.framework.core.hardware.camera_capture.cv2.VideoCapture",
         new=DummyVideoCaptureNotOpened,
     ):
         device = CameraCaptureDevice(device_index=1)
@@ -85,7 +87,9 @@ def test_async_capture_device_initialize_failure():
 
 # テストケース３: get_latest_frame がフレーム未更新の場合の動作確認
 def test_get_latest_frame_no_update():
-    with patch("nyxpy.framework.core.hardware.capture.cv2.VideoCapture", new=DummyVideoCapture):
+    with patch(
+        "nyxpy.framework.core.hardware.camera_capture.cv2.VideoCapture", new=DummyVideoCapture
+    ):
         device = CameraCaptureDevice(device_index=2, fps=20.0)
         device.initialize()
         # 強制的に latest_frame を None

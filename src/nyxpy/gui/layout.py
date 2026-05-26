@@ -182,3 +182,14 @@ def virtual_controller_metrics_for_key(value: object) -> VirtualControllerMetric
         metrics.allocated_left_width(preset),
         metrics.controller_initial_height,
     )
+
+
+def calc_aspect_size(size, aspect_w: int = 16, aspect_h: int = 9) -> tuple[int, int]:
+    """指定領域内に収まるアスペクト比維持後の幅と高さを返します。"""
+    width, height = size.width(), size.height()
+    target_width = width
+    target_height = int(width * aspect_h / aspect_w)
+    if target_height > height:
+        target_height = height
+        target_width = int(height * aspect_w / aspect_h)
+    return target_width, target_height

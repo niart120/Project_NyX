@@ -86,8 +86,8 @@
 | `src/nyxpy/framework/core/logger/dispatcher.py` | 新規 | `LOGGING_FRAMEWORK.md` の `LogSinkDispatcher` へ異常・中断イベントを配信 |
 | `src/nyxpy/framework/core/settings/global_settings.py` | 変更 | `SettingsStore` / settings snapshot の schema、既定値、型検証、設定読み込み失敗時の `ConfigurationError` を実装 |
 | `src/nyxpy/framework/core/settings/secrets_settings.py` | 変更 | `SecretsStore` / secrets snapshot の schema、秘匿値のログマスク、型検証、読み込み失敗時の `ConfigurationError` を実装 |
-| `src/nyxpy/framework/core/utils/helper.py` | 変更 | `parse_define_args()` を `str` / `Iterable[str]` 対応にし、パース失敗を `ConfigurationError` に正規化 |
-| `src/nyxpy/framework/core/api/notification_handler.py` | 変更 | 通知失敗を飲み込むだけでなく、秘匿情報を除いた `ResourceError` 相当の構造化ログに記録 |
+| `src/nyxpy/framework/core/runtime/exec_args.py` | 変更 | `parse_define_args()` を `str` / `Iterable[str]` 対応にし、パース失敗を `ConfigurationError` に正規化 |
+| `src/nyxpy/framework/core/notifications/notification_handler.py` | 変更 | 通知失敗を飲み込むだけでなく、秘匿情報を除いた `ResourceError` 相当の構造化ログに記録 |
 | `src/nyxpy/gui/main_window.py` | 変更 | GUI cancel が例外を送出しない経路へ変更し、`RunResult` に基づき完了/中断/失敗を表示 |
 | `src/nyxpy/gui/panes/log_pane.py` | 変更 | loguru 文字列 handler ではなく `LOGGING_FRAMEWORK.md` の `UserEvent` を購読 |
 | `src/nyxpy/cli/run_cli.py` | 変更 | `RunResult` に基づく終了コード、エラーメッセージ、キャンセル表示へ変更。通知設定は secrets snapshot から取得 |

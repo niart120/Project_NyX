@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import cv2
 
 
-class NotificationInterface(ABC):
+class Notifier(ABC):
     """通知 service adapter が実装する送信 interface。"""
 
     @abstractmethod

@@ -880,7 +880,7 @@ def test_execute_macro_with_params_logs_parse_exception(
             return "broken"
 
     class FakeDialog:
-        def __init__(self, parent, macro_name):
+        def __init__(self, parent):
             self.param_edit = FakeParamEdit()
 
         def exec(self):
