@@ -47,7 +47,7 @@ def test_discord_notification_notify_with_image(monkeypatch):
 
     monkeypatch.setattr(requests, "post", fake_post)
 
-    def fake_imencode(ext, img):
+    def fake_imencode(_ext, img):
         return True, np.frombuffer(b"dummy_png_bytes", dtype=np.uint8)
 
     monkeypatch.setattr(cv2, "imencode", fake_imencode)
@@ -73,7 +73,7 @@ def test_discord_notification_notify_error(monkeypatch):
         ):
             logs.append((level, message, component, event, exc))
 
-    def fake_imencode(ext, img):
+    def fake_imencode(_ext, img):
         return False, None
 
     monkeypatch.setattr(cv2, "imencode", fake_imencode)

@@ -1,7 +1,5 @@
 """Runtime port を既存 framework 実装へ接続する adapter。"""
 
-from __future__ import annotations
-
 import time
 from threading import Lock
 

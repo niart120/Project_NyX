@@ -255,6 +255,7 @@ class MacroRegistry:
         return self.resolve(name_or_id).factory.create()
 
     def list(self, include_failed: bool = False) -> Sequence[MacroDefinition]:
+        _ = include_failed  # Failed loads have no MacroDefinition; use diagnostics().
         with self._lock:
             return tuple(self._definitions.values())
 

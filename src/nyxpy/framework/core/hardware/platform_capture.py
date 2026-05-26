@@ -1,7 +1,5 @@
 """キャプチャ処理向けの platform 初期化。"""
 
-from __future__ import annotations
-
 import ctypes
 import platform
 

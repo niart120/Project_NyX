@@ -1,7 +1,5 @@
 """ログ管理の例外型。"""
 
-from __future__ import annotations
-
 from nyxpy.framework.core.macro.exceptions import (
     ConfigurationError,
     ErrorDetailValue,

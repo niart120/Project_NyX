@@ -1,7 +1,5 @@
 """Runtime 用 device port factory。"""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from threading import Lock
 from typing import Any

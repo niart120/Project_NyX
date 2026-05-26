@@ -44,6 +44,7 @@ class FakeRegistry:
         self.reloads += 1
 
     def list(self, include_failed: bool = False):
+        _ = include_failed
         return tuple(self.definitions)
 
 

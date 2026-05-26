@@ -1,7 +1,5 @@
 """ログ表示 pane。"""
 
-from __future__ import annotations
-
 from typing import cast
 
 from PySide6.QtWidgets import (

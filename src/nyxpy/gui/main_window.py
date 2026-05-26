@@ -225,7 +225,7 @@ class MainWindow(QMainWindow):
             action.setCheckable(True)
             action.setData(preset.key)
             action.triggered.connect(
-                lambda checked=False, key=preset.key: self.apply_window_size_preset(key)
+                lambda _checked=False, key=preset.key: self.apply_window_size_preset(key)
             )
             self.window_size_action_group.addAction(action)
             self.window_size_actions[preset.key] = action
@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
             action.setData(value)
             action.setChecked(_same_number_or_none(current_fps, value))
             action.triggered.connect(
-                lambda checked=False, fps=value: self._apply_connection_settings(
+                lambda _checked=False, fps=value: self._apply_connection_settings(
                     {"capture_fps": fps}
                 )
             )
@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
             selection.fallback_reason == ConnectionFallbackReason.USER_SELECTED_DUMMY
         )
         dummy_action.triggered.connect(
-            lambda checked=False: self._apply_connection_settings(
+            lambda _checked=False: self._apply_connection_settings(
                 {"capture_source_type": "camera", "capture_device": DUMMY_DEVICE_NAME}
             )
         )
@@ -335,7 +335,7 @@ class MainWindow(QMainWindow):
             action.setData(device.name)
             action.setChecked(selection.selected == device)
             action.triggered.connect(
-                lambda checked=False, name=device.name: self._apply_connection_settings(
+                lambda _checked=False, name=device.name: self._apply_connection_settings(
                     {"capture_source_type": "camera", "capture_device": name}
                 )
             )
@@ -363,7 +363,7 @@ class MainWindow(QMainWindow):
             action.setData(identifier)
             action.setChecked(selection.selected == window)
             action.triggered.connect(
-                lambda checked=False, selected=window: self._apply_connection_settings(
+                lambda _checked=False, selected=window: self._apply_connection_settings(
                     {
                         "capture_source_type": "window",
                         "capture_window_title": selected.title,
@@ -394,7 +394,7 @@ class MainWindow(QMainWindow):
             selection.fallback_reason == ConnectionFallbackReason.USER_SELECTED_DUMMY
         )
         dummy_action.triggered.connect(
-            lambda checked=False: self._apply_connection_settings(
+            lambda _checked=False: self._apply_connection_settings(
                 {"serial_device": DUMMY_DEVICE_NAME}
             )
         )
@@ -412,7 +412,7 @@ class MainWindow(QMainWindow):
             action.setData(identifier)
             action.setChecked(selection.selected == device)
             action.triggered.connect(
-                lambda checked=False, serial=identifier: self._apply_connection_settings(
+                lambda _checked=False, serial=identifier: self._apply_connection_settings(
                     {"serial_device": serial}
                 )
             )
@@ -434,7 +434,7 @@ class MainWindow(QMainWindow):
             action.setData(int(baud))
             action.setChecked(baud == current_baud)
             action.triggered.connect(
-                lambda checked=False, value=int(baud): self._apply_connection_settings(
+                lambda _checked=False, value=int(baud): self._apply_connection_settings(
                     {"serial_baud": value}
                 )
             )
@@ -452,7 +452,7 @@ class MainWindow(QMainWindow):
             action.setData(protocol_name)
             action.setChecked(protocol_name == current)
             action.triggered.connect(
-                lambda checked=False, name=protocol_name: self._apply_connection_settings(
+                lambda _checked=False, name=protocol_name: self._apply_connection_settings(
                     _protocol_setting_updates(name, self.global_settings.get("serial_baud", 9600))
                 )
             )

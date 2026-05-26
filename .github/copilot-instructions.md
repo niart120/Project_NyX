@@ -26,26 +26,44 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ```
 src/nyxpy/
-  framework/     — フレームワーク本体 (MacroBase, Command, imgproc, ロガー等)
+  __main__.py    — `nyxpy` console script の入口
+  py.typed       — PEP 561 の型情報 marker
+  framework/
+    core/
+      api/       — 外部通知 API
+      constants/ — ボタン・座標・画面サイズなどの定数
+      hardware/  — キャプチャ、シリアル、プロトコル、デバイス探索
+      imgproc/   — 画像処理・OCR
+      io/        — runtime port、resource store、artifact store
+      logger/    — ログ event、dispatcher、sink、backend
+      macro/     — MacroBase、Command、registry、scaffold
+      runtime/   — runtime builder、runner、execution context
+      settings/  — workspace/global/secrets 設定
   gui/           — PySide6 GUI
-  cli/           — CLI エントリポイント
+  cli/           — `nyxpy run` の CLI 実装
+  templates/     — `nyxpy create` 用 scaffold template
 macros/
   {macro_id}/    — ローカル作業用マクロ。Git 管理外だが pytest 対象
 resources/
   {macro_id}/    — ローカル作業用リソース。Git 管理外
+docs/             — GitHub Pages で公開する利用者・マクロ開発者・API docs
 examples/
   macros/        — 公開用マクロ本体
     shared/      — 公開用マクロ間共通部品
     {macro_id}/  — 公開用マクロパッケージ
   resources/     — 公開用マクロの設定ファイル・画像リソース
-  tests/         — 公開用マクロのテスト
+  tests/         — 公開用マクロの単体・性能テスト
 tests/
   unit/          — 単体テスト
   gui/           — GUI テスト (pytest-qt)
   hardware/      — 実機必要テスト (@pytest.mark.realdevice)
   integration/   — 結合テスト
   perf/          — パフォーマンステスト
-spec/macro/      — マクロ仕様書
+spec/
+  macro/         — マクロ仕様書
+  framework/     — フレームワーク再設計・詳細仕様
+  docs/          — ドキュメント整備仕様
+  agent/         — エージェント向け作業仕様・完了記録
 ```
 
 **依存方向の制約:**
@@ -86,7 +104,7 @@ examples/macros/xxx/  →  examples/macros/yyy/*       NG (マクロ間の直接
 - フォーマット: `uv run ruff format .`
 
 ### 型ヒント
-- Python 3.12+ のため、前方参照以外で `from __future__ import annotations` は不要
+- Python 3.12+ のため、`TYPE_CHECKING` 配下の型や未定義名を注釈で参照する場合など、実行時評価を遅延する必要がある場合だけ `from __future__ import annotations` を使う
 - モダン構文を使用する:
   - `X | None` — not `Optional[X]`
   - `list[X]` / `dict[K, V]` — not `List[X]` / `Dict[K, V]`
@@ -101,13 +119,16 @@ examples/macros/xxx/  →  examples/macros/yyy/*       NG (マクロ間の直接
 ## よく使うコマンド
 
 ```console
-uv run nyx-gui                  # GUI 起動
-uv run nyx-cli                  # CLI 起動
+uv run nyxpy gui                # GUI 起動
+uv run nyxpy run <macro_id>     # CLI でマクロ実行
 uv run pytest                   # 全テスト
 uv run pytest tests/unit/       # 単体テストのみ
 uv run ruff check .             # リント
 uv run ruff format .            # フォーマット
+uv run ty check src/nyxpy --output-format concise --no-progress  # 型チェック
 ```
+
+`nyx-cli` は `nyxpy run`、`nyx-gui` は `nyxpy gui` の alias として扱う。
 
 ## コミットルール
 
