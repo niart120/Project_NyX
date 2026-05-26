@@ -71,7 +71,7 @@ class LogPane(QWidget):
         self.clear_button.clicked.connect(self.view.clear)
         connect_user_event(self.gui_sink, self._append_event_to_view)
         connect_technical_event(self.gui_sink, self._append_technical_to_view)
-        self.debug_checkbox.stateChanged.connect(self._on_debug_checkbox_changed)
+        self.debug_checkbox.toggled.connect(self._on_debug_checkbox_changed)
 
     @property
     def debug_enabled(self) -> bool:
@@ -111,10 +111,10 @@ class LogPane(QWidget):
         self.dispose()
         super().closeEvent(event)
 
-    def _on_debug_checkbox_changed(self, state):
+    def _on_debug_checkbox_changed(self, checked: bool):
         if self.gui_sink_id is None:
             return
-        level = "DEBUG" if self.debug_checkbox.isChecked() else "INFO"
+        level = "DEBUG" if checked else "INFO"
         self.dispatcher.set_level(self.gui_sink_id, level)
 
 

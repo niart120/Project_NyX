@@ -92,7 +92,7 @@ class EntryPointLoader:
             if source_path.is_file():
                 module_name = f"{self.module_prefix}.{source_path.stem}"
                 module = self._import_module(module_name)
-                macro_cls = self._single_local_macro_class(module, source_path)
+                macro_cls = self._single_local_macro_class(module)
                 macro_root = source_path.parent
                 default_id = source_path.stem
             elif source_path.is_dir():
@@ -143,7 +143,7 @@ class EntryPointLoader:
         module = self._import_module(module_name)
         return [(macro_cls, module_name) for macro_cls in self._local_macro_classes(module)]
 
-    def _single_local_macro_class(self, module: ModuleType, source_path: Path) -> type[MacroBase]:
+    def _single_local_macro_class(self, module: ModuleType) -> type[MacroBase]:
         candidates = self._local_macro_classes(module)
         if len(candidates) != 1:
             raise MacroLoadError(

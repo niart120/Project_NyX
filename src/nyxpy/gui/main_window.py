@@ -777,7 +777,7 @@ class MainWindow(QMainWindow):
         if macro_name is None:
             self.status_label.setText("マクロが選択されていません")
             return
-        dlg = MacroParamsDialog(self, macro_name)
+        dlg = MacroParamsDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 

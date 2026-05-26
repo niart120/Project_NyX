@@ -126,6 +126,7 @@ uv run pytest tests/unit/       # 単体テストのみ
 uv run ruff check .             # リント
 uv run ruff format .            # フォーマット
 uv run ty check src/nyxpy --output-format concise --no-progress  # 型チェック
+uv run vulture src tests examples macros --min-confidence 80      # 未使用コード候補の検出
 ```
 
 `nyx-cli` は `nyxpy run`、`nyx-gui` は `nyxpy gui` の alias として扱う。
