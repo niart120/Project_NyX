@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import requests
 
-from nyxpy.framework.core.api.discord_notification import DiscordNotification
+from nyxpy.framework.core.notifications.discord_notification import DiscordNotification
 
 
 def test_discord_notification_notify_text_only(monkeypatch):

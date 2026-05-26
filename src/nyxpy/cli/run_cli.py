@@ -6,9 +6,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from nyxpy.framework.core.api.notification_handler import (
-    create_notification_handler_from_settings,
-)
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
@@ -19,6 +16,9 @@ from nyxpy.framework.core.io.device_factories import (
 from nyxpy.framework.core.logger import LoggerPort, LoggingComponents, create_default_logging
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.notifications.notification_handler import (
+    create_notification_handler_from_settings,
+)
 from nyxpy.framework.core.runtime.builder import MacroRuntimeBuilder, create_device_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus

@@ -1,8 +1,8 @@
 # 通知システム設計詳細
 
-このドキュメントでは、Project NyX における外部通知システムの設計と実装について説明します。旧 `docs` から移設したアーカイブであり、現行コードでは `src/nyxpy/framework/core/api/` が正本です。
+このドキュメントでは、Project NyX における外部通知システムの設計と実装について説明します。旧 `docs` から移設したアーカイブであり、現行コードでは `src/nyxpy/framework/core/notifications/` が正本です。
 
-**実装状況: 通知システムは実装済み (`src/nyxpy/framework/core/api/`)**
+**実装状況: 通知システムは実装済み (`src/nyxpy/framework/core/notifications/`)**
 
 ---
 
@@ -86,7 +86,7 @@ password = "your-app-password"
 ### 5.1 プログラムからの呼び出し
 
 ```python
-from nyxpy.framework.core.api.notification_handler import create_notification_handler_from_settings
+from nyxpy.framework.core.notifications.notification_handler import create_notification_handler_from_settings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
 # 設定から通知ハンドラーを作成

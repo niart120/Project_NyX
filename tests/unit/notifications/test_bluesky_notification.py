@@ -3,7 +3,7 @@ from unittest.mock import Mock, call, patch
 
 import requests
 
-from nyxpy.framework.core.api.bluesky_notification import BlueskyNotification
+from nyxpy.framework.core.notifications.bluesky_notification import BlueskyNotification
 
 
 # 固定の時刻をモックするためのクラス
@@ -43,7 +43,7 @@ def test_bluesky_notification_authentication():
 def test_bluesky_notification_notify():
     # datetimeモジュールをパッチ
     with (
-        patch("nyxpy.framework.core.api.bluesky_notification.datetime", MockDateTime),
+        patch("nyxpy.framework.core.notifications.bluesky_notification.datetime", MockDateTime),
         patch("requests.post") as mock_post,
     ):
         # Mock responses
@@ -94,7 +94,7 @@ def test_bluesky_notification_notify():
 def test_token_refresh_on_401():
     # datetimeモジュールをパッチ
     with (
-        patch("nyxpy.framework.core.api.bluesky_notification.datetime", MockDateTime),
+        patch("nyxpy.framework.core.notifications.bluesky_notification.datetime", MockDateTime),
         patch("requests.post") as mock_post,
     ):
         # Authentication response

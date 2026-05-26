@@ -112,7 +112,7 @@
 | `src\nyxpy\framework\core\logger\sinks.py` | 新規 | file、console、test sink を実装。GUI sink は `src\nyxpy\gui\` 配下に置く |
 | `src\nyxpy\framework\core\settings\global_settings.py` | 変更 | 互換 shim を分離し、`SettingsStore` / snapshot 経路へ移行 |
 | `src\nyxpy\framework\core\settings\secrets_settings.py` | 変更 | 互換 shim を分離し、`SecretsStore` / secrets snapshot 経路へ移行 |
-| `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を構造化ログへ記録し、マクロ失敗へ伝播させない |
+| `src\nyxpy\framework\core\notifications\notification_handler.py` | 変更 | 通知失敗を構造化ログへ記録し、マクロ失敗へ伝播させない |
 | `src\nyxpy\framework\core\singletons.py` | 変更 | 互換 shim だけを残し、新 Runtime 経路からの参照を削除 |
 | `src\nyxpy\cli\run_cli.py` | 変更 | `MacroRuntimeBuilder` と `RunResult` ベースの CLI adapter へ移行 |
 | `src\nyxpy\gui\main_window.py` | 変更 | `RunHandle` / `RunResult` ベースの GUI adapter へ移行 |
@@ -322,7 +322,7 @@ Runtime の責務は registry 解決、`definition.factory.create()`、`DefaultC
 | 項目 | 内容 |
 |------|------|
 | 目的 | シリアル、キャプチャ、リソース、通知、ログを Port で抽象化し、Runtime 中核を具象デバイスから切り離す |
-| 対象ファイル | `src\nyxpy\framework\core\io\ports.py`, `io\adapters.py`, `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\runtime\builder.py`, `src\nyxpy\framework\core\logger\ports.py`, `src\nyxpy\framework\core\api\notification_handler.py`, `src\nyxpy\framework\core\singletons.py`, `tests\unit\framework\io\test_ports.py`, `tests\hardware\test_macro_runtime_realdevice.py` |
+| 対象ファイル | `src\nyxpy\framework\core\io\ports.py`, `io\adapters.py`, `src\nyxpy\framework\core\io\resources.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\runtime\builder.py`, `src\nyxpy\framework\core\logger\ports.py`, `src\nyxpy\framework\core\notifications\notification_handler.py`, `src\nyxpy\framework\core\singletons.py`, `tests\unit\framework\io\test_ports.py`, `tests\hardware\test_macro_runtime_realdevice.py` |
 | 完了条件 | fake Port で Runtime が単体テスト可能であり、既存 serial/capture/resource/notification/logger 実装は adapter 経由で使える |
 | テスト | `test_controller_output_port_serializes_send_operations`, `test_frame_source_await_ready_success_after_first_frame`, `test_frame_source_await_ready_timeout`, `test_notification_port_logs_notifier_failure`, `test_default_logger_emits_structured_log_with_run_context`, `test_serial_controller_output_port_realdevice`, `test_capture_frame_source_realdevice_ready` |
 | リスク | 暗黙 dummy fallback の扱い変更、async detection race、frame readiness、GUI preview と Runtime 実行で capture 所有権が競合する |

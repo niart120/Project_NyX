@@ -89,7 +89,7 @@ handler 管理は `custom_handlers` の dict と loguru の handler ID に依存
 | `src\nyxpy\framework\core\runtime\builder.py` | 変更 | composition root から受け取った `LoggerPort` を `ExecutionContext` へ注入する。CLI/GUI 用 logger 構成は担当しない |
 | `src\nyxpy\framework\core\macro\command.py` | 変更 | 既存 `Command.log()` を `LoggerPort.user()` へ接続し、組み込み DEBUG ログを `command_debug_enabled` で制御 |
 | `src\nyxpy\framework\core\settings\global_settings.py` | 変更 | `logging.*` 設定を schema に追加 |
-| `src\nyxpy\framework\core\api\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
+| `src\nyxpy\framework\core\notifications\notification_handler.py` | 変更 | 通知失敗を secret mask 済み `TechnicalLog` として記録 |
 | `src\nyxpy\gui\log_sink.py` | 新規 | `GuiLogSink` を定義し、`UserEvent` を Qt Signal へ変換する GUI 層 adapter |
 | `src\nyxpy\gui\panes\log_pane.py` | 変更 | loguru 文字列 handler ではなく `GuiLogSink` 由来の Qt Signal を購読 |
 | `tests\unit\framework\logger\test_logging_framework.py` | 新規 | logger port、sink 配信、secret mask、context、handler 例外隔離を検証 |

@@ -1,4 +1,4 @@
-from nyxpy.framework.core.api.notification_handler import NotificationHandler
+from nyxpy.framework.core.notifications.notification_handler import NotificationHandler
 
 
 class MockNotifier:

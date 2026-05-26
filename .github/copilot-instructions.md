@@ -30,13 +30,13 @@ src/nyxpy/
   py.typed       — PEP 561 の型情報 marker
   framework/
     core/
-      api/       — 外部通知 API
       constants/ — ボタン・座標・画面サイズなどの定数
       hardware/  — キャプチャ、シリアル、プロトコル、デバイス探索
       imgproc/   — 画像処理・OCR
       io/        — runtime port、resource store、artifact store
       logger/    — ログ event、dispatcher、sink、backend
       macro/     — MacroBase、Command、registry、scaffold
+      notifications/ — Discord / Bluesky などの外部通知 adapter
       runtime/   — runtime builder、runner、execution context
       settings/  — workspace/global/secrets 設定
   gui/           — PySide6 GUI

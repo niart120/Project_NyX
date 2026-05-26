@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from nyxpy.framework.core.api.notification_handler import NotificationHandler
 from nyxpy.framework.core.hardware.capture import CameraCaptureDevice
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
@@ -16,6 +15,7 @@ from nyxpy.framework.core.io.device_factories import (
 )
 from nyxpy.framework.core.logger import NullLoggerPort
 from nyxpy.framework.core.macro.registry import MacroRegistry
+from nyxpy.framework.core.notifications.notification_handler import NotificationHandler
 from nyxpy.framework.core.runtime.builder import create_device_runtime_builder
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunStatus
