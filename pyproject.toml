@@ -1,7 +1,7 @@
 [project]
 name = "nyxfw"
 version = "0.1.0"
-description = "Nintendo Switch automation framework with macro APIs, CLI, and GUI"
+description = "NS automation framework with macro APIs, CLI, and GUI"
 authors = [
     {name = "niart120",email = "38847256+niart120@users.noreply.github.com"}
 ]
