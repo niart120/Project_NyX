@@ -21,7 +21,7 @@
 
 最小テンプレートだけを package data として同梱する。`examples\macros` は公開サンプルであり、利用者の雛形生成元にはしない。
 
-`uv tool install nyxfw` 後の主導線は `nyxpy ...` とし、macro 個別生成は `nyxpy create <macro_id>` から呼ぶ。`nyx-cli` は実行系 alias として扱い、scaffold の主導線にはしない。`nyxpy new` は多義的なため使わない。
+`uv tool install nyxpy-fw` 後の主導線は `nyxpy ...` とし、macro 個別生成は `nyxpy create <macro_id>` から呼ぶ。`nyx-cli` は実行系 alias として扱い、scaffold の主導線にはしない。`nyxpy new` は多義的なため使わない。
 
 `nyxpy init` は通常、workspace 初期化後にサンプルマクロ `sample_macro` も生成する。空の workspace だけを作る場合は `nyxpy init --blank` を使う。`nyxpy create <macro_id>` は workspace が存在しない場合に失敗し、先に `nyxpy init` を実行するよう案内する。
 

@@ -698,7 +698,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nyxfw"
+name = "nyxpy-fw"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

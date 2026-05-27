@@ -15,10 +15,10 @@ NyX は uv が管理する Python 環境で動作します。Python の実装知
 
 ## 最短手順
 
-配布パッケージ `nyxfw` を使う場合:
+配布パッケージ `nyxpy-fw` を使う場合:
 
 ```console
-uv tool install nyxfw
+uv tool install nyxpy-fw
 nyxpy init
 nyxpy gui
 ```

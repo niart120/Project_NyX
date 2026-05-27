@@ -19,7 +19,7 @@
 6. GitHub Actions から TestPyPI へ publish する。
 7. TestPyPI 版を clean venv に install し、依存解決と CLI 起動を確認する。
 8. PyPI の pending publisher を登録する。
-9. release commit を main に取り込み、`v*` tag を作成する。
+9. release commit を `master` に取り込み、`v*` tag を作成する。
 10. GitHub Actions から PyPI へ publish する。
 11. 公開後の project page、install、CLI を確認する。
 
@@ -202,12 +202,12 @@ POSIX shell では `.venv-testpypi\Scripts\python` を `.venv-testpypi/bin/pytho
 
 本番 publish は TestPyPI 検証後に実行する。`.github\workflows\publish.yml` は `target=pypi` の場合、`refs/tags/v*` からの実行だけを許可する。
 
-1. release commit を main に取り込む。
+1. release commit を `master` に取り込む。
 2. annotated tag を作成する。
 
 ```console
 git tag -a v0.1.0 -m "v0.1.0"
-git push origin main
+git push origin master
 git push origin v0.1.0
 ```
 

@@ -19,10 +19,10 @@ uv --version
 
 ## パッケージで導入する
 
-配布パッケージ `nyxfw` を使う場合は `uv tool install` で CLI / GUI を導入します。
+配布パッケージ `nyxpy-fw` を使う場合は `uv tool install` で CLI / GUI を導入します。
 
 ```console
-uv tool install nyxfw
+uv tool install nyxpy-fw
 nyxpy --help
 ```
 
@@ -31,7 +31,7 @@ nyxpy --help
 更新する場合:
 
 ```console
-uv tool upgrade nyxfw
+uv tool upgrade nyxpy-fw
 ```
 
 マクロが追加の外部ライブラリを必要とする場合、`uv tool install` で作られる隔離環境にもその依存が必要です。必要な依存はマクロ配布元の手順を確認してください。

@@ -26,10 +26,10 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ## クイックスタート
 
-配布パッケージ `nyxfw` は公開準備中です。公開後は次の導線を使います。
+配布パッケージ `nyxpy-fw` は公開準備中です。公開後は次の導線を使います。
 
 ```console
-uv tool install nyxfw
+uv tool install nyxpy-fw
 nyxpy init
 nyxpy gui
 ```

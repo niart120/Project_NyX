@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-`uv tool install nyxfw` 後に、利用者が `nyxpy ...` から GUI 起動、マクロ実行、workspace 初期化、マクロ生成、docs 表示へ到達できるようにする。`nyx-gui` と `nyx-cli` は主導線ではなく alias として扱う。
+`uv tool install nyxpy-fw` 後に、利用者が `nyxpy ...` から GUI 起動、マクロ実行、workspace 初期化、マクロ生成、docs 表示へ到達できるようにする。`nyx-gui` と `nyx-cli` は主導線ではなく alias として扱う。
 
 ## 2. 現状
 

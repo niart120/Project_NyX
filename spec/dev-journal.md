@@ -20,7 +20,7 @@
 
 ### 現状
 
-`uv tool install nyxfw` で CLI/GUI を導入した場合、tool の隔離環境には NyX と NyX の依存だけが入り、`macros\` から import されるマクロ固有の外部依存は自動では入らない。
+`uv tool install nyxpy-fw` で CLI/GUI を導入した場合、tool の隔離環境には NyX と NyX の依存だけが入り、`macros\` から import されるマクロ固有の外部依存は自動では入らない。
 
 ### 観察
 

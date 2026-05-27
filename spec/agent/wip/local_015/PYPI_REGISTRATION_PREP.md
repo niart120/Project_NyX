@@ -61,13 +61,13 @@ PyPI 初回公開は配布名、成果物内容、metadata、Trusted Publishing 
 
 ### 3.2 配布名の再々考
 
-現行の `pyproject.toml` は配布名 `nyxfw`、import package 名 `nyxpy` である。2026-05-27 時点の確認では、`nyxpy-fw`、`nyxpy-app`、`nyxfw` は PyPI / TestPyPI とも未登録である。`nyxpy-fw` と `nyxpy_fw` は PyPI の正規化により同一名として扱われる。
+現行の `pyproject.toml` は配布名 `nyxpy-fw`、import package 名 `nyxpy` である。2026-05-27 時点の確認では、`nyxpy-fw`、`nyxpy-app`、`nyxfw` は PyPI / TestPyPI とも未登録である。`nyxpy-fw` と `nyxpy_fw` は PyPI の正規化により同一名として扱われる。
 
 | 候補 | 判定 | 理由 |
 |------|------|------|
 | `nyxpy-fw` | 第一候補 | import package `nyxpy` との関係が分かりやすく、framework 依存として導入する用途にも合う |
 | `nyxpy-app` | 第二候補 | GUI / CLI アプリとしての導入名には合うが、マクロ開発者が `nyxpy.framework.*` を依存として使う説明にはやや弱い |
-| `nyxfw` | 旧候補 | 短いが、`nyxpy` との対応が分かりにくい。既存 docs では採用済みのため置換コストは低い |
+| `nyxfw` | 旧候補 | 短いが、`nyxpy` との対応が分かりにくい。以前の docs では採用済みだったが、公開前に `nyxpy-fw` へ寄せる |
 | `nyxpy` | 不採用 | PyPI で既存 project が使用中。import package 名としてのみ維持する |
 | `project-nyx` | 不採用 | TestPyPI で既存 project があり、公開パッケージ名としてリポジトリ内向きに見える |
 
@@ -241,21 +241,21 @@ PyPI 本番 publish 後は同じ version の再アップロードができない
 
 ## 6. 実装チェックリスト
 
-- [ ] `dist\*.whl`, `dist\*.tar.gz`, `build\`, `*.egg-info`, `src\*.egg-info`, `site\` を削除する
-- [ ] `.pypirc` を publish 手順から外し、Git 管理対象や archive に含まれないことを確認する
-- [ ] 配布名を `nyxpy-fw` / `nyxpy-app` / `nyxfw` から最終決定する
-- [ ] `pyproject.toml` の `name`、metadata、dependencies、scripts、URLs を確定名に更新する
+- [x] `dist\*.whl`, `dist\*.tar.gz`, `build\`, `*.egg-info`, `src\*.egg-info`, `site\` を削除する
+- [x] `.pypirc` を publish 手順から外し、Git 管理対象や archive に含まれないことを確認する
+- [x] 配布名を `nyxpy-fw` に最終決定する
+- [x] `pyproject.toml` の `name`、metadata、dependencies、scripts、URLs を確定名に更新する
 - [ ] Python 3.14 は初回公開対象外とし、`requires-python = ">=3.12,<3.14"` を維持する
-- [ ] README と docs の install 導線が `uv tool install <配布名>` と `nyxpy ...` に揃っていることを確認する
-- [ ] `uv lock --check` を実行する
-- [ ] `uv run ruff check .` を実行する
-- [ ] `uv run ty check src/nyxpy --output-format concise --no-progress` を実行する
-- [ ] `uv run pytest` を実行する
-- [ ] `uv run vulture src tests examples macros --min-confidence 80` を実行する
-- [ ] `uv run --no-sync mkdocs build --strict` を実行する
-- [ ] `uv build` を実行する
-- [ ] `uvx twine check --strict dist/*` を実行する
-- [ ] wheel / sdist 内容を確認する
+- [x] README と docs の install 導線が `uv tool install <配布名>` と `nyxpy ...` に揃っていることを確認する
+- [x] `uv lock --check` を実行する
+- [x] `uv run ruff check .` を実行する
+- [x] `uv run ty check src/nyxpy --output-format concise --no-progress` を実行する
+- [x] `uv run pytest` を実行する
+- [x] `uv run vulture src tests examples macros --min-confidence 80` を実行する
+- [x] `uv run --no-sync mkdocs build --strict` を実行する
+- [x] `uv build` を実行する
+- [x] `uvx twine check --strict dist/*` を実行する
+- [x] wheel / sdist 内容を確認する
 - [ ] TestPyPI account sidebar で pending publisher を登録する
 - [ ] GitHub environment `testpypi` を確認または作成する
 - [ ] `target=testpypi` で publish workflow を実行する

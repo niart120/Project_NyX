@@ -1,5 +1,5 @@
 [project]
-name = "nyxfw"
+name = "nyxpy-fw"
 version = "0.1.0"
 description = "NS automation framework with macro APIs, CLI, and GUI"
 authors = [
@@ -72,6 +72,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 targets.wheel.packages = ["src/nyxpy"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.nyxpy/**",
+    "/.pypirc",
+    "/build/**",
+    "/dist/**",
+    "/macros/**",
+    "/resources/**",
+    "/site/**",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
