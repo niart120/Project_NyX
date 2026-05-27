@@ -257,11 +257,11 @@ PyPI 本番 publish 後は同じ version の再アップロードができない
 - [x] `uvx twine check --strict dist/*` を実行する
 - [x] wheel / sdist 内容を確認する
 - [ ] TestPyPI account sidebar で pending publisher を登録する
-- [ ] GitHub environment `testpypi` を確認または作成する
+- [x] GitHub environment `testpypi` を確認または作成する
 - [ ] `target=testpypi` で publish workflow を実行する
 - [ ] TestPyPI から `--no-deps` で wheel を取得し、依存は PyPI から install して動作確認する
 - [ ] PyPI account sidebar で pending publisher を登録する
-- [ ] GitHub environment `pypi` を確認または作成し、required reviewers を設定する
+- [x] GitHub environment `pypi` を確認または作成し、required reviewers を設定する
 - [ ] release commit と `v0.1.0` tag を作成する
 - [ ] `target=pypi` で publish workflow を `v*` tag から実行する
 - [ ] PyPI project page と `uv tool install <配布名>` を確認する
