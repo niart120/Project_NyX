@@ -38,17 +38,6 @@ nyxpy gui
 
 `nyxpy init` は確認用の `sample_macro` も生成します。空の workspace だけが必要な場合は、`nyxpy init --blank` を使います。
 
-リポジトリから動作確認する場合も、実行用 workspace はリポジトリ外に作成します。
-
-```console
-git clone https://github.com/niart120/Project_NyX.git
-mkdir nyx-workspace
-cd Project_NyX
-uv sync
-cd ../nyx-workspace
-uv run --project ../Project_NyX nyxpy init
-uv run --project ../Project_NyX nyxpy gui
-```
 
 ## ドキュメント
 
