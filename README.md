@@ -1,8 +1,8 @@
-# Project NyX
+# NyXPy-FW
 
 ![Alpha Version Badge](https://img.shields.io/badge/Status-Alpha-orange)
 
-NyX は、Nintendo Switch 向け自動化ツールの開発フレームワークです。PC に接続したキャプチャデバイスからゲーム画面を取得し、シリアル通信デバイスを介してコントローラー操作を自動化できます。
+NyXPy-FW (Project NyX) は、キャプチャデバイスから取得した画面とシリアル通信デバイス経由のコントローラー入力を組み合わせる、ゲーム自動化向けの Python フレームワークです。GUI、CLI、マクロ API、ログ、実行成果物の保存をまとめて提供します。
 
 **注意: このソフトウェアは開発中のアルファ版です。機能や設計が変更される可能性があります。**
 
@@ -26,29 +26,35 @@ NyX は、Nintendo Switch 向け自動化ツールの開発フレームワーク
 
 ## クイックスタート
 
-配布パッケージ `nyxpy-fw` は公開準備中です。公開後は次の導線を使います。
+PyPI から導入する場合は、空の workspace 用ディレクトリを作成し、その中で `nyxpy init` を実行します。
 
 ```console
 uv tool install nyxpy-fw
+mkdir nyx-workspace
+cd nyx-workspace
 nyxpy init
 nyxpy gui
 ```
 
-現時点で動作確認する場合は、リポジトリを取得して起動します。
+`nyxpy init` は確認用の `sample_macro` も生成します。空の workspace だけが必要な場合は、`nyxpy init --blank` を使います。
+
+リポジトリから動作確認する場合も、実行用 workspace はリポジトリ外に作成します。
 
 ```console
 git clone https://github.com/niart120/Project_NyX.git
+mkdir nyx-workspace
 cd Project_NyX
 uv sync
-uv run nyxpy init
-uv run nyxpy gui
+cd ../nyx-workspace
+uv run --project ../Project_NyX nyxpy init
+uv run --project ../Project_NyX nyxpy gui
 ```
 
 ## ドキュメント
 
 利用者向けガイド、マクロ開発者向けドキュメント、API リファレンスは GitHub Pages で公開しています。
 
-- [Project NyX Docs](https://niart120.github.io/Project_NyX/)
+- [NyXPy-FW Docs](https://niart120.github.io/Project_NyX/)
 - [利用者向けガイド](https://niart120.github.io/Project_NyX/user-guide/)
 - [マクロ開発者向けドキュメント](https://niart120.github.io/Project_NyX/macro-development/)
 - [API リファレンス](https://niart120.github.io/Project_NyX/api/framework/)

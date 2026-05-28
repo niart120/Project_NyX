@@ -331,7 +331,7 @@ def cli_main(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     """CLIの引数パーサーを構築します。"""
-    parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
+    parser = argparse.ArgumentParser(description="NyXPy-FW CLI - game automation tool")
     add_run_arguments(parser)
     return parser
 

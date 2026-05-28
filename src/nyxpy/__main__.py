@@ -59,7 +59,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
 
     """
     parser = argparse.ArgumentParser(
-        prog="nyxpy", description="NyX Macro Framework for Nintendo Switch automation"
+        prog="nyxpy", description="NyXPy-FW macro framework for game automation"
     )
     subparsers = parser.add_subparsers(dest="command", required=True, help="Command to execute")
 
@@ -120,7 +120,7 @@ def gui_app() -> int:
 
 def run_alias_main(argv: list[str] | None = None) -> int:
     """Run macro execution CLI as the `nyx-cli` alias."""
-    parser = argparse.ArgumentParser(description="NyX CLI - Nintendo Switch Automation Tool")
+    parser = argparse.ArgumentParser(description="NyXPy-FW CLI - game automation tool")
     add_run_arguments(parser)
     return cli_main(parser.parse_args(argv))
 
