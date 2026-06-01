@@ -1,0 +1,4 @@
+interface:
+  display_name: "NyX Framework Spec Writing"
+  short_description: "Draft and review NyX framework specs"
+  default_prompt: "Use $framework-spec-writing to draft or review a Project NyX framework spec."

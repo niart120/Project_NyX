@@ -3,7 +3,7 @@
 > **文書種別**: 仕様書。既存マクロ import / lifecycle 互換契約、`MacroRegistry`、`MacroDefinition`、manifest 任意採用、class metadata、`MacroDefinition.settings_path` の正本である。settings lookup の解決と読み込みは `CONFIGURATION_AND_RESOURCES.md` を正本とする。
 > **対象モジュール**: `src/nyxpy/framework/core/macro/`  
 > **目的**: 既存マクロの import / lifecycle 互換を維持しつつ、ロード・識別・実行基盤をレジストリ中心へ再設計する
-> **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`  
+> **関連ドキュメント**: `.agents/skills/framework-spec-writing/template.md`
 > **既存ソース**: `src/nyxpy/framework/core/macro/base.py`, `src/nyxpy/framework/core/macro/command.py`, `src/nyxpy/framework/core/macro/executor.py`, `src/nyxpy/framework/core/macro/settings_resolver.py`
 > **破壊的変更**: 維持する既存マクロ互換契約は本書を正とする。互換契約外の破壊的変更、削除条件、代替 API、テストゲートは `DEPRECATION_AND_MIGRATION.md` を正とする。
 

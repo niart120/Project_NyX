@@ -29,7 +29,7 @@
 |----------|----------|----------|
 | `macros/xxx/macro.py` | 新規 | メインマクロ |
 | `macros/xxx/__init__.py` | 新規 | パッケージ初期化 |
-| `static/xxx/settings.toml` | 新規 | 設定ファイル |
+| `resources/xxx/settings.toml` | 新規 | 設定ファイル |
 
 ## 3. 設計方針
 

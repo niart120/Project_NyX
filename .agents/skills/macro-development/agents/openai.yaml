@@ -1,0 +1,4 @@
+interface:
+  display_name: "NyX Macro Development"
+  short_description: "Build and update Project NyX macros"
+  default_prompt: "Use $macro-development to create or update a Project NyX macro."

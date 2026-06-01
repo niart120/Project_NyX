@@ -1,0 +1,4 @@
+interface:
+  display_name: "NyX Dev Journal"
+  short_description: "Record Project NyX design notes"
+  default_prompt: "Use $dev-journal to record a concise Project NyX design note."

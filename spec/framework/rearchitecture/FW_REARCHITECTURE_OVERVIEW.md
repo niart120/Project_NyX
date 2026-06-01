@@ -3,7 +3,7 @@
 > **文書種別**: 仕様書。再設計全体の方針と仕様依存関係を定義し、詳細 API の正本は下記の所有文書へ委譲する。
 > **対象モジュール**: `src\nyxpy\framework\core\macro\` および将来追加する `src\nyxpy\framework\core\runtime\`  
 > **目的**: 既存マクロ資産の import 互換を維持しながら、マクロ発見・生成・実行・中断・結果取得を `MacroRuntime` 中心に再整理する。  
-> **関連ドキュメント**: `.github/skills/framework-spec-writing/template.md`, `spec/framework/archive/architecture.md`, `ARCHITECTURE_DIAGRAMS.md`, `DEPRECATION_AND_MIGRATION.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `RUNTIME_AND_IO_PORTS.md`, `OBSERVABILITY_AND_GUI_CLI.md`
+> **関連ドキュメント**: `.agents/skills/framework-spec-writing/template.md`, `spec/framework/archive/architecture.md`, `ARCHITECTURE_DIAGRAMS.md`, `DEPRECATION_AND_MIGRATION.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `RUNTIME_AND_IO_PORTS.md`, `OBSERVABILITY_AND_GUI_CLI.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\base.py`, `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\singletons.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
 > **破壊的変更**: 維持する互換契約の大分類は本書と `MACRO_COMPATIBILITY_AND_REGISTRY.md` を正とする。破壊的変更、削除条件、代替 API、テストゲートの詳細は `DEPRECATION_AND_MIGRATION.md` を正とし、本書では全体方針だけを扱う。
 
