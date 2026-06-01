@@ -1,7 +1,6 @@
 ---
 name: macro-development
 description: "Project NyX のマクロ実装・修正・レビューを行うスキル。USE WHEN: ユーザが「マクロを作って」「マクロを直して」「macros/ 配下を実装」「resources/ の設定を追加」「NyX の MacroBase / Command を使う」「examples/macros を参考にしたい」など、Nintendo Switch 自動化マクロのコード・設定・テストを扱う意図を示したとき。仕様書だけを書く場合は macro-spec-writing を使う。"
-argument-hint: "[macro_id または作業内容]"
 ---
 
 # NyX マクロ開発スキル
@@ -43,7 +42,7 @@ https://raw.githubusercontent.com/niart120/Project_NyX/master/docs/macro-develop
 4. 設定値の変換や判定ロジックは `config.py` や独立関数へ分離し、`Command` なしでテストします。
 5. 設定ファイルは `resources\<macro_id>\settings.toml` に置き、マクロ側は `settings_path = "resource:settings.toml"` を標準にします。
 6. 画像資材は `resources\<macro_id>\assets` に置き、`cmd.load_img()` では資材ディレクトリからの相対パスを使います。
-7. `cmd.capture()` の結果は `None` を確認してから shape 参照・画像処理・保存を行います。
+7. `cmd.capture()` はフレーム未準備時に例外を送出するため、通常分岐として握りつぶさず framework の実行失敗として扱います。
 8. 必要なテストを追加し、ruff と pytest で確認します。
 
 ## 依存方向
@@ -70,7 +69,7 @@ examples\macros\xxx  -> examples\macros\yyy     NG
 
 - `macros\<macro_id>` と `resources\<macro_id>` の対応が取れている。
 - `macro.py` または `__init__.py` のどちらか一方に、そのファイルで定義した `MacroBase` 派生クラスが 1 つだけある。
-- `cmd.capture()` の `None` を処理している。
+- `cmd.capture()` の失敗をマクロ側の通常分岐として扱っていない。
 - `finalize()` で押下状態の解放など必要な後片付けをしている。
 - 副作用のないロジックに単体テストがある。
 - PowerShell で次を実行し、変更範囲に応じて成功を確認している。
@@ -78,6 +77,7 @@ examples\macros\xxx  -> examples\macros\yyy     NG
 ```powershell
 uv run ruff format .
 uv run ruff check .
-uv run pytest tests macros examples/tests
+uv run ty check src/nyxpy --output-format concise --no-progress
+uv run pytest tests macros
 ```
 

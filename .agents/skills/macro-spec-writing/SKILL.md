@@ -1,7 +1,6 @@
 ---
 name: macro-spec-writing
 description: "マクロ仕様書の新規作成・レビュー・修正を行うスキル。Use when: ユーザが「仕様書を書いて」「specを作成」「仕様書レビュー」「仕様のテンプレート」と言ったとき、または spec/agent/ 配下のMarkdownを扱うとき。Nintendo Switch自動化マクロの設計仕様・実装仕様・テスト方針を所定フォーマットで執筆する。"
-argument-hint: "[マクロ名またはファイルパス] [new|review|fix]"
 ---
 
 # マクロ仕様書執筆スキル
@@ -74,7 +73,7 @@ spec/macro/{macro_name}/補助ドキュメント.md  # 補足（任意）
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `macros/xxx/macro.py` | 新規 | メインマクロ |
-| `static/xxx/settings.toml` | 新規 | 設定ファイル |
+| `resources/xxx/settings.toml` | 新規 | 設定ファイル |
 
 変更種別は `新規` / `変更` / `削除` のいずれか。
 
@@ -188,6 +187,7 @@ macros/xxx/  →  macros/yyy/*         NG (マクロ間の直接依存)
 - マクロパッケージ同士は **互いに import してはならない**
 - 複数マクロで使いたい関数は、副作用のない純粋関数として共通モジュールに切り出す
 - 共通部品は `Command` に依存せず、引数と戻り値のみでやり取りする
+- 設定・画像資材は `resources/<macro_id>` を標準配置にし、旧 `static/<macro_name>` を前提にしない
 
 ## 執筆手順
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "NyX Macro Spec Writing"
+  short_description: "Draft and review NyX macro specs"
+  default_prompt: "Use $macro-spec-writing to draft or review a Project NyX macro spec."

@@ -3,7 +3,7 @@
 > **文書種別**: 仕様書。`MacroRuntime`、`MacroRuntimeBuilder`、Ports、`ExecutionContext`、`RunResult`、`RunHandle` の正本である。
 > **対象モジュール**: `src\nyxpy\framework\core\runtime\`, `src\nyxpy\framework\core\io\`, `src\nyxpy\framework\core\macro\`, `src\nyxpy\framework\core\hardware\`  
 > **目的**: マクロ実行組み立てとデバイス入出力を Runtime と Port に分離し、既存マクロの import 互換を維持したまま GUI/CLI の重複構築と I/O 境界の不具合を解消する。  
-> **関連ドキュメント**: `.github\skills\framework-spec-writing\template.md`, `FOLLOWUP_FIXES.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `TEST_STRATEGY.md`
+> **関連ドキュメント**: `.agents\skills\framework-spec-writing\template.md`, `FOLLOWUP_FIXES.md`, `CONFIGURATION_AND_RESOURCES.md`, `RESOURCE_FILE_IO.md`, `LOGGING_FRAMEWORK.md`, `ERROR_CANCELLATION_LOGGING.md`, `OBSERVABILITY_AND_GUI_CLI.md`, `TEST_STRATEGY.md`
 > **既存ソース**: `src\nyxpy\framework\core\macro\command.py`, `src\nyxpy\framework\core\hardware\serial_comm.py`, `src\nyxpy\framework\core\hardware\camera_capture.py`, `src\nyxpy\framework\core\hardware\resource.py`, `src\nyxpy\framework\core\notifications\notification_handler.py`, `src\nyxpy\cli\run_cli.py`, `src\nyxpy\gui\main_window.py`
 > **破壊的変更**: 破壊的変更と削除条件は `DEPRECATION_AND_MIGRATION.md` を正とする。本書では Runtime / Port / `DefaultCommand(context=...)` に影響する制約だけを定義する。
 

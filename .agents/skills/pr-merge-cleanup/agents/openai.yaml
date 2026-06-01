@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Merge Cleanup"
+  short_description: "Push, merge, and clean up a PR"
+  default_prompt: "Use $pr-merge-cleanup to merge a completed branch through a GitHub PR."
