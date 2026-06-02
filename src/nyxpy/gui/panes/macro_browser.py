@@ -268,7 +268,6 @@ class MacroBrowserPane(QWidget):
     def _select_tree_macro_id(self, macro_id: str | None) -> None:
         self.explorer_tree.clearSelection()
         if macro_id is None:
-            self.explorer_tree.setCurrentItem(None)
             return
         item = self._find_tree_item(macro_id)
         if item is not None:
@@ -277,7 +276,6 @@ class MacroBrowserPane(QWidget):
     def _select_search_macro_id(self, macro_id: str | None) -> None:
         self.search_results.clearSelection()
         if macro_id is None:
-            self.search_results.setCurrentItem(None)
             return
         for row in range(self.search_results.count()):
             item = self.search_results.item(row)
@@ -287,7 +285,10 @@ class MacroBrowserPane(QWidget):
 
     def _find_tree_item(self, macro_id: str) -> QTreeWidgetItem | None:
         for index in range(self.explorer_tree.topLevelItemCount()):
-            found = self._find_tree_item_recursive(self.explorer_tree.topLevelItem(index), macro_id)
+            item = self.explorer_tree.topLevelItem(index)
+            if item is None:
+                continue
+            found = self._find_tree_item_recursive(item, macro_id)
             if found is not None:
                 return found
         return None
