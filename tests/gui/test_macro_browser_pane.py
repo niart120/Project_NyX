@@ -163,6 +163,35 @@ def test_macro_browser_reload_clears_missing_selection(qtbot, tmp_path: Path):
     assert widget.selected_macro_id() is None
 
 
+def test_macro_browser_reload_clears_selection_when_search_no_longer_matches(
+    qtbot,
+    tmp_path: Path,
+):
+    widget, registry = browser(qtbot, tmp_path)
+    widget.set_view_mode("search")
+    widget.set_search_query("tag:rng")
+    widget.search_results.setCurrentRow(0)
+    registry.definitions = [
+        definition(
+            "frlg-id",
+            display_name="FRLG ID",
+            macro_root=tmp_path / "macros" / "pokemon" / "frlg_id",
+            tags=("utility",),
+        ),
+        definition(
+            "timer",
+            display_name="Timer",
+            macro_root=tmp_path / "macros" / "timer",
+        ),
+    ]
+
+    qtbot.mouseClick(widget.reload_button, Qt.MouseButton.LeftButton)
+
+    assert widget.stack.currentWidget() is widget.search_page
+    assert widget.search_results.count() == 0
+    assert widget.selected_macro_id() is None
+
+
 def test_macro_browser_ctrl_f_focuses_search(qtbot, tmp_path: Path):
     widget, _registry = browser(qtbot, tmp_path)
     widget.show()

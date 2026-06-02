@@ -49,7 +49,7 @@ def location_for_definition(
         relative_parts = macro_root.relative_to(matched_root).parts
     except ValueError:
         relative_parts = ()
-    if relative_parts:
+    if relative_parts and _is_package_definition(definition):
         relative_parts = relative_parts[:-1]
     return MacroLocation(root_label=label, relative_parts=tuple(relative_parts))
 
@@ -164,6 +164,14 @@ def _root_label(root: Path, index: int) -> str:
         if index == 0:
             return "workspace"
     return root.name or str(root)
+
+
+def _is_package_definition(definition: MacroDefinition) -> bool:
+    source_path = Path(definition.source_path)
+    return source_path.parent == Path(definition.macro_root) and source_path.name in {
+        "__init__.py",
+        "macro.py",
+    }
 
 
 def _nodes_from_entry(entry: dict) -> tuple[MacroExplorerNode, ...]:

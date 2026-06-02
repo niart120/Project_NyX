@@ -117,7 +117,11 @@ class MacroBrowserPane(QWidget):
         self._query = query
         self.update_macro_view()
         self.set_view_mode(view_mode)
-        if selected_macro_id and self._definition_exists(selected_macro_id):
+        if (
+            selected_macro_id
+            and self._definition_exists(selected_macro_id)
+            and (view_mode != "search" or self._search_contains(selected_macro_id))
+        ):
             self._set_selected_macro_id(selected_macro_id, emit=False)
             self._restore_selection()
             return

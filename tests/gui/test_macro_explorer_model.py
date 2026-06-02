@@ -21,6 +21,7 @@ def definition(
     macro_root: Path,
     class_name: str | None = None,
     description: str = "",
+    source_path: Path | None = None,
     tags: tuple[str, ...] = (),
 ) -> MacroDefinition:
     return MacroDefinition(
@@ -30,7 +31,7 @@ def definition(
         class_name=class_name or display_name.replace(" ", ""),
         module_name="tests.gui.test_macro_explorer_model",
         macro_root=macro_root,
-        source_path=macro_root / "macro.py",
+        source_path=source_path or macro_root / "macro.py",
         settings_path=None,
         description=description,
         tags=tags,
@@ -70,6 +71,29 @@ def test_build_explorer_tree_omits_single_root_label(tmp_path: Path):
     tree = build_explorer_tree(definitions, (macros_root,))
 
     assert tree == (MacroExplorerNode(label="A Macro", macro_id="macro-a"),)
+
+
+def test_build_explorer_tree_keeps_nested_single_file_folder(tmp_path: Path):
+    macros_root = tmp_path / "macros"
+    macro_root = macros_root / "pokemon"
+    definitions = (
+        definition(
+            "frlg-id",
+            display_name="FRLG ID",
+            macro_root=macro_root,
+            source_path=macro_root / "frlg_id.py",
+        ),
+    )
+
+    tree = build_explorer_tree(definitions, (macros_root,))
+
+    assert tree == (
+        MacroExplorerNode(
+            label="pokemon",
+            macro_id=None,
+            children=(MacroExplorerNode(label="FRLG ID", macro_id="frlg-id"),),
+        ),
+    )
 
 
 def test_build_explorer_tree_keeps_multiple_root_labels(tmp_path: Path):
