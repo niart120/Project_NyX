@@ -40,8 +40,8 @@ PyPI 初回公開は配布名、成果物内容、metadata、Trusted Publishing 
 | `dist\` | 削除 | 古い sdist / wheel を削除してから再生成する。`dist\.gitignore` は保持する |
 | `.pypirc` | 削除候補 | Trusted Publishing に使わないローカル設定。中身を公開せず、Git 管理対象にしない |
 | `build\`, `*.egg-info`, `src\*.egg-info`, `site\` | 削除 | 古い build / docs 生成物が混入しないよう削除する |
-| `spec\agent\wip\local_015\PYPI_REGISTRATION_PREP.md` | 新規 | 本作業仕様書 |
-| `spec\agent\wip\local_015\PYPI_PUBLICATION_RUNBOOK.md` | 新規 | PyPI / TestPyPI / GitHub environment の手順書 |
+| `spec\agent\complete\local_015\PYPI_REGISTRATION_PREP.md` | 新規 | 本作業仕様書 |
+| `spec\agent\complete\local_015\PYPI_PUBLICATION_RUNBOOK.md` | 新規 | PyPI / TestPyPI / GitHub environment の手順書 |
 
 ## 3. 設計方針
 
@@ -245,7 +245,7 @@ PyPI 本番 publish 後は同じ version の再アップロードができない
 - [x] `.pypirc` を publish 手順から外し、Git 管理対象や archive に含まれないことを確認する
 - [x] 配布名を `nyxpy-fw` に最終決定する
 - [x] `pyproject.toml` の `name`、metadata、dependencies、scripts、URLs を確定名に更新する
-- [ ] Python 3.14 は初回公開対象外とし、`requires-python = ">=3.12,<3.14"` を維持する
+- [x] Python 3.14 は初回公開対象外とし、`requires-python = ">=3.12,<3.14"` を維持する
 - [x] README と docs の install 導線が `uv tool install <配布名>` と `nyxpy ...` に揃っていることを確認する
 - [x] `uv lock --check` を実行する
 - [x] `uv run ruff check .` を実行する
@@ -260,8 +260,8 @@ PyPI 本番 publish 後は同じ version の再アップロードができない
 - [x] GitHub environment `testpypi` を確認または作成する
 - [x] `target=testpypi` で publish workflow を実行する
 - [ ] TestPyPI から `--no-deps` で wheel を取得し、依存は PyPI から install して動作確認する
-- [ ] PyPI account sidebar で pending publisher を登録する
+- [x] PyPI account sidebar で pending publisher を登録する
 - [x] GitHub environment `pypi` を確認または作成し、required reviewers を設定する
-- [ ] release commit と `v0.1.0` tag を作成する
-- [ ] `target=pypi` で publish workflow を `v*` tag から実行する
+- [x] release commit と `v0.1.0` tag を作成する
+- [x] `target=pypi` で publish workflow を `v*` tag から実行する
 - [ ] PyPI project page と `uv tool install <配布名>` を確認する

@@ -69,7 +69,7 @@ dev-journal からの仕様化時点で次の方針を確定する。
 | `tests\gui\test_macro_catalog.py` | 変更 | location metadata と既存 stable ID 契約を検証する。 |
 | `tests\gui\test_macro_explorer_model.py` | 新規 | 階層構築、検索 token、並び順、選択維持の純粋ロジックを検証する。 |
 | `tests\gui\test_macro_browser_pane.py` | 新規 | Qt widget と signal、view 切替、reload 後の選択維持を検証する。既存 test が `test_macro_catalog.py` に同居している場合は分離する。 |
-| `spec\agent\wip\local_016\MACRO_EXPLORER_HIERARCHY_AND_SEARCH.md` | 新規 | 本仕様書。 |
+| `spec\agent\complete\local_016\MACRO_EXPLORER_HIERARCHY_AND_SEARCH.md` | 新規 | 本仕様書。 |
 | `spec\dev-journal.md` | 変更 | 仕様へ昇格した dev-journal エントリを削除する。 |
 
 ## 3. 設計方針
