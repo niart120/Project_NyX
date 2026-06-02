@@ -103,7 +103,7 @@ def search_macros(
     definitions: tuple[MacroDefinition, ...],
     query: str,
 ) -> tuple[MacroSearchResult, ...]:
-    """query に一致する macro を score 順で返す。"""
+    """Query に一致する macro を score 順で返す。"""
     tokens = _search_tokens(query)
     if not tokens:
         return tuple(

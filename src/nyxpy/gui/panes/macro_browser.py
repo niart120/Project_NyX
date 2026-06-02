@@ -29,7 +29,6 @@ from nyxpy.gui.macro_explorer_model import (
 )
 from nyxpy.gui.typography import apply_pane_title_font
 
-
 ViewMode = Literal["explorer", "search"]
 
 
