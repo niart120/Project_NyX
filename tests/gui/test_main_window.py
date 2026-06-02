@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from PySide6.QtCore import QPoint
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog
 
@@ -106,6 +107,7 @@ class FakeCatalog:
                 id="dummy-id",
                 display_name="Dummy Macro",
                 class_name="DummyMacro",
+                macro_root=Path("macros") / "dummy",
                 description="dummy desc",
                 tags=("Tag1", "Tag2"),
             )
@@ -290,9 +292,15 @@ def run_result(status: RunStatus, message: str = "") -> RunResult:
     )
 
 
+def select_macro(window: MainWindow, macro_id: str = "dummy-id") -> None:
+    item = window.macro_browser._find_tree_item(macro_id)
+    assert item is not None
+    window.macro_browser.explorer_tree.setCurrentItem(item)
+
+
 def test_initial_ui_state(window: MainWindow):
-    assert window.macro_browser.table.rowCount() == 1
-    assert window.macro_browser.table.item(0, 0).text() == "Dummy Macro"
+    assert window.macro_browser.explorer_tree.topLevelItemCount() == 1
+    assert window.macro_browser.explorer_tree.topLevelItem(0).text(0) == "Dummy Macro"
     assert window.status_label.text() == "準備完了"
     assert window.touch_panel_checkbox.text() == "タッチパネル"
     assert not window.touch_panel_checkbox.isChecked()
@@ -611,12 +619,13 @@ def test_window_size_menu_updates_settings(window: MainWindow, services: FakeSer
 
 
 def test_run_button_enabled_on_selection(window: MainWindow):
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
     assert window.control_pane.run_btn.isEnabled()
 
 
 def test_macro_search_is_not_rendered_in_initial_layout(window: MainWindow):
     assert not hasattr(window.macro_browser, "search_box")
+    assert window.macro_browser.stack.currentWidget() is window.macro_browser.explorer_tree
 
 
 def test_connection_status_is_not_rendered_in_macro_explorer(window: MainWindow):
@@ -724,17 +733,27 @@ def test_title_bar_actions_are_right_aligned(window: MainWindow):
 
 def test_left_column_content_edges_align(window: MainWindow, qtbot):
     window.show()
-    qtbot.waitUntil(lambda: window.macro_browser.table.width() > 0, timeout=1000)
+    qtbot.waitUntil(lambda: window.macro_browser.explorer_tree.width() > 0, timeout=1000)
 
     assert window.macro_browser.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
     assert window.control_pane.layout().contentsMargins().left() == LEFT_PANE_CONTENT_MARGIN
+    macro_left = window.macro_browser.explorer_tree.mapTo(window, QPoint(0, 0)).x()
+    macro_right = window.macro_browser.explorer_tree.mapTo(
+        window,
+        QPoint(window.macro_browser.explorer_tree.width(), 0),
+    ).x()
+    run_left = window.control_pane.run_btn.mapTo(window, QPoint(0, 0)).x()
+    settings_right = window.control_pane.settings_btn.mapTo(
+        window,
+        QPoint(window.control_pane.settings_btn.width(), 0),
+    ).x()
     assert (
-        window.control_pane.run_btn.geometry().left()
-        == window.macro_browser.table.geometry().left()
+        run_left
+        == macro_left
     )
     assert (
-        window.control_pane.settings_btn.geometry().right()
-        == window.macro_browser.table.geometry().right()
+        settings_right
+        == macro_right
     )
 
 
@@ -848,7 +867,7 @@ def test_macro_explorer_footer_unifies_control_button_height(window: MainWindow)
 def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):
     handle = FakeRunHandle()
     services.builder = FakeBuilder(handle)
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
 
     window._start_macro({"count": 1})
 
@@ -862,7 +881,7 @@ def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeSe
 
 def test_main_window_start_logs_start_exception(window: MainWindow, services: FakeServices):
     services.builder.start.side_effect = RuntimeError("start failed")
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
 
     window._start_macro({"count": 1})
 
@@ -891,7 +910,7 @@ def test_execute_macro_with_params_logs_parse_exception(
 
     monkeypatch.setattr("nyxpy.gui.main_window.MacroParamsDialog", FakeDialog)
     monkeypatch.setattr("nyxpy.gui.main_window.parse_define_args", fail_parse)
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
 
     window.execute_macro_with_params()
 
@@ -903,7 +922,7 @@ def test_execute_macro_with_params_logs_parse_exception(
 def test_main_window_cancel_enters_cancelling_state(window: MainWindow):
     handle = FakeRunHandle(done=False)
     window.run_handle = handle
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
     window.control_pane.set_run_state(RunUiState.RUNNING)
 
     window.cancel_macro()
@@ -916,7 +935,7 @@ def test_main_window_cancel_enters_cancelling_state(window: MainWindow):
 
 def test_main_window_poll_updates_status_from_run_result(window: MainWindow):
     window.run_handle = FakeRunHandle(run_result(RunStatus.SUCCESS), done=True)
-    window.macro_browser.table.selectRow(0)
+    select_macro(window)
     window.control_pane.set_run_state(RunUiState.RUNNING)
 
     window._poll_run_handle()
