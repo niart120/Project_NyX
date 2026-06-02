@@ -10,7 +10,7 @@
 
 ### 1.1 目的
 
-マクロ数が増えた場合でも、GUI 左上のマクロ一覧 pane で配置場所とメタデータの関係を失わずに目的のマクロを選択できる状態にする。通常時は配置場所に基づく Explorer 表示、検索時はマクロ名とタグ名に基づく Search 表示へ切り替え、実行対象の stable `macro_id` 選択契約を維持する。
+マクロ数が増えた場合でも、GUI 左上のマクロ一覧 pane で配置場所とメタデータの関係を失わずに目的のマクロを選択できる状態にする。通常時は配置場所に基づく Explorer 表示、検索時はマクロ名、説明文、タグ名に基づく Search 表示へ切り替え、実行対象の stable `macro_id` 選択契約を維持する。
 
 ### 1.2 用語定義
 
@@ -21,8 +21,8 @@
 | MacroDefinition | registry が読み込んだマクロ定義。`id`, `display_name`, `macro_root`, `source_path`, `description`, `tags` を持つ。 |
 | Explorer view | マクロの配置場所を軸に階層表示する通常表示。 |
 | Search view | 検索語に一致するマクロを flat list で表示する検索表示。 |
-| search token | 空白で分割した検索語。マクロ名、`macro_id`、class name、タグ名に照合する。 |
-| tag filter | `tag:<query>` 形式でタグ名だけに照合する検索 token。 |
+| search token | 空白で分割した検索語。マクロ名、`macro_id`、class name、説明文、タグ名に照合する。 |
+| tag filter | `tag:<query>` または `#<query>` 形式でタグ名だけに照合する検索 token。 |
 
 ### 1.3 背景・問題
 
@@ -302,7 +302,7 @@ Tags: {tag1, tag2}
 | 事象 | 表示 / 動作 |
 |------|-------------|
 | reload で macro load diagnostic が発生 | 既存 registry diagnostics の扱いに従い、一覧には読み込めた macro だけを表示する。 |
-| Search query が `tag:` だけ | tag filter の空 token とみなし、結果 0 件ではなく全件表示する。 |
+| Search query が `tag:` または `#` だけ | tag filter の空 token とみなし、結果 0 件ではなく全件表示する。 |
 | `MacroCatalog.get(macro_id)` が失敗 | 選択を解除し、`selection_changed(False)` を emit する。 |
 | folder node が選択された | `selected_macro_id()` は `None` を返す。 |
 
@@ -357,7 +357,7 @@ Tags: {tag1, tag2}
 |--------|------|
 | Stable identity gate | Explorer / Search のどちらでも `selected_macro_id()` が stable `MacroDefinition.id` を返す。 |
 | Location gate | Explorer view が配置場所を階層として表示する。 |
-| Search gate | Search view が名前とタグに基づいて結果を返し、空 query で全件を表示する。 |
+| Search gate | Search view が名前、説明文、タグに基づいて結果を返し、空 query で全件を表示する。 |
 | Layout gate | HD pane で検索 input が常時表示されず、切替 UI と reload が header 内に収まる。 |
 | Runtime isolation gate | GUI 表示 model が Runtime、Command、hardware port に依存しない。 |
 | Core dependency gate | framework 層が `nyxpy.gui` を import しない。 |
