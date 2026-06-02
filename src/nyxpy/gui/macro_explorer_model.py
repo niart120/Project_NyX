@@ -167,7 +167,10 @@ def _root_label(root: Path, index: int) -> str:
 
 
 def _is_package_definition(definition: MacroDefinition) -> bool:
-    source_path = Path(definition.source_path)
+    source_path_value = getattr(definition, "source_path", None)
+    if source_path_value is None:
+        return True
+    source_path = Path(source_path_value)
     return source_path.parent == Path(definition.macro_root) and source_path.name in {
         "__init__.py",
         "macro.py",
