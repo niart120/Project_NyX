@@ -6,9 +6,9 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.registry import (
     ClassMacroFactory,
     MacroDefinition,
+    MacroSearchRoot,
 )
 from nyxpy.gui.macro_catalog import MacroCatalog
-from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 
 
 class DummyMacro(MacroBase):
@@ -34,6 +34,11 @@ def definition(macro_id: str, *, display_name: str, class_name: str) -> MacroDef
 
 class FakeRegistry:
     def __init__(self) -> None:
+        self.project_root = Path(".")
+        self.macro_search_roots = (
+            MacroSearchRoot(Path("macros"), Path("resources")),
+            MacroSearchRoot(Path("examples") / "macros", Path("examples") / "resources"),
+        )
         self.definitions = [
             definition("macro-b", display_name="B Macro", class_name="SameName"),
             definition("macro-a", display_name="A Macro", class_name="SameName"),
@@ -68,14 +73,10 @@ def test_macro_catalog_reload_preserves_stable_ids():
     assert catalog.get("macro-a").display_name == "Renamed Macro"
 
 
-def test_macro_browser_selection_returns_macro_id(qtbot):
+def test_macro_catalog_exposes_search_roots():
     catalog = MacroCatalog(FakeRegistry())  # type: ignore[arg-type]
-    widget = MacroBrowserPane(catalog)
-    qtbot.addWidget(widget)
 
-    widget.table.selectRow(0)
-
-    assert widget.table.columnCount() == 1
-    assert widget.table.horizontalHeaderItem(0).text() == "マクロ名"
-    assert widget.table.item(0, 0).text() == "A Macro"
-    assert widget.selected_macro_id() == "macro-a"
+    assert catalog.search_roots() == (
+        Path("macros"),
+        Path("examples") / "macros",
+    )

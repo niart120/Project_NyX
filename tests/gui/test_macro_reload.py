@@ -27,10 +27,24 @@ def macro_browser(qtbot, macro_catalog: MacroCatalog) -> MacroBrowserPane:
     return widget
 
 
+def macro_leaf_labels(widget: MacroBrowserPane) -> list[str]:
+    labels: list[str] = []
+    for index in range(widget.explorer_tree.topLevelItemCount()):
+        collect_macro_leaf_labels(widget.explorer_tree.topLevelItem(index), labels)
+    return labels
+
+
+def collect_macro_leaf_labels(item, labels: list[str]) -> None:
+    if item.data(0, Qt.ItemDataRole.UserRole):
+        labels.append(item.text(0))
+    for index in range(item.childCount()):
+        collect_macro_leaf_labels(item.child(index), labels)
+
+
 def test_macro_reload_add_and_remove(
     qtbot, macro_browser: MacroBrowserPane, macros_dir: Path
 ) -> None:
-    initial_count = macro_browser.table.rowCount()
+    initial_count = len(macro_leaf_labels(macro_browser))
     new_macro_path = macros_dir / "dummy_macro.py"
 
     new_macro_path.write_text(
@@ -50,13 +64,11 @@ class DummyMacro(MacroBase):
     )
     qtbot.mouseClick(macro_browser.reload_button, Qt.LeftButton)
 
-    assert macro_browser.table.rowCount() == initial_count + 1
-    assert any(
-        "DummyMacro" in macro_browser.table.item(row, 0).text()
-        for row in range(macro_browser.table.rowCount())
-    )
+    labels = macro_leaf_labels(macro_browser)
+    assert len(labels) == initial_count + 1
+    assert "DummyMacro" in labels
 
     new_macro_path.unlink()
     qtbot.mouseClick(macro_browser.reload_button, Qt.LeftButton)
 
-    assert macro_browser.table.rowCount() == initial_count
+    assert len(macro_leaf_labels(macro_browser)) == initial_count
