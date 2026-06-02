@@ -339,17 +339,17 @@ Tags: {tag1, tag2}
 ## 6. 実装チェックリスト
 
 - [x] ユーザ確認事項を確定する。
-- [ ] `MacroCatalog.search_roots()` を追加する。
-- [ ] `macro_explorer_model.py` を追加し、階層構築と検索を純粋関数で実装する。
-- [ ] `MacroBrowserPane` を Explorer / Search 切替 UI へ置き換える。
-- [ ] `selected_macro_id()` と `selection_changed` の外部契約を維持する。
-- [ ] reload 後の view mode、query、選択復元を実装する。
-- [ ] keyboard 操作を実装する。
-- [ ] 旧 `update_macro_table()` と table 直接参照テストを削除または正 API へ更新する。
-- [ ] GUI model のユニットテストを追加する。
-- [ ] GUI widget テストを追加する。
-- [ ] `uv run ruff check src\nyxpy\gui tests\gui` を実行する。
-- [ ] `uv run pytest tests\gui\test_macro_catalog.py tests\gui\test_macro_explorer_model.py tests\gui\test_macro_browser_pane.py` を実行する。
+- [x] `MacroCatalog.search_roots()` を追加する。
+- [x] `macro_explorer_model.py` を追加し、階層構築と検索を純粋関数で実装する。
+- [x] `MacroBrowserPane` を Explorer / Search 切替 UI へ置き換える。
+- [x] `selected_macro_id()` と `selection_changed` の外部契約を維持する。
+- [x] reload 後の view mode、query、選択復元を実装する。
+- [x] keyboard 操作を実装する。
+- [x] 旧 `update_macro_table()` と table 直接参照テストを削除または正 API へ更新する。
+- [x] GUI model のユニットテストを追加する。
+- [x] GUI widget テストを追加する。
+- [x] `uv run ruff check src\nyxpy\gui tests\gui` を実行する。
+- [x] `uv run pytest tests\gui\test_macro_catalog.py tests\gui\test_macro_explorer_model.py tests\gui\test_macro_browser_pane.py` を実行する。
 
 ## 7. 完了ゲート
 
