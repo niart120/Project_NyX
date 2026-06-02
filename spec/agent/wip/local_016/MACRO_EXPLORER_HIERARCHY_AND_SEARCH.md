@@ -1,9 +1,9 @@
 # マクロ一覧表示の階層化と検索切替 仕様書
 
-> **文書種別**: 詳細仕様。GUI のマクロ一覧 pane を Explorer / Search 切替と階層表示へ拡張する。  
-> **作業ブランチ**: `docs/macro-explorer-tree-search`  
-> **対象モジュール**: `src\nyxpy\gui\panes\macro_browser.py`, `src\nyxpy\gui\macro_catalog.py`, `src\nyxpy\gui\`, `tests\gui\`  
-> **関連仕様**: `spec\agent\complete\local_006\MACRO_EXPLORER_PANEL.md`, `spec\agent\complete\local_008\SETTINGS_PREVIEW_CAPTURE_REFRESH.md`, `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md`  
+> **文書種別**: 詳細仕様。GUI のマクロ一覧 pane を Explorer / Search 切替と階層表示へ拡張する。
+> **作業ブランチ**: `docs/macro-explorer-tree-search`
+> **対象モジュール**: `src\nyxpy\gui\panes\macro_browser.py`, `src\nyxpy\gui\macro_catalog.py`, `src\nyxpy\gui\`, `tests\gui\`
+> **関連仕様**: `spec\agent\complete\local_006\MACRO_EXPLORER_PANEL.md`, `spec\agent\complete\local_008\SETTINGS_PREVIEW_CAPTURE_REFRESH.md`, `spec\gui\rearchitecture\IMPLEMENTATION_PLAN.md`
 > **元 dev-journal**: `2026-05-17: マクロ一覧表示の階層化と検索切替`
 
 ## 1. 概要
