@@ -1,5 +1,7 @@
 """GUI 表示用の macro catalog model。"""
 
+from pathlib import Path
+
 from nyxpy.framework.core.macro.registry import MacroDefinition, MacroRegistry
 
 
@@ -24,3 +26,12 @@ class MacroCatalog:
 
     def get(self, macro_id: str) -> MacroDefinition:
         return self.definitions_by_id[macro_id]
+
+    def search_roots(self) -> tuple[Path, ...]:
+        roots = getattr(self.registry, "macro_search_roots", None)
+        if roots is not None:
+            return tuple(Path(root.macros_dir) for root in roots)
+        macros_dir = getattr(self.registry, "macros_dir", None)
+        if macros_dir is not None:
+            return (Path(macros_dir),)
+        return ()
