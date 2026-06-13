@@ -22,6 +22,7 @@ class AppSettingsDialog(QDialog):
         secrets: SecretsSettings,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
+        ponkan_capture_available: bool | None = None,
     ):
         """Settings tab を構築し、適用ボタンの signal を接続します。"""
         super().__init__(parent)
@@ -37,6 +38,7 @@ class AppSettingsDialog(QDialog):
             self.settings,
             self.secrets,
             device_discovery=device_discovery,
+            ponkan_capture_available=ponkan_capture_available,
         )
         layout.addWidget(self.tab_widget)
 

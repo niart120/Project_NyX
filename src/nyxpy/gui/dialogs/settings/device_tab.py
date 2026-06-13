@@ -3,13 +3,11 @@
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -18,13 +16,14 @@ from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryServic
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
 
 _CAPTURE_SOURCE_OPTIONS = (
     ("カメラ", "camera"),
     ("ウィンドウ", "window"),
-    ("キャプチャ", "capture"),
 )
+_CAPTURE_SOURCE_OPTION = ("キャプチャ", "capture")
 
 
 class DeviceSettingsTab(QWidget):
@@ -37,12 +36,18 @@ class DeviceSettingsTab(QWidget):
         parent=None,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
+        ponkan_capture_available: bool | None = None,
     ):
         """Settings store と device discovery service を保持し、選択 UI を作ります。"""
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets
         self.device_discovery = device_discovery or DeviceDiscoveryService()
+        self.ponkan_capture_available = (
+            is_ponkan_capture_available()
+            if ponkan_capture_available is None
+            else bool(ponkan_capture_available)
+        )
         layout = QVBoxLayout(self)
 
         self.cap_group = QGroupBox("キャプチャ入力")
@@ -54,6 +59,8 @@ class DeviceSettingsTab(QWidget):
         self.capture_source_type = QComboBox()
         for label, value in _CAPTURE_SOURCE_OPTIONS:
             self.capture_source_type.addItem(label, value)
+        if self.ponkan_capture_available:
+            self.capture_source_type.addItem(*_CAPTURE_SOURCE_OPTION)
         self._set_capture_source_type(self.settings.get("capture_source_type", "camera"))
         self.capture_source_type.currentIndexChanged.connect(
             lambda _index: self._update_source_field_state(self._capture_source_type())
@@ -116,78 +123,6 @@ class DeviceSettingsTab(QWidget):
         self.capture_fps_label = QLabel("Capture FPS:")
         cap_form.addRow(self.capture_fps_label, self.capture_fps)
 
-        self.capture_provider = QComboBox()
-        self.capture_provider.addItem("ponkan", "ponkan")
-        _set_combo_current_data(
-            self.capture_provider,
-            self.settings.get("capture_provider", "ponkan"),
-        )
-        self.capture_provider_label = QLabel("Capture Provider:")
-        cap_form.addRow(self.capture_provider_label, self.capture_provider)
-
-        self.capture_device_profile = QComboBox()
-        self.capture_device_profile.addItem("n3dsxl", "n3dsxl")
-        _set_combo_current_data(
-            self.capture_device_profile,
-            self.settings.get("capture_device_profile", "n3dsxl"),
-        )
-        self.capture_device_profile_label = QLabel("Device Profile:")
-        cap_form.addRow(self.capture_device_profile_label, self.capture_device_profile)
-
-        self.ponkan_backend = QComboBox()
-        for backend in ("auto", "d3xx", "d3xx-native"):
-            self.ponkan_backend.addItem(backend, backend)
-        _set_combo_current_data(self.ponkan_backend, self.settings.get("ponkan_backend", "auto"))
-        self.ponkan_backend_label = QLabel("Ponkan Backend:")
-        cap_form.addRow(self.ponkan_backend_label, self.ponkan_backend)
-
-        self.ponkan_raw_slots = QSpinBox()
-        self.ponkan_raw_slots.setRange(1, 16)
-        self.ponkan_raw_slots.setValue(int(self.settings.get("ponkan_raw_slots", 2)))
-        self.ponkan_raw_slots_label = QLabel("Raw Slots:")
-        cap_form.addRow(self.ponkan_raw_slots_label, self.ponkan_raw_slots)
-
-        self.ponkan_output_queue_size = QSpinBox()
-        self.ponkan_output_queue_size.setRange(1, 64)
-        self.ponkan_output_queue_size.setValue(
-            int(self.settings.get("ponkan_output_queue_size", 2))
-        )
-        self.ponkan_output_queue_size_label = QLabel("Output Queue Size:")
-        cap_form.addRow(self.ponkan_output_queue_size_label, self.ponkan_output_queue_size)
-
-        self.ponkan_drop_policy = QComboBox()
-        for policy in ("drop_oldest", "drop_newest", "block"):
-            self.ponkan_drop_policy.addItem(policy, policy)
-        _set_combo_current_data(
-            self.ponkan_drop_policy,
-            self.settings.get("ponkan_drop_policy", "drop_oldest"),
-        )
-        self.ponkan_drop_policy_label = QLabel("Drop Policy:")
-        cap_form.addRow(self.ponkan_drop_policy_label, self.ponkan_drop_policy)
-
-        self.ponkan_poll_interval = QDoubleSpinBox()
-        self.ponkan_poll_interval.setDecimals(6)
-        self.ponkan_poll_interval.setRange(0.000001, 1.0)
-        self.ponkan_poll_interval.setSingleStep(0.001)
-        self.ponkan_poll_interval.setValue(float(self.settings.get("ponkan_poll_interval", 0.004)))
-        self.ponkan_poll_interval_label = QLabel("Poll Interval:")
-        cap_form.addRow(self.ponkan_poll_interval_label, self.ponkan_poll_interval)
-
-        self.ponkan_read_timeout = QDoubleSpinBox()
-        self.ponkan_read_timeout.setDecimals(3)
-        self.ponkan_read_timeout.setRange(0.0, 60.0)
-        self.ponkan_read_timeout.setSingleStep(0.1)
-        self.ponkan_read_timeout.setValue(float(self.settings.get("ponkan_read_timeout", 1.0)))
-        self.ponkan_read_timeout_label = QLabel("Read Timeout:")
-        cap_form.addRow(self.ponkan_read_timeout_label, self.ponkan_read_timeout)
-
-        self.ponkan_collect_timing = QCheckBox("有効")
-        self.ponkan_collect_timing.setChecked(
-            bool(self.settings.get("ponkan_collect_timing", False))
-        )
-        self.ponkan_collect_timing_label = QLabel("Collect Timing:")
-        cap_form.addRow(self.ponkan_collect_timing_label, self.ponkan_collect_timing)
-
         self.n3dsxl_hd_aspect_box_enabled = QCheckBox("有効")
         self.n3dsxl_hd_aspect_box_enabled.setChecked(
             bool(self.settings.get("n3dsxl_hd_aspect_box_enabled", True))
@@ -198,15 +133,6 @@ class DeviceSettingsTab(QWidget):
             self.n3dsxl_hd_aspect_box_enabled,
         )
         self.capture_setting_rows = (
-            (self.capture_provider_label, self.capture_provider),
-            (self.capture_device_profile_label, self.capture_device_profile),
-            (self.ponkan_backend_label, self.ponkan_backend),
-            (self.ponkan_raw_slots_label, self.ponkan_raw_slots),
-            (self.ponkan_output_queue_size_label, self.ponkan_output_queue_size),
-            (self.ponkan_drop_policy_label, self.ponkan_drop_policy),
-            (self.ponkan_poll_interval_label, self.ponkan_poll_interval),
-            (self.ponkan_read_timeout_label, self.ponkan_read_timeout),
-            (self.ponkan_collect_timing_label, self.ponkan_collect_timing),
             (self.n3dsxl_hd_aspect_box_enabled_label, self.n3dsxl_hd_aspect_box_enabled),
         )
 
@@ -348,18 +274,8 @@ class DeviceSettingsTab(QWidget):
             self.settings.set("capture_fps", self.capture_fps.currentData())
             self.settings.set("capture_aspect_box_enabled", self.aspect_box_enabled.isChecked())
         elif source_type == "capture":
-            self.settings.set("capture_provider", self.capture_provider.currentData())
-            self.settings.set("capture_device_profile", self.capture_device_profile.currentData())
-            self.settings.set("ponkan_backend", self.ponkan_backend.currentData())
-            self.settings.set("ponkan_raw_slots", self.ponkan_raw_slots.value())
-            self.settings.set(
-                "ponkan_output_queue_size",
-                self.ponkan_output_queue_size.value(),
-            )
-            self.settings.set("ponkan_drop_policy", self.ponkan_drop_policy.currentData())
-            self.settings.set("ponkan_poll_interval", self.ponkan_poll_interval.value())
-            self.settings.set("ponkan_read_timeout", self.ponkan_read_timeout.value())
-            self.settings.set("ponkan_collect_timing", self.ponkan_collect_timing.isChecked())
+            self.settings.set("capture_provider", "ponkan")
+            self.settings.set("capture_device_profile", "n3dsxl")
             self.settings.set(
                 "n3dsxl_hd_aspect_box_enabled",
                 self.n3dsxl_hd_aspect_box_enabled.isChecked(),
@@ -406,8 +322,3 @@ def _layout_container(layout: QHBoxLayout) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     container.setLayout(layout)
     return container
-
-
-def _set_combo_current_data(combo: QComboBox, value: object) -> None:
-    index = combo.findData(value)
-    combo.setCurrentIndex(index if index >= 0 else 0)
