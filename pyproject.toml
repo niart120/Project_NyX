@@ -59,6 +59,9 @@ nyx-gui = "nyxpy.__main__:gui_app"
 windows = [
     "windows-capture>=2.0.0,<3.0.0 ; sys_platform == 'win32'",
 ]
+ponkan = [
+    "ponkan-python>=0.1.2,<0.2.0 ; sys_platform == 'win32'",
+]
 
 [project.urls]
 Homepage = "https://github.com/niart120/Project_NyX"

@@ -4,6 +4,7 @@ from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     CaptureRect,
     CaptureSourceKey,
+    PonkanCaptureSourceConfig,
     WindowCaptureSourceConfig,
     capture_source_from_settings,
 )
@@ -50,3 +51,63 @@ def test_capture_source_key_includes_transform() -> None:
     )
 
     assert raw != boxed
+
+
+def test_capture_source_from_settings_creates_ponkan_capture_source() -> None:
+    source = capture_source_from_settings(
+        {
+            "capture_source_type": "capture",
+            "capture_provider": "ponkan",
+            "capture_device_profile": "n3dsxl",
+            "ponkan_backend": "d3xx-native",
+            "ponkan_raw_slots": 3,
+            "ponkan_output_queue_size": 4,
+            "ponkan_drop_policy": "block",
+            "ponkan_poll_interval": 0.01,
+            "ponkan_read_timeout": None,
+            "ponkan_collect_timing": True,
+        }
+    )
+
+    assert isinstance(source, PonkanCaptureSourceConfig)
+    assert source.ponkan_backend == "d3xx-native"
+    assert source.raw_slots == 3
+    assert source.output_queue_size == 4
+    assert source.drop_policy == "block"
+    assert source.poll_interval == 0.01
+    assert source.read_timeout is None
+    assert source.collect_timing is True
+    assert source.transform.aspect_box_enabled is True
+
+
+def test_capture_source_rejects_invalid_ponkan_backend() -> None:
+    with pytest.raises(ConfigurationError) as exc_info:
+        capture_source_from_settings(
+            {
+                "capture_source_type": "capture",
+                "ponkan_backend": "libusb",
+            }
+        )
+
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_BACKEND_INVALID"
+
+
+def test_capture_source_key_includes_ponkan_runtime_settings() -> None:
+    first = CaptureSourceKey.from_source(
+        capture_source_from_settings(
+            {
+                "capture_source_type": "capture",
+                "ponkan_backend": "auto",
+            }
+        )
+    )
+    second = CaptureSourceKey.from_source(
+        capture_source_from_settings(
+            {
+                "capture_source_type": "capture",
+                "ponkan_backend": "d3xx",
+            }
+        )
+    )
+
+    assert first != second

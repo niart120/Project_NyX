@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+from nyxpy.framework.core.hardware.capture_source import PonkanCaptureSourceConfig
+from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroDefinition
 from nyxpy.framework.core.runtime.builder import create_device_runtime_builder
+from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from tests.support.fakes import (
     FakeControllerOutputPort,
     FakeFrameSourcePort,
@@ -75,3 +79,43 @@ def test_runtime_builder_rejects_removed_screen_region_source(tmp_path: Path) ->
                 "capture_aspect_box_enabled": True,
             },
         )
+
+
+def test_runtime_uses_ponkan_capture_frame_source(tmp_path: Path) -> None:
+    frame = np.zeros((480, 854, 3), dtype=np.uint8)
+
+    class PonkanFrameFactory:
+        def __init__(self) -> None:
+            self.sources = []
+
+        def create(self, *, source, allow_dummy, timeout_sec):
+            self.sources.append(source)
+            return FakeFrameSourcePort(frame)
+
+        def close(self) -> None:
+            pass
+
+    frame_factory = PonkanFrameFactory()
+    builder = create_device_runtime_builder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        protocol=object(),
+        notification_handler=None,
+        logger=FakeLoggerPort(),
+        controller_output_factory=ControllerFactory(),
+        frame_source_factory=frame_factory,
+        settings={
+            "capture_source_type": "capture",
+            "capture_provider": "ponkan",
+            "capture_device_profile": "n3dsxl",
+            "ponkan_backend": "d3xx",
+        },
+    )
+
+    context = builder.build(RuntimeBuildRequest(macro_id="sample"))
+    context.frame_source.initialize()
+    captured = DefaultCommand(context=context).capture()
+
+    assert isinstance(frame_factory.sources[-1], PonkanCaptureSourceConfig)
+    assert frame_factory.sources[-1].ponkan_backend == "d3xx"
+    assert captured.shape == (720, 1280, 3)

@@ -9,9 +9,11 @@ from typing import Literal
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformConfig
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
-CaptureSourceType = Literal["camera", "window"]
+CaptureSourceType = Literal["camera", "window", "capture"]
 WindowMatchMode = Literal["exact", "contains"]
 CaptureBackendName = Literal["auto", "mss", "windows_graphics_capture"]
+PonkanBackendName = Literal["auto", "d3xx", "d3xx-native"]
+PonkanDropPolicy = Literal["drop_oldest", "drop_newest", "block"]
 
 
 @dataclass(frozen=True)
@@ -65,7 +67,28 @@ class WindowCaptureSourceConfig:
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
 
 
-CaptureSourceConfig = CameraCaptureSourceConfig | WindowCaptureSourceConfig
+@dataclass(frozen=True)
+class PonkanCaptureSourceConfig:
+    """ponkan-python を使う直接接続型キャプチャ入力元の設定。"""
+
+    source_type: Literal["capture"] = "capture"
+    provider: Literal["ponkan"] = "ponkan"
+    device_profile: Literal["n3dsxl"] = "n3dsxl"
+    ponkan_backend: PonkanBackendName = "auto"
+    raw_slots: int = 2
+    output_queue_size: int = 2
+    drop_policy: PonkanDropPolicy = "drop_oldest"
+    poll_interval: float = 0.004
+    read_timeout: float | None = 1.0
+    collect_timing: bool = False
+    transform: FrameTransformConfig = field(
+        default_factory=lambda: FrameTransformConfig(aspect_box_enabled=True)
+    )
+
+
+CaptureSourceConfig = (
+    CameraCaptureSourceConfig | WindowCaptureSourceConfig | PonkanCaptureSourceConfig
+)
 
 
 @dataclass(frozen=True)
@@ -78,6 +101,14 @@ class CaptureSourceKey:
     fps: float
     region: CaptureRect | None = None
     match_mode: str = ""
+    provider: str = ""
+    device_profile: str = ""
+    raw_slots: int = 0
+    output_queue_size: int = 0
+    drop_policy: str = ""
+    poll_interval: float = 0.0
+    read_timeout: float | None = None
+    collect_timing: bool = False
     transform: FrameTransformConfig = field(default_factory=FrameTransformConfig)
 
     @classmethod
@@ -101,6 +132,22 @@ class CaptureSourceKey:
                     backend=source.backend,
                     fps=source.fps,
                     match_mode=source.match_mode,
+                    transform=source.transform,
+                )
+            case PonkanCaptureSourceConfig():
+                return cls(
+                    source_type="capture",
+                    identifier=f"{source.provider}:{source.device_profile}",
+                    backend=source.ponkan_backend,
+                    fps=0.0,
+                    provider=source.provider,
+                    device_profile=source.device_profile,
+                    raw_slots=source.raw_slots,
+                    output_queue_size=source.output_queue_size,
+                    drop_policy=source.drop_policy,
+                    poll_interval=source.poll_interval,
+                    read_timeout=source.read_timeout,
+                    collect_timing=source.collect_timing,
                     transform=source.transform,
                 )
 
@@ -137,6 +184,8 @@ def capture_source_from_settings(
                 fps=_fps(settings.get("capture_fps"), 30.0),
                 transform=_transform(settings),
             )
+        case "capture":
+            return _ponkan_source(settings)
         case _:
             raise ConfigurationError(
                 "invalid capture source type",
@@ -150,6 +199,51 @@ def _transform(settings: Mapping[str, object]) -> FrameTransformConfig:
     return FrameTransformConfig(
         aspect_box_enabled=bool(settings.get("capture_aspect_box_enabled", False))
     )
+
+
+def _ponkan_transform(settings: Mapping[str, object]) -> FrameTransformConfig:
+    return FrameTransformConfig(
+        aspect_box_enabled=bool(_setting(settings, "n3dsxl_hd_aspect_box_enabled", True))
+    )
+
+
+def _ponkan_source(settings: Mapping[str, object]) -> PonkanCaptureSourceConfig:
+    provider = _text(_setting(settings, "capture_provider", "ponkan")) or "ponkan"
+    if provider != "ponkan":
+        raise ConfigurationError(
+            "invalid capture provider",
+            code="NYX_CAPTURE_PROVIDER_INVALID",
+            component="CaptureSourceConfig",
+            details={"capture_provider": provider},
+        )
+    profile = _text(_setting(settings, "capture_device_profile", "n3dsxl")) or "n3dsxl"
+    if profile != "n3dsxl":
+        raise ConfigurationError(
+            "invalid capture device profile",
+            code="NYX_CAPTURE_DEVICE_PROFILE_INVALID",
+            component="CaptureSourceConfig",
+            details={"capture_device_profile": profile},
+        )
+    return PonkanCaptureSourceConfig(
+        ponkan_backend=_ponkan_backend(_setting(settings, "ponkan_backend", "auto")),
+        raw_slots=_positive_int(_setting(settings, "ponkan_raw_slots", 2), "ponkan_raw_slots"),
+        output_queue_size=_positive_int(
+            _setting(settings, "ponkan_output_queue_size", 2),
+            "ponkan_output_queue_size",
+        ),
+        drop_policy=_ponkan_drop_policy(_setting(settings, "ponkan_drop_policy", "drop_oldest")),
+        poll_interval=_positive_float(
+            _setting(settings, "ponkan_poll_interval", 0.004),
+            "ponkan_poll_interval",
+        ),
+        read_timeout=_read_timeout(_setting(settings, "ponkan_read_timeout", 1.0)),
+        collect_timing=bool(_setting(settings, "ponkan_collect_timing", False)),
+        transform=_ponkan_transform(settings),
+    )
+
+
+def _setting(settings: Mapping[str, object], key: str, default: object) -> object:
+    return settings[key] if key in settings else default
 
 
 def _text(value: object) -> str:
@@ -212,3 +306,99 @@ def _backend(value: object) -> CaptureBackendName:
         component="CaptureSourceConfig",
         details={"capture_backend": text},
     )
+
+
+def _ponkan_backend(value: object) -> PonkanBackendName:
+    text = _text(value) or "auto"
+    if text == "auto":
+        return "auto"
+    if text == "d3xx":
+        return "d3xx"
+    if text == "d3xx-native":
+        return "d3xx-native"
+    raise ConfigurationError(
+        "invalid ponkan capture backend",
+        code="NYX_PONKAN_CAPTURE_BACKEND_INVALID",
+        component="CaptureSourceConfig",
+        details={"ponkan_backend": text},
+    )
+
+
+def _ponkan_drop_policy(value: object) -> PonkanDropPolicy:
+    text = _text(value) or "drop_oldest"
+    if text == "drop_oldest":
+        return "drop_oldest"
+    if text == "drop_newest":
+        return "drop_newest"
+    if text == "block":
+        return "block"
+    raise ConfigurationError(
+        "invalid ponkan drop policy",
+        code="NYX_PONKAN_DROP_POLICY_INVALID",
+        component="CaptureSourceConfig",
+        details={"ponkan_drop_policy": text},
+    )
+
+
+def _positive_int(value: object, key: str) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError(
+            f"{key} must be an integer",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={key: str(value)},
+        ) from exc
+    if parsed <= 0:
+        raise ConfigurationError(
+            f"{key} must be positive",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={key: parsed},
+        )
+    return parsed
+
+
+def _positive_float(value: object, key: str) -> float:
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError(
+            f"{key} must be numeric",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={key: str(value)},
+        ) from exc
+    if parsed <= 0:
+        raise ConfigurationError(
+            f"{key} must be positive",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={key: parsed},
+        )
+    return parsed
+
+
+def _read_timeout(value: object) -> float | None:
+    if value is None:
+        return None
+    if value == "":
+        return 1.0
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError(
+            "ponkan_read_timeout must be numeric or null",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={"ponkan_read_timeout": str(value)},
+        ) from exc
+    if parsed < 0:
+        raise ConfigurationError(
+            "ponkan_read_timeout must be greater than or equal to 0",
+            code="NYX_PONKAN_CAPTURE_NUMERIC_INVALID",
+            component="CaptureSourceConfig",
+            details={"ponkan_read_timeout": parsed},
+        )
+    return parsed

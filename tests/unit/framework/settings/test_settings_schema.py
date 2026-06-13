@@ -19,7 +19,17 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
 
     assert snapshot["serial_baud"] == 9600
     assert snapshot["capture_source_type"] == "camera"
+    assert snapshot["capture_provider"] == "ponkan"
+    assert snapshot["capture_device_profile"] == "n3dsxl"
     assert snapshot["capture_aspect_box_enabled"] is False
+    assert snapshot["ponkan_backend"] == "auto"
+    assert snapshot["ponkan_raw_slots"] == 2
+    assert snapshot["ponkan_output_queue_size"] == 2
+    assert snapshot["ponkan_drop_policy"] == "drop_oldest"
+    assert snapshot["ponkan_poll_interval"] == 0.004
+    assert snapshot["ponkan_read_timeout"] == 1.0
+    assert snapshot["ponkan_collect_timing"] is False
+    assert snapshot["n3dsxl_hd_aspect_box_enabled"] is True
     assert snapshot["runtime"]["allow_dummy"] is False
     assert snapshot["gui"]["window_size_preset"] == "full_hd"
     assert snapshot["gui"]["preview_touch_enabled"] is False
@@ -80,6 +90,40 @@ def test_settings_store_rejects_removed_screen_region_source(tmp_path) -> None:
         SettingsStore(config_dir=tmp_path)
 
     assert exc_info.value.code == "NYX_SETTINGS_SCHEMA_INVALID"
+
+
+def test_settings_store_accepts_ponkan_capture_source(tmp_path) -> None:
+    (tmp_path / "global.toml").write_text(
+        "\n".join(
+            [
+                'capture_source_type = "capture"',
+                'capture_provider = "ponkan"',
+                'capture_device_profile = "n3dsxl"',
+                'ponkan_backend = "d3xx-native"',
+                "ponkan_raw_slots = 3",
+                "ponkan_output_queue_size = 4",
+                'ponkan_drop_policy = "block"',
+                "ponkan_poll_interval = 0.01",
+                "ponkan_read_timeout = 0.5",
+                "ponkan_collect_timing = true",
+                "n3dsxl_hd_aspect_box_enabled = false",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = SettingsStore(config_dir=tmp_path).snapshot()
+
+    assert snapshot["capture_source_type"] == "capture"
+    assert snapshot["ponkan_backend"] == "d3xx-native"
+    assert snapshot["ponkan_raw_slots"] == 3
+    assert snapshot["ponkan_output_queue_size"] == 4
+    assert snapshot["ponkan_drop_policy"] == "block"
+    assert snapshot["ponkan_poll_interval"] == 0.01
+    assert snapshot["ponkan_read_timeout"] == 0.5
+    assert snapshot["ponkan_collect_timing"] is True
+    assert snapshot["n3dsxl_hd_aspect_box_enabled"] is False
 
 
 def test_settings_store_rejects_broken_toml_without_overwriting(tmp_path) -> None:

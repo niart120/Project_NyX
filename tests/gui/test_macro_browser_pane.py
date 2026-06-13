@@ -44,9 +44,7 @@ def definition(
 
 class FakeRegistry:
     def __init__(self, macros_root: Path) -> None:
-        self.macro_search_roots = (
-            MacroSearchRoot(macros_root, macros_root.parent / "resources"),
-        )
+        self.macro_search_roots = (MacroSearchRoot(macros_root, macros_root.parent / "resources"),)
         self.definitions = [
             definition(
                 "frlg-id",

@@ -747,14 +747,8 @@ def test_left_column_content_edges_align(window: MainWindow, qtbot):
         window,
         QPoint(window.control_pane.settings_btn.width(), 0),
     ).x()
-    assert (
-        run_left
-        == macro_left
-    )
-    assert (
-        settings_right
-        == macro_right
-    )
+    assert run_left == macro_left
+    assert settings_right == macro_right
 
 
 def test_vertical_surplus_is_allocated_to_lists_and_logs(window: MainWindow):

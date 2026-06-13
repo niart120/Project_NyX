@@ -2,6 +2,7 @@ import pytest
 
 from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
+    PonkanCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.device_discovery import (
@@ -68,6 +69,26 @@ class CaptureDevice:
         self.initialize_calls = 0
         self.release_calls = 0
         CaptureDevice.instances.append(self)
+
+    def initialize(self) -> None:
+        self.initialize_calls += 1
+
+    def get_frame(self):
+        return object()
+
+    def release(self) -> None:
+        self.release_calls += 1
+
+
+class PonkanCaptureDevice:
+    instances = []
+
+    def __init__(self, config, **kwargs) -> None:
+        self.config = config
+        self.kwargs = kwargs
+        self.initialize_calls = 0
+        self.release_calls = 0
+        PonkanCaptureDevice.instances.append(self)
 
     def initialize(self) -> None:
         self.initialize_calls += 1
@@ -198,6 +219,71 @@ def test_frame_source_factory_creates_window_source() -> None:
     )
 
     assert port.capture_device is not None
+
+
+def test_frame_source_factory_creates_ponkan_capture_source() -> None:
+    PonkanCaptureDevice.instances.clear()
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        ponkan_capture_factory=PonkanCaptureDevice,
+    )
+
+    port = factory.create(
+        source=PonkanCaptureSourceConfig(ponkan_backend="d3xx"),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+    port.initialize()
+
+    assert PonkanCaptureDevice.instances[0].config.ponkan_backend == "d3xx"
+    assert PonkanCaptureDevice.instances[0].initialize_calls == 1
+
+
+def test_frame_source_factory_recreates_capture_source_when_backend_changes() -> None:
+    PonkanCaptureDevice.instances.clear()
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        ponkan_capture_factory=PonkanCaptureDevice,
+    )
+
+    first = factory.create(
+        source=PonkanCaptureSourceConfig(ponkan_backend="auto"),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+    second = factory.create(
+        source=PonkanCaptureSourceConfig(ponkan_backend="d3xx"),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+
+    assert first.capture_device is not second.capture_device
+
+
+def test_frame_source_factory_does_not_dummy_fallback_for_ponkan_configuration_error() -> None:
+    class FailingPonkanCaptureDevice(PonkanCaptureDevice):
+        def initialize(self) -> None:
+            raise ConfigurationError(
+                "ponkan missing",
+                code="NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING",
+                component="PonkanCaptureDevice",
+            )
+
+    factory = FrameSourcePortFactory(
+        discovery=Discovery(),
+        ponkan_capture_factory=FailingPonkanCaptureDevice,
+    )
+
+    port = factory.create(
+        source=PonkanCaptureSourceConfig(),
+        allow_dummy=True,
+        timeout_sec=0,
+    )
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        port.initialize()
+
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING"
 
 
 def test_frame_source_factory_falls_back_to_dummy_when_window_not_selected() -> None:

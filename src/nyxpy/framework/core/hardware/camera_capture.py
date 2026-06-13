@@ -11,6 +11,14 @@ import numpy as np
 from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 
 
+class CaptureDeviceNotReady(RuntimeError):
+    """Capture device がまだ frame を返せない状態。"""
+
+
+class CaptureDeviceReadFailed(RuntimeError):
+    """Capture device の取得処理が復旧不能な失敗で停止した状態。"""
+
+
 class CaptureDeviceInterface(ABC):
     """フレーム取得デバイスが満たす同期 interface。"""
 
@@ -126,7 +134,7 @@ class CameraCaptureDevice(CaptureDeviceInterface):
         """キャッシュされた最新のフレームを取得します。"""
         with self._lock:
             if self.latest_frame is None:
-                raise RuntimeError("CameraCaptureDevice: No frame available yet.")
+                raise CaptureDeviceNotReady("CameraCaptureDevice: No frame available yet.")
             # Return a copy of the latest or the latest frame
             return self.latest_frame.copy()
 
