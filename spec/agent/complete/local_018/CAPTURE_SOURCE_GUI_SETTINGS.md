@@ -426,22 +426,22 @@ GUI は上記を握りつぶさない。`MainWindow.apply_app_settings()` は既
 - [x] local_017 との責務分担を確定
 - [x] GUI の source 名を「カメラ / ウィンドウ / キャプチャ」に確定
 - [x] GUI から保存する capture / ponkan / profile settings を確定
-- [ ] `GlobalSettings` schema に `capture` と capture / ponkan keys を追加
-- [ ] `DeviceSettingsTab` に source item data と capture 設定行を追加
-- [ ] `DeviceSettingsTab.apply()` で inactive source settings を保持
-- [ ] `MainWindow` 接続メニューに `キャプチャ > ponkan > n3dsxl` source tree を追加
-- [ ] `MainWindow` 接続メニューに `キャプチャ設定 > Ponkan Backend` submenu を追加
-- [ ] `n3dsxl` 配下に physical device action を追加しない
-- [ ] メニューバーの camera/window/capture action が inactive source settings を保持する
-- [ ] メニュー生成時に `ponkan` package を import しない
-- [ ] macro 非実行時の camera/window/capture source 切り替えを即時 preview 反映する
-- [ ] macro 実行中の source 切り替えを deferred apply にする
-- [ ] `MainWindow._update_connection_status()` を capture source に対応
-- [ ] `ponkan-python` 未導入時に dummy へ fallback せず preview error 表示にする
-- [ ] `GuiAppServices.FRAME_SOURCE_SETTING_KEYS` と `_frame_source_key()` を更新
-- [ ] `GuiAppServices._discard_unavailable_connection_settings()` を source 別 stale check に更新
-- [ ] GUI tests を追加・更新
-- [ ] settings schema tests を追加・更新
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src/nyxpy --output-format concise --no-progress`
-- [ ] `uv run pytest tests/gui/test_device_settings_tab.py tests/gui/test_main_window.py tests/gui/test_app_services.py tests/unit/framework/settings/test_settings_schema.py`
+- [x] `GlobalSettings` schema に `capture` と capture / ponkan keys を追加
+- [x] `DeviceSettingsTab` に source item data と capture 設定行を追加
+- [x] `DeviceSettingsTab.apply()` で inactive source settings を保持
+- [x] `MainWindow` 接続メニューに `キャプチャ > ponkan > n3dsxl` source tree を追加
+- [x] `MainWindow` 接続メニューに `キャプチャ設定 > Ponkan Backend` submenu を追加
+- [x] `n3dsxl` 配下に physical device action を追加しない
+- [x] メニューバーの camera/window/capture action が inactive source settings を保持する
+- [x] メニュー生成時に `ponkan` package を import しない
+- [x] macro 非実行時の camera/window/capture source 切り替えを即時 preview 反映する
+- [x] macro 実行中の source 切り替えを deferred apply にする
+- [x] `MainWindow._update_connection_status()` を capture source に対応
+- [x] `ponkan-python` 未導入時に dummy へ fallback せず preview error 表示にする
+- [x] `GuiAppServices.FRAME_SOURCE_SETTING_KEYS` と `_frame_source_key()` を更新
+- [x] `GuiAppServices._discard_unavailable_connection_settings()` を source 別 stale check に更新
+- [x] GUI tests を追加・更新
+- [x] settings schema tests を追加・更新
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src/nyxpy --output-format concise --no-progress`
+- [x] `uv run pytest tests/gui/test_device_settings_tab.py tests/gui/test_main_window.py tests/gui/test_app_services.py tests/unit/framework/settings/test_settings_schema.py`

@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/`, `src/nyxpy/framework/core/io/`
 > **目的**: `ponkan-python` を利用し、直接接続型キャプチャデバイスから取得した画面を NyX の `FrameSourcePort` へ供給する。
-> **関連ドキュメント**: `spec/framework/rearchitecture/RUNTIME_AND_IO_PORTS.md`, `spec/agent/complete/local_007/NINTENDO_3DS_SCREEN_COORDINATES_AND_TOUCH.md`, `spec/agent/complete/local_008/SETTINGS_PREVIEW_CAPTURE_REFRESH.md`, `spec/agent/wip/local_018/CAPTURE_SOURCE_GUI_SETTINGS.md`
+> **関連ドキュメント**: `spec/framework/rearchitecture/RUNTIME_AND_IO_PORTS.md`, `spec/agent/complete/local_007/NINTENDO_3DS_SCREEN_COORDINATES_AND_TOUCH.md`, `spec/agent/complete/local_008/SETTINGS_PREVIEW_CAPTURE_REFRESH.md`, `spec/agent/complete/local_018/CAPTURE_SOURCE_GUI_SETTINGS.md`
 > **外部調査日**: 2026-06-13
 
 ## 1. 概要

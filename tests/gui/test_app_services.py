@@ -6,7 +6,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
     WindowDiscoveryResult,
 )
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
-from nyxpy.gui.app_services import GuiAppServices
+from nyxpy.gui.app_services import GuiAppServices, _frame_source_key
 
 
 class FakeSettings:
@@ -218,6 +218,87 @@ def test_app_services_ignores_window_title_change_while_camera_source_is_active(
     assert outcome.frame_source_changed is False
 
 
+def test_app_services_rebuilds_builder_when_ponkan_key_changes() -> None:
+    settings = {
+        "capture_source_type": "capture",
+        "capture_provider": "ponkan",
+        "capture_device_profile": "n3dsxl",
+        "ponkan_backend": "d3xx-native",
+        "ponkan_raw_slots": 2,
+        "ponkan_output_queue_size": 2,
+        "ponkan_drop_policy": "drop_oldest",
+        "ponkan_poll_interval": 0.004,
+        "ponkan_read_timeout": 1.0,
+        "ponkan_collect_timing": False,
+        "n3dsxl_hd_aspect_box_enabled": True,
+    }
+    services = make_services(
+        settings,
+        previous_builder_settings={
+            **settings,
+            "ponkan_backend": "auto",
+        },
+    )
+    services._active_frame_source_key = (
+        "capture",
+        "ponkan",
+        "n3dsxl",
+        "auto",
+        2,
+        2,
+        "drop_oldest",
+        0.004,
+        1.0,
+        False,
+        True,
+    )
+
+    outcome = services.apply_settings(is_run_active=False)
+
+    assert outcome.builder_replaced is True
+    assert outcome.frame_source_changed is True
+    assert outcome.preview_frame_source is services.runtime_builder.preview
+
+
+def test_app_services_frame_source_key_uses_ponkan_settings() -> None:
+    settings = {
+        "capture_source_type": "capture",
+        "capture_device": "Camera1",
+        "capture_window_title": "Viewer",
+        "capture_window_identifier": "hwnd-1",
+        "capture_provider": "ponkan",
+        "capture_device_profile": "n3dsxl",
+        "ponkan_backend": "d3xx",
+        "ponkan_raw_slots": 3,
+        "ponkan_output_queue_size": 4,
+        "ponkan_drop_policy": "block",
+        "ponkan_poll_interval": 0.01,
+        "ponkan_read_timeout": 0.5,
+        "ponkan_collect_timing": True,
+        "n3dsxl_hd_aspect_box_enabled": False,
+    }
+
+    key = _frame_source_key(settings)
+    settings["capture_device"] = "Camera2"
+    settings["capture_window_title"] = "Other Viewer"
+    settings["capture_window_identifier"] = "hwnd-2"
+
+    assert key == (
+        "capture",
+        "ponkan",
+        "n3dsxl",
+        "d3xx",
+        3,
+        4,
+        "block",
+        0.01,
+        0.5,
+        True,
+        False,
+    )
+    assert _frame_source_key(settings) == key
+
+
 def test_app_services_does_not_rebuild_for_gui_only_setting() -> None:
     settings = {
         "capture_source_type": "window",
@@ -383,3 +464,26 @@ def test_app_services_keeps_window_setting_when_window_discovery_raises() -> Non
 
     assert services.global_settings.get("capture_window_title") == "Viewer"
     assert services.global_settings.get("capture_window_identifier") == "hwnd-1"
+
+
+def test_app_services_keeps_camera_window_settings_for_capture_source() -> None:
+    settings = {
+        "capture_source_type": "capture",
+        "capture_device": "Missing Camera",
+        "capture_window_title": "Closed Viewer",
+        "capture_window_identifier": "hwnd-old",
+        "capture_window_match_mode": "exact",
+        "capture_provider": "ponkan",
+        "capture_device_profile": "n3dsxl",
+        "serial_device": "COM1",
+    }
+    services = make_services(
+        settings,
+        device_discovery=FakeDiscovery(serial=("COM1",), capture=(), windows=()),
+    )
+
+    services.apply_settings(is_run_active=False)
+
+    assert services.global_settings.get("capture_device") == "Missing Camera"
+    assert services.global_settings.get("capture_window_title") == "Closed Viewer"
+    assert services.global_settings.get("capture_window_identifier") == "hwnd-old"

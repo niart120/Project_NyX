@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -71,6 +72,16 @@ class FakeSettings:
             "serial_protocol": "CH552",
             "serial_baud": 9600,
             "capture_fps": None,
+            "capture_provider": "ponkan",
+            "capture_device_profile": "n3dsxl",
+            "ponkan_backend": "auto",
+            "ponkan_raw_slots": 2,
+            "ponkan_output_queue_size": 2,
+            "ponkan_drop_policy": "drop_oldest",
+            "ponkan_poll_interval": 0.004,
+            "ponkan_read_timeout": 1.0,
+            "ponkan_collect_timing": False,
+            "n3dsxl_hd_aspect_box_enabled": True,
         }
 
     def get(self, key: str, default=None):
@@ -338,7 +349,79 @@ def test_capture_input_menu_nests_candidates_under_input_source(window: MainWind
         if action.menu() is not None
     ]
 
-    assert source_menus == ["カメラ", "ウィンドウ"]
+    assert source_menus == ["カメラ", "ウィンドウ", "キャプチャ"]
+
+
+def test_connection_menu_nests_capture_profiles_under_capture_source(
+    window: MainWindow,
+) -> None:
+    assert window.capture_source_menu is not None
+    capture_provider_menus = [
+        action.menu().title() for action in window.capture_source_menu.actions() if action.menu()
+    ]
+
+    assert capture_provider_menus == ["ponkan"]
+    assert window.capture_provider_menu is not None
+    assert [action.text() for action in window.capture_provider_menu.actions()] == ["n3dsxl"]
+
+
+def test_connection_menu_applies_capture_profile_source_setting(window: MainWindow) -> None:
+    assert window.capture_provider_menu is not None
+    action = next(
+        action for action in window.capture_provider_menu.actions() if action.text() == "n3dsxl"
+    )
+
+    action.trigger()
+
+    assert window.global_settings.get("capture_source_type") == "capture"
+    assert window.global_settings.get("capture_provider") == "ponkan"
+    assert window.global_settings.get("capture_device_profile") == "n3dsxl"
+    assert window.services.apply_calls[-1] is False
+
+
+def test_connection_menu_has_ponkan_backend_under_capture_settings(
+    window: MainWindow,
+) -> None:
+    assert window.capture_settings_menu is not None
+    assert window.ponkan_backend_menu is not None
+
+    backend_actions = window.ponkan_backend_menu.actions()
+    assert [action.text() for action in backend_actions] == ["auto", "d3xx", "d3xx-native"]
+    assert backend_actions[0].isChecked()
+
+    backend_actions[2].trigger()
+
+    assert window.global_settings.get("ponkan_backend") == "d3xx-native"
+    assert window.global_settings.get("capture_source_type") == "camera"
+
+
+def test_connection_menu_disables_capture_fps_for_capture_source(window: MainWindow) -> None:
+    window.global_settings.set("capture_source_type", "capture")
+    window._refresh_connection_menu()
+
+    assert window.capture_settings_menu is not None
+    assert window.capture_fps_menu is not None
+    assert window.capture_settings_menu.isEnabled()
+    assert not window.capture_fps_menu.isEnabled()
+
+
+def test_connection_menu_does_not_list_physical_ponkan_devices(window: MainWindow) -> None:
+    assert window.capture_provider_menu is not None
+
+    actions = window.capture_provider_menu.actions()
+
+    assert len(actions) == 1
+    assert actions[0].text() == "n3dsxl"
+
+
+def test_connection_menu_does_not_import_ponkan_when_populating_capture_actions(
+    window: MainWindow,
+) -> None:
+    sys.modules.pop("ponkan", None)
+
+    window._refresh_connection_menu()
+
+    assert "ponkan" not in sys.modules
 
 
 def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) -> None:
@@ -490,6 +573,24 @@ def test_connection_menu_applies_window_source_setting(window: MainWindow) -> No
     assert window.global_settings.get("capture_source_type") == "window"
     assert window.global_settings.get("capture_window_title") == "Viewer"
     assert window.global_settings.get("capture_window_identifier") == "hwnd-1"
+
+
+def test_connection_menu_preserves_inactive_source_settings(window: MainWindow) -> None:
+    window.global_settings.set("capture_device", "Camera1")
+    window.global_settings.set("capture_window_title", "Viewer")
+    window.global_settings.set("capture_window_identifier", "hwnd-1")
+    window.global_settings.set("ponkan_backend", "d3xx")
+    assert window.capture_provider_menu is not None
+    action = next(
+        action for action in window.capture_provider_menu.actions() if action.text() == "n3dsxl"
+    )
+
+    action.trigger()
+
+    assert window.global_settings.get("capture_device") == "Camera1"
+    assert window.global_settings.get("capture_window_title") == "Viewer"
+    assert window.global_settings.get("capture_window_identifier") == "hwnd-1"
+    assert window.global_settings.get("ponkan_backend") == "d3xx"
 
 
 def test_connection_menu_clamps_baudrate_when_protocol_changes(window: MainWindow) -> None:
@@ -672,6 +773,18 @@ def test_status_bar_resolves_window_status_by_title_when_identifier_is_stale(
     qtbot.addWidget(w)
 
     assert w.capture_status_label.text() == "映像: Viewer 接続中"
+    w.preview_pane.timer.stop()
+
+
+def test_status_bar_displays_capture_profile_state(qtbot, services: FakeServices):
+    services.global_settings.set("capture_source_type", "capture")
+    services.global_settings.set("serial_device", "COM1")
+
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_status_label.text() == "映像: キャプチャ (N3DSXL) 接続中"
+    assert w.serial_status_label.text() == "シリアル: USB Serial Device (COM1) 接続中"
     w.preview_pane.timer.stop()
 
 
