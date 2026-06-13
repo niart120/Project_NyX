@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.constants import Button, KeyboardOp, KeyCode
+from nyxpy.framework.core.hardware.camera_capture import CaptureDeviceReadFailed
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, ThreeDSSerialProtocol
 from nyxpy.framework.core.io.adapters import (
     CaptureFrameSourcePort,
@@ -12,7 +13,7 @@ from nyxpy.framework.core.io.adapters import (
     NotificationHandlerAdapter,
     SerialControllerOutputPort,
 )
-from nyxpy.framework.core.io.ports import FrameNotReadyError
+from nyxpy.framework.core.io.ports import FrameNotReadyError, FrameReadError
 
 
 class SerialDevice:
@@ -169,6 +170,17 @@ def test_frame_source_latest_frame_returns_copy_and_reports_not_ready() -> None:
     assert frame[0, 0, 0] == 1
 
     with pytest.raises(FrameNotReadyError):
+        port.latest_frame()
+
+
+def test_frame_source_latest_frame_maps_capture_device_read_failed() -> None:
+    class FailingCaptureDevice:
+        def get_frame(self):
+            raise CaptureDeviceReadFailed("reader stopped")
+
+    port = CaptureFrameSourcePort(FailingCaptureDevice())
+
+    with pytest.raises(FrameReadError):
         port.latest_frame()
 
 

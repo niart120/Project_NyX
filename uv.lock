@@ -442,6 +442,17 @@ wheels = [
 ]
 
 [[package]]
+name = "libusb1"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/35/f9d2a990d092d647b47540cd229e1d68432c0f51183484ca189612a4824c/libusb1-3.4.0.tar.gz", hash = "sha256:9cf5638506d54f21bf36550d97ea63189111a23c4d8078f630103a2052135f45", size = 91206, upload-time = "2026-05-16T20:59:19.315Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/64/d4b59444e4d3b6979aa5eb58840634465a24b41a9ab03dcf8434c9b89551/libusb1-3.4.0-py3-none-any.whl", hash = "sha256:e83d034e44c3efe1c4599c6281d34bca50a38c12cab3b7b6217d583161a01ffd", size = 67373, upload-time = "2026-05-16T20:59:13.142Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/55/a838a4278fac4ee49bf670ddc59d621999a1cb2a3188fb13a23609ea4f06/libusb1-3.4.0-py3-none-win32.whl", hash = "sha256:0a1aa1416034690eb9dc9a895eda0fef44d853bca1053eb1de50a5906684846d", size = 129704, upload-time = "2026-05-16T20:59:15.243Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/08/02aecf6dad627534a5835244ece14d7f187ef430354d9b8551199934d059/libusb1-3.4.0-py3-none-win_amd64.whl", hash = "sha256:b7dcc1f324a895af6aac708bc5513a17373f97349cc2ab8a277519c788bd18ca", size = 141212, upload-time = "2026-05-16T20:59:17.286Z" },
+]
+
+[[package]]
 name = "loguru"
 version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
@@ -720,6 +731,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+ponkan = [
+    { name = "ponkan-python", marker = "sys_platform == 'win32'" },
+]
 windows = [
     { name = "windows-capture", marker = "sys_platform == 'win32'" },
 ]
@@ -750,6 +764,7 @@ requires-dist = [
     { name = "paddleocr", specifier = ">=3.5.0,<3.6.0" },
     { name = "paddlepaddle", specifier = ">=3.2.2,<3.3.0" },
     { name = "pillow", specifier = ">=12.2.0,<13.0.0" },
+    { name = "ponkan-python", marker = "sys_platform == 'win32' and extra == 'ponkan'", specifier = ">=0.1.2,<0.2.0" },
     { name = "pyserial", specifier = ">=3.5,<4.0" },
     { name = "pyside6", specifier = ">=6.11.0,<7.0.0" },
     { name = "requests", specifier = ">=2.34.0,<3.0.0" },
@@ -757,7 +772,7 @@ requires-dist = [
     { name = "tomlkit", specifier = ">=0.13.3,<0.14.0" },
     { name = "windows-capture", marker = "sys_platform == 'win32' and extra == 'windows'", specifier = ">=2.0.0,<3.0.0" },
 ]
-provides-extras = ["windows"]
+provides-extras = ["windows", "ponkan"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1017,6 +1032,20 @@ wheels = [
 ]
 
 [[package]]
+name = "ponkan-python"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "libusb1", marker = "sys_platform == 'win32'" },
+    { name = "numpy", marker = "sys_platform == 'win32'" },
+    { name = "pyd3xx", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/23/8c/11526e89a96d0e01ec525bbe72b26947ba0c06c4378fbde74633c9644ea7/ponkan_python-0.1.2.tar.gz", hash = "sha256:fbaf83511ea68f2f42a3f41cfc7b9025c296b8a46b8250725701d2b69effbdd9", size = 75032, upload-time = "2026-06-12T18:02:27.958Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/2e/32a0a79fae1a0ba6953b3a1c21c3f7d309b75f961f7ad81cb16bc1fea235/ponkan_python-0.1.2-py3-none-any.whl", hash = "sha256:01e68cd2cd484e75533e9c2270d1121602b1bd0f3a1efb202f1a1c5964d43566", size = 63582, upload-time = "2026-06-12T18:02:26.543Z" },
+]
+
+[[package]]
 name = "prettytable"
 version = "3.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1122,6 +1151,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/59/fe/aae679b64363eb78326c7fdc9d06ec3de18bac68be4b612fc1fe8902693c/pycryptodome-3.23.0-cp37-abi3-win32.whl", hash = "sha256:507dbead45474b62b2bbe318eb1c4c8ee641077532067fec9c1aa82c31f84886", size = 1768484, upload-time = "2025-05-17T17:21:08.535Z" },
     { url = "https://files.pythonhosted.org/packages/54/2f/e97a1b8294db0daaa87012c24a7bb714147c7ade7656973fd6c736b484ff/pycryptodome-3.23.0-cp37-abi3-win_amd64.whl", hash = "sha256:c75b52aacc6c0c260f204cbdd834f76edc9fb0d8e0da9fbf8352ef58202564e2", size = 1799636, upload-time = "2025-05-17T17:21:10.393Z" },
     { url = "https://files.pythonhosted.org/packages/18/3d/f9441a0d798bf2b1e645adc3265e55706aead1255ccdad3856dbdcffec14/pycryptodome-3.23.0-cp37-abi3-win_arm64.whl", hash = "sha256:11eeeb6917903876f134b56ba11abe95c0b0fd5e3330def218083c7d98bbcb3c", size = 1703675, upload-time = "2025-05-17T17:21:13.146Z" },
+]
+
+[[package]]
+name = "pyd3xx"
+version = "1.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/97/666e521b30ba8fe23428d8dece9526df8b63a748bdc38e83793f6fcce8aa/pyd3xx-1.1.4.tar.gz", hash = "sha256:226e83b1a097bb2c0f075f7f8e9e1cf896508daeb1dffe3511cb63c8acedef9f", size = 2628724, upload-time = "2026-05-29T16:30:04.646Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/78/07c894baab4bd5b3a54af9b6be5c4428047e52897520bb1e1291f470e6e2/pyd3xx-1.1.4-py3-none-any.whl", hash = "sha256:31dbc429db809cee3796e0611b28eb458fd0cbdf8588110ca379f18593cf27e3", size = 2698882, upload-time = "2026-05-29T16:30:02.534Z" },
 ]
 
 [[package]]

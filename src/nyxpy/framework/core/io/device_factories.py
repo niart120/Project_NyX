@@ -9,6 +9,7 @@ from nyxpy.framework.core.hardware.capture_source import (
     CameraCaptureSourceConfig,
     CaptureSourceConfig,
     CaptureSourceKey,
+    PonkanCaptureSourceConfig,
     WindowCaptureSourceConfig,
 )
 from nyxpy.framework.core.hardware.device_discovery import (
@@ -18,6 +19,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
     DeviceInfo,
 )
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
+from nyxpy.framework.core.hardware.ponkan_capture import PonkanCaptureDevice
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.serial_comm import (
     DummySerialComm,
@@ -119,6 +121,7 @@ class FrameSourcePortFactory:
         discovery: DeviceDiscoveryService,
         logger: LoggerPort | None = None,
         capture_factory: Callable[..., object] = CameraCaptureDevice,
+        ponkan_capture_factory: Callable[..., object] = PonkanCaptureDevice,
         window_locator_factory: Callable[[], WindowLocatorBackend] | None = None,
         window_backend_factory: Callable[[str], WindowCaptureBackend] | None = None,
     ) -> None:
@@ -126,6 +129,7 @@ class FrameSourcePortFactory:
         self.discovery = discovery
         self.logger = logger or NullLoggerPort()
         self.capture_factory = capture_factory
+        self.ponkan_capture_factory = ponkan_capture_factory
         self.window_locator_factory = window_locator_factory
         self.window_backend_factory = window_backend_factory
         self._devices: dict[CaptureSourceKey, object] = {}
@@ -146,6 +150,8 @@ class FrameSourcePortFactory:
                 )
             case WindowCaptureSourceConfig():
                 return self._create_window_source(source, allow_dummy=allow_dummy)
+            case PonkanCaptureSourceConfig():
+                return self._create_ponkan_capture_source(source)
 
     def _create_camera_source(
         self,
@@ -250,6 +256,19 @@ class FrameSourcePortFactory:
                 self._dummy_capture(_dummy_capture_key(source.fps, source.transform), source),
                 logger=self.logger,
             )
+        return CaptureFrameSourcePort(device)
+
+    def _create_ponkan_capture_source(self, source: PonkanCaptureSourceConfig) -> FrameSourcePort:
+        cache_key = CaptureSourceKey.from_source(source)
+        device = self._devices.get(cache_key)
+        if device is None:
+            device = _SharedCaptureDevice(
+                _TransformingCaptureDevice(
+                    self.ponkan_capture_factory(source, logger=self.logger),
+                    transform=source.transform,
+                )
+            )
+            self._devices[cache_key] = device
         return CaptureFrameSourcePort(device)
 
     def close(self) -> None:

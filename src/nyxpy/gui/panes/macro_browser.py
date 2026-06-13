@@ -256,7 +256,9 @@ class MacroBrowserPane(QWidget):
         self._set_selected_macro_id(macro_id)
 
     def _set_selected_macro_id(self, macro_id: str | None, *, emit: bool = True) -> None:
-        self._selected_macro_id = macro_id if macro_id and self._definition_exists(macro_id) else None
+        self._selected_macro_id = (
+            macro_id if macro_id and self._definition_exists(macro_id) else None
+        )
         self._restore_selection()
         if emit:
             self.selection_changed.emit(self._selected_macro_id is not None)

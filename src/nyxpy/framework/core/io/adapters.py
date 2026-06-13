@@ -7,6 +7,10 @@ import cv2
 import numpy as np
 
 from nyxpy.framework.core.constants import KeyboardOp, KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.hardware.camera_capture import (
+    CaptureDeviceNotReady,
+    CaptureDeviceReadFailed,
+)
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
@@ -109,7 +113,9 @@ class CaptureFrameSourcePort(FrameSourcePort):
                     try:
                         if self.capture_device.get_frame() is not None:
                             return True
-                    except RuntimeError:
+                    except CaptureDeviceReadFailed:
+                        return False
+                    except (CaptureDeviceNotReady, RuntimeError):
                         pass
                 finally:
                     self._frame_lock.release()
@@ -122,6 +128,10 @@ class CaptureFrameSourcePort(FrameSourcePort):
             raise FrameReadError("Frame source lock acquisition timed out.")
         try:
             frame = self.capture_device.get_frame()
+        except CaptureDeviceReadFailed as exc:
+            raise FrameReadError() from exc
+        except CaptureDeviceNotReady as exc:
+            raise FrameNotReadyError() from exc
         except RuntimeError as exc:
             raise FrameNotReadyError() from exc
         finally:
@@ -134,7 +144,7 @@ class CaptureFrameSourcePort(FrameSourcePort):
         try:
             try:
                 frame = self.capture_device.get_frame()
-            except RuntimeError:
+            except (CaptureDeviceNotReady, CaptureDeviceReadFailed, RuntimeError):
                 return None
         finally:
             self._frame_lock.release()

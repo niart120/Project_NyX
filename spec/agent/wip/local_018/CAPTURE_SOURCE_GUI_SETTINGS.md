@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/gui/`, `src/nyxpy/framework/core/settings/`
 > **目的**: 直接接続型キャプチャ source を GUI から選択・設定・再接続できるようにし、`ponkan-python` 統合を利用者の操作導線へ接続する。
-> **関連ドキュメント**: `spec/agent/wip/local_017/PONKAN_CAPTURE_SOURCE.md`, `spec/agent/complete/local_008/SETTINGS_PREVIEW_CAPTURE_REFRESH.md`
+> **関連ドキュメント**: `spec/agent/complete/local_017/PONKAN_CAPTURE_SOURCE.md`, `spec/agent/complete/local_008/SETTINGS_PREVIEW_CAPTURE_REFRESH.md`
 > **既存ソース**: `src/nyxpy/gui/dialogs/settings/device_tab.py`, `src/nyxpy/gui/main_window.py`, `src/nyxpy/gui/app_services.py`
 > **破壊的変更**: なし。既存 `camera` / `window` source の設定値と操作導線は維持する。
 

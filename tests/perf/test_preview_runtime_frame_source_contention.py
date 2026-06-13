@@ -3,6 +3,8 @@ import time
 
 import numpy as np
 
+from nyxpy.framework.core.hardware.capture_source import PonkanCaptureSourceConfig
+from nyxpy.framework.core.hardware.ponkan_capture import PonkanCaptureDevice
 from nyxpy.framework.core.io.adapters import CaptureFrameSourcePort
 
 
@@ -54,3 +56,34 @@ def test_preview_runtime_frame_source_contention_perf() -> None:
 
     assert sum(tick >= 0.016 for tick in preview_ticks) / len(preview_ticks) < 0.01
     assert _p95(contended) < max(_p95(baseline) * 2, 0.01)
+
+
+def test_ponkan_capture_frame_source_try_latest_frame_is_nonblocking() -> None:
+    class BlockingReader:
+        def read(self, *, output=None, colorspace=None, timeout=None):
+            time.sleep(0.05)
+            return None
+
+        def stats(self):
+            return {}
+
+        def close(self) -> None:
+            pass
+
+    device = PonkanCaptureDevice(
+        PonkanCaptureSourceConfig(read_timeout=0.05),
+        opener=lambda _config: BlockingReader(),
+    )
+    source = CaptureFrameSourcePort(device)
+    samples: list[float] = []
+
+    source.initialize()
+    try:
+        for _ in range(20):
+            started = time.perf_counter()
+            source.try_latest_frame()
+            samples.append(time.perf_counter() - started)
+    finally:
+        device.release()
+
+    assert _p95(samples) < 0.005

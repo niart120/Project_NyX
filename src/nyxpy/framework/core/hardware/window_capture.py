@@ -12,7 +12,11 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-from nyxpy.framework.core.hardware.camera_capture import CaptureDeviceInterface
+from nyxpy.framework.core.hardware.camera_capture import (
+    CaptureDeviceInterface,
+    CaptureDeviceNotReady,
+    CaptureDeviceReadFailed,
+)
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.frame_transform import FrameTransformer
 from nyxpy.framework.core.hardware.platform_capture import ensure_capture_coordinate_space
@@ -311,8 +315,14 @@ class _ThreadedSessionCaptureDevice(CaptureDeviceInterface):
 
     def get_frame(self) -> cv2.typing.MatLike:
         with self._lock:
+            if self._last_error is not None and not self._running:
+                raise CaptureDeviceReadFailed(
+                    f"{self.config.source_type} capture reader failed"
+                ) from self._last_error
             if self._latest_frame is None:
-                raise RuntimeError(f"{self.config.source_type} capture has no frame available yet")
+                raise CaptureDeviceNotReady(
+                    f"{self.config.source_type} capture has no frame available yet"
+                )
             return self._latest_frame.copy()
 
     def release(self) -> None:
