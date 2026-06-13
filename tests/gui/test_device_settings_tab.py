@@ -1,3 +1,4 @@
+import pytest
 from PySide6.QtWidgets import QLabel
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
@@ -74,6 +75,14 @@ class EmptyDiscovery:
         return ()
 
 
+@pytest.fixture(autouse=True)
+def _default_ponkan_available(monkeypatch):
+    monkeypatch.setattr(
+        "nyxpy.gui.dialogs.settings.device_tab.is_ponkan_capture_available",
+        lambda: True,
+    )
+
+
 def test_device_tab_protocol_options_include_3ds(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
@@ -91,7 +100,7 @@ def test_device_tab_selects_3ds_default_baudrate(qtbot):
     assert tab.ser_baud.currentText() == "115200"
 
 
-def test_device_settings_tab_shows_capture_source_type(qtbot):
+def test_device_settings_tab_shows_simple_capture_option_when_ponkan_available(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
@@ -109,6 +118,26 @@ def test_device_settings_tab_shows_capture_source_type(qtbot):
         "ウィンドウ",
         "キャプチャ",
     ]
+
+
+def test_device_settings_tab_hides_capture_option_when_ponkan_unavailable(qtbot):
+    settings = FakeSettings()
+    settings.data["capture_source_type"] = "capture"
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        ponkan_capture_available=False,
+    )
+    qtbot.addWidget(tab)
+
+    assert [
+        tab.capture_source_type.itemData(i) for i in range(tab.capture_source_type.count())
+    ] == [
+        "camera",
+        "window",
+    ]
+    assert tab.capture_source_type.currentData() == "camera"
 
 
 def test_device_settings_tab_applies_window_capture_settings(qtbot):
@@ -169,25 +198,36 @@ def test_device_settings_tab_places_letterbox_on_source_row(qtbot):
     assert settings.data["capture_aspect_box_enabled"] is True
 
 
-def test_device_settings_tab_hides_irrelevant_source_fields(qtbot):
+def test_device_settings_tab_shows_only_hd_aspect_for_capture(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
+    advanced_labels = {
+        "Capture Provider:",
+        "Device Profile:",
+        "Ponkan Backend:",
+        "Raw Slots:",
+        "Output Queue Size:",
+        "Drop Policy:",
+        "Poll Interval:",
+        "Read Timeout:",
+        "Collect Timing:",
+    }
 
     assert not tab.cap_device.isHidden()
     assert tab.window_row.isHidden()
-    assert tab.capture_provider.isHidden()
+    assert advanced_labels.isdisjoint(_label_texts(tab.cap_group))
 
     _set_capture_source(tab, "window")
     assert tab.camera_row.isHidden()
     assert not tab.window_row.isHidden()
     assert not tab.window_match_mode.isHidden()
     assert not tab.capture_backend.isHidden()
-    assert tab.capture_provider.isHidden()
+    assert tab.n3dsxl_hd_aspect_box_enabled.isHidden()
 
     _set_capture_source(tab, "camera")
     assert not tab.cap_device.isHidden()
     assert tab.window_row.isHidden()
-    assert tab.capture_provider.isHidden()
+    assert tab.n3dsxl_hd_aspect_box_enabled.isHidden()
 
     _set_capture_source(tab, "capture")
     assert tab.camera_row.isHidden()
@@ -196,30 +236,41 @@ def test_device_settings_tab_hides_irrelevant_source_fields(qtbot):
     assert tab.capture_backend.isHidden()
     assert tab.capture_fps.isHidden()
     assert tab.aspect_box_enabled.isHidden()
-    assert not tab.capture_provider.isHidden()
-    assert not tab.capture_device_profile.isHidden()
-    assert not tab.ponkan_backend.isHidden()
+    assert not tab.n3dsxl_hd_aspect_box_enabled.isHidden()
+    assert not tab.n3dsxl_hd_aspect_box_enabled_label.isHidden()
+    assert advanced_labels.isdisjoint(_label_texts(tab.cap_group))
 
 
-def test_device_settings_tab_applies_ponkan_capture_settings(qtbot):
+def test_device_settings_tab_applies_fixed_ponkan_capture_settings(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
     _set_capture_source(tab, "capture")
-    _set_combo_data(tab.ponkan_backend, "d3xx-native")
-    tab.ponkan_raw_slots.setValue(3)
-    tab.ponkan_output_queue_size.setValue(4)
-    _set_combo_data(tab.ponkan_drop_policy, "block")
-    tab.ponkan_poll_interval.setValue(0.01)
-    tab.ponkan_read_timeout.setValue(0.5)
-    tab.ponkan_collect_timing.setChecked(True)
     tab.n3dsxl_hd_aspect_box_enabled.setChecked(False)
     tab.apply()
 
     assert settings.data["capture_source_type"] == "capture"
     assert settings.data["capture_provider"] == "ponkan"
     assert settings.data["capture_device_profile"] == "n3dsxl"
+    assert settings.data["n3dsxl_hd_aspect_box_enabled"] is False
+
+
+def test_device_settings_tab_does_not_overwrite_hidden_ponkan_settings(qtbot):
+    settings = FakeSettings()
+    settings.data["ponkan_backend"] = "d3xx-native"
+    settings.data["ponkan_raw_slots"] = 3
+    settings.data["ponkan_output_queue_size"] = 4
+    settings.data["ponkan_drop_policy"] = "block"
+    settings.data["ponkan_poll_interval"] = 0.01
+    settings.data["ponkan_read_timeout"] = 0.5
+    settings.data["ponkan_collect_timing"] = True
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    _set_capture_source(tab, "capture")
+    tab.apply()
+
     assert settings.data["ponkan_backend"] == "d3xx-native"
     assert settings.data["ponkan_raw_slots"] == 3
     assert settings.data["ponkan_output_queue_size"] == 4
@@ -227,7 +278,6 @@ def test_device_settings_tab_applies_ponkan_capture_settings(qtbot):
     assert settings.data["ponkan_poll_interval"] == 0.01
     assert settings.data["ponkan_read_timeout"] == 0.5
     assert settings.data["ponkan_collect_timing"] is True
-    assert settings.data["n3dsxl_hd_aspect_box_enabled"] is False
 
 
 def test_device_settings_tab_preserves_inactive_source_settings_for_capture(qtbot):
@@ -309,9 +359,3 @@ def _set_capture_source(tab: DeviceSettingsTab, source_type: str) -> None:
     index = tab.capture_source_type.findData(source_type)
     assert index >= 0
     tab.capture_source_type.setCurrentIndex(index)
-
-
-def _set_combo_data(combo, value: str) -> None:
-    index = combo.findData(value)
-    assert index >= 0
-    combo.setCurrentIndex(index)

@@ -34,6 +34,7 @@ from nyxpy.framework.core.runtime.builder import (
 )
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.macro_catalog import MacroCatalog
 
 
@@ -124,6 +125,7 @@ class GuiAppServices:
         )
         self.logger = self.logging.logger
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
+        self.ponkan_capture_available = is_ponkan_capture_available()
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)
         self.runtime_builder: MacroRuntimeBuilder | None = None
@@ -320,6 +322,21 @@ class GuiAppServices:
             )
 
     def _discard_unavailable_connection_settings(self) -> None:
+        discarded_keys: list[str] = []
+        source_type = str(self.global_settings.get("capture_source_type", "camera") or "camera")
+        if source_type == "capture" and not self._is_ponkan_capture_available():
+            self.global_settings.set("capture_source_type", "camera")
+            self.logger.user(
+                "INFO",
+                "ponkan-python が未導入のためキャプチャ入力をカメラへ戻しました。",
+                component="GuiAppServices",
+                event="configuration.connection_discarded",
+                extra={
+                    "keys": "capture_source_type",
+                    "reason": "ponkan_unavailable",
+                },
+            )
+
         discovery = getattr(self, "device_discovery", None)
         detect = getattr(discovery, "detect", None)
         if not callable(detect):
@@ -328,7 +345,6 @@ class GuiAppServices:
         if not isinstance(result, DeviceDiscoveryResult):
             return
 
-        discarded_keys: list[str] = []
         serial_device = str(self.global_settings.get("serial_device", "") or "").strip()
         if (
             serial_device
@@ -340,7 +356,6 @@ class GuiAppServices:
             self.global_settings.set("serial_device", "")
             discarded_keys.append("serial_device")
 
-        source_type = str(self.global_settings.get("capture_source_type", "camera") or "camera")
         if source_type == "window":
             discarded_keys.extend(self._discard_unavailable_window_settings())
         elif source_type == "camera":
@@ -363,6 +378,12 @@ class GuiAppServices:
                 event="configuration.connection_discarded",
                 extra={"keys": ", ".join(discarded_keys)},
             )
+
+    def _is_ponkan_capture_available(self) -> bool:
+        value = getattr(self, "ponkan_capture_available", None)
+        if value is None:
+            return is_ponkan_capture_available()
+        return bool(value)
 
     def _discard_unavailable_window_settings(self) -> list[str]:
         title = str(self.global_settings.get("capture_window_title", "") or "").strip()

@@ -189,6 +189,7 @@ class FakeServices:
         self.secrets_settings = FakeSecrets()
         self.device_discovery = FakeDiscovery()
         self.macro_catalog = FakeCatalog()
+        self.ponkan_capture_available = True
         self.builder = FakeBuilder()
         self.apply_calls = []
         self.next_apply_outcome = SettingsApplyOutcome(
@@ -352,23 +353,44 @@ def test_capture_input_menu_nests_candidates_under_input_source(window: MainWind
     assert source_menus == ["カメラ", "ウィンドウ", "キャプチャ"]
 
 
-def test_connection_menu_nests_capture_profiles_under_capture_source(
+def test_connection_menu_hides_capture_when_ponkan_unavailable(
+    qtbot,
+    services: FakeServices,
+) -> None:
+    services.ponkan_capture_available = False
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+
+    assert w.capture_source_type_menu is not None
+    source_menus = [
+        action.menu().title()
+        for action in w.capture_source_type_menu.actions()
+        if action.menu() is not None
+    ]
+
+    assert source_menus == ["カメラ", "ウィンドウ"]
+    assert w.capture_source_menu is None
+    w.preview_pane.timer.stop()
+
+
+def test_connection_menu_shows_n3dsxl_action_under_capture_when_ponkan_available(
     window: MainWindow,
 ) -> None:
     assert window.capture_source_menu is not None
-    capture_provider_menus = [
-        action.menu().title() for action in window.capture_source_menu.actions() if action.menu()
+
+    assert [action.text() for action in window.capture_source_menu.actions()] == [
+        "N3DSXL (ponkan-python)"
     ]
-
-    assert capture_provider_menus == ["ponkan"]
-    assert window.capture_provider_menu is not None
-    assert [action.text() for action in window.capture_provider_menu.actions()] == ["n3dsxl"]
+    assert all(action.menu() is None for action in window.capture_source_menu.actions())
+    assert window.capture_provider_menu is None
 
 
-def test_connection_menu_applies_capture_profile_source_setting(window: MainWindow) -> None:
-    assert window.capture_provider_menu is not None
+def test_connection_menu_applies_fixed_ponkan_profile(window: MainWindow) -> None:
+    assert window.capture_source_menu is not None
     action = next(
-        action for action in window.capture_provider_menu.actions() if action.text() == "n3dsxl"
+        action
+        for action in window.capture_source_menu.actions()
+        if action.text() == "N3DSXL (ponkan-python)"
     )
 
     action.trigger()
@@ -379,39 +401,36 @@ def test_connection_menu_applies_capture_profile_source_setting(window: MainWind
     assert window.services.apply_calls[-1] is False
 
 
-def test_connection_menu_has_ponkan_backend_under_capture_settings(
+def test_connection_menu_removes_ponkan_backend_submenu(
     window: MainWindow,
 ) -> None:
-    assert window.capture_settings_menu is not None
-    assert window.ponkan_backend_menu is not None
+    assert window.capture_input_menu is not None
+    child_menus = [
+        action.menu().title()
+        for action in window.capture_input_menu.actions()
+        if action.menu() is not None
+    ]
 
-    backend_actions = window.ponkan_backend_menu.actions()
-    assert [action.text() for action in backend_actions] == ["auto", "d3xx", "d3xx-native"]
-    assert backend_actions[0].isChecked()
-
-    backend_actions[2].trigger()
-
-    assert window.global_settings.get("ponkan_backend") == "d3xx-native"
-    assert window.global_settings.get("capture_source_type") == "camera"
+    assert child_menus == ["入力ソース", "FPS"]
+    assert window.capture_settings_menu is None
+    assert window.ponkan_backend_menu is None
 
 
 def test_connection_menu_disables_capture_fps_for_capture_source(window: MainWindow) -> None:
     window.global_settings.set("capture_source_type", "capture")
     window._refresh_connection_menu()
 
-    assert window.capture_settings_menu is not None
     assert window.capture_fps_menu is not None
-    assert window.capture_settings_menu.isEnabled()
     assert not window.capture_fps_menu.isEnabled()
 
 
 def test_connection_menu_does_not_list_physical_ponkan_devices(window: MainWindow) -> None:
-    assert window.capture_provider_menu is not None
+    assert window.capture_source_menu is not None
 
-    actions = window.capture_provider_menu.actions()
+    actions = window.capture_source_menu.actions()
 
     assert len(actions) == 1
-    assert actions[0].text() == "n3dsxl"
+    assert actions[0].text() == "N3DSXL (ponkan-python)"
 
 
 def test_connection_menu_does_not_import_ponkan_when_populating_capture_actions(
@@ -580,9 +599,11 @@ def test_connection_menu_preserves_inactive_source_settings(window: MainWindow) 
     window.global_settings.set("capture_window_title", "Viewer")
     window.global_settings.set("capture_window_identifier", "hwnd-1")
     window.global_settings.set("ponkan_backend", "d3xx")
-    assert window.capture_provider_menu is not None
+    assert window.capture_source_menu is not None
     action = next(
-        action for action in window.capture_provider_menu.actions() if action.text() == "n3dsxl"
+        action
+        for action in window.capture_source_menu.actions()
+        if action.text() == "N3DSXL (ponkan-python)"
     )
 
     action.trigger()

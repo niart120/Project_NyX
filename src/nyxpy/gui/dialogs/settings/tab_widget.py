@@ -20,6 +20,7 @@ class SettingsTabWidget(QTabWidget):
         secrets: SecretsSettings,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
+        ponkan_capture_available: bool | None = None,
     ):
         """Device/notification tab を生成し、store と discovery service を渡します。"""
         super().__init__(parent)
@@ -27,6 +28,7 @@ class SettingsTabWidget(QTabWidget):
             settings,
             secrets,
             device_discovery=device_discovery,
+            ponkan_capture_available=ponkan_capture_available,
         )
         self.notification_tab = NotificationSettingsTab(settings, secrets)
 
