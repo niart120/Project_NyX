@@ -17,6 +17,16 @@ class FakeSettings:
             "capture_backend": "auto",
             "capture_fps": None,
             "capture_aspect_box_enabled": False,
+            "capture_provider": "ponkan",
+            "capture_device_profile": "n3dsxl",
+            "ponkan_backend": "auto",
+            "ponkan_raw_slots": 2,
+            "ponkan_output_queue_size": 2,
+            "ponkan_drop_policy": "drop_oldest",
+            "ponkan_poll_interval": 0.004,
+            "ponkan_read_timeout": 1.0,
+            "ponkan_collect_timing": False,
+            "n3dsxl_hd_aspect_box_enabled": True,
             "preview_fps": 60,
             "serial_device": "COM1",
             "serial_protocol": "CH552",
@@ -86,10 +96,18 @@ def test_device_settings_tab_shows_capture_source_type(qtbot):
     qtbot.addWidget(tab)
 
     assert [
-        tab.capture_source_type.itemText(i) for i in range(tab.capture_source_type.count())
+        tab.capture_source_type.itemData(i) for i in range(tab.capture_source_type.count())
     ] == [
         "camera",
         "window",
+        "capture",
+    ]
+    assert [
+        tab.capture_source_type.itemText(i) for i in range(tab.capture_source_type.count())
+    ] == [
+        "カメラ",
+        "ウィンドウ",
+        "キャプチャ",
     ]
 
 
@@ -98,7 +116,7 @@ def test_device_settings_tab_applies_window_capture_settings(qtbot):
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    tab.capture_source_type.setCurrentText("window")
+    _set_capture_source(tab, "window")
     tab.window_source.setCurrentIndex(0)
     tab.window_match_mode.setCurrentText("contains")
     tab.capture_backend.setCurrentText("mss")
@@ -127,7 +145,7 @@ def test_device_settings_tab_saves_custom_window_title_without_identifier(qtbot)
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    tab.capture_source_type.setCurrentText("window")
+    _set_capture_source(tab, "window")
     tab.window_source.setEditText("View")
     tab.window_match_mode.setCurrentText("contains")
     tab.apply()
@@ -157,16 +175,79 @@ def test_device_settings_tab_hides_irrelevant_source_fields(qtbot):
 
     assert not tab.cap_device.isHidden()
     assert tab.window_row.isHidden()
+    assert tab.capture_provider.isHidden()
 
-    tab.capture_source_type.setCurrentText("window")
+    _set_capture_source(tab, "window")
     assert tab.camera_row.isHidden()
     assert not tab.window_row.isHidden()
     assert not tab.window_match_mode.isHidden()
     assert not tab.capture_backend.isHidden()
+    assert tab.capture_provider.isHidden()
 
-    tab.capture_source_type.setCurrentText("camera")
+    _set_capture_source(tab, "camera")
     assert not tab.cap_device.isHidden()
     assert tab.window_row.isHidden()
+    assert tab.capture_provider.isHidden()
+
+    _set_capture_source(tab, "capture")
+    assert tab.camera_row.isHidden()
+    assert tab.window_row.isHidden()
+    assert tab.window_match_mode.isHidden()
+    assert tab.capture_backend.isHidden()
+    assert tab.capture_fps.isHidden()
+    assert tab.aspect_box_enabled.isHidden()
+    assert not tab.capture_provider.isHidden()
+    assert not tab.capture_device_profile.isHidden()
+    assert not tab.ponkan_backend.isHidden()
+
+
+def test_device_settings_tab_applies_ponkan_capture_settings(qtbot):
+    settings = FakeSettings()
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    _set_capture_source(tab, "capture")
+    _set_combo_data(tab.ponkan_backend, "d3xx-native")
+    tab.ponkan_raw_slots.setValue(3)
+    tab.ponkan_output_queue_size.setValue(4)
+    _set_combo_data(tab.ponkan_drop_policy, "block")
+    tab.ponkan_poll_interval.setValue(0.01)
+    tab.ponkan_read_timeout.setValue(0.5)
+    tab.ponkan_collect_timing.setChecked(True)
+    tab.n3dsxl_hd_aspect_box_enabled.setChecked(False)
+    tab.apply()
+
+    assert settings.data["capture_source_type"] == "capture"
+    assert settings.data["capture_provider"] == "ponkan"
+    assert settings.data["capture_device_profile"] == "n3dsxl"
+    assert settings.data["ponkan_backend"] == "d3xx-native"
+    assert settings.data["ponkan_raw_slots"] == 3
+    assert settings.data["ponkan_output_queue_size"] == 4
+    assert settings.data["ponkan_drop_policy"] == "block"
+    assert settings.data["ponkan_poll_interval"] == 0.01
+    assert settings.data["ponkan_read_timeout"] == 0.5
+    assert settings.data["ponkan_collect_timing"] is True
+    assert settings.data["n3dsxl_hd_aspect_box_enabled"] is False
+
+
+def test_device_settings_tab_preserves_inactive_source_settings_for_capture(qtbot):
+    settings = FakeSettings()
+    settings.data["capture_device"] = "Camera1"
+    settings.data["capture_window_title"] = "Viewer"
+    settings.data["capture_window_identifier"] = "hwnd-1"
+    settings.data["capture_backend"] = "mss"
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    _set_capture_source(tab, "capture")
+    tab.cap_device.clear()
+    tab.window_source.setEditText("")
+    tab.apply()
+
+    assert settings.data["capture_device"] == "Camera1"
+    assert settings.data["capture_window_title"] == "Viewer"
+    assert settings.data["capture_window_identifier"] == "hwnd-1"
+    assert settings.data["capture_backend"] == "mss"
 
 
 def test_device_settings_tab_saves_serial_identifier(qtbot):
@@ -222,3 +303,15 @@ def test_device_settings_tab_places_preview_fps_in_appearance_group(qtbot):
 
 def _label_texts(widget) -> list[str]:
     return [label.text() for label in widget.findChildren(QLabel)]
+
+
+def _set_capture_source(tab: DeviceSettingsTab, source_type: str) -> None:
+    index = tab.capture_source_type.findData(source_type)
+    assert index >= 0
+    tab.capture_source_type.setCurrentIndex(index)
+
+
+def _set_combo_data(combo, value: str) -> None:
+    index = combo.findData(value)
+    assert index >= 0
+    combo.setCurrentIndex(index)

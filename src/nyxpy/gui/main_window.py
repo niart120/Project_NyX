@@ -69,6 +69,7 @@ _CAPTURE_FPS_OPTIONS = (
     ("30", 30.0),
     ("60", 60.0),
 )
+_PONKAN_BACKEND_OPTIONS = ("auto", "d3xx", "d3xx-native")
 _SERIAL_BAUD_OPTIONS = (
     "1200",
     "2400",
@@ -179,9 +180,15 @@ class MainWindow(QMainWindow):
         self.capture_source_type_menu: QMenu | None = None
         self.camera_source_menu: QMenu | None = None
         self.window_source_menu: QMenu | None = None
+        self.capture_source_menu: QMenu | None = None
+        self.capture_provider_menu: QMenu | None = None
+        self.capture_settings_menu: QMenu | None = None
+        self.ponkan_backend_menu: QMenu | None = None
         self.capture_fps_menu: QMenu | None = None
         self.serial_baud_menu: QMenu | None = None
         self.capture_device_action_group: QActionGroup | None = None
+        self.capture_profile_action_group: QActionGroup | None = None
+        self.ponkan_backend_action_group: QActionGroup | None = None
         self.capture_fps_action_group: QActionGroup | None = None
         self.serial_device_action_group: QActionGroup | None = None
         self.serial_baud_action_group: QActionGroup | None = None
@@ -265,8 +272,17 @@ class MainWindow(QMainWindow):
             devices,
             windows,
         )
+        self.capture_settings_menu = QMenu("キャプチャ設定", menu)
+        self.capture_settings_menu.setEnabled(
+            self.global_settings.get("capture_source_type", "camera") == "capture"
+        )
+        menu.addMenu(self.capture_settings_menu)
+        self._populate_capture_settings_menu(self.capture_settings_menu)
         menu.addSeparator()
         self.capture_fps_menu = QMenu("FPS", menu)
+        self.capture_fps_menu.setEnabled(
+            self.global_settings.get("capture_source_type", "camera") != "capture"
+        )
         menu.addMenu(self.capture_fps_menu)
         self.capture_fps_action_group = QActionGroup(self)
         self.capture_fps_action_group.setExclusive(True)
@@ -293,10 +309,63 @@ class MainWindow(QMainWindow):
         menu.clear()
         self.camera_source_menu = QMenu("カメラ", menu)
         self.window_source_menu = QMenu("ウィンドウ", menu)
+        self.capture_source_menu = QMenu("キャプチャ", menu)
         menu.addMenu(self.camera_source_menu)
         menu.addMenu(self.window_source_menu)
+        menu.addMenu(self.capture_source_menu)
         self._populate_camera_source_menu(self.camera_source_menu, devices)
         self._populate_window_source_menu(self.window_source_menu, windows)
+        self._populate_direct_capture_source_menu(self.capture_source_menu)
+
+    def _populate_direct_capture_source_menu(self, menu: QMenu) -> None:
+        menu.clear()
+        self.capture_provider_menu = QMenu("ponkan", menu)
+        menu.addMenu(self.capture_provider_menu)
+        self.capture_profile_action_group = QActionGroup(self)
+        self.capture_profile_action_group.setExclusive(True)
+        action = QAction("n3dsxl", self)
+        action.setCheckable(True)
+        action.setData("n3dsxl")
+        action.setChecked(
+            self.global_settings.get("capture_source_type", "camera") == "capture"
+            and self.global_settings.get("capture_provider", "ponkan") == "ponkan"
+            and self.global_settings.get("capture_device_profile", "n3dsxl") == "n3dsxl"
+        )
+        action.triggered.connect(
+            lambda _checked=False: self._apply_connection_settings(
+                {
+                    "capture_source_type": "capture",
+                    "capture_provider": "ponkan",
+                    "capture_device_profile": "n3dsxl",
+                }
+            )
+        )
+        self.capture_profile_action_group.addAction(action)
+        self.capture_provider_menu.addAction(action)
+
+    def _populate_capture_settings_menu(self, menu: QMenu) -> None:
+        menu.clear()
+        self.ponkan_backend_menu = QMenu("Ponkan Backend", menu)
+        menu.addMenu(self.ponkan_backend_menu)
+        self._populate_ponkan_backend_menu(self.ponkan_backend_menu)
+
+    def _populate_ponkan_backend_menu(self, menu: QMenu) -> None:
+        menu.clear()
+        self.ponkan_backend_action_group = QActionGroup(self)
+        self.ponkan_backend_action_group.setExclusive(True)
+        current = self.global_settings.get("ponkan_backend", "auto")
+        for backend in _PONKAN_BACKEND_OPTIONS:
+            action = QAction(backend, self)
+            action.setCheckable(True)
+            action.setData(backend)
+            action.setChecked(current == backend)
+            action.triggered.connect(
+                lambda _checked=False, value=backend: self._apply_connection_settings(
+                    {"ponkan_backend": value}
+                )
+            )
+            self.ponkan_backend_action_group.addAction(action)
+            menu.addAction(action)
 
     def _populate_camera_source_menu(
         self,
@@ -628,12 +697,14 @@ class MainWindow(QMainWindow):
     def _update_connection_status(self) -> None:
         source_type = self.global_settings.get("capture_source_type", "camera")
         discovery_snapshot = _device_discovery_snapshot(self.device_discovery)
-        window_snapshot = _window_discovery_snapshot(self.device_discovery)
         if source_type == "window":
+            window_snapshot = _window_discovery_snapshot(self.device_discovery)
             capture_selection = _select_window_connection_status(
                 self.global_settings,
                 window_snapshot,
             )
+        elif source_type == "capture":
+            capture_selection = None
         else:
             capture_selection = select_capture_target(
                 ConnectionRequest(
@@ -645,7 +716,10 @@ class MainWindow(QMainWindow):
             )
         if self.preview_connection_error is not None:
             capture_status = f"映像: 接続失敗 ({self.preview_connection_error})"
+        elif source_type == "capture":
+            capture_status = "映像: キャプチャ (N3DSXL) 接続中"
         else:
+            assert capture_selection is not None
             capture_status = _format_connection_status("映像", capture_selection)
         serial_selection = select_serial_target(
             ConnectionRequest(

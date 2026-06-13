@@ -51,17 +51,35 @@ class SettingsApplyOutcome:
     deferred: bool = False
 
 
-FRAME_SOURCE_SETTING_KEYS = frozenset(
+PONKAN_FRAME_SOURCE_SETTING_KEYS = frozenset(
     {
-        "capture_source_type",
-        "capture_device",
-        "capture_window_title",
-        "capture_window_identifier",
-        "capture_window_match_mode",
-        "capture_backend",
-        "capture_fps",
-        "capture_aspect_box_enabled",
+        "capture_provider",
+        "capture_device_profile",
+        "ponkan_backend",
+        "ponkan_raw_slots",
+        "ponkan_output_queue_size",
+        "ponkan_drop_policy",
+        "ponkan_poll_interval",
+        "ponkan_read_timeout",
+        "ponkan_collect_timing",
+        "n3dsxl_hd_aspect_box_enabled",
     }
+)
+
+FRAME_SOURCE_SETTING_KEYS = (
+    frozenset(
+        {
+            "capture_source_type",
+            "capture_device",
+            "capture_window_title",
+            "capture_window_identifier",
+            "capture_window_match_mode",
+            "capture_backend",
+            "capture_fps",
+            "capture_aspect_box_enabled",
+        }
+    )
+    | PONKAN_FRAME_SOURCE_SETTING_KEYS
 )
 
 CONTROLLER_SETTING_KEYS = frozenset(
@@ -325,7 +343,7 @@ class GuiAppServices:
         source_type = str(self.global_settings.get("capture_source_type", "camera") or "camera")
         if source_type == "window":
             discarded_keys.extend(self._discard_unavailable_window_settings())
-        else:
+        elif source_type == "camera":
             capture_device = str(self.global_settings.get("capture_device", "") or "").strip()
             if (
                 capture_device
@@ -548,6 +566,20 @@ def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
             _dotted_get(settings, "capture_backend", "auto"),
             capture_fps,
             aspect_box_enabled,
+        )
+    if source_type == "capture":
+        return (
+            "capture",
+            _dotted_get(settings, "capture_provider", "ponkan"),
+            _dotted_get(settings, "capture_device_profile", "n3dsxl"),
+            _dotted_get(settings, "ponkan_backend", "auto"),
+            _dotted_get(settings, "ponkan_raw_slots", 2),
+            _dotted_get(settings, "ponkan_output_queue_size", 2),
+            _dotted_get(settings, "ponkan_drop_policy", "drop_oldest"),
+            _dotted_get(settings, "ponkan_poll_interval", 0.004),
+            _dotted_get(settings, "ponkan_read_timeout", 1.0),
+            _dotted_get(settings, "ponkan_collect_timing", False),
+            _dotted_get(settings, "n3dsxl_hd_aspect_box_enabled", True),
         )
     return (
         "camera",
