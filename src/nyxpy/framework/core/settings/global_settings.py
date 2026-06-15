@@ -38,7 +38,6 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             "capture_device_profile",
             str,
             "n3dsxl",
-            choices=("n3dsxl",),
         ),
         "capture_window_title": SettingField("capture_window_title", str, ""),
         "capture_window_match_mode": SettingField(

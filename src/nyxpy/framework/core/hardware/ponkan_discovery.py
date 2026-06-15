@@ -94,18 +94,9 @@ def list_ponkan_capture_devices(
                 remediation="Install the ponkan optional dependency for NyX.",
                 errors=(f"ponkan: {type(exc).__name__}: {exc}",),
             )
-        try:
-            lister = cast(PonkanListCaptureDevices, getattr(ponkan, "list_capture_devices"))
-        except AttributeError as exc:
-            return PonkanCaptureDiscoverySnapshot(
-                profile_id=profile,
-                backend_preference=backend,
-                reason="missing_package",
-                remediation="Install ponkan-python 0.2.0 or later.",
-                errors=(f"ponkan: {type(exc).__name__}: {exc}",),
-            )
-
     try:
+        if lister is None:
+            lister = cast(PonkanListCaptureDevices, getattr(ponkan, "list_capture_devices"))
         discovery = lister(profile=profile, backend=backend, include_rejected=include_rejected)
     except Exception as exc:
         return PonkanCaptureDiscoverySnapshot(

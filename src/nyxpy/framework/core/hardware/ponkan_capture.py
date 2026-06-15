@@ -117,11 +117,7 @@ class PonkanCaptureDevice(CaptureDeviceInterface):
             return
         while self._running:
             try:
-                frame = reader.read(
-                    output="both_vertical",
-                    colorspace="BGR",
-                    timeout=self.config.read_timeout,
-                )
+                frame = reader.read(timeout=self.config.read_timeout)
             except Exception as exc:
                 if not self._running:
                     return
@@ -157,26 +153,11 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             cause=exc,
         ) from exc
 
-    try:
-        capture_config = getattr(ponkan, "CaptureConfig")
-        capture_output = getattr(ponkan, "CaptureOutput")
-        get_capture_profile = getattr(ponkan, "get_capture_profile")
-        open_capture = getattr(ponkan, "open_capture")
-        capture_error = getattr(ponkan_errors, "CaptureError")
-        dependency_unavailable_error = getattr(ponkan_errors, "DependencyUnavailableError")
-    except AttributeError as exc:
-        raise ConfigurationError(
-            "ponkan-python 0.2.0 or later is required for capture source",
-            code="NYX_PONKAN_CAPTURE_API_UNSUPPORTED",
-            component="PonkanCaptureDevice",
-            details={
-                "extra": "ponkan",
-                "provider": config.provider,
-                "profile": config.device_profile,
-                "cause": type(exc).__name__,
-            },
-            cause=exc,
-        ) from exc
+    capture_config = getattr(ponkan, "CaptureConfig")
+    get_capture_profile = getattr(ponkan, "get_capture_profile")
+    open_capture = getattr(ponkan, "open_capture")
+    capture_error = getattr(ponkan_errors, "CaptureError")
+    dependency_unavailable_error = getattr(ponkan_errors, "DependencyUnavailableError")
 
     try:
         profile = get_capture_profile(config.device_profile)
@@ -198,8 +179,8 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
         source=getattr(profile, "model", "new_3ds_xl"),
         model=getattr(profile, "model", "new_3ds_xl"),
         backend=config.ponkan_backend,
-        output=capture_output.BOTH_VERTICAL,
-        colorspace="BGR",
+        output=getattr(profile, "default_output", "both_vertical"),
+        colorspace=_opencv_colorspace(profile),
         raw_slots=config.raw_slots,
         output_queue_size=config.output_queue_size,
         drop_policy=config.drop_policy,
@@ -257,6 +238,21 @@ def _ponkan_error_details(
 def _upstream_recoverable(exc: BaseException) -> bool:
     value = getattr(exc, "recoverable", False)
     return bool(value)
+
+
+def _opencv_colorspace(profile: object) -> str:
+    supported = tuple(str(value) for value in getattr(profile, "supported_colorspaces", ()))
+    if supported and "BGR" not in supported:
+        raise ConfigurationError(
+            "ponkan capture profile does not support BGR output",
+            code="NYX_PONKAN_CAPTURE_COLORSPACE_UNSUPPORTED",
+            component="PonkanCaptureDevice",
+            details={
+                "profile": str(getattr(profile, "id", "")),
+                "supported_colorspaces": list(supported),
+            },
+        )
+    return "BGR"
 
 
 def _detail_scalar(value: object) -> str | int | float | bool | None:

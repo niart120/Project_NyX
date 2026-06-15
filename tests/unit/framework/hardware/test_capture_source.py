@@ -70,6 +70,7 @@ def test_capture_source_from_settings_creates_ponkan_capture_source() -> None:
     )
 
     assert isinstance(source, PonkanCaptureSourceConfig)
+    assert source.device_profile == "n3dsxl"
     assert source.ponkan_backend == "d3xx-native"
     assert source.raw_slots == 3
     assert source.output_queue_size == 4
@@ -111,3 +112,16 @@ def test_capture_source_key_includes_ponkan_runtime_settings() -> None:
     )
 
     assert first != second
+
+
+def test_capture_source_defers_ponkan_profile_validation_to_upstream_registry() -> None:
+    source = capture_source_from_settings(
+        {
+            "capture_source_type": "capture",
+            "capture_device_profile": "future_profile",
+        }
+    )
+
+    assert isinstance(source, PonkanCaptureSourceConfig)
+    assert source.device_profile == "future_profile"
+    assert source.transform.aspect_box_enabled is False

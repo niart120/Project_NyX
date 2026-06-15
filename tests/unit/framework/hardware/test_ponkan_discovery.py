@@ -60,3 +60,19 @@ def test_ponkan_capture_listing_reports_upstream_error() -> None:
     assert snapshot.reason == "missing_runtime"
     assert snapshot.remediation == "Install D3XX runtime."
     assert snapshot.errors == ("ponkan: CaptureError: missing runtime",)
+
+
+def test_ponkan_capture_listing_missing_api_is_regular_discovery_error(monkeypatch) -> None:
+    import sys
+    from types import ModuleType
+
+    ponkan = ModuleType("ponkan")
+    monkeypatch.setitem(sys.modules, "ponkan", ponkan)
+
+    snapshot = list_ponkan_capture_devices()
+
+    assert snapshot.backend_status == "unavailable"
+    assert snapshot.reason == "unknown"
+    assert snapshot.errors == (
+        "ponkan: AttributeError: module 'ponkan' has no attribute 'list_capture_devices'",
+    )
