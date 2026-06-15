@@ -149,6 +149,26 @@ def test_ponkan_capture_dependency_unavailable_is_configuration_error(monkeypatc
 
     assert exc_info.value.code == "NYX_PONKAN_CAPTURE_DEPENDENCY_UNAVAILABLE"
     assert exc_info.value.details["backend"] == "d3xx"
+    assert exc_info.value.details["upstream_reason"] is None
+
+
+def test_ponkan_capture_unsupported_api_is_configuration_error(monkeypatch) -> None:
+    class CaptureError(Exception):
+        pass
+
+    class DependencyUnavailableError(CaptureError):
+        pass
+
+    calls = _install_fake_ponkan(monkeypatch, CaptureError, DependencyUnavailableError)
+    ponkan = sys.modules["ponkan"]
+    delattr(ponkan, "get_capture_profile")
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        _open_ponkan_capture(PonkanCaptureSourceConfig())
+
+    assert calls == {}
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_API_UNSUPPORTED"
+    assert exc_info.value.details["extra"] == "ponkan"
 
 
 def test_ponkan_open_capture_uses_upstream_default_device_selection(monkeypatch) -> None:
@@ -175,6 +195,8 @@ def test_ponkan_open_capture_uses_upstream_default_device_selection(monkeypatch)
     assert isinstance(reader, FakeReader)
     assert calls["open_args"] == ()
     config = calls["open_kwargs"]["config"]
+    assert config.source == "new_3ds_xl"
+    assert config.model == "new_3ds_xl"
     assert config.backend == "d3xx-native"
     assert config.raw_slots == 3
     assert config.output_queue_size == 4
@@ -206,6 +228,7 @@ def _install_fake_ponkan(
     ponkan = ModuleType("ponkan")
     ponkan.CaptureConfig = CaptureConfig
     ponkan.CaptureOutput = SimpleNamespace(BOTH_VERTICAL="both_vertical")
+    ponkan.get_capture_profile = lambda _profile: SimpleNamespace(model="new_3ds_xl")
     ponkan.open_capture = open_capture
 
     errors = ModuleType("ponkan.errors")

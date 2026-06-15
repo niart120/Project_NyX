@@ -16,6 +16,11 @@ from nyxpy.framework.core.hardware.capture_source import (
     capture_source_from_settings,
 )
 from nyxpy.framework.core.hardware.ponkan_capture import PonkanCaptureDevice
+from nyxpy.framework.core.hardware.ponkan_discovery import (
+    PonkanCaptureDeviceDescriptor,
+    PonkanCaptureDiscoverySnapshot,
+    list_ponkan_capture_devices,
+)
 
 __all__ = [
     "CameraCaptureDevice",
@@ -27,7 +32,10 @@ __all__ = [
     "CaptureSourceKey",
     "DummyCaptureDevice",
     "PonkanCaptureDevice",
+    "PonkanCaptureDeviceDescriptor",
+    "PonkanCaptureDiscoverySnapshot",
     "PonkanCaptureSourceConfig",
     "WindowCaptureSourceConfig",
     "capture_source_from_settings",
+    "list_ponkan_capture_devices",
 ]

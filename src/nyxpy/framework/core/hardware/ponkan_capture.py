@@ -157,13 +157,46 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             cause=exc,
         ) from exc
 
-    capture_config = getattr(ponkan, "CaptureConfig")
-    capture_output = getattr(ponkan, "CaptureOutput")
-    open_capture = getattr(ponkan, "open_capture")
-    capture_error = getattr(ponkan_errors, "CaptureError")
-    dependency_unavailable_error = getattr(ponkan_errors, "DependencyUnavailableError")
+    try:
+        capture_config = getattr(ponkan, "CaptureConfig")
+        capture_output = getattr(ponkan, "CaptureOutput")
+        get_capture_profile = getattr(ponkan, "get_capture_profile")
+        open_capture = getattr(ponkan, "open_capture")
+        capture_error = getattr(ponkan_errors, "CaptureError")
+        dependency_unavailable_error = getattr(ponkan_errors, "DependencyUnavailableError")
+    except AttributeError as exc:
+        raise ConfigurationError(
+            "ponkan-python 0.2.0 or later is required for capture source",
+            code="NYX_PONKAN_CAPTURE_API_UNSUPPORTED",
+            component="PonkanCaptureDevice",
+            details={
+                "extra": "ponkan",
+                "provider": config.provider,
+                "profile": config.device_profile,
+                "cause": type(exc).__name__,
+            },
+            cause=exc,
+        ) from exc
+
+    try:
+        profile = get_capture_profile(config.device_profile)
+    except capture_error as exc:
+        raise ConfigurationError(
+            "invalid ponkan capture profile",
+            code="NYX_PONKAN_CAPTURE_PROFILE_INVALID",
+            component="PonkanCaptureDevice",
+            recoverable=_upstream_recoverable(exc),
+            details=_ponkan_error_details(
+                exc,
+                backend=config.ponkan_backend,
+                profile=config.device_profile,
+            ),
+            cause=exc,
+        ) from exc
 
     ponkan_config = capture_config(
+        source=getattr(profile, "model", "new_3ds_xl"),
+        model=getattr(profile, "model", "new_3ds_xl"),
         backend=config.ponkan_backend,
         output=capture_output.BOTH_VERTICAL,
         colorspace="BGR",
@@ -181,7 +214,12 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             "ponkan capture dependency is unavailable",
             code="NYX_PONKAN_CAPTURE_DEPENDENCY_UNAVAILABLE",
             component="PonkanCaptureDevice",
-            details={"backend": config.ponkan_backend, "cause": type(exc).__name__},
+            recoverable=_upstream_recoverable(exc),
+            details=_ponkan_error_details(
+                exc,
+                backend=config.ponkan_backend,
+                profile=config.device_profile,
+            ),
             cause=exc,
         ) from exc
     except capture_error as exc:
@@ -189,6 +227,39 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             "failed to open ponkan capture source",
             code="NYX_PONKAN_CAPTURE_OPEN_FAILED",
             component="PonkanCaptureDevice",
-            details={"backend": config.ponkan_backend, "cause": type(exc).__name__},
+            recoverable=_upstream_recoverable(exc),
+            details=_ponkan_error_details(
+                exc,
+                backend=config.ponkan_backend,
+                profile=config.device_profile,
+            ),
             cause=exc,
         ) from exc
+
+
+def _ponkan_error_details(
+    exc: BaseException,
+    *,
+    backend: str,
+    profile: str,
+) -> dict[str, str | int | float | bool | None]:
+    details: dict[str, str | int | float | bool | None] = {
+        "backend": backend,
+        "profile": profile,
+        "cause": type(exc).__name__,
+    }
+    for key in ("code", "profile", "backend", "reason", "recoverable", "remediation"):
+        value = getattr(exc, key, None)
+        details[f"upstream_{key}"] = _detail_scalar(value)
+    return details
+
+
+def _upstream_recoverable(exc: BaseException) -> bool:
+    value = getattr(exc, "recoverable", False)
+    return bool(value)
+
+
+def _detail_scalar(value: object) -> str | int | float | bool | None:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    return str(value)
