@@ -29,3 +29,17 @@
 ### 方針
 
 次の docstring ルール拡充では `src\nyxpy\` と `examples\macros\` の public method を分類し、Qt override や signal handler の扱いを決めてから D102 を段階適用する。
+
+## 2026-06-16: ponkan 低レベル capture 設定の公開範囲
+
+### 現状
+
+`src/nyxpy/framework/core/hardware/capture_source.py` は `ponkan_raw_slots`、`ponkan_output_queue_size`、`ponkan_drop_policy`、`ponkan_poll_interval`、`ponkan_collect_timing` を設定 surface として読み、`PonkanCaptureSourceConfig` 経由で `ponkan.CaptureConfig` に渡している。
+
+### 観察
+
+これらは profile registry が表す対象機種 metadata ではなく streaming 実装の tuning 値であり、利用者向け設定として公開し続けると NyX 側が上流の低レベル queue / polling 詳細を mirror する形になる。
+
+### 方針
+
+次の ponkan capture redesign では `ponkan_backend` と `ponkan_read_timeout` 以外の `ponkan_*` を内部 default または開発者向け設定へ落とす破壊的変更を検討する。
