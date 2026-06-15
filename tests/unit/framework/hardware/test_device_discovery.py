@@ -6,6 +6,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
     DeviceDiscoveryService,
     DeviceInfo,
 )
+from nyxpy.framework.core.hardware.ponkan_discovery import PonkanCaptureDiscoverySnapshot
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 
 
@@ -93,3 +94,34 @@ def test_device_discovery_keeps_serial_identifier_in_snapshot() -> None:
     assert found is not None
     assert found.display_name == "USB Serial Device (COM1)"
     assert discovery.serial_display_name("COM1") == "USB Serial Device (COM1)"
+
+
+def test_device_discovery_lists_ponkan_capture_devices_separately(monkeypatch) -> None:
+    snapshot = PonkanCaptureDiscoverySnapshot(
+        backend_preference="auto",
+        resolved_backend="d3xx-native",
+        backend_status="available",
+        reason="device_not_found",
+    )
+    calls = {}
+
+    def list_devices(**kwargs):
+        calls.update(kwargs)
+        return snapshot
+
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.device_discovery.list_ponkan_capture_devices",
+        list_devices,
+    )
+    discovery = Discovery()
+
+    result = discovery.detect_ponkan_capture_devices_result(
+        timeout_sec=1.0,
+        profile="n3dsxl",
+        backend="d3xx-native",
+        include_rejected=True,
+    )
+
+    assert result is snapshot
+    assert discovery.last_ponkan_capture_discovery is snapshot
+    assert calls == {"profile": "n3dsxl", "backend": "d3xx-native", "include_rejected": True}

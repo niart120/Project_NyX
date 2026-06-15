@@ -764,7 +764,7 @@ requires-dist = [
     { name = "paddleocr", specifier = ">=3.5.0,<3.6.0" },
     { name = "paddlepaddle", specifier = ">=3.2.2,<3.3.0" },
     { name = "pillow", specifier = ">=12.2.0,<13.0.0" },
-    { name = "ponkan-python", marker = "sys_platform == 'win32' and extra == 'ponkan'", specifier = ">=0.1.2,<0.2.0" },
+    { name = "ponkan-python", marker = "sys_platform == 'win32' and extra == 'ponkan'", specifier = ">=0.2.0,<0.3.0" },
     { name = "pyserial", specifier = ">=3.5,<4.0" },
     { name = "pyside6", specifier = ">=6.11.0,<7.0.0" },
     { name = "requests", specifier = ">=2.34.0,<3.0.0" },
@@ -1033,16 +1033,16 @@ wheels = [
 
 [[package]]
 name = "ponkan-python"
-version = "0.1.2"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "libusb1", marker = "sys_platform == 'win32'" },
     { name = "numpy", marker = "sys_platform == 'win32'" },
     { name = "pyd3xx", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/8c/11526e89a96d0e01ec525bbe72b26947ba0c06c4378fbde74633c9644ea7/ponkan_python-0.1.2.tar.gz", hash = "sha256:fbaf83511ea68f2f42a3f41cfc7b9025c296b8a46b8250725701d2b69effbdd9", size = 75032, upload-time = "2026-06-12T18:02:27.958Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/16/e7da562982fd996f19957498182b9337f4f08e43e584bd73058f13725dc3/ponkan_python-0.2.0.tar.gz", hash = "sha256:08d01565a989265564fcfce77a7bdee995ed1ebf2eee6ee00c3948a1ad8de18a", size = 87727, upload-time = "2026-06-15T14:12:48.78Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/2e/32a0a79fae1a0ba6953b3a1c21c3f7d309b75f961f7ad81cb16bc1fea235/ponkan_python-0.1.2-py3-none-any.whl", hash = "sha256:01e68cd2cd484e75533e9c2270d1121602b1bd0f3a1efb202f1a1c5964d43566", size = 63582, upload-time = "2026-06-12T18:02:26.543Z" },
+    { url = "https://files.pythonhosted.org/packages/73/6e/ebdb4c79f465723c921460459750b4df0aecc92f7cfe9cdab3c242fd60e5/ponkan_python-0.2.0-py3-none-any.whl", hash = "sha256:cff5992b7d6c8ea9e23066c08d3d6b5bcc18c4cd938bebfb821001b3c6785de1", size = 70153, upload-time = "2026-06-15T14:12:47.602Z" },
 ]
 
 [[package]]

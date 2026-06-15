@@ -81,8 +81,8 @@ def test_ponkan_capture_device_caches_bgr_frame_copy() -> None:
     device.release()
 
     assert reader.read_calls[0] == {
-        "output": "both_vertical",
-        "colorspace": "BGR",
+        "output": None,
+        "colorspace": None,
         "timeout": 0.25,
     }
 
@@ -149,6 +149,31 @@ def test_ponkan_capture_dependency_unavailable_is_configuration_error(monkeypatc
 
     assert exc_info.value.code == "NYX_PONKAN_CAPTURE_DEPENDENCY_UNAVAILABLE"
     assert exc_info.value.details["backend"] == "d3xx"
+    assert exc_info.value.details["upstream_reason"] is None
+
+
+def test_ponkan_capture_invalid_profile_is_configuration_error(monkeypatch) -> None:
+    class CaptureError(Exception):
+        reason = "unsupported_profile"
+
+    class DependencyUnavailableError(CaptureError):
+        pass
+
+    calls = _install_fake_ponkan(monkeypatch, CaptureError, DependencyUnavailableError)
+    ponkan = sys.modules["ponkan"]
+
+    def get_capture_profile(_profile):
+        raise CaptureError("unknown profile")
+
+    ponkan.get_capture_profile = get_capture_profile
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        _open_ponkan_capture(PonkanCaptureSourceConfig(device_profile="future_profile"))
+
+    assert calls == {}
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_PROFILE_INVALID"
+    assert exc_info.value.details["profile"] == "future_profile"
+    assert exc_info.value.details["upstream_reason"] == "unsupported_profile"
 
 
 def test_ponkan_open_capture_uses_upstream_default_device_selection(monkeypatch) -> None:
@@ -175,13 +200,42 @@ def test_ponkan_open_capture_uses_upstream_default_device_selection(monkeypatch)
     assert isinstance(reader, FakeReader)
     assert calls["open_args"] == ()
     config = calls["open_kwargs"]["config"]
+    assert config.source == "new_3ds_xl"
+    assert config.model == "new_3ds_xl"
     assert config.backend == "d3xx-native"
+    assert config.output == "both_vertical"
+    assert config.colorspace == "BGR"
     assert config.raw_slots == 3
     assert config.output_queue_size == 4
     assert config.drop_policy == "block"
     assert config.poll_interval == 0.01
     assert config.read_timeout is None
     assert config.collect_timing is True
+
+
+def test_ponkan_capture_rejects_profile_without_bgr_colorspace(monkeypatch) -> None:
+    class CaptureError(Exception):
+        pass
+
+    class DependencyUnavailableError(CaptureError):
+        pass
+
+    calls = _install_fake_ponkan(monkeypatch, CaptureError, DependencyUnavailableError)
+    ponkan = sys.modules["ponkan"]
+    ponkan.get_capture_profile = lambda _profile: SimpleNamespace(
+        id="future_profile",
+        model="future_model",
+        default_output="both_vertical",
+        supported_colorspaces=("RGB",),
+    )
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        _open_ponkan_capture(PonkanCaptureSourceConfig(device_profile="future_profile"))
+
+    assert calls == {}
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_COLORSPACE_UNSUPPORTED"
+    assert exc_info.value.details["profile"] == "future_profile"
+    assert exc_info.value.details["supported_colorspaces"] == ["RGB"]
 
 
 def _install_fake_ponkan(
@@ -205,7 +259,12 @@ def _install_fake_ponkan(
 
     ponkan = ModuleType("ponkan")
     ponkan.CaptureConfig = CaptureConfig
-    ponkan.CaptureOutput = SimpleNamespace(BOTH_VERTICAL="both_vertical")
+    ponkan.get_capture_profile = lambda _profile: SimpleNamespace(
+        id="n3dsxl",
+        model="new_3ds_xl",
+        default_output="both_vertical",
+        supported_colorspaces=("RGB", "BGR"),
+    )
     ponkan.open_capture = open_capture
 
     errors = ModuleType("ponkan.errors")

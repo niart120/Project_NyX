@@ -73,7 +73,7 @@ class PonkanCaptureSourceConfig:
 
     source_type: Literal["capture"] = "capture"
     provider: Literal["ponkan"] = "ponkan"
-    device_profile: Literal["n3dsxl"] = "n3dsxl"
+    device_profile: str = "n3dsxl"
     ponkan_backend: PonkanBackendName = "auto"
     raw_slots: int = 2
     output_queue_size: int = 2
@@ -201,7 +201,9 @@ def _transform(settings: Mapping[str, object]) -> FrameTransformConfig:
     )
 
 
-def _ponkan_transform(settings: Mapping[str, object]) -> FrameTransformConfig:
+def _ponkan_transform(settings: Mapping[str, object], *, profile: str) -> FrameTransformConfig:
+    if profile != "n3dsxl":
+        return FrameTransformConfig()
     return FrameTransformConfig(
         aspect_box_enabled=bool(_setting(settings, "n3dsxl_hd_aspect_box_enabled", True))
     )
@@ -217,14 +219,8 @@ def _ponkan_source(settings: Mapping[str, object]) -> PonkanCaptureSourceConfig:
             details={"capture_provider": provider},
         )
     profile = _text(_setting(settings, "capture_device_profile", "n3dsxl")) or "n3dsxl"
-    if profile != "n3dsxl":
-        raise ConfigurationError(
-            "invalid capture device profile",
-            code="NYX_CAPTURE_DEVICE_PROFILE_INVALID",
-            component="CaptureSourceConfig",
-            details={"capture_device_profile": profile},
-        )
     return PonkanCaptureSourceConfig(
+        device_profile=profile,
         ponkan_backend=_ponkan_backend(_setting(settings, "ponkan_backend", "auto")),
         raw_slots=_positive_int(_setting(settings, "ponkan_raw_slots", 2), "ponkan_raw_slots"),
         output_queue_size=_positive_int(
@@ -238,7 +234,7 @@ def _ponkan_source(settings: Mapping[str, object]) -> PonkanCaptureSourceConfig:
         ),
         read_timeout=_read_timeout(_setting(settings, "ponkan_read_timeout", 1.0)),
         collect_timing=bool(_setting(settings, "ponkan_collect_timing", False)),
-        transform=_ponkan_transform(settings),
+        transform=_ponkan_transform(settings, profile=profile),
     )
 
 

@@ -12,6 +12,11 @@ import cv2
 import serial.tools.list_ports
 from cv2_enumerate_cameras import enumerate_cameras
 
+from nyxpy.framework.core.hardware.ponkan_discovery import (
+    PonkanCaptureDeviceDescriptor,
+    PonkanCaptureDiscoverySnapshot,
+    list_ponkan_capture_devices,
+)
 from nyxpy.framework.core.hardware.window_discovery import (
     DefaultWindowLocatorBackend,
     WindowInfo,
@@ -70,6 +75,7 @@ class DeviceDiscoveryService:
         self.window_locator = DefaultWindowLocatorBackend()
         self._last_result = DeviceDiscoveryResult()
         self._last_window_sources: tuple[WindowInfo, ...] = ()
+        self._last_ponkan_capture_discovery = PonkanCaptureDiscoverySnapshot()
         self._lock = threading.Lock()
 
     @property
@@ -82,6 +88,12 @@ class DeviceDiscoveryService:
         """直近に検出した window capture 候補を返します。"""
         with self._lock:
             return self._last_window_sources
+
+    @property
+    def last_ponkan_capture_discovery(self) -> PonkanCaptureDiscoverySnapshot:
+        """Return the latest ponkan capture discovery snapshot."""
+        with self._lock:
+            return self._last_ponkan_capture_discovery
 
     def detect(self, timeout_sec: float = 2.0) -> DeviceDiscoveryResult:
         if timeout_sec < 0:
@@ -142,6 +154,62 @@ class DeviceDiscoveryService:
 
     def detect_window_sources(self, timeout_sec: float = 2.0) -> tuple[WindowInfo, ...]:
         return self.detect_window_sources_result(timeout_sec=timeout_sec).window_sources
+
+    def detect_ponkan_capture_devices(
+        self,
+        *,
+        timeout_sec: float = 2.0,
+        profile: str = "n3dsxl",
+        backend: str = "auto",
+        include_rejected: bool = False,
+    ) -> tuple[PonkanCaptureDeviceDescriptor, ...]:
+        """Return visible ponkan capture device descriptors."""
+        return self.detect_ponkan_capture_devices_result(
+            timeout_sec=timeout_sec,
+            profile=profile,
+            backend=backend,
+            include_rejected=include_rejected,
+        ).devices
+
+    def detect_ponkan_capture_devices_result(
+        self,
+        *,
+        timeout_sec: float = 2.0,
+        profile: str = "n3dsxl",
+        backend: str = "auto",
+        include_rejected: bool = False,
+    ) -> PonkanCaptureDiscoverySnapshot:
+        """Return structured ponkan capture discovery state."""
+        if timeout_sec < 0:
+            raise ValueError("timeout_sec must be greater than or equal to 0")
+        result: PonkanCaptureDiscoverySnapshot | None = None
+
+        def worker() -> None:
+            nonlocal result
+            result = list_ponkan_capture_devices(
+                profile=profile,
+                backend=backend,
+                include_rejected=include_rejected,
+            )
+
+        thread = threading.Thread(target=worker, name="nyx-ponkan-discovery", daemon=True)
+        thread.start()
+        thread.join(timeout_sec)
+        if thread.is_alive():
+            detected = PonkanCaptureDiscoverySnapshot(
+                profile_id=profile,
+                backend_preference=backend,
+                timed_out=True,
+                errors=("ponkan: discovery timed out",),
+            )
+        else:
+            detected = result or PonkanCaptureDiscoverySnapshot(
+                profile_id=profile,
+                backend_preference=backend,
+            )
+        with self._lock:
+            self._last_ponkan_capture_discovery = detected
+        return detected
 
     def detect_window_sources_result(
         self,
