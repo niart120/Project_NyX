@@ -1,0 +1,4 @@
+interface:
+  display_name: "PyPI Release"
+  short_description: "PyPI release workflow for Project NyX"
+  default_prompt: "Use $pypi-release to plan and run a Project NyX PyPI release."
