@@ -188,8 +188,8 @@ TestPyPI は依存ライブラリが揃っていないため、NyX の wheel だ
 ```console
 python -m venv .venv-testpypi
 .venv-testpypi\Scripts\python -m pip install --upgrade pip
-.venv-testpypi\Scripts\python -m pip download --no-deps --index-url https://test.pypi.org/simple/ --dest .tmp-testpypi nyxpy-fw==0.1.0
-.venv-testpypi\Scripts\python -m pip install .tmp-testpypi\nyxpy_fw-0.1.0-py3-none-any.whl
+.venv-testpypi\Scripts\python -m pip download --no-deps --index-url https://test.pypi.org/simple/ --dest .tmp-testpypi nyxpy-fw==0.2.0
+.venv-testpypi\Scripts\python -m pip install .tmp-testpypi\nyxpy_fw-0.2.0-py3-none-any.whl
 .venv-testpypi\Scripts\python -c "import nyxpy; print(nyxpy.__name__)"
 .venv-testpypi\Scripts\nyxpy --help
 ```
@@ -206,15 +206,15 @@ POSIX shell では `.venv-testpypi\Scripts\python` を `.venv-testpypi/bin/pytho
 2. annotated tag を作成する。
 
 ```console
-git tag -a v0.1.0 -m "v0.1.0"
+git tag -a v0.2.0 -m "v0.2.0"
 git push origin master
-git push origin v0.1.0
+git push origin v0.2.0
 ```
 
 3. GitHub の **Actions** を開く。
 4. **Publish Python Package** workflow を選ぶ。
 5. **Run workflow** を押す。
-6. ref に `v0.1.0` tag を選ぶ。
+6. ref に `v0.2.0` tag を選ぶ。
 7. `target` に `pypi` を選ぶ。
 8. workflow を実行する。
 9. GitHub environment `pypi` の approval が求められた場合は、内容を確認して承認する。
