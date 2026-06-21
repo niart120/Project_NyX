@@ -1,6 +1,6 @@
 [project]
 name = "nyxpy-fw"
-version = "0.1.0"
+version = "0.2.0"
 description = "Game automation framework with macro APIs, CLI, and GUI"
 authors = [
     {name = "niart120",email = "38847256+niart120@users.noreply.github.com"}
