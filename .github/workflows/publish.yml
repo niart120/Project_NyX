@@ -43,7 +43,9 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml,uv.lock"
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
 
       - name: package build
         run: uv build
