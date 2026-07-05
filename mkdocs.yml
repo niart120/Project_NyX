@@ -28,6 +28,16 @@ nav:
       - テスト: macro-development/testing.md
       - Nintendo 3DS: macro-development/nintendo-3ds.md
       - 画像処理: macro-development/image-processing.md
+  - 設計:
+      - swbt 連携:
+          - 概要: architecture/swbt-integration/index.md
+          - レイヤード配置: architecture/swbt-integration/architecture.md
+          - Runtime composition: architecture/swbt-integration/runtime-composition.md
+          - Controller port 契約: architecture/swbt-integration/controller-port-contract.md
+          - swbt service: architecture/swbt-integration/swbt-service.md
+          - 入力マッピング: architecture/swbt-integration/input-mapping.md
+          - 設定・CLI・GUI: architecture/swbt-integration/configuration-cli-gui.md
+          - テストと段階導入: architecture/swbt-integration/testing-rollout.md
   - API リファレンス:
       - フレームワーク API: api/framework.md
 
