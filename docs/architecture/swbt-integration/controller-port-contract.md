@@ -57,6 +57,8 @@ swbt backend では次の対応にします。
 
 port 側に NyXPy 用の状態を持たせます。service に差分操作を連続で投げるより、毎回 `InputState` を作って `apply()` へ渡す方が同時入力の扱いが明確です。
 
+GUI manual input とマクロ runtime は同じ `SwbtGamepadService` を共有します。ただし `SwbtControllerOutputPort` 自体は共有しません。factory は `create()` ごとに新しい port を返し、port の内部状態は常に neutral から始めます。新しい runtime 用 port を作る時点で service へも neutral を送って、manual input 側の残存状態を引き継がないようにします。
+
 ```python
 from dataclasses import dataclass, field
 
@@ -103,12 +105,15 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         *,
         service: SwbtGamepadService,
         mapper: NyxSwbtInputMapper,
+        reset_on_open: bool = True,
     ) -> None:
         self._service = service
         self._mapper = mapper
         self._state = NyxSwbtState()
         self._lock = RLock()
         self._closed = False
+        if reset_on_open:
+            self._service.neutral()
 
     def press(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
@@ -176,6 +181,10 @@ class SwbtControllerOutputPort(ControllerOutputPort):
 ## close と finalize
 
 `MacroRuntime` は実行終了時に controller port を close します。swbt backend では `close()` で neutral を送るため、マクロの `finalize()` でも `cmd.release()` を呼ぶと二重 neutral になります。これは許容します。二重 neutral は安全側の操作であり、状態を壊しません。
+
+`close()` は transport を閉じません。共有 service の完全終了は `SwbtControllerOutputPortFactory.close()` が担当します。CLI では `runtime_builder.shutdown()` が実行直後に呼ばれるため、そのタイミングで transport も閉じます。GUI では backend 設定変更、アプリ終了、または明示的な disconnect 操作まで transport を維持できます。
+
+GUI はマクロ実行中に manual input を無効化します。同じ service に対して manual input port と runtime port が同時に state update を送る運用は対象外です。
 
 ## 即時送信について
 

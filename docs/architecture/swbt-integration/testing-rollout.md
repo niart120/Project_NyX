@@ -112,7 +112,9 @@ close 後の apply が DeviceError になる
 controller.backend 未指定 -> serial factory
 controller.backend="serial" -> SerialControllerOutputPortFactory
 controller.backend="swbt" -> SwbtControllerOutputPortFactory
-CLI override --controller swbt -> swbt factory
+CLI override --controller swbt -> serial protocol を生成せず swbt factory
+CLI override --controller serial -> --serial が必須
+CLI override --controller swbt -> --serial は不要
 allow_dummy=True + swbt open 失敗 -> DummySwbtGamepadService
 allow_dummy=False + swbt open 失敗 -> ConfigurationError
 ```
@@ -170,7 +172,7 @@ close 後に入力が残らない
 ### Phase 1: 内部構造
 
 - `ControllerOutputPortFactory` を `SerialControllerOutputPortFactory` へ改名する。
-- 互換 import を残す場合は deprecation comment を入れる。
+- 互換 alias は残さない。呼び出し元とテストを同じ変更で正 API へ更新する。
 - `make_controller_port_factory()` を追加する。
 - 既存 serial backend のテストを通す。
 
@@ -180,6 +182,8 @@ close 後に入力が残らない
 - `SwbtGamepadConfig`、`SwbtGamepadService`、`SwbtControllerOutputPort` を追加する。
 - button / hat / stick の mapper を追加する。
 - CLI から `--controller swbt` を選べるようにする。
+- swbt backend では `--serial` を不要にし、serial backend では `--serial` を必須にする。
+- swbt backend では `ProtocolFactory.resolve_baudrate()` と `create_protocol()` が呼ばれないことをテストする。
 - dummy service を使った runtime integration test を追加する。
 
 ### Phase 3: pairing / reconnect UX
@@ -219,12 +223,14 @@ unsupported feature が silent failure にならない
 | GUI lifetime と runtime close が競合する | factory が service を所有し、port close は neutral、factory close は完全終了に分ける |
 | serial 既存設定との互換性 | `serial_device` / `serial_baud` を読み続け、新 schema へ正規化する |
 | swbt 依存が通常 install を重くする | optional dependency にする |
+| manual input と runtime が同じ service を更新する | GUI は実行中の manual input を無効化し、runtime port 作成時に neutral へ揃える |
+| diagnostics path 変更が cached service に反映されない | `diagnostics_path` を service key に含め、変更時に builder を再生成する |
 
 ## 未確定事項
 
 | 項目 | 決める方法 |
 |---|---|
 | stick Y 軸の既定 | 実機で上方向、下方向を確認する |
-| `close()` で完全 disconnect するか | CLI と GUI で lifecycle を分け、GUI は factory lifetime を優先する |
-| diagnostics の既定保存先 | CLI は未指定なら無効、GUI は run artifact 連携を別 PR で決める |
+| `close()` で完全 disconnect するか | 決定済み。port close は neutral のみ、完全 disconnect は factory close |
+| diagnostics の既定保存先 | CLI は未指定なら無効。GUI は固定 path または無効を既定にし、run artifact 連携は別 PR で決める |
 | swbt public flush の要否 | `press` duration が短いマクロで実機確認し、必要なら swbt-python 側へ追加する |

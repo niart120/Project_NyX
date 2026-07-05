@@ -43,6 +43,8 @@ SerialControllerOutputPortFactory
 SwbtControllerOutputPortFactory
 ```
 
+この改名では互換 alias を残しません。Project NyX のフレームワーク本体はアルファ版として扱うため、`ControllerOutputPortFactory` の import 利用箇所とテストを同じ変更で `SerialControllerOutputPortFactory` へ更新します。
+
 この 2 つは同じ interface class を実装する必要はありません。どちらも最終的に `ControllerOutputPort` を返せばよいです。
 
 ## controller config
@@ -147,12 +149,25 @@ GUI の preview と manual input を考えると、factory は device / service 
 
 ```text
 SwbtControllerOutputPortFactory
-  ├─ adapter + key_store_path ごとに SwbtGamepadService を cache
+  ├─ service key ごとに SwbtGamepadService を cache
   ├─ create() で SwbtControllerOutputPort を返す
   └─ close() で service.close() を呼ぶ
 ```
 
-CLI 実行だけなら port が service を所有して `close()` で完全終了しても動きます。ただし GUI の manual input とマクロ実行で接続を使い回すなら、factory が service を持つ構造の方が自然です。
+service key は少なくとも次を含めます。
+
+```text
+adapter
+key_store_path
+report_period_us
+device_name
+diagnostics_path
+connect_on_open
+```
+
+`allow_pairing` と `connect_timeout_sec` は接続試行ごとの値です。既存 service が未接続なら次の `start()` / `connect()` に使えますが、接続済み service の key には含めません。設定変更で service key が変わる場合は runtime builder を再生成し、古い factory を `close()` します。
+
+GUI と runtime は同じ接続を共有します。CLI 実行だけなら port が service を所有して `close()` で完全終了しても動きますが、実装方針としては CLI でも GUI でも factory が service を所有します。これにより manual input とマクロ実行で reconnect を繰り返さずに済みます。
 
 ## close の責務分担
 
@@ -171,7 +186,20 @@ MacroRuntimeBuilder.shutdown()
             └─ close(neutral=True)
 ```
 
-CLI では runtime 終了時に完全 close してもよいですが、GUI では lifetime controller を閉じる時点まで transport を維持できます。
+CLI でも GUI でも port close は neutral だけを担当します。完全 close は factory close に寄せます。CLI では `runtime_builder.shutdown()` がすぐ呼ばれるため、その時点で transport も閉じます。GUI では runtime 終了後も builder が生きている限り transport を維持できます。
+
+## shared service と port state
+
+`SwbtControllerOutputPort` は NyXPy 側の入力状態を持ちます。GUI manual input とマクロ runtime は別 port でも同じ service を共有するため、runtime 開始時は必ず neutral から始めます。
+
+```text
+SwbtControllerOutputPortFactory.create()
+  └─ 新しい SwbtControllerOutputPort を返す
+       ├─ port 内部状態は NyxSwbtState() で初期化
+       └─ 必要に応じて service.neutral() を呼び、共有 service 側も neutral に揃える
+```
+
+port の `close()` は内部状態を破棄し、service に neutral を送るだけです。別 port が直前に持っていた状態は維持しません。manual input と runtime 実行を同時に動かさない前提にし、GUI は macro 実行中に manual input 操作を無効化します。
 
 ## dummy fallback
 

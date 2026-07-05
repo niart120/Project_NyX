@@ -28,8 +28,15 @@ frame = cmd.capture()
 | マクロ API | 変更しない |
 | swbt import | `hardware/swbt_*` と `io/swbt_adapter.py` 付近へ閉じ込める |
 | 依存追加 | `swbt` extra dependency として追加する |
+| CLI の `--serial` | serial backend 専用。swbt backend では不要 |
+| GUI / runtime の接続 | `SwbtControllerOutputPortFactory` が所有する service を共有する |
+| factory 改名 | 互換 alias は残さず、呼び出し元を `SerialControllerOutputPortFactory` へ更新する |
 
 「実行時の振り分け port を置かない」とは、`press()` や `release()` のたびに backend を見て分岐する `ControllerOutputPort` を作らない、という意味です。具象 port の選択は起動時に済ませ、実行中は `ControllerOutputPort` の抽象で隠蔽します。
+
+CLI では `--controller` を先に解決します。serial backend の場合だけ serial protocol と baudrate を解決し、swbt backend では Bluetooth HID 用の設定から factory を作ります。
+
+GUI と runtime は swbt 接続を共有します。manual input とマクロ実行は同じ `SwbtGamepadService` を使いますが、同時操作は対象外です。マクロ実行開始時に neutral へ揃え、実行中は manual input を無効化します。
 
 ## 文書構成
 

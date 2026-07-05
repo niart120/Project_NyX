@@ -30,13 +30,13 @@ BUTTON_MAP: dict[NyxButton, SwbtButton] = {
     NyxButton.PLUS: SwbtButton.PLUS,
     NyxButton.MINUS: SwbtButton.MINUS,
     NyxButton.HOME: SwbtButton.HOME,
-    NyxButton.CAPTURE: SwbtButton.CAPTURE,
-    NyxButton.LEFT_STICK: SwbtButton.LEFT_STICK,
-    NyxButton.RIGHT_STICK: SwbtButton.RIGHT_STICK,
+    NyxButton.CAP: SwbtButton.CAPTURE,
+    NyxButton.LS: SwbtButton.LEFT_STICK,
+    NyxButton.RS: SwbtButton.RIGHT_STICK,
 }
 ```
 
-NyXPy 側の enum 名が異なる場合は、既存 `constants/controller.py` に合わせて dict を修正します。自動変換ではなく明示 dict にする理由は、名前の偶然一致へ依存しないためです。
+NyXPy 側は capture button を `CAP`、stick click を `LS` / `RS` として定義しています。swbt-python 側は `CAPTURE`、`LEFT_STICK`、`RIGHT_STICK` です。自動変換ではなく明示 dict にする理由は、名前の違いと偶然一致の両方へ依存しないためです。
 
 ## Hat
 

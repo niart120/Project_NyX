@@ -29,7 +29,7 @@ uv tool install "nyxpy-fw[swbt]"
 
 ## settings schema
 
-既存の `serial_device` / `serial_baud` は互換性のため読み続けます。新しい設定では controller backend を明示します。
+既存の `serial_device` / `serial_baud` / `serial_protocol` は、既存 workspace の読み込み元として扱います。新しい設定では controller backend を明示します。
 
 ```toml
 [controller]
@@ -96,7 +96,7 @@ def controller_config_from_settings(settings: Mapping[str, object]) -> Controlle
     if backend == "serial":
         return SerialControllerConfig(
             device=str(dotted_get(settings, "controller.serial.device", settings.get("serial_device")) or "") or None,
-            protocol=str(dotted_get(settings, "controller.serial.protocol", settings.get("protocol", "CH552"))),
+            protocol=str(dotted_get(settings, "controller.serial.protocol", settings.get("serial_protocol", "CH552"))),
             baudrate=int(dotted_get(settings, "controller.serial.baudrate", settings.get("serial_baud", 9600))),
         )
 
@@ -123,22 +123,30 @@ def controller_config_from_settings(settings: Mapping[str, object]) -> Controlle
 
 ## CLI option
 
-通常実行:
+CLI は controller backend を serial protocol 生成より前に決定します。`--controller swbt` の場合、`ProtocolFactory.resolve_baudrate()` と `create_protocol()` は呼びません。
+
+serial backend の通常実行:
 
 ```console
-nyxpy run sample_macro --controller swbt --bt-adapter usb:0
+nyxpy run sample_macro --controller serial --serial COM3 --capture Camera1
+```
+
+swbt backend の通常実行:
+
+```console
+nyxpy run sample_macro --controller swbt --bt-adapter usb:0 --capture Camera1
 ```
 
 初回 pairing:
 
 ```console
-nyxpy run sample_macro --controller swbt --bt-adapter usb:0 --bt-pair
+nyxpy run sample_macro --controller swbt --bt-adapter usb:0 --bt-pair --capture Camera1
 ```
 
 key store 指定:
 
 ```console
-nyxpy run sample_macro   --controller swbt   --bt-adapter usb:0   --bt-key-store .nyxpy/swbt/switch-main.json
+nyxpy run sample_macro   --controller swbt   --bt-adapter usb:0   --bt-key-store .nyxpy/swbt/switch-main.json   --capture Camera1
 ```
 
 追加する CLI option:
@@ -146,13 +154,17 @@ nyxpy run sample_macro   --controller swbt   --bt-adapter usb:0   --bt-key-store
 | option | 対応設定 | 既定値 |
 |---|---|---|
 | `--controller serial|swbt` | `controller.backend` | `serial` |
+| `--serial TEXT` | `controller.serial.device` | serial backend では必須。swbt backend では不要 |
+| `--protocol TEXT` | `controller.serial.protocol` | `CH552`。serial backend 専用 |
+| `--baud INT` | `controller.serial.baudrate` | protocol 既定値。serial backend 専用 |
+| `--capture TEXT` | capture source 設定 | 実行時に frame source を使うため必須 |
 | `--bt-adapter TEXT` | `controller.swbt.adapter` | `usb:0` |
 | `--bt-pair` | `controller.swbt.allow_pairing` | `false` |
 | `--bt-key-store PATH` | `controller.swbt.key_store_path` | `.nyxpy/swbt/switch-bond.json` |
 | `--bt-timeout FLOAT` | `controller.swbt.connect_timeout_sec` | `30.0` |
 | `--bt-diagnostics PATH` | `controller.swbt.diagnostics_path` | 未指定 |
 
-CLI option は設定ファイルより優先します。
+CLI option は設定ファイルより優先します。`--serial` は swbt backend では不要です。serial backend のときだけ必須にし、swbt backend で未指定でも parse error にしません。
 
 ## GUI 項目
 
@@ -191,6 +203,8 @@ Open diagnostics folder
 
 `Refresh adapters` は `swbt-probe adapters --json` を subprocess で呼ぶ実装から始めます。このコマンドは adapter 一覧確認用であり、対象機器への pairing、HID advertising、report loop は開始しません。
 
+GUI と runtime は同じ `SwbtGamepadService` 接続を共有します。GUI の manual input とマクロ実行で接続を作り直さず、`SwbtControllerOutputPortFactory` が service lifetime を所有します。backend を serial から swbt、または swbt から serial へ切り替えた場合は runtime builder を再生成し、古い factory を shutdown して transport を閉じます。
+
 ## hardware guide へのリンク
 
 swbt backend の設定画面には、次の注意を表示します。
@@ -217,3 +231,5 @@ resources/<macro_id>/artifacts/<run_artifact_dir>/logs/swbt-trace.jsonl
 ```
 
 ただし `SwbtGamepadService` は runtime artifact store へ直接依存しません。diagnostics path は構成起点で解決してから service config に渡します。
+
+GUI と runtime で接続を共有する場合、`diagnostics_path` は service lifetime に紐づきます。実行ごとの artifact directory へ trace を必ず分けたい場合は、run 開始前に builder を再生成するか、diagnostics writer を service から切り離す設計を別途入れます。初期実装では、CLI は明示された `--bt-diagnostics` の path だけへ出力し、GUI は固定 path または diagnostics 無効を既定にします。

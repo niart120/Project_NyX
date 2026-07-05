@@ -75,7 +75,7 @@ src/nyxpy/framework/core/hardware/swbt_mapper.py
   NyX KeyType → swbt InputState 変換
 
 src/nyxpy/framework/core/io/device_factories.py
-  SerialControllerOutputPortFactory       # 既存 ControllerOutputPortFactory の実態名
+  SerialControllerOutputPortFactory       # 既存 ControllerOutputPortFactory を改名
   SwbtControllerOutputPortFactory         # 新規
 
 src/nyxpy/framework/core/runtime/builder.py
@@ -88,6 +88,8 @@ src/nyxpy/framework/core/settings/schema.py
 ```
 
 `SerialControllerOutputPort` を `io/adapters.py` から分割するかどうかは別判断です。最小変更では既存位置のままにし、`SwbtControllerOutputPort` だけ `io/swbt_adapter.py` に置きます。
+
+`ControllerOutputPortFactory` の改名では互換 alias を残しません。呼び出し元、テスト、公開 export を同じ変更で `SerialControllerOutputPortFactory` へ更新します。
 
 ## 依存方向
 
