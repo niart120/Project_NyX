@@ -41,11 +41,13 @@ Project_NyX `Button` を swbt `Button` へ変換する。
 | `Button.PLUS` | `swbt.Button.PLUS` |
 | `Button.MINUS` | `swbt.Button.MINUS` |
 | `Button.HOME` | `swbt.Button.HOME` |
-| `Button.CAPTURE` | `swbt.Button.CAPTURE` |
-| `Button.LCLICK` | `swbt.Button.LEFT_STICK` |
-| `Button.RCLICK` | `swbt.Button.RIGHT_STICK` |
+| `Button.CAP` | `swbt.Button.CAPTURE` |
+| `Button.LS` | `swbt.Button.LEFT_STICK` |
+| `Button.RS` | `swbt.Button.RIGHT_STICK` |
 
 Project_NyX 側に backend 固有ではないが swbt が扱えない button がある場合は `NYX_SWBT_INPUT_UNSUPPORTED` にする。
+
+`Button.CAPTURE`、`Button.LCLICK`、`Button.RCLICK` の alias は追加しない。Project_NyX 既存定数を直接 swbt 定数へ対応付ける。
 
 ## Hat
 
@@ -143,6 +145,7 @@ button、stick、IMU を同一 report に入れる必要がある場合は、por
 | Joy-Con L で right stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | Joy-Con R で left stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | unsupported button | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| invalid input type / value | `NYX_SWBT_INPUT_INVALID` |
 | touch input | `NotImplementedError` |
 | keyboard input | `NotImplementedError` |
 | invalid IMU frame count | `NYX_IMU_FRAME_COUNT_INVALID` |

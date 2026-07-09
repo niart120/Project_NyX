@@ -45,19 +45,20 @@ class SerialControllerConfig:
 @dataclass(frozen=True)
 class SwbtControllerConfig:
     model: SwbtControllerModel
-    adapter: str = "usb:0"
-    key_store_path: Path | None = Path(".nyxpy/swbt/pro-controller-bond.json")
+    adapter: str | None = None
+    key_store_path: Path | None = None
     connect_timeout_sec: float = 30.0
-    operation_timeout_sec: float = 5.0
     report_period_us: int | None = 8000
-    diagnostics_path: Path | None = None
-    reset_on_port_create: bool = True
 
 
 ControllerConfig = SerialControllerConfig | SwbtControllerConfig
 ```
 
 `SwbtControllerConfig` は `controller_type` 文字列を持たない。設定正規化の時点で `SwbtControllerModel` へ解決する。
+
+`key_store_path` が `None` の場合は、session 作成前に `.nyxpy/swbt/<controller>-bond.json` へ補完する。`adapter` が `None` または空文字の場合、接続操作は `NYX_SWBT_ADAPTER_NOT_SELECTED` で失敗させる。
+
+`operation_timeout_sec` は settings / config に出さず、session / factory の内部既定値として扱う。diagnostics は config path ではなく writer を session へ渡す。
 
 ## make_controller_port_factory
 
@@ -122,16 +123,18 @@ VirtualControllerModel
 
 ## SwbtControllerOutputPortFactory
 
-swbt factory は session を cache できる。`create()` ごとに新しい `SwbtControllerOutputPort` を返すが、同じ adapter / controller model / key store の transport resource は `SwbtControllerSession` に集約する。
+swbt factory は session を cache する。`create()` ごとに新しい `SwbtControllerOutputPort` を返すが、同じ adapter / controller model / key store / report period の transport resource は `SwbtControllerSession` に集約する。
 
 ```text
 SwbtControllerOutputPortFactory
   ├─ config から session key を作る
   ├─ session key ごとに SwbtControllerSession を cache する
-  ├─ create() で reconnect 済み session を得る
+  ├─ create() で open + reconnect 済み session を得る
   ├─ create() で SwbtControllerOutputPort を返す
   ├─ pair(config) で明示 pairing を行う
   ├─ reconnect(config) で明示 reconnect を行う
+  ├─ disconnect(config) で factory-managed cached session を閉じる
+  ├─ status(config) で factory-managed cached session の状態を返す
   └─ close() で cached session をすべて close する
 ```
 
@@ -142,8 +145,16 @@ model.controller_type
 adapter
 key_store_path
 report_period_us
-diagnostics_path
+```
+
+session key に含めない値:
+
+```text
+connect_timeout_sec
 operation_timeout_sec
+allow_dummy
+diagnostics writer
+reset_on_port_create
 ```
 
 接続試行ごとの値:
@@ -154,6 +165,8 @@ allow_dummy
 ```
 
 macro 実行時の接続は reconnect のみである。pairing は runtime の副作用として行わない。
+
+`allow_dummy=True` による dummy fallback は `create()` だけで有効にする。`pair()` と `reconnect()` は実接続操作なので dummy fallback しない。
 
 ## port 作成
 
@@ -167,19 +180,29 @@ class SwbtControllerOutputPortFactory:
         timeout_sec: float,
     ) -> ControllerOutputPort:
         session = self._session_for_config(config, allow_dummy=allow_dummy)
-        session.start(timeout_sec=timeout_sec)  # open + reconnect
+        session.open()
+        session.reconnect(timeout_sec=timeout_sec)
         return SwbtControllerOutputPort(
             session=session,
             mapper=NyxSwbtInputMapper(model=config.model),
-            reset_on_create=config.reset_on_port_create,
         )
 ```
 
-`session.start()` は保存済み pairing key に基づく reconnect を行う。key store がない場合や key store が不正な場合は `ConfigurationError` に変換する。
+`SwbtControllerSession.start()` は作らない。`factory.create()` が `open()` と `reconnect()` を順に呼ぶ。
 
-## GUI pair / reconnect
+key store がない場合に pairing へ fallback しない。key store がない場合や不正な場合は `ConfigurationError` に変換する。
 
-GUI の pair / reconnect は入力反映経路ではない。app service から `SwbtControllerOutputPortFactory` の lifecycle method を呼ぶ。
+port 作成時は `SwbtControllerOutputPort` が neutral を常に試みる。`reset_on_port_create` という設定や引数は持たない。
+
+## diagnostics writer
+
+swbt diagnostics は path 設定ではなく writer interface として扱う。runtime / GUI / CLI には `diagnostics_path`、`--diagnostics`、diagnostics UI を出さない。
+
+NyX 内部では diagnostics writer を `LoggerPort.technical(...)` へ流す adapter を用意する。実機 test では同じ writer を tee し、`tmp/hardware/swbt/<timestamp>/swbt-trace.jsonl` に証跡を残す。
+
+## GUI pair / reconnect / disconnect
+
+GUI の pair / reconnect / disconnect は入力反映経路ではない。app service から `SwbtControllerOutputPortFactory` の lifecycle method を呼ぶ。
 
 ```text
 Pair button
@@ -201,6 +224,15 @@ Reconnect button
   -> VirtualControllerModel.set_controller(port)
 ```
 
+```text
+Disconnect button
+  -> VirtualControllerModel.set_controller(None)
+  -> previous manual port.release()
+  -> previous manual port.close()
+  -> swbt_factory.disconnect(config)
+  -> status update
+```
+
 `Pair` / `Reconnect` が成功したあとに GUI manual input を有効化する。失敗した場合は `VirtualControllerModel.set_controller(None)` に戻す。
 
 ## macro runtime との排他
@@ -211,10 +243,12 @@ GUI lifetime controller と macro runtime controller が同じ adapter を同時
 |---|---|
 | disconnected | adapter refresh、pair、reconnect |
 | connected for manual input | 仮想コントローラー操作、release all、disconnect |
-| macro running | manual input、pair、reconnect を無効化 |
-| macro start requested while manual connected | GUI lifetime port を `release()` / `close()` してから runtime を開始 |
+| macro running | manual input、pair、reconnect、disconnect を無効化 |
+| macro start requested while manual connected | `VirtualControllerModel.set_controller(None)` 後に GUI lifetime port を `release()` / `close()` してから runtime を開始 |
 
 runtime 終了後、GUI は自動で reconnect しない。利用者が `Reconnect from pairing key` を押した時だけ GUI lifetime port を再作成する。
+
+factory は session cache を持つが、初期実装では active lease 管理や `NYX_SWBT_ADAPTER_BUSY` を入れない。排他は GUI の macro start sequence と port close で担保する。
 
 ## shutdown
 

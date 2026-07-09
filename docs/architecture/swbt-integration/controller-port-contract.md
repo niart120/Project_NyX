@@ -112,15 +112,13 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         *,
         session: SwbtControllerSession,
         mapper: NyxSwbtInputMapper,
-        reset_on_create: bool = True,
     ) -> None:
         self._session = session
         self._mapper = mapper
         self._state = NyxSwbtState()
         self._lock = RLock()
         self._closed = False
-        if reset_on_create:
-            self._session.neutral()
+        self._session.neutral()
 
     def press(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
@@ -169,6 +167,8 @@ class SwbtControllerOutputPort(ControllerOutputPort):
 `MacroRuntime` は実行終了時に controller port を close する。swbt backend では `close()` で neutral を試みる。マクロの `finalize()` でも `cmd.release()` を呼ぶ場合、neutral が重なるが、安全側の操作として許容する。
 
 transport の完全 close は `SwbtControllerOutputPortFactory.close()` から `SwbtControllerSession.close()` を呼ぶことで行う。
+
+port 作成時の neutral は常に試みる。`reset_on_port_create` という設定や constructor 引数は持たない。
 
 ## 短い押下の扱い
 

@@ -66,11 +66,12 @@ usb:0 — ASUS USB-BT500 (VID:PID 0b05:190e)
 | 状況 | 扱い |
 |---|---|
 | selected adapter が `name` に一致 | その adapter を採用 |
-| selected adapter が `aliases` に一致 | 対応する `name` へ解決して採用 |
-| 候補が 1 件で adapter 未指定 | その `name` を採用してよい |
-| 候補が 0 件 | error |
-| 候補が複数で adapter 未指定 | error。ユーザーに選ばせる |
-| 複数候補が同じ alias に見える | 自動選択しない |
+| selected adapter が `aliases` に一致 | 対応する `name` へ解決し、保存値も `name` に正規化する |
+| adapter が空文字または未指定 | 候補数に関係なく `NYX_SWBT_ADAPTER_NOT_SELECTED` |
+| selected adapter がどの `name` / `aliases` にも一致しない | `NYX_SWBT_ADAPTER_NOT_FOUND` |
+| 複数候補が同じ alias に一致 | `NYX_SWBT_ADAPTER_AMBIGUOUS` |
+
+候補が 1 件だけの場合でも adapter 未指定を自動採用しない。pair / reconnect / run は、利用者が settings または CLI / GUI で adapter を選んだ後に実行する。
 
 ## CLI
 
