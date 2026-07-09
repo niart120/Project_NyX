@@ -2,13 +2,34 @@ from pathlib import Path
 
 import pytest
 
-from nyxpy.framework.core.constants import Button, KeyCode
+from nyxpy.framework.core.constants import Button, IMUFrame, KeyCode
+from nyxpy.framework.core.io.ports import ControllerOutputPort
 from nyxpy.framework.core.io.resources import (
     DefaultResourcePathGuard,
     MacroResourceScope,
     ResourcePathError,
 )
 from tests.support.fakes import FakeControllerOutputPort, FakeFullCapabilityController
+
+
+class MinimalControllerOutputPort(ControllerOutputPort):
+    def press(self, keys):
+        pass
+
+    def hold(self, keys):
+        pass
+
+    def release(self, keys=()):
+        pass
+
+    def keyboard(self, text):
+        pass
+
+    def type_key(self, key):
+        pass
+
+    def close(self):
+        pass
 
 
 def test_controller_output_port_contract_records_basic_operations() -> None:
@@ -32,15 +53,18 @@ def test_controller_output_port_contract_records_basic_operations() -> None:
 
 
 def test_controller_output_port_optional_methods_raise_by_default() -> None:
-    controller = FakeControllerOutputPort()
+    controller = MinimalControllerOutputPort()
 
     assert not controller.supports_touch
+    assert not controller.supports_imu
     with pytest.raises(NotImplementedError, match="touch input"):
         controller.touch_down(1, 2)
     with pytest.raises(NotImplementedError, match="touch input"):
         controller.touch_up()
     with pytest.raises(NotImplementedError, match="sleep control"):
         controller.disable_sleep(True)
+    with pytest.raises(NotImplementedError, match="IMU input"):
+        controller.imu(IMUFrame.neutral())
 
 
 def test_full_fake_controller_overrides_optional_methods() -> None:

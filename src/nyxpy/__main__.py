@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 from nyxpy.cli.run_cli import add_run_arguments, cli_main
+from nyxpy.cli.swbt_cli import add_swbt_arguments
+from nyxpy.cli.swbt_cli import cli_main as swbt_cli_main
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.scaffold import (
     MacroScaffoldConflictError,
@@ -65,6 +67,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
 
     run_parser = subparsers.add_parser("run", help="Run macro via command line interface")
     add_run_arguments(run_parser)
+    add_swbt_arguments(subparsers)
 
     init_parser = subparsers.add_parser(
         "init",
@@ -152,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "run":
             return cli_main(args)
+        elif args.command == "swbt":
+            return swbt_cli_main(args)
         elif args.command == "init":
             return init_app(blank=args.blank, force=args.force)
         elif args.command == "create":

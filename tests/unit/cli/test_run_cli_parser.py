@@ -93,6 +93,16 @@ def test_cli_parser_keeps_existing_options() -> None:
     assert args.define == ["count=3", 'name="nyx"']
 
 
+def test_top_level_parser_accepts_swbt_adapters_command() -> None:
+    from nyxpy.__main__ import parse_arguments
+
+    args = parse_arguments(["swbt", "adapters", "--json"])
+
+    assert args.command == "swbt"
+    assert args.swbt_command == "adapters"
+    assert args.json is True
+
+
 def test_cli_does_not_accept_notification_secret_args() -> None:
     parser = run_cli.build_parser()
 

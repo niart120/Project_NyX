@@ -7,6 +7,13 @@ from nyxpy.framework.core.io.adapters import (
     NotificationHandlerAdapter,
     SerialControllerOutputPort,
 )
+from nyxpy.framework.core.io.controller_config import (
+    ControllerBackend,
+    ControllerConfig,
+    SerialControllerConfig,
+    controller_config_from_settings,
+    parse_controller_backend,
+)
 from nyxpy.framework.core.io.device_factories import (
     ControllerOutputPortFactory,
     FrameSourcePortFactory,
@@ -40,6 +47,8 @@ from nyxpy.framework.core.io.resources import (
 
 __all__ = [
     "ControllerOutputPort",
+    "ControllerBackend",
+    "ControllerConfig",
     "CaptureFrameSourcePort",
     "ControllerOutputPortFactory",
     "DefaultResourcePathGuard",
@@ -68,4 +77,7 @@ __all__ = [
     "ResourceWriteError",
     "RunArtifactStore",
     "SerialControllerOutputPort",
+    "SerialControllerConfig",
+    "controller_config_from_settings",
+    "parse_controller_backend",
 ]
