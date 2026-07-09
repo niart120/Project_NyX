@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import MethodType
 
 from nyxpy.framework.core.hardware.device_discovery import (
@@ -119,6 +120,11 @@ class FakeSwbtDiscovery:
     def list_adapters(self):
         self.calls += 1
         return self.adapters
+
+
+class RaisingSwbtDiscovery:
+    def list_adapters(self):
+        raise RuntimeError("adapter discovery failed")
 
 
 class FakeSwbtStatus:
@@ -398,6 +404,18 @@ def test_app_services_refresh_swbt_adapters_uses_discovery_only() -> None:
     assert factory.calls == []
 
 
+def test_app_services_logs_swbt_adapter_refresh_failure() -> None:
+    services = make_services({"capture_source_type": "camera", "capture_device": "Camera1"})
+    services.swbt_adapter_discovery = RaisingSwbtDiscovery()
+
+    try:
+        services.refresh_swbt_adapters()
+    except RuntimeError:
+        pass
+
+    assert services.logger.technical_events[-1][1]["event"] == "swbt.adapter_refresh_failed"
+
+
 def test_app_services_pair_swbt_returns_gui_status_view() -> None:
     settings = {
         "capture_source_type": "camera",
@@ -419,6 +437,13 @@ def test_app_services_pair_swbt_returns_gui_status_view() -> None:
     assert status.connected is True
     assert status.controller_type == "joy-con-l"
     assert status.adapter == "hci0"
+
+
+def test_gui_does_not_import_swbt_python() -> None:
+    for source_path in (Path("src") / "nyxpy" / "gui").rglob("*.py"):
+        source = source_path.read_text(encoding="utf-8")
+        assert "from swbt" not in source
+        assert "import swbt" not in source
 
 
 def test_app_services_reports_preview_start_failure_without_failing_settings() -> None:

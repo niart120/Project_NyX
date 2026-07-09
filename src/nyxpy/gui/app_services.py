@@ -361,7 +361,17 @@ class GuiAppServices:
 
     def refresh_swbt_adapters(self) -> tuple[SwbtAdapterView, ...]:
         """Swbt adapter 候補を列挙する。pair / reconnect は行わない。"""
-        return self.swbt_adapter_discovery.list_adapters()
+        try:
+            return self.swbt_adapter_discovery.list_adapters()
+        except Exception as exc:
+            self.logger.technical(
+                "WARNING",
+                "swbt adapter refresh failed.",
+                component="GuiAppServices",
+                event="swbt.adapter_refresh_failed",
+                exc=exc,
+            )
+            raise
 
     def pair_swbt(self) -> SwbtControllerStatusView:
         """現在設定で swbt pairing を明示実行する。"""
