@@ -9,10 +9,26 @@ from nyxpy.framework.core.hardware.swbt.config import (
     resolve_controller_model,
     supported_controller_models,
 )
+from nyxpy.framework.core.hardware.swbt.controller import SwbtControllerOutputPort
 from nyxpy.framework.core.hardware.swbt.discovery import (
     SwbtAdapterDiscoveryService,
     SwbtAdapterView,
     resolve_adapter,
+)
+from nyxpy.framework.core.hardware.swbt.factory import (
+    SwbtControllerOutputPortFactory,
+    SwbtSessionKey,
+    session_key,
+)
+from nyxpy.framework.core.hardware.swbt.mapper import (
+    NyxSwbtInputMapper,
+    NyxSwbtState,
+    normalize_imu_frames,
+)
+from nyxpy.framework.core.hardware.swbt.session import (
+    DummySwbtControllerSession,
+    DummySwbtStatus,
+    SwbtControllerSession,
 )
 
 __all__ = [
@@ -20,10 +36,20 @@ __all__ = [
     "SwbtAdapterView",
     "SwbtControllerConfig",
     "SwbtControllerModel",
+    "SwbtControllerOutputPort",
+    "SwbtControllerOutputPortFactory",
+    "SwbtControllerSession",
     "SwbtControllerType",
     "SwbtInputCapabilities",
+    "SwbtSessionKey",
+    "DummySwbtControllerSession",
+    "DummySwbtStatus",
+    "NyxSwbtInputMapper",
+    "NyxSwbtState",
+    "normalize_imu_frames",
     "parse_controller_type",
     "resolve_adapter",
     "resolve_controller_model",
+    "session_key",
     "supported_controller_models",
 ]
