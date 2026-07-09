@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from nyxpy.framework.core.hardware.capture_source import PonkanCaptureSourceConfig
+from nyxpy.framework.core.io.controller_config import SerialControllerConfig
 from nyxpy.framework.core.macro.command import DefaultCommand
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.macro.registry import MacroDefinition
@@ -69,10 +70,10 @@ def test_runtime_builder_rejects_removed_screen_region_source(tmp_path: Path) ->
         create_device_runtime_builder(
             project_root=tmp_path,
             registry=Registry(definition(tmp_path)),
-            protocol=object(),
+            controller_config=SerialControllerConfig(device=None),
             notification_handler=None,
             logger=FakeLoggerPort(),
-            controller_output_factory=ControllerFactory(),
+            serial_controller_factory=ControllerFactory(),
             frame_source_factory=frame_factory,
             settings={
                 "capture_source_type": "screen_region",
@@ -99,10 +100,10 @@ def test_runtime_uses_ponkan_capture_frame_source(tmp_path: Path) -> None:
     builder = create_device_runtime_builder(
         project_root=tmp_path,
         registry=Registry(definition(tmp_path)),
-        protocol=object(),
+        controller_config=SerialControllerConfig(device=None),
         notification_handler=None,
         logger=FakeLoggerPort(),
-        controller_output_factory=ControllerFactory(),
+        serial_controller_factory=ControllerFactory(),
         frame_source_factory=frame_factory,
         settings={
             "capture_source_type": "capture",

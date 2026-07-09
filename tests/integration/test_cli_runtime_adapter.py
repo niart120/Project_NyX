@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from nyxpy.cli import run_cli
+from nyxpy.framework.core.io.controller_config import SerialControllerConfig
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 
 
@@ -83,13 +84,13 @@ def test_cli_notification_settings_source_is_secrets_store(monkeypatch, tmp_path
     logger = Logger()
 
     run_cli.create_runtime_builder(
-        MagicMock(),
         logger=logger,
+        controller_config=SerialControllerConfig(device="COM1"),
         project_root=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
         device_discovery=discovery,
-        controller_output_factory=controller_factory,
+        serial_controller_factory=controller_factory,
         frame_source_factory=frame_factory,
     )
 

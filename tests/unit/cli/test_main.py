@@ -14,6 +14,7 @@ from nyxpy.cli.run_cli import (
     execute_macro,
 )
 from nyxpy.framework.core.hardware.protocol import CH552SerialProtocol, ThreeDSSerialProtocol
+from nyxpy.framework.core.io.controller_config import SerialControllerConfig
 from nyxpy.framework.core.macro.exceptions import ConfigurationError, ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 
@@ -146,21 +147,24 @@ def test_create_runtime_builder_delegates_device_selection_to_builder(monkeypatc
 
     logger = MockLogger()
     create_runtime_builder(
-        MagicMock(),
         logger=logger,
+        controller_config=SerialControllerConfig(device="COM1"),
         project_root=tmp_path,
         settings_store=settings_store,
         secrets_store=secrets_store,
         device_discovery=discovery,
-        controller_output_factory=controller_factory,
+        serial_controller_factory=controller_factory,
         frame_source_factory=frame_factory,
     )
 
     mock_registry.assert_called_once_with(project_root=tmp_path)
     registry.reload.assert_called_once()
     assert mock_builder.call_args.kwargs["device_discovery"] is discovery
-    assert mock_builder.call_args.kwargs["controller_output_factory"] is controller_factory
+    assert mock_builder.call_args.kwargs["serial_controller_factory"] is controller_factory
     assert mock_builder.call_args.kwargs["frame_source_factory"] is frame_factory
+    assert mock_builder.call_args.kwargs["controller_config"] == SerialControllerConfig(
+        device="COM1"
+    )
     assert mock_builder.call_args.kwargs["settings"] == {"runtime.allow_dummy": False}
     assert "serial_device" not in mock_builder.call_args.kwargs
     assert "capture_device" not in mock_builder.call_args.kwargs
@@ -185,7 +189,11 @@ def test_create_runtime_builder_passes_project_config_dir_to_stores(monkeypatch,
     )
     monkeypatch.setattr("nyxpy.cli.run_cli.create_device_runtime_builder", mock_builder)
 
-    create_runtime_builder(MagicMock(), logger=MockLogger(), project_root=tmp_path)
+    create_runtime_builder(
+        logger=MockLogger(),
+        controller_config=SerialControllerConfig(device=None),
+        project_root=tmp_path,
+    )
 
     mock_settings_store.assert_called_once_with(
         config_dir=tmp_path.resolve() / ".nyxpy",
@@ -243,10 +251,15 @@ def test_cli_does_not_accept_notification_secret_args() -> None:
 
 def make_args():
     args = MagicMock()
+    args.controller = None
     args.serial = "COM1"
     args.capture = "Camera1"
     args.protocol = "CH552"
     args.baud = None
+    args.swbt_adapter = None
+    args.swbt_controller_type = None
+    args.swbt_key_store = None
+    args.swbt_timeout = None
     args.macro_name = "Sample"
     args.silence = False
     args.verbose = False
@@ -270,13 +283,11 @@ def test_cli_main_success(monkeypatch, tmp_path):
     paths = patch_cli_workspace(monkeypatch, tmp_path)
     mock_logging = MockLoggingComponents()
     mock_configure = MagicMock(return_value=mock_logging)
-    mock_protocol = MagicMock()
     mock_builder = MagicMock()
     mock_create_builder = MagicMock(return_value=mock_builder)
     mock_execute = MagicMock(return_value=result(RunStatus.SUCCESS))
 
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", mock_configure)
-    monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: mock_protocol)
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_runtime_builder",
         mock_create_builder,
@@ -291,12 +302,15 @@ def test_cli_main_success(monkeypatch, tmp_path):
         base_dir=paths.logs_dir,
     )
     mock_create_builder.assert_called_once_with(
-        protocol=mock_protocol,
         logger=mock_logging.logger,
+        controller_config=SerialControllerConfig(
+            device="COM1",
+            protocol="CH552",
+            baudrate=9600,
+        ),
         project_root=paths.project_root,
-        serial_name="COM1",
         capture_name="Camera1",
-        baudrate=9600,
+        settings_store=mock_create_builder.call_args.kwargs["settings_store"],
     )
     mock_execute.assert_called_once_with(
         runtime_builder=mock_builder,
@@ -329,7 +343,7 @@ def test_cli_main_uses_3ds_default_baudrate(monkeypatch, tmp_path):
     create_builder = __import__(
         "nyxpy.cli.run_cli", fromlist=["create_runtime_builder"]
     ).create_runtime_builder
-    assert create_builder.call_args.kwargs["baudrate"] == 115200
+    assert create_builder.call_args.kwargs["controller_config"].baudrate == 115200
 
 
 def test_cli_main_baud_override(monkeypatch, tmp_path):
@@ -356,7 +370,7 @@ def test_cli_main_baud_override(monkeypatch, tmp_path):
     create_builder = __import__(
         "nyxpy.cli.run_cli", fromlist=["create_runtime_builder"]
     ).create_runtime_builder
-    assert create_builder.call_args.kwargs["baudrate"] == 9600
+    assert create_builder.call_args.kwargs["controller_config"].baudrate == 9600
 
 
 def test_cli_main_value_error(monkeypatch, mock_log_manager, tmp_path):
@@ -368,8 +382,8 @@ def test_cli_main_value_error(monkeypatch, mock_log_manager, tmp_path):
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_protocol",
-        lambda name: (_ for _ in ()).throw(ValueError("invalid protocol")),
+        "nyxpy.cli.run_cli.controller_config_from_overrides",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("invalid protocol")),
     )
 
     assert cli_main(args) == 1
@@ -383,8 +397,8 @@ def test_cli_main_exception(monkeypatch, mock_log_manager, tmp_path):
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_protocol",
-        lambda name: (_ for _ in ()).throw(Exception("Unexpected error")),
+        "nyxpy.cli.run_cli.controller_config_from_overrides",
+        lambda *args, **kwargs: (_ for _ in ()).throw(Exception("Unexpected error")),
     )
 
     assert cli_main(args) == 2
@@ -403,8 +417,8 @@ def test_cli_unhandled_exception_uses_fixed_user_message(
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_protocol",
-        lambda name: (_ for _ in ()).throw(
+        "nyxpy.cli.run_cli.controller_config_from_overrides",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("secret value leaked from E:\\secret\\payload.txt")
         ),
     )
@@ -425,8 +439,10 @@ def test_cli_configuration_error_returns_1(monkeypatch, mock_log_manager, tmp_pa
         "nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=mock_log_manager)
     )
     monkeypatch.setattr(
-        "nyxpy.cli.run_cli.create_protocol",
-        lambda name: (_ for _ in ()).throw(ConfigurationError("invalid protocol settings")),
+        "nyxpy.cli.run_cli.controller_config_from_overrides",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ConfigurationError("invalid protocol settings")
+        ),
     )
 
     assert cli_main(args) == 1
@@ -441,7 +457,6 @@ def test_cli_cleanup_failures_are_logged(monkeypatch, tmp_path):
     builder.shutdown = MagicMock(side_effect=RuntimeError("shutdown failed"))
 
     monkeypatch.setattr("nyxpy.cli.run_cli.configure_logging", MagicMock(return_value=logging))
-    monkeypatch.setattr("nyxpy.cli.run_cli.create_protocol", lambda name: MagicMock())
     monkeypatch.setattr(
         "nyxpy.cli.run_cli.create_runtime_builder",
         MagicMock(return_value=builder),

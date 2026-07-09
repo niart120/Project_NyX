@@ -13,7 +13,7 @@ from nyxpy.framework.core.hardware.swbt.config import (
     resolve_controller_model,
 )
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
-from nyxpy.framework.core.settings.schema import dotted_get
+from nyxpy.framework.core.settings.schema import dotted_get, dotted_set
 
 _LEGACY_SERIAL_KEYS = ("serial_device", "serial_baud", "serial_protocol")
 
@@ -75,6 +75,40 @@ def controller_config_from_settings(
             key="controller.swbt.report_period_us",
         ),
     )
+
+
+def controller_config_from_overrides(
+    settings: Mapping[str, Any],
+    *,
+    workspace_root: Path | None = None,
+    backend: str | ControllerBackend | None = None,
+    serial_device: str | None = None,
+    serial_protocol: str | None = None,
+    serial_baudrate: int | None = None,
+    swbt_adapter: str | None = None,
+    swbt_controller_type: str | None = None,
+    swbt_key_store_path: Path | str | None = None,
+    swbt_connect_timeout_sec: float | None = None,
+) -> ControllerConfig:
+    """Settings の copy に CLI override を重ねて ControllerConfig を作る。"""
+    data = _settings_copy(settings)
+    if backend is not None:
+        dotted_set(data, "controller.backend", str(backend))
+    if serial_device is not None:
+        dotted_set(data, "controller.serial.device", serial_device)
+    if serial_protocol is not None:
+        dotted_set(data, "controller.serial.protocol", serial_protocol)
+    if serial_baudrate is not None:
+        dotted_set(data, "controller.serial.baudrate", serial_baudrate)
+    if swbt_adapter is not None:
+        dotted_set(data, "controller.swbt.adapter", swbt_adapter)
+    if swbt_controller_type is not None:
+        dotted_set(data, "controller.swbt.controller_type", swbt_controller_type)
+    if swbt_key_store_path is not None:
+        dotted_set(data, "controller.swbt.key_store_path", str(swbt_key_store_path))
+    if swbt_connect_timeout_sec is not None:
+        dotted_set(data, "controller.swbt.connect_timeout_sec", swbt_connect_timeout_sec)
+    return controller_config_from_settings(data, workspace_root=workspace_root)
 
 
 def parse_controller_backend(value: object) -> ControllerBackend:
@@ -149,3 +183,11 @@ def _invalid_positive(key: str) -> ConfigurationError:
         component="ControllerConfig",
         details={"key": key},
     )
+
+
+def _settings_copy(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _settings_copy(nested) for key, nested in value.items()}
+    if isinstance(value, list | tuple):
+        return [_settings_copy(item) for item in value]
+    return value

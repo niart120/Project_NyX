@@ -41,6 +41,13 @@ Pairing は利用者の明示操作である。macro run が key store 不足を
 - CLI に clipboard / command copy / GUI 連携用 preview は追加しない。
 - `nyxpy swbt status` は初期範囲外とする。
 
+### 1.6 完了結果
+
+- `create_device_runtime_builder()` は `ControllerConfig` を受け取り、`SerialControllerConfig` では `SerialControllerOutputPortFactory`、`SwbtControllerConfig` では `SwbtControllerOutputPortFactory` を選ぶ構成にした。
+- `nyxpy run` は settings と CLI override から controller config を作る。`--controller swbt` では serial protocol を生成しない。
+- `nyxpy swbt pair` / `reconnect` / `disconnect` を追加し、CLI override が settings を保存しないことをテストで確認した。
+- `swbt-python 0.2.0` の公開 controller API は同期 API であるため、CLI も同期処理として factory / session を呼ぶ。event loop thread は追加していない。
+
 ## 2. 対象ファイル
 
 | ファイル | 変更種別 | 変更内容 |
@@ -84,7 +91,7 @@ backend 選択は runtime builder を作る構成処理で完了させる。`Mac
 
 ### 並行性・スレッド安全性
 
-CLI は同期処理として session / factory を呼ぶ。event loop thread は `SwbtControllerSession` が所有する。CLI 終了時は `finally` で runtime builder または factory を close する。
+CLI は同期処理として session / factory を呼ぶ。swbt 公開 API が同期 API であるため、event loop thread は追加しない。CLI 終了時は `finally` で runtime builder または factory を close する。
 
 ## 4. 実装仕様
 
@@ -173,19 +180,21 @@ uv run ruff format .
 uv run ruff check .
 uv run ty check src/nyxpy --output-format concise --no-progress
 uv run pytest tests/unit/cli/test_run_cli_parser.py tests/unit/cli/test_swbt_cli.py tests/unit/framework/runtime/test_runtime_builder.py tests/integration/test_swbt_runtime_cli_integration.py -m "not realdevice and not swbt"
+uv run pytest tests/unit -m "not realdevice and not swbt"
+uv run pytest tests/integration -m "not realdevice and not swbt"
 ```
 
 ## 6. 実装チェックリスト
 
-- [ ] `SerialControllerOutputPortFactory` を正名として扱い、旧名 alias を残さない。
-- [ ] `make_controller_port_factory()` を追加し、backend 分岐を構成処理に閉じる。
-- [ ] `create_device_runtime_builder()` と `create_runtime_builder()` を `ControllerConfig` ベースへ更新する。
-- [ ] swbt backend で serial protocol 生成を呼ばないことをテストする。
-- [ ] `nyxpy run` に swbt option を追加する。
-- [ ] `--serial` と `--capture` の parser 必須を外し、validation へ移す。
-- [ ] `nyxpy swbt pair` と `nyxpy swbt reconnect` を追加する。
-- [ ] `nyxpy swbt disconnect` を追加する。
-- [ ] `supported_controller_models()` から CLI choices を作る。
-- [ ] CLI override が settings を書き換えないことを確認する。
-- [ ] runtime shutdown で swbt factory close が呼ばれることを確認する。
-- [ ] dummy session を使った runtime integration test を追加する。
+- [x] `SerialControllerOutputPortFactory` を正名として扱い、旧名 alias を残さない。
+- [x] `make_controller_port_factory()` を追加し、backend 分岐を構成処理に閉じる。
+- [x] `create_device_runtime_builder()` と `create_runtime_builder()` を `ControllerConfig` ベースへ更新する。
+- [x] swbt backend で serial protocol 生成を呼ばないことをテストする。
+- [x] `nyxpy run` に swbt option を追加する。
+- [x] `--serial` と `--capture` の parser 必須を外し、validation へ移す。
+- [x] `nyxpy swbt pair` と `nyxpy swbt reconnect` を追加する。
+- [x] `nyxpy swbt disconnect` を追加する。
+- [x] `supported_controller_models()` から CLI choices を作る。
+- [x] CLI override が settings を書き換えないことを確認する。
+- [x] runtime shutdown で swbt factory close が呼ばれることを確認する。
+- [x] dummy session を使った runtime integration test を追加する。

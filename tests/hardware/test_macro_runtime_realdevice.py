@@ -9,9 +9,10 @@ from nyxpy.framework.core.hardware.camera_capture import CameraCaptureDevice
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.serial_comm import SerialComm
+from nyxpy.framework.core.io.controller_config import SerialControllerConfig
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.logger import NullLoggerPort
 from nyxpy.framework.core.macro.registry import MacroRegistry
@@ -87,7 +88,7 @@ def test_macro_runtime_runs_with_real_serial_and_capture(tmp_path: Path) -> None
 
     discovery = StaticDiscovery(serial_port, capture_index)
     protocol = ProtocolFactory.create_protocol(protocol_name)
-    controller_factory = ControllerOutputPortFactory(
+    controller_factory = SerialControllerOutputPortFactory(
         discovery=discovery,
         protocol=protocol,
         serial_factory=SerialComm,
@@ -101,12 +102,14 @@ def test_macro_runtime_runs_with_real_serial_and_capture(tmp_path: Path) -> None
         project_root=tmp_path,
         registry=registry,
         device_discovery=discovery,
-        controller_output_factory=controller_factory,
+        controller_config=SerialControllerConfig(
+            device=serial_port,
+            protocol=protocol_name,
+            baudrate=baudrate,
+        ),
+        serial_controller_factory=controller_factory,
         frame_source_factory=frame_factory,
-        serial_name=serial_port,
         capture_name=str(capture_index),
-        baudrate=baudrate,
-        protocol=protocol,
         notification_handler=NotificationHandler([]),
         logger=NullLoggerPort(),
     )
