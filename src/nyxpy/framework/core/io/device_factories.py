@@ -37,7 +37,7 @@ from nyxpy.framework.core.logger import LoggerPort, NullLoggerPort
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
-class ControllerOutputPortFactory:
+class SerialControllerOutputPortFactory:
     """シリアル device 設定から controller output port を生成します。"""
 
     def __init__(
@@ -101,7 +101,7 @@ class ControllerOutputPortFactory:
                 errors.append(exc)
         self._devices.clear()
         if errors:
-            raise ExceptionGroup("ControllerOutputPortFactory close failed", errors)
+            raise ExceptionGroup("SerialControllerOutputPortFactory close failed", errors)
 
     def _dummy_serial(self) -> SerialCommInterface:
         device = self._devices.get(DUMMY_DEVICE_NAME)

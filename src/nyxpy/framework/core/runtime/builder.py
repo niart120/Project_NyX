@@ -10,14 +10,17 @@ from uuid import uuid4
 
 from nyxpy.framework.core.hardware.capture_source import capture_source_from_settings
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
-from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
+from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig
+from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.io.adapters import (
     NoopNotificationAdapter,
     NotificationHandlerAdapter,
 )
+from nyxpy.framework.core.io.controller_config import ControllerConfig, SerialControllerConfig
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
@@ -182,40 +185,38 @@ def create_device_runtime_builder(
     *,
     project_root: Path,
     registry: MacroRegistry,
-    protocol: SerialProtocolInterface,
+    controller_config: ControllerConfig,
     notification_handler,
     logger: LoggerPort,
     device_discovery: DeviceDiscoveryService | None = None,
-    controller_output_factory: ControllerOutputPortFactory | None = None,
+    serial_controller_factory: SerialControllerOutputPortFactory | None = None,
+    swbt_controller_factory: SwbtControllerOutputPortFactory | None = None,
     frame_source_factory: FrameSourcePortFactory | None = None,
-    serial_name: str | None = None,
     capture_name: str | None = None,
-    baudrate: int | None = None,
     detection_timeout_sec: float = 2.0,
     settings: SettingsSnapshot | None = None,
     lifetime_allow_dummy: bool | None = None,
 ) -> MacroRuntimeBuilder:
     """Device discovery と Port factory を Runtime builder へ接続する。"""
     settings_snapshot = dict(settings or {})
-    resolved_serial_name = _optional_name(
-        serial_name if serial_name is not None else settings_snapshot.get("serial_device")
-    )
     resolved_capture_name = _optional_name(capture_name)
     capture_source_type = str(settings_snapshot.get("capture_source_type", "camera") or "camera")
     capture_source = capture_source_from_settings(
         settings_snapshot,
         capture_name_override=resolved_capture_name if capture_source_type == "camera" else None,
     )
-    resolved_baudrate = _optional_int(
-        baudrate if baudrate is not None else settings_snapshot.get("serial_baud")
-    )
     lifetime_request = RuntimeBuildRequest(macro_id="__gui_lifetime__")
     discovery = device_discovery or DeviceDiscoveryService(logger=logger)
     discovery.detect(detection_timeout_sec)
-    controller_factory = controller_output_factory or ControllerOutputPortFactory(
-        discovery=discovery,
-        protocol=protocol,
-    )
+    serial_factory = serial_controller_factory
+    swbt_factory = swbt_controller_factory
+    if isinstance(controller_config, SerialControllerConfig) and serial_factory is None:
+        serial_factory = SerialControllerOutputPortFactory(
+            discovery=discovery,
+            protocol=ProtocolFactory.create_protocol(controller_config.protocol),
+        )
+    if isinstance(controller_config, SwbtControllerConfig) and swbt_factory is None:
+        swbt_factory = SwbtControllerOutputPortFactory()
     frame_factory = frame_source_factory or FrameSourcePortFactory(
         discovery=discovery,
         logger=logger,
@@ -229,16 +230,24 @@ def create_device_runtime_builder(
             return lifetime_allow_dummy
         return allow_dummy(lifetime_request)
 
+    controller_port_factory = make_controller_port_factory(
+        config=controller_config,
+        serial_factory=serial_factory,
+        swbt_factory=swbt_factory,
+        allow_dummy=allow_dummy,
+        detection_timeout_sec=detection_timeout_sec,
+    )
+    shutdown_callbacks = _controller_shutdown_callbacks(
+        config=controller_config,
+        serial_factory=serial_factory,
+        swbt_factory=swbt_factory,
+    ) + (frame_factory.close,)
+
     return MacroRuntimeBuilder(
         project_root=project_root,
         registry=registry,
         settings=settings_snapshot,
-        controller_factory=lambda request, _definition: controller_factory.create(
-            name=resolved_serial_name,
-            baudrate=resolved_baudrate,
-            allow_dummy=allow_dummy(request),
-            timeout_sec=detection_timeout_sec,
-        ),
+        controller_factory=controller_port_factory,
         frame_source_factory=lambda request, _definition: frame_factory.create(
             source=capture_source,
             allow_dummy=allow_dummy(request),
@@ -269,14 +278,78 @@ def create_device_runtime_builder(
             allow_dummy=lifetime_dummy(),
             timeout_sec=detection_timeout_sec,
         ),
-        manual_controller_factory=lambda: controller_factory.create(
-            name=resolved_serial_name,
-            baudrate=resolved_baudrate,
+        manual_controller_factory=lambda: _create_controller_port(
+            config=controller_config,
+            serial_factory=serial_factory,
+            swbt_factory=swbt_factory,
             allow_dummy=lifetime_dummy(),
-            timeout_sec=detection_timeout_sec,
+            detection_timeout_sec=detection_timeout_sec,
         ),
-        shutdown_callbacks=(controller_factory.close, frame_factory.close),
+        shutdown_callbacks=shutdown_callbacks,
     )
+
+
+def make_controller_port_factory(
+    *,
+    config: ControllerConfig,
+    serial_factory: SerialControllerOutputPortFactory | None,
+    swbt_factory: SwbtControllerOutputPortFactory | None,
+    allow_dummy: Callable[[RuntimeBuildRequest], bool],
+    detection_timeout_sec: float,
+) -> PortFactory[ControllerOutputPort]:
+    """ControllerConfig に対応する runtime controller port factory を作る。"""
+
+    def create(request: RuntimeBuildRequest, _definition: MacroDefinition) -> ControllerOutputPort:
+        return _create_controller_port(
+            config=config,
+            serial_factory=serial_factory,
+            swbt_factory=swbt_factory,
+            allow_dummy=allow_dummy(request),
+            detection_timeout_sec=detection_timeout_sec,
+        )
+
+    return create
+
+
+def _create_controller_port(
+    *,
+    config: ControllerConfig,
+    serial_factory: SerialControllerOutputPortFactory | None,
+    swbt_factory: SwbtControllerOutputPortFactory | None,
+    allow_dummy: bool,
+    detection_timeout_sec: float,
+) -> ControllerOutputPort:
+    if isinstance(config, SerialControllerConfig):
+        if serial_factory is None:
+            raise RuntimeError("serial controller factory is not configured")
+        return serial_factory.create(
+            name=config.device,
+            baudrate=config.baudrate,
+            allow_dummy=allow_dummy,
+            timeout_sec=detection_timeout_sec,
+        )
+    if isinstance(config, SwbtControllerConfig):
+        if swbt_factory is None:
+            raise RuntimeError("swbt controller factory is not configured")
+        return swbt_factory.create(
+            config=config,
+            allow_dummy=allow_dummy,
+            timeout_sec=config.connect_timeout_sec,
+        )
+    raise TypeError(f"unsupported controller config: {type(config).__name__}")
+
+
+def _controller_shutdown_callbacks(
+    *,
+    config: ControllerConfig,
+    serial_factory: SerialControllerOutputPortFactory | None,
+    swbt_factory: SwbtControllerOutputPortFactory | None,
+) -> tuple[ShutdownCallback, ...]:
+    if isinstance(config, SerialControllerConfig):
+        return () if serial_factory is None else (serial_factory.close,)
+    if isinstance(config, SwbtControllerConfig):
+        return () if swbt_factory is None else (swbt_factory.close,)
+    return ()
 
 
 def _allow_dummy(settings: dict[str, Any], request: RuntimeBuildRequest) -> bool:

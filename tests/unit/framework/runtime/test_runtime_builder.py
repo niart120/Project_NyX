@@ -5,10 +5,12 @@ import pytest
 
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryResult, DeviceInfo
+from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, resolve_controller_model
 from nyxpy.framework.core.io.adapters import NoopNotificationAdapter, NotificationHandlerAdapter
+from nyxpy.framework.core.io.controller_config import SerialControllerConfig
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.io.resources import MacroResourceScope
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -111,6 +113,19 @@ class RecordingFrameFactory:
         self.closed = True
 
 
+class RecordingSwbtFactory:
+    def __init__(self) -> None:
+        self.creates = []
+        self.closed = False
+
+    def create(self, *, config, allow_dummy: bool, timeout_sec: float):
+        self.creates.append((config, allow_dummy, timeout_sec))
+        return FakeControllerOutputPort()
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def definition(tmp_path: Path) -> MacroDefinition:
     return MacroDefinition(
         id="sample",
@@ -131,7 +146,14 @@ def make_builder(tmp_path: Path, discovery: Discovery, **kwargs):
     notification_handler = kwargs.pop("notification_handler", None)
     frame_source_factory = kwargs.pop("frame_source_factory", None)
     macro_settings = kwargs.pop("macro_settings", None)
-    controller_factory = ControllerOutputPortFactory(
+    serial_name = kwargs.pop("serial_name", None)
+    baudrate = kwargs.pop("baudrate", 9600)
+    capture_name = kwargs.pop("capture_name", None)
+    controller_config = kwargs.pop(
+        "controller_config",
+        SerialControllerConfig(device=serial_name, protocol="CH552", baudrate=baudrate),
+    )
+    controller_factory = SerialControllerOutputPortFactory(
         discovery=discovery,
         protocol=object(),
         serial_factory=SerialDevice,
@@ -145,9 +167,10 @@ def make_builder(tmp_path: Path, discovery: Discovery, **kwargs):
         project_root=tmp_path,
         registry=Registry(definition(tmp_path), macro_settings),
         device_discovery=discovery,
-        controller_output_factory=controller_factory,
+        controller_config=controller_config,
+        serial_controller_factory=controller_factory,
         frame_source_factory=frame_factory,
-        protocol=object(),
+        capture_name=capture_name,
         notification_handler=notification_handler,
         logger=FakeLoggerPort(),
         **kwargs,
@@ -293,12 +316,67 @@ def test_runtime_builder_rejects_legacy_manager_arguments(tmp_path: Path) -> Non
         create_device_runtime_builder(
             project_root=tmp_path,
             registry=Registry(definition(tmp_path)),
+            controller_config=SerialControllerConfig(device=None),
             serial_manager=object(),
             capture_manager=object(),
-            protocol=object(),
             notification_handler=None,
             logger=FakeLoggerPort(),
         )
+
+
+def test_make_controller_port_factory_selects_swbt(tmp_path: Path) -> None:
+    swbt_factory = RecordingSwbtFactory()
+    frame_factory = RecordingFrameFactory()
+    swbt_config = SwbtControllerConfig(
+        model=resolve_controller_model("pro-controller"),
+        adapter="usb:0",
+        key_store_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-bond.json",
+        connect_timeout_sec=4.0,
+    )
+    builder = create_device_runtime_builder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        device_discovery=Discovery(),
+        controller_config=swbt_config,
+        swbt_controller_factory=swbt_factory,
+        frame_source_factory=frame_factory,
+        notification_handler=None,
+        logger=FakeLoggerPort(),
+    )
+
+    context = builder.build(RuntimeBuildRequest(macro_id="sample"))
+    builder.shutdown()
+
+    assert isinstance(context.controller, FakeControllerOutputPort)
+    assert swbt_factory.creates == [(swbt_config, False, 4.0)]
+    assert swbt_factory.closed is True
+
+
+def test_run_swbt_does_not_resolve_serial_protocol(monkeypatch, tmp_path: Path) -> None:
+    def fail_create_protocol(_name):
+        raise AssertionError("serial protocol should not be created for swbt")
+
+    monkeypatch.setattr(
+        "nyxpy.framework.core.runtime.builder.ProtocolFactory.create_protocol",
+        fail_create_protocol,
+    )
+    swbt_config = SwbtControllerConfig(
+        model=resolve_controller_model("pro-controller"),
+        adapter="usb:0",
+        key_store_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-bond.json",
+    )
+    builder = create_device_runtime_builder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        device_discovery=Discovery(),
+        controller_config=swbt_config,
+        swbt_controller_factory=RecordingSwbtFactory(),
+        frame_source_factory=RecordingFrameFactory(),
+        notification_handler=None,
+        logger=FakeLoggerPort(),
+    )
+
+    builder.build(RuntimeBuildRequest(macro_id="sample"))
 
 
 def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path) -> None:

@@ -11,12 +11,13 @@ from nyxpy.framework.core.io.controller_config import (
     ControllerBackend,
     ControllerConfig,
     SerialControllerConfig,
+    controller_config_from_overrides,
     controller_config_from_settings,
     parse_controller_backend,
 )
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.io.ports import (
     ControllerOutputPort,
@@ -50,7 +51,6 @@ __all__ = [
     "ControllerBackend",
     "ControllerConfig",
     "CaptureFrameSourcePort",
-    "ControllerOutputPortFactory",
     "DefaultResourcePathGuard",
     "DummyFrameSourcePort",
     "FrameSourcePortFactory",
@@ -78,6 +78,8 @@ __all__ = [
     "RunArtifactStore",
     "SerialControllerOutputPort",
     "SerialControllerConfig",
+    "SerialControllerOutputPortFactory",
+    "controller_config_from_overrides",
     "controller_config_from_settings",
     "parse_controller_backend",
 ]

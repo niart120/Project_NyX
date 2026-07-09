@@ -17,8 +17,8 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
+from nyxpy.framework.core.io.controller_config import controller_config_from_settings
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
 )
 from nyxpy.framework.core.io.ports import ControllerOutputPort, FrameSourcePort
@@ -85,9 +85,15 @@ FRAME_SOURCE_SETTING_KEYS = (
 
 CONTROLLER_SETTING_KEYS = frozenset(
     {
-        "serial_device",
-        "serial_baud",
-        "serial_protocol",
+        "controller.backend",
+        "controller.serial.device",
+        "controller.serial.baudrate",
+        "controller.serial.protocol",
+        "controller.swbt.adapter",
+        "controller.swbt.controller_type",
+        "controller.swbt.key_store_path",
+        "controller.swbt.connect_timeout_sec",
+        "controller.swbt.report_period_us",
     }
 )
 
@@ -268,12 +274,9 @@ class GuiAppServices:
 
     def _replace_runtime_builder(self) -> None:
         previous_builder = self.runtime_builder
-        protocol = ProtocolFactory.create_protocol(
-            self.global_settings.get("serial_protocol", "CH552")
-        )
-        controller_factory = ControllerOutputPortFactory(
-            discovery=self.device_discovery,
-            protocol=protocol,
+        controller_config = controller_config_from_settings(
+            self.global_settings.data,
+            workspace_root=self.project_root,
         )
         frame_factory = FrameSourcePortFactory(
             discovery=self.device_discovery,
@@ -287,12 +290,9 @@ class GuiAppServices:
             project_root=self.project_root,
             registry=self.registry,
             device_discovery=self.device_discovery,
-            controller_output_factory=controller_factory,
+            controller_config=controller_config,
             frame_source_factory=frame_factory,
-            serial_name=self.global_settings.get("serial_device"),
             capture_name=self.global_settings.get("capture_device"),
-            baudrate=self.global_settings.get("serial_baud", 9600),
-            protocol=protocol,
             notification_handler=notification_handler,
             logger=self.logger,
             settings=self.global_settings.data,
@@ -345,7 +345,7 @@ class GuiAppServices:
         if not isinstance(result, DeviceDiscoveryResult):
             return
 
-        serial_device = str(self.global_settings.get("serial_device", "") or "").strip()
+        serial_device = str(self.global_settings.get("controller.serial.device", "") or "").strip()
         if (
             serial_device
             and serial_device != DUMMY_DEVICE_NAME
@@ -353,8 +353,8 @@ class GuiAppServices:
             and not _has_discovery_error(result, "serial")
             and not _serial_exists(result, serial_device)
         ):
-            self.global_settings.set("serial_device", "")
-            discarded_keys.append("serial_device")
+            self.global_settings.set("controller.serial.device", "")
+            discarded_keys.append("controller.serial.device")
 
         if source_type == "window":
             discarded_keys.extend(self._discard_unavailable_window_settings())
@@ -443,8 +443,8 @@ class GuiAppServices:
         return WindowDiscoveryResult(window_sources=windows)
 
     def _log_setting_changes(self, changed_keys: set[str]) -> None:
-        if {"serial_device", "serial_baud"} & changed_keys:
-            serial_identifier = str(self.global_settings.get("serial_device", "") or "")
+        if {"controller.serial.device", "controller.serial.baudrate"} & changed_keys:
+            serial_identifier = str(self.global_settings.get("controller.serial.device", "") or "")
             discovery = getattr(self, "device_discovery", None)
             display_name = getattr(discovery, "serial_display_name", None)
             serial_display = (
@@ -454,7 +454,7 @@ class GuiAppServices:
             )
             self.logger.user(
                 "INFO",
-                f"シリアルデバイス設定を更新しました: {serial_display} ({self.global_settings.get('serial_baud', 9600)} bps)",
+                f"シリアルデバイス設定を更新しました: {serial_display} ({self.global_settings.get('controller.serial.baudrate', 9600)} bps)",
                 component="GuiAppServices",
                 event="configuration.changed",
             )
@@ -465,11 +465,13 @@ class GuiAppServices:
                 component="GuiAppServices",
                 event="configuration.changed",
             )
-        if "serial_protocol" in changed_keys:
-            ProtocolFactory.create_protocol(self.global_settings.get("serial_protocol", "CH552"))
+        if "controller.serial.protocol" in changed_keys:
+            ProtocolFactory.create_protocol(
+                self.global_settings.get("controller.serial.protocol", "CH552")
+            )
             self.logger.user(
                 "INFO",
-                f"コントローラープロトコルを切り替えました: {self.global_settings.get('serial_protocol', 'CH552')}",
+                f"コントローラープロトコルを切り替えました: {self.global_settings.get('controller.serial.protocol', 'CH552')}",
                 component="GuiAppServices",
                 event="configuration.changed",
             )

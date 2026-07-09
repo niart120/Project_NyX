@@ -3,15 +3,22 @@
 import argparse
 import pathlib
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.config import supported_controller_models
+from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
+from nyxpy.framework.core.io.controller_config import (
+    ControllerConfig,
+    SerialControllerConfig,
+    controller_config_from_overrides,
+)
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.logger import LoggerPort, LoggingComponents, create_default_logging
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -99,34 +106,32 @@ def create_protocol(protocol_name: str) -> SerialProtocolInterface:
 
 
 def create_runtime_builder(
-    protocol: SerialProtocolInterface,
     logger: LoggerPort,
     *,
+    controller_config: ControllerConfig,
     project_root: pathlib.Path | None = None,
-    serial_name: str | None = None,
     capture_name: str | None = None,
-    baudrate: int | None = None,
     detection_timeout_sec: float = 2.0,
     settings_store: SettingsStore | None = None,
     secrets_store: SecretsStore | None = None,
     device_discovery: DeviceDiscoveryService | None = None,
-    controller_output_factory: ControllerOutputPortFactory | None = None,
+    serial_controller_factory: SerialControllerOutputPortFactory | None = None,
+    swbt_controller_factory: SwbtControllerOutputPortFactory | None = None,
     frame_source_factory: FrameSourcePortFactory | None = None,
 ) -> MacroRuntimeBuilder:
     """CLI で利用する Runtime builder を作成します。
 
     Args:
-        protocol: 使用するプロトコル実装
         logger: Runtime に注入する logger
+        controller_config: 使用する controller backend 設定
         project_root: 使用する NyX workspace root
-        serial_name: 使用するシリアルデバイス名
         capture_name: 使用するキャプチャデバイス名
-        baudrate: シリアルボーレート
         detection_timeout_sec: デバイス自動検出のタイムアウト秒数
         settings_store: 差し替え用の設定 store。未指定の場合は workspace から読み込みます
         secrets_store: 差し替え用の secrets store。未指定の場合は workspace から読み込みます
         device_discovery: 差し替え用のデバイス検出 service
-        controller_output_factory: 差し替え用の controller output factory
+        serial_controller_factory: 差し替え用の serial controller output factory
+        swbt_controller_factory: 差し替え用の swbt controller output factory
         frame_source_factory: 差し替え用の frame source factory
 
     Returns:
@@ -143,10 +148,6 @@ def create_runtime_builder(
     settings = settings_store or SettingsStore(config_dir=paths.config_dir, strict_load=False)
     secrets = secrets_store or SecretsStore(config_dir=paths.config_dir, strict_load=False)
     discovery = device_discovery or DeviceDiscoveryService(logger=logger)
-    controller_factory = controller_output_factory or ControllerOutputPortFactory(
-        discovery=discovery,
-        protocol=protocol,
-    )
     frame_factory = frame_source_factory or FrameSourcePortFactory(
         discovery=discovery,
         logger=logger,
@@ -158,13 +159,12 @@ def create_runtime_builder(
         project_root=paths.project_root,
         registry=registry,
         device_discovery=discovery,
-        controller_output_factory=controller_factory,
+        controller_config=controller_config,
+        serial_controller_factory=serial_controller_factory,
+        swbt_controller_factory=swbt_controller_factory,
         frame_source_factory=frame_factory,
-        serial_name=serial_name,
         capture_name=capture_name,
-        baudrate=baudrate,
         detection_timeout_sec=detection_timeout_sec,
-        protocol=protocol,
         notification_handler=notification_handler,
         logger=logger,
         settings=settings.snapshot(),
@@ -267,16 +267,18 @@ def cli_main(args: argparse.Namespace) -> int:
         )
         logger = logging.logger
 
-        baudrate = ProtocolFactory.resolve_baudrate(args.protocol, getattr(args, "baud", None))
-
-        protocol = create_protocol(args.protocol)
+        settings = SettingsStore(config_dir=paths.config_dir, strict_load=False)
+        controller_config = _controller_config_from_args(
+            args,
+            settings_snapshot=settings.snapshot(),
+            workspace_root=paths.project_root,
+        )
         runtime_builder = create_runtime_builder(
-            protocol=protocol,
             logger=logger,
+            controller_config=controller_config,
             project_root=paths.project_root,
-            serial_name=args.serial,
             capture_name=args.capture,
-            baudrate=baudrate,
+            settings_store=settings,
         )
 
         # マクロ実行引数の解析
@@ -339,15 +341,40 @@ def build_parser() -> argparse.ArgumentParser:
 def add_run_arguments(parser: argparse.ArgumentParser) -> None:
     """マクロ実行 command の共通引数を parser に追加します。"""
     parser.add_argument("macro_name", help="実行するマクロ名")
-    parser.add_argument("-s", "--serial", required=True, help="シリアルデバイス名")
-    parser.add_argument("-c", "--capture", required=True, help="キャプチャデバイス名")
+    parser.add_argument(
+        "--controller",
+        choices=("serial", "swbt"),
+        default=None,
+        help="controller backend override",
+    )
+    parser.add_argument("-s", "--serial", default=None, help="シリアルデバイス名")
+    parser.add_argument("-c", "--capture", default=None, help="キャプチャデバイス名")
     parser.add_argument(
         "-p",
         "--protocol",
-        default="CH552",
-        help="通信プロトコル (default: CH552)",
+        default=None,
+        help="通信プロトコル",
     )
     parser.add_argument("--baud", type=int, default=None, help="シリアルボーレート")
+    parser.add_argument("--swbt-adapter", default=None, help="swbt adapter override")
+    parser.add_argument(
+        "--swbt-controller-type",
+        choices=tuple(model.settings_value for model in supported_controller_models()),
+        default=None,
+        help="swbt controller type override",
+    )
+    parser.add_argument(
+        "--swbt-key-store",
+        type=pathlib.Path,
+        default=None,
+        help="swbt pairing key store path override",
+    )
+    parser.add_argument(
+        "--swbt-timeout",
+        type=float,
+        default=None,
+        help="swbt connect timeout seconds override",
+    )
     parser.add_argument("--silence", action="store_true", help="ログ出力を最小限に抑制")
     parser.add_argument("--verbose", action="store_true", help="詳細なログ出力を有効化")
     parser.add_argument(
@@ -356,6 +383,35 @@ def add_run_arguments(parser: argparse.ArgumentParser) -> None:
         help="マクロ実行時の変数定義 (key=value形式)",
         default=[],
     )
+
+
+def _controller_config_from_args(
+    args: argparse.Namespace,
+    *,
+    settings_snapshot,
+    workspace_root: pathlib.Path,
+) -> ControllerConfig:
+    config = controller_config_from_overrides(
+        settings_snapshot,
+        workspace_root=workspace_root,
+        backend=getattr(args, "controller", None),
+        serial_device=getattr(args, "serial", None),
+        serial_protocol=getattr(args, "protocol", None),
+        serial_baudrate=getattr(args, "baud", None),
+        swbt_adapter=getattr(args, "swbt_adapter", None),
+        swbt_controller_type=getattr(args, "swbt_controller_type", None),
+        swbt_key_store_path=getattr(args, "swbt_key_store", None),
+        swbt_connect_timeout_sec=getattr(args, "swbt_timeout", None),
+    )
+    if isinstance(config, SerialControllerConfig):
+        protocol_override = getattr(args, "protocol", None)
+        baud_override = getattr(args, "baud", None)
+        if protocol_override is not None and baud_override is None:
+            return replace(
+                config,
+                baudrate=ProtocolFactory.resolve_baudrate(config.protocol, None),
+            )
+    return config
 
 
 def main():

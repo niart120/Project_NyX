@@ -84,13 +84,36 @@ def test_cli_parser_keeps_existing_options() -> None:
     )
 
     assert args.macro_name == "sample"
+    assert args.controller is None
     assert args.serial == "serial-1"
     assert args.capture == "capture-1"
     assert args.protocol == "ch552"
     assert args.baud == 115200
+    assert args.swbt_adapter is None
+    assert args.swbt_controller_type is None
     assert args.silence is True
     assert args.verbose is True
     assert args.define == ["count=3", 'name="nyx"']
+
+
+def test_run_parser_accepts_swbt_without_serial() -> None:
+    parser = run_cli.build_parser()
+
+    args = parser.parse_args(["sample", "--controller", "swbt", "--swbt-adapter", "usb:0"])
+
+    assert args.controller == "swbt"
+    assert args.serial is None
+    assert args.capture is None
+    assert args.swbt_adapter == "usb:0"
+
+
+def test_run_parser_accepts_settings_capture_without_capture_option() -> None:
+    parser = run_cli.build_parser()
+
+    args = parser.parse_args(["sample", "--serial", "serial-1"])
+
+    assert args.serial == "serial-1"
+    assert args.capture is None
 
 
 def test_top_level_parser_accepts_swbt_adapters_command() -> None:
@@ -101,6 +124,29 @@ def test_top_level_parser_accepts_swbt_adapters_command() -> None:
     assert args.command == "swbt"
     assert args.swbt_command == "adapters"
     assert args.json is True
+
+
+def test_top_level_parser_accepts_swbt_pair_command() -> None:
+    from nyxpy.__main__ import parse_arguments
+
+    args = parse_arguments(
+        [
+            "swbt",
+            "pair",
+            "--adapter",
+            "usb:0",
+            "--controller-type",
+            "pro-controller",
+            "--timeout",
+            "5",
+        ]
+    )
+
+    assert args.command == "swbt"
+    assert args.swbt_command == "pair"
+    assert args.adapter == "usb:0"
+    assert args.controller_type == "pro-controller"
+    assert args.timeout == 5.0
 
 
 def test_cli_does_not_accept_notification_secret_args() -> None:

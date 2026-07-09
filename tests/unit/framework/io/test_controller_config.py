@@ -6,6 +6,7 @@ from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, Swbt
 from nyxpy.framework.core.io.controller_config import (
     ControllerBackend,
     SerialControllerConfig,
+    controller_config_from_overrides,
     controller_config_from_settings,
     parse_controller_backend,
 )
@@ -85,6 +86,35 @@ def test_swbt_controller_config_does_not_keep_controller_type_string() -> None:
     assert config.model.controller_type is SwbtControllerType.PRO_CONTROLLER
     assert config.adapter == "usb:0"
     assert config.key_store_path == Path(".nyxpy/swbt/pro.json")
+
+
+def test_controller_config_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
+    settings = {
+        "controller": {
+            "backend": "serial",
+            "swbt": {
+                "controller_type": "joy-con-r",
+                "adapter": "settings-adapter",
+            },
+        }
+    }
+
+    config = controller_config_from_overrides(
+        settings,
+        workspace_root=tmp_path,
+        backend="swbt",
+        swbt_controller_type="pro-controller",
+        swbt_adapter="usb:0",
+        swbt_connect_timeout_sec=5.0,
+    )
+
+    assert isinstance(config, SwbtControllerConfig)
+    assert config.model.controller_type is SwbtControllerType.PRO_CONTROLLER
+    assert config.adapter == "usb:0"
+    assert config.connect_timeout_sec == 5.0
+    assert settings["controller"]["backend"] == "serial"
+    assert settings["controller"]["swbt"]["controller_type"] == "joy-con-r"
+    assert settings["controller"]["swbt"]["adapter"] == "settings-adapter"
 
 
 def test_controller_config_rejects_invalid_backend_and_non_positive_values() -> None:

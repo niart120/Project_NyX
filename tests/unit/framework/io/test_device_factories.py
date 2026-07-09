@@ -12,8 +12,8 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.window_capture import WindowCaptureBackend, WindowCaptureSession
 from nyxpy.framework.core.io.device_factories import (
-    ControllerOutputPortFactory,
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
@@ -124,7 +124,7 @@ class Backend(WindowCaptureBackend):
 
 def test_controller_factory_reuses_named_device_and_closes_once() -> None:
     SerialDevice.instances.clear()
-    factory = ControllerOutputPortFactory(
+    factory = SerialControllerOutputPortFactory(
         discovery=Discovery(),
         protocol=Protocol(),
         serial_factory=SerialDevice,
@@ -301,7 +301,7 @@ def test_frame_source_factory_falls_back_to_dummy_when_window_not_selected() -> 
 
 def test_controller_factory_uses_serial_identifier() -> None:
     SerialDevice.instances.clear()
-    factory = ControllerOutputPortFactory(
+    factory = SerialControllerOutputPortFactory(
         discovery=Discovery(),
         protocol=Protocol(),
         serial_factory=SerialDevice,
@@ -314,7 +314,7 @@ def test_controller_factory_uses_serial_identifier() -> None:
 
 @pytest.mark.parametrize("name", [None, DUMMY_DEVICE_NAME])
 def test_controller_factory_rejects_dummy_without_explicit_permission(name) -> None:
-    factory = ControllerOutputPortFactory(
+    factory = SerialControllerOutputPortFactory(
         discovery=Discovery(),
         protocol=Protocol(),
         serial_factory=SerialDevice,
@@ -329,7 +329,7 @@ def test_controller_factory_falls_back_to_dummy_when_open_fails_and_dummy_allowe
         def open(self, baudrate: int) -> None:
             raise OSError("port unavailable")
 
-    factory = ControllerOutputPortFactory(
+    factory = SerialControllerOutputPortFactory(
         discovery=Discovery(),
         protocol=Protocol(),
         serial_factory=FailingSerialDevice,
