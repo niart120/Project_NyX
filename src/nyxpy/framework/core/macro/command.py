@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import cv2
 
-from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.constants import IMUFrame, KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.io.resources import ArtifactScope, OverwritePolicy, ResourceRef
 from nyxpy.framework.core.macro.decorators import check_interrupt
 from nyxpy.framework.core.macro.text_input import validate_keyboard_text
@@ -367,6 +367,10 @@ class Command(ABC):
         """対応プロトコルでスリープ制御を切り替えます。"""
         raise NotImplementedError("Current serial protocol does not support sleep control.")
 
+    def imu(self, *frames: IMUFrame) -> None:
+        """IMU 入力を現在状態へ反映します。対応しない backend は失敗します。"""
+        raise NotImplementedError("Current controller output does not support IMU input.")
+
 
 class DefaultCommand(Command):
     """DefaultCommand は、フレームワーク側で提供するコマンド実装です。
@@ -425,6 +429,11 @@ class DefaultCommand(Command):
     def disable_sleep(self, enabled: bool = True) -> None:
         self._debug_command(f"Disable sleep: {enabled}")
         self.context.controller.disable_sleep(enabled)
+
+    @check_interrupt
+    def imu(self, *frames: IMUFrame) -> None:
+        self._debug_command(f"Sending IMU frames: {frames}")
+        self.context.controller.imu(*frames)
 
     @check_interrupt
     def wait(self, wait: float) -> None:

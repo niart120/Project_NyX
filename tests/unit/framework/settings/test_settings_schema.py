@@ -17,7 +17,11 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
 
     snapshot = store.snapshot()
 
-    assert snapshot["serial_baud"] == 9600
+    assert snapshot["controller"]["backend"] == "serial"
+    assert snapshot["controller"]["serial"]["baudrate"] == 9600
+    assert snapshot["controller"]["serial"]["protocol"] == "CH552"
+    assert snapshot["controller"]["swbt"]["controller_type"] == "pro-controller"
+    assert snapshot["controller"]["swbt"]["adapter"] is None
     assert snapshot["capture_source_type"] == "camera"
     assert snapshot["capture_provider"] == "ponkan"
     assert snapshot["capture_device_profile"] == "n3dsxl"
@@ -35,7 +39,7 @@ def test_settings_store_applies_defaults_and_returns_immutable_snapshot(tmp_path
     assert snapshot["gui"]["preview_touch_enabled"] is False
     assert isinstance(snapshot, MappingProxyType)
     with pytest.raises(TypeError):
-        snapshot["serial_baud"] = 115200
+        snapshot["controller"] = {}
     with pytest.raises(TypeError):
         snapshot["runtime"]["allow_dummy"] = True
 
@@ -65,14 +69,17 @@ def test_settings_store_get_set_supports_dotted_keys(tmp_path) -> None:
     store = SettingsStore(config_dir=tmp_path)
 
     store.set("runtime.allow_dummy", True)
-    store.set("serial_baud", 115200)
+    store.set("controller.serial.baudrate", 115200)
 
     assert store.get("runtime.allow_dummy") is True
-    assert store.get("serial_baud") == 115200
+    assert store.get("controller.serial.baudrate") == 115200
 
 
 def test_settings_store_rejects_invalid_schema_type(tmp_path) -> None:
-    (tmp_path / "global.toml").write_text('serial_baud = "fast"\n', encoding="utf-8")
+    (tmp_path / "global.toml").write_text(
+        '[controller.serial]\nbaudrate = "fast"\n',
+        encoding="utf-8",
+    )
 
     with pytest.raises(ConfigurationError) as exc_info:
         SettingsStore(config_dir=tmp_path)

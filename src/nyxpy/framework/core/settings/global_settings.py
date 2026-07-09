@@ -82,9 +82,41 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             True,
         ),
         "preview_fps": SettingField("preview_fps", int, 60),
-        "serial_device": SettingField("serial_device", str, ""),
-        "serial_baud": SettingField("serial_baud", int, 9600),
-        "serial_protocol": SettingField("serial_protocol", str, "CH552"),
+        "controller.backend": SettingField(
+            "controller.backend",
+            str,
+            "serial",
+            choices=("serial", "swbt"),
+        ),
+        "controller.serial.device": SettingField("controller.serial.device", str, ""),
+        "controller.serial.protocol": SettingField("controller.serial.protocol", str, "CH552"),
+        "controller.serial.baudrate": SettingField("controller.serial.baudrate", int, 9600),
+        "controller.swbt.controller_type": SettingField(
+            "controller.swbt.controller_type",
+            str,
+            "pro-controller",
+            choices=("pro-controller", "joy-con-l", "joy-con-r"),
+        ),
+        "controller.swbt.adapter": SettingField(
+            "controller.swbt.adapter",
+            (str, type(None)),
+            None,
+        ),
+        "controller.swbt.key_store_path": SettingField(
+            "controller.swbt.key_store_path",
+            (str, type(None)),
+            None,
+        ),
+        "controller.swbt.connect_timeout_sec": SettingField(
+            "controller.swbt.connect_timeout_sec",
+            float,
+            30.0,
+        ),
+        "controller.swbt.report_period_us": SettingField(
+            "controller.swbt.report_period_us",
+            (int, type(None)),
+            8000,
+        ),
         "runtime.allow_dummy": SettingField("runtime.allow_dummy", bool, False),
         "runtime.frame_ready_timeout_sec": SettingField(
             "runtime.frame_ready_timeout_sec", float, 3.0

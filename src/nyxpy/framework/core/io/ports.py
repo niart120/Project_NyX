@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import cv2
 
-from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.constants import IMUFrame, KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.macro.exceptions import DeviceError
 
 
@@ -57,6 +57,10 @@ class ControllerOutputPort(ABC):
     def supports_touch(self) -> bool:
         return False
 
+    @property
+    def supports_imu(self) -> bool:
+        return False
+
     def touch_down(self, x: int, y: int) -> None:
         raise NotImplementedError("Current controller output does not support touch input.")
 
@@ -65,6 +69,9 @@ class ControllerOutputPort(ABC):
 
     def disable_sleep(self, enabled: bool = True) -> None:
         raise NotImplementedError("Current controller output does not support sleep control.")
+
+    def imu(self, *frames: IMUFrame) -> None:
+        raise NotImplementedError("Current controller output does not support IMU input.")
 
 
 class FrameSourcePort(ABC):

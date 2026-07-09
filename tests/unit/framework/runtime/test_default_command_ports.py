@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from nyxpy.framework.core.constants import Button, KeyCode
+from nyxpy.framework.core.constants import Button, IMUFrame, KeyCode
 from nyxpy.framework.core.io.ports import FrameNotReadyError
 from nyxpy.framework.core.io.resources import (
     ArtifactScope,
@@ -42,6 +42,20 @@ def test_default_command_press_delegates_to_controller_port(tmp_path) -> None:
     cmd.press(Button.A, dur=0, wait=0)
 
     assert controller.events == [("press", (Button.A,)), ("release", (Button.A,))]
+
+
+def test_default_command_imu_delegates_to_controller(tmp_path) -> None:
+    class ImuController(FakeControllerOutputPort):
+        def imu(self, *frames: IMUFrame) -> None:
+            self.events.append(("imu", frames))
+
+    controller = ImuController()
+    cmd = DefaultCommand(context=make_fake_execution_context(tmp_path, controller=controller))
+    frame = IMUFrame.gyro(x=100)
+
+    cmd.imu(frame)
+
+    assert controller.events == [("imu", (frame,))]
 
 
 def test_default_command_suppresses_builtin_debug_logs_by_default(tmp_path) -> None:

@@ -4,6 +4,7 @@
 """
 
 from .controller import Button, Hat, ThreeDSButton, TouchState
+from .imu import IMUFrame, Vector3
 from .keyboard import KeyboardOp, KeyCode, SpecialKeyCode
 from .screen import (
     THREEDS_BOTTOM_PILLARBOXED_AREA,
@@ -58,6 +59,8 @@ __all__ = [
     "Hat",
     "ThreeDSButton",
     "TouchState",
+    "IMUFrame",
+    "Vector3",
     "LStick",
     "RStick",
     "KeyboardOp",
