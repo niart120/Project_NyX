@@ -1,86 +1,145 @@
-# swbt-python 連携設計
+# swbt 連携
 
-この文書群は、Project_NyX に `swbt-python` を組み込み、Bluetooth HID 経由の NX 互換コントローラー入力を NyXPy の既存マクロ API から使えるようにするための設計です。
+この文書群は、Project_NyX から `swbt-python` を controller backend として利用するための設計方針を定義する。
 
-設計の中心は、`swbt-python` を `SerialProtocolInterface` に入れないことです。`swbt-python` はシリアル送信用 bytes を作る部品ではなく、Bluetooth HID デバイスとしての接続、pairing、reconnect、入力状態、周期 report loop を持つ部品です。NyXPy 側では `ControllerOutputPort` の具象実装として扱います。
+`swbt-python` は NX 互換の仮想 Bluetooth HID controller を Python から扱うための library である。Project_NyX では、Bluetooth adapter の列挙、pairing、保存済み pairing key に基づく reconnect、入力 report の送信を controller backend の実装として扱う。マクロ作者から見える通常 API は `Command`、GUI の仮想コントローラーから見える境界は既存の `ControllerOutputPort` に止める。
 
-## 目的
+## 最小構成
 
-既存マクロを変更せず、次のような `Command` API をそのまま使える状態にします。
+```toml
+[controller]
+backend = "swbt"
 
-```python
-cmd.press(Button.A, dur=0.06, wait=0.08)
-cmd.hold(Button.ZL)
-cmd.release()
-frame = cmd.capture()
+[controller.swbt]
+controller_type = "pro-controller"
+adapter = "usb:0"
+key_store_path = ".nyxpy/swbt/pro-controller-bond.json"
+connect_timeout_sec = 30.0
+operation_timeout_sec = 5.0
+report_period_us = 8000
+reset_on_port_create = true
 ```
 
-利用者は設定または CLI / GUI で controller backend を `serial` または `swbt` から選びます。マクロ、`DefaultCommand`、`ExecutionContext`、`MacroRuntime` は `ControllerOutputPort` だけへ依存します。
+`controller_type` は settings / CLI / GUI の境界でだけ文字列として扱う。runtime 内部では `SwbtControllerType` と `SwbtControllerModel` に正規化し、`Literal[...]` や raw string key による controller class dispatch を残さない。
 
-## 設計判断
+## 入力反映の基本方針
 
-| 判断 | 採用方針 |
+swbt backend は、GUI 仮想コントローラー専用の入力 session を追加しない。
+
+現行の GUI はすでに次の経路で十分に抽象化されている。
+
+```text
+GUI widget
+  -> VirtualControllerPane
+  -> VirtualControllerModel
+  -> ControllerOutputPort
+```
+
+swbt 対応後もこの経路を維持する。
+
+```text
+GUI widget
+  -> VirtualControllerPane
+  -> VirtualControllerModel
+  -> ControllerOutputPort
+  -> SwbtControllerOutputPort
+  -> hardware.swbt.SwbtControllerSession
+  -> swbt-python controller
+```
+
+serial backend では次のままになる。
+
+```text
+GUI widget
+  -> VirtualControllerPane
+  -> VirtualControllerModel
+  -> ControllerOutputPort
+  -> SerialControllerOutputPort
+  -> SerialProtocolInterface
+  -> SerialComm
+```
+
+`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の async resource、connection、event loop、`InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。
+
+## GUI の範囲
+
+GUI の swbt 設定画面に置く機能は、実機運用に必要なものに絞る。
+
+| 機能 | 目的 |
 |---|---|
-| swbt の配置 | `ControllerOutputPort` の具象 adapter として追加する |
-| serial protocol への追加 | しない |
-| 実行時の振り分け port | 置かない |
-| backend 選択 | runtime builder を作る構成起点で一度だけ行う |
-| マクロ API | 変更しない |
-| swbt import | `hardware/swbt_*` と `io/swbt_adapter.py` 付近へ閉じ込める |
-| 依存追加 | `swbt` extra dependency として追加する |
-| CLI の `--serial` | serial backend 専用。swbt backend では不要 |
-| GUI / runtime の接続 | `SwbtControllerOutputPortFactory` が所有する service を共有する |
-| factory 改名 | 互換 alias は残さず、呼び出し元を `SerialControllerOutputPortFactory` へ更新する |
+| デバイス一覧取得 / 更新 | `list_adapters()` で利用可能な dedicated USB Bluetooth adapter 候補を表示する |
+| コントローラー種別指定 | Pro Controller / Joy-Con L / Joy-Con R を選ぶ |
+| ペアリング | 選択した adapter、controller type、key store path で pairing する |
+| pairing key に基づく reconnect | 保存済み key store を使って reconnect する |
+| 仮想コントローラー manual input | 既存 `VirtualControllerModel` から `ControllerOutputPort` へ button / D-pad / stick を送る |
 
-「実行時の振り分け port を置かない」とは、`press()` や `release()` のたびに backend を見て分岐する `ControllerOutputPort` を作らない、という意味です。具象 port の選択は起動時に済ませ、実行中は `ControllerOutputPort` の抽象で隠蔽します。
+GUI と CLI の間で値を受け渡すための clipboard 機能、CLI command 生成、CLI 実行履歴との連携、diagnostics folder を開く導線、controller color editor は持たせない。
 
-CLI では `--controller` を先に解決します。serial backend の場合だけ serial protocol と baudrate を解決し、swbt backend では Bluetooth HID 用の設定から factory を作ります。
+manual input は GUI の仮想コントローラー操作として扱う。マクロ生成や CLI 補助ではなく、接続確認、メニュー操作、実機状態の調整に使う直接入力である。IMU 操作 UI は含めない。
 
-GUI と runtime は swbt 接続を共有します。manual input とマクロ実行は同じ `SwbtGamepadService` を使いますが、同時操作は対象外です。マクロ実行開始時に neutral へ揃え、実行中は manual input を無効化します。
+## IMU 入力
 
-## 文書構成
+`Command` と `ControllerOutputPort` には IMU 入力命令を追加する。
 
-| 文書 | 読む場面 |
+```python
+cmd.imu(IMUFrame.gyro(x=100, y=0, z=0))
+cmd.imu(IMUFrame.neutral())
+```
+
+swbt backend は `swbt.IMUFrame` と `InputState.with_imu(...)` へ変換して送信する。IMU を扱わない backend は silent no-op にせず、既定実装で `NotImplementedError` を送出する。
+
+GUI manual input では IMU を直接操作しない。preset gesture、pose editor、raw frame editor、replay / recording は対象外とする。
+
+## 主要な設計判断
+
+| 項目 | 方針 |
 |---|---|
-| [architecture.md](architecture.md) | どの層に何を置くかを確認する |
-| [runtime-composition.md](runtime-composition.md) | factory 名、builder、manual input の扱いを決める |
-| [controller-port-contract.md](controller-port-contract.md) | `press` / `hold` / `release` の意味を実装する |
-| [swbt-service.md](swbt-service.md) | 非同期 `SwitchGamepad` を NyXPy の同期 API へ接続する |
-| [input-mapping.md](input-mapping.md) | button、hat、stick の変換を書く |
-| [configuration-cli-gui.md](configuration-cli-gui.md) | 設定ファイル、CLI、GUI を追加する |
-| [testing-rollout.md](testing-rollout.md) | テストと段階導入を進める |
+| package | `nyxpy.framework.core.hardware.swbt` に swbt 固有実装を集約する |
+| module 名 | package で namespace を切るため `swbt_*.py` にはしない |
+| controller type | `SwbtControllerType` / `SwbtControllerModel` で扱い、文字列は設定境界で解決する |
+| adapter refresh | Python API の `list_adapters()` を直接呼ぶ |
+| pairing | 明示操作として扱い、通常の macro run では勝手に pairing しない |
+| reconnect | key store に保存済み pairing 情報があることを前提にする |
+| input | NyX state から `InputState` を構成し、`apply(state)` を使う |
+| manual input | 既存 `VirtualControllerModel` と `ControllerOutputPort` 経路を使う |
+| unsupported input | silent no-op にせず明示的に失敗させる |
+
+## 文書一覧
+
+| 文書 | 内容 |
+|---|---|
+| [architecture.md](architecture.md) | package 配置、依存方向、import policy |
+| [abstraction-audit.md](abstraction-audit.md) | 余計な抽象レイヤーを入れていないかの自己検証 |
+| [public-api.md](public-api.md) | Project_NyX が使う `swbt-python` 公開 API |
+| [controller-models.md](controller-models.md) | controller type の domain model と registry |
+| [adapter-discovery.md](adapter-discovery.md) | `list_adapters()` と `AdapterInfo` の扱い |
+| [runtime-composition.md](runtime-composition.md) | runtime builder、factory、GUI lifetime controller |
+| [controller-session.md](controller-session.md) | `SwbtControllerSession` の責務と connection lifecycle |
+| [manual-input.md](manual-input.md) | GUI 仮想コントローラー manual input |
+| [imu-command.md](imu-command.md) | `Command.imu(...)` と backend 対応方針 |
+| [controller-port-contract.md](controller-port-contract.md) | `ControllerOutputPort` と swbt input API の対応 |
+| [input-mapping.md](input-mapping.md) | Button / Hat / Stick / IMU の mapping と controller type 制約 |
+| [configuration-cli-gui.md](configuration-cli-gui.md) | settings、CLI、GUI の仕様 |
+| [testing.md](testing.md) | unit / session / CLI / GUI / 実機 test |
+| [testing-rollout.md](testing-rollout.md) | 導入順序、完了条件、リスク |
 
 ## 対象範囲
 
-この設計で扱うもの:
+対象に含めるもの:
 
-- `swbt-python` を NyXPy の controller output backend として使うこと
-- serial backend と swbt backend の切り替え
-- 既存 `Command` API の互換性維持
-- 初回 pairing と reconnect の設定
-- adapter probe、diagnostics trace、実機テスト方針
+- swbt backend の controller 出力
+- dedicated USB Bluetooth adapter の列挙
+- Pro Controller / Joy-Con L / Joy-Con R の選択
+- pairing と key store への保存
+- 保存済み pairing key に基づく reconnect
+- `ControllerOutputPort` からの button / D-pad / stick / IMU 入力
+- GUI 仮想コントローラーによる manual input
 
-この設計では扱わないもの:
+対象に含めないもの:
 
-- `swbt-python` の Bluetooth HID protocol 実装そのものの変更
-- NyXPy マクロ API への新規高水準 action API 追加
-- motion / IMU 入力を NyXPy の公開 API として設計すること
-- 3DS touch / sleep control を swbt backend で代替すること
-
-## 用語
-
-| 用語 | 意味 |
-|---|---|
-| controller backend | NyXPy の controller 出力実装。`serial` または `swbt` |
-| port | runtime が依存する抽象インターフェース |
-| adapter | port を満たす具象実装 |
-| service | 外部ライブラリや実デバイスの lifecycle を隠す部品 |
-| 構成起点 | 設定を読み、具象 factory を選び、runtime builder へ注入する場所 |
-
-## 参照元
-
-- Project_NyX `ControllerOutputPort`: https://github.com/niart120/Project_NyX/blob/master/src/nyxpy/framework/core/io/ports.py
-- Project_NyX `MacroRuntimeBuilder`: https://github.com/niart120/Project_NyX/blob/master/src/nyxpy/framework/core/runtime/builder.py
-- Project_NyX `SerialProtocolInterface`: https://github.com/niart120/Project_NyX/blob/master/src/nyxpy/framework/core/hardware/protocol.py
-- swbt-python public API: https://niart120.github.io/swbt-python/api/
-- swbt-python usage guide: https://niart120.github.io/swbt-python/usage/
+- 3DS touch、keyboard、sleep control を swbt backend で代替すること
+- 左右 Joy-Con を 1 つの controller として扱うこと
+- GUI から CLI 用の値を生成・コピーすること
+- GUI で swbt diagnostics や controller colors を編集すること
+- GUI manual input から IMU gesture / pose / raw frame を送ること
+- PC の通常 Bluetooth stack をそのまま使うこと
