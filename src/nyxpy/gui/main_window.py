@@ -173,6 +173,7 @@ class MainWindow(QMainWindow):
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
         self.connection_menu: QMenu | None = None
+        self.controller_backend_menu: QMenu | None = None
         self.capture_input_menu: QMenu | None = None
         self.serial_device_menu: QMenu | None = None
         self.protocol_menu: QMenu | None = None
@@ -189,6 +190,7 @@ class MainWindow(QMainWindow):
         self.capture_profile_action_group: QActionGroup | None = None
         self.ponkan_backend_action_group: QActionGroup | None = None
         self.capture_fps_action_group: QActionGroup | None = None
+        self.controller_backend_action_group: QActionGroup | None = None
         self.serial_device_action_group: QActionGroup | None = None
         self.serial_baud_action_group: QActionGroup | None = None
         self.protocol_action_group: QActionGroup | None = None
@@ -216,6 +218,7 @@ class MainWindow(QMainWindow):
     def _build_menu_bar(self) -> None:
         self.connection_menu = self.menuBar().addMenu("接続")
         self.capture_input_menu = self.connection_menu.addMenu("キャプチャ入力")
+        self.controller_backend_menu = self.connection_menu.addMenu("コントローラー")
         self.serial_device_menu = self.connection_menu.addMenu("シリアルデバイス")
         self.protocol_menu = self.connection_menu.addMenu("プロトコル")
         self.connection_menu.aboutToShow.connect(
@@ -252,16 +255,59 @@ class MainWindow(QMainWindow):
                 snapshot.capture_devices,
                 windows,
             )
+        if self.controller_backend_menu is not None:
+            self._populate_controller_backend_menu(self.controller_backend_menu)
         if self.serial_device_menu is not None:
             self._populate_serial_device_menu(self.serial_device_menu, snapshot.serial_devices)
         if self.protocol_menu is not None:
             self._populate_protocol_menu(self.protocol_menu)
+        is_serial = self.global_settings.get("controller.backend", "serial") == "serial"
+        if self.serial_device_menu is not None:
+            self.serial_device_menu.setEnabled(is_serial)
+        if self.protocol_menu is not None:
+            self.protocol_menu.setEnabled(is_serial)
 
     def _ponkan_capture_available(self) -> bool:
         value = getattr(self.services, "ponkan_capture_available", False)
         if callable(value):
             return bool(value())
         return bool(value)
+
+    def _populate_controller_backend_menu(self, menu: QMenu) -> None:
+        menu.clear()
+        self.controller_backend_action_group = QActionGroup(self)
+        self.controller_backend_action_group.setExclusive(True)
+        current = str(self.global_settings.get("controller.backend", "serial") or "serial")
+        for label, backend in (("Serial", "serial"), ("swbt", "swbt")):
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setData(backend)
+            action.setChecked(current == backend)
+            action.triggered.connect(
+                lambda _checked=False, value=backend: self._apply_connection_settings(
+                    {"controller.backend": value}
+                )
+            )
+            self.controller_backend_action_group.addAction(action)
+            menu.addAction(action)
+        menu.addSeparator()
+        lifecycle_enabled = current == "swbt" and not self._is_run_active()
+        pair_action = QAction("Pair", self)
+        reconnect_action = QAction("Reconnect", self)
+        disconnect_action = QAction("Disconnect", self)
+        pair_action.setEnabled(lifecycle_enabled)
+        reconnect_action.setEnabled(lifecycle_enabled)
+        disconnect_action.setEnabled(lifecycle_enabled)
+        pair_action.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
+        reconnect_action.triggered.connect(
+            lambda _checked=False: self._invoke_swbt_action("reconnect")
+        )
+        disconnect_action.triggered.connect(
+            lambda _checked=False: self._invoke_swbt_action("disconnect")
+        )
+        menu.addAction(pair_action)
+        menu.addAction(reconnect_action)
+        menu.addAction(disconnect_action)
 
     def _populate_capture_input_menu(
         self,
@@ -431,7 +477,7 @@ class MainWindow(QMainWindow):
         menu.clear()
         self.serial_device_action_group = QActionGroup(self)
         self.serial_device_action_group.setExclusive(True)
-        current = str(self.global_settings.get("serial_device", "") or "")
+        current = str(self.global_settings.get("controller.serial.device", "") or "")
         selection = select_serial_target(
             ConnectionRequest(kind="serial", requested=current, allow_dummy=True),
             DeviceDiscoveryResult(serial_devices=devices),
@@ -444,7 +490,10 @@ class MainWindow(QMainWindow):
         )
         dummy_action.triggered.connect(
             lambda _checked=False: self._apply_connection_settings(
-                {"serial_device": DUMMY_DEVICE_NAME}
+                {
+                    "controller.backend": "serial",
+                    "controller.serial.device": DUMMY_DEVICE_NAME,
+                }
             )
         )
         self.serial_device_action_group.addAction(dummy_action)
@@ -462,7 +511,10 @@ class MainWindow(QMainWindow):
             action.setChecked(selection.selected == device)
             action.triggered.connect(
                 lambda _checked=False, serial=identifier: self._apply_connection_settings(
-                    {"serial_device": serial}
+                    {
+                        "controller.backend": "serial",
+                        "controller.serial.device": serial,
+                    }
                 )
             )
             self.serial_device_action_group.addAction(action)
@@ -472,8 +524,10 @@ class MainWindow(QMainWindow):
         menu.addMenu(self.serial_baud_menu)
         self.serial_baud_action_group = QActionGroup(self)
         self.serial_baud_action_group.setExclusive(True)
-        current_baud = str(self.global_settings.get("serial_baud", 9600))
-        protocol_name = str(self.global_settings.get("serial_protocol", "CH552") or "CH552")
+        current_baud = str(self.global_settings.get("controller.serial.baudrate", 9600))
+        protocol_name = str(
+            self.global_settings.get("controller.serial.protocol", "CH552") or "CH552"
+        )
         baud_options = [str(value) for value in _supported_baudrates(protocol_name)]
         if current_baud not in baud_options:
             baud_options.append(current_baud)
@@ -484,7 +538,10 @@ class MainWindow(QMainWindow):
             action.setChecked(baud == current_baud)
             action.triggered.connect(
                 lambda _checked=False, value=int(baud): self._apply_connection_settings(
-                    {"serial_baud": value}
+                    {
+                        "controller.backend": "serial",
+                        "controller.serial.baudrate": value,
+                    }
                 )
             )
             self.serial_baud_action_group.addAction(action)
@@ -494,7 +551,7 @@ class MainWindow(QMainWindow):
         menu.clear()
         self.protocol_action_group = QActionGroup(self)
         self.protocol_action_group.setExclusive(True)
-        current = str(self.global_settings.get("serial_protocol", "CH552") or "CH552")
+        current = str(self.global_settings.get("controller.serial.protocol", "CH552") or "CH552")
         for protocol_name in ProtocolFactory.get_protocol_names():
             action = QAction(protocol_name, self)
             action.setCheckable(True)
@@ -502,7 +559,10 @@ class MainWindow(QMainWindow):
             action.setChecked(protocol_name == current)
             action.triggered.connect(
                 lambda _checked=False, name=protocol_name: self._apply_connection_settings(
-                    _protocol_setting_updates(name, self.global_settings.get("serial_baud", 9600))
+                    _protocol_setting_updates(
+                        name,
+                        self.global_settings.get("controller.serial.baudrate", 9600),
+                    )
                 )
             )
             self.protocol_action_group.addAction(action)
@@ -514,6 +574,83 @@ class MainWindow(QMainWindow):
                 self.global_settings.set(key, value)
         self.apply_app_settings()
         self._refresh_connection_menu()
+
+    def _invoke_swbt_action(self, action: str) -> None:
+        try:
+            if action == "pair":
+                self._pair_swbt_controller()
+            elif action == "reconnect":
+                self._reconnect_swbt_controller()
+            elif action == "disconnect":
+                self._disconnect_swbt_controller()
+        except Exception:
+            return
+
+    def _pair_swbt_controller(self) -> object:
+        return self._connect_swbt_manual_controller(self.services.pair_swbt)
+
+    def _reconnect_swbt_controller(self) -> object:
+        return self._connect_swbt_manual_controller(self.services.reconnect_swbt)
+
+    def _disconnect_swbt_controller(self) -> None:
+        if self._is_run_active():
+            raise RuntimeError("macro is running")
+        if not self._release_manual_controller(
+            event="swbt.manual_controller_release_failed",
+            message="GUI manual controller release failed before swbt disconnect.",
+            user_message="エラー: swbt 切断前に手動入力用コントローラーを解放できません",
+        ):
+            raise RuntimeError("manual controller release failed")
+        try:
+            self.services.disconnect_swbt()
+        except Exception as exc:
+            self.manual_controller_error = exc
+            self.logger.technical(
+                "ERROR",
+                "swbt disconnect failed.",
+                component="MainWindow",
+                event="swbt.disconnect_failed",
+                exc=exc,
+            )
+            self.status_label.setText("エラー: swbt を切断できません")
+            self._update_connection_status()
+            raise
+        self.manual_controller_error = None
+        self.virtual_controller.model.set_controller(None)
+        self.virtual_controller.set_manual_input_enabled(True)
+        self._update_connection_status()
+
+    def _connect_swbt_manual_controller(self, lifecycle_action) -> object:
+        if self._is_run_active():
+            raise RuntimeError("macro is running")
+        if not self._release_manual_controller(
+            event="swbt.manual_controller_release_failed",
+            message="GUI manual controller release failed before swbt connect.",
+            user_message="エラー: swbt 接続前に手動入力用コントローラーを解放できません",
+        ):
+            raise RuntimeError("manual controller release failed")
+        try:
+            status = lifecycle_action()
+            builder = self.services.create_runtime_builder()
+            manual_controller = builder.controller_output_for_manual_input()
+        except Exception as exc:
+            self.manual_controller_error = exc
+            self.virtual_controller.model.set_controller(None)
+            self.logger.technical(
+                "ERROR",
+                "swbt lifecycle operation failed.",
+                component="MainWindow",
+                event="swbt.lifecycle_failed",
+                exc=exc,
+            )
+            self.status_label.setText("エラー: swbt 接続操作に失敗しました")
+            self._update_connection_status()
+            raise
+        self.manual_controller_error = None
+        self.virtual_controller.model.set_controller(manual_controller)
+        self.virtual_controller.set_manual_input_enabled(True)
+        self._update_connection_status()
+        return status
 
     def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
         preset_key = normalize_window_size_preset_key(key)
@@ -701,20 +838,40 @@ class MainWindow(QMainWindow):
         else:
             assert capture_selection is not None
             capture_status = _format_connection_status("映像", capture_selection)
-        serial_selection = select_serial_target(
-            ConnectionRequest(
-                kind="serial",
-                requested=str(self.global_settings.get("serial_device", "") or ""),
-                allow_dummy=True,
-            ),
-            discovery_snapshot,
-        )
-        if self.manual_controller_error is not None:
-            serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
+        controller_backend = str(self.global_settings.get("controller.backend", "serial"))
+        if controller_backend == "swbt":
+            if self.manual_controller_error is not None:
+                serial_status = f"swbt: 接続失敗 ({self.manual_controller_error})"
+            else:
+                serial_status = self._format_swbt_connection_status()
         else:
-            serial_status = _format_connection_status("シリアル", serial_selection)
+            serial_selection = select_serial_target(
+                ConnectionRequest(
+                    kind="serial",
+                    requested=str(self.global_settings.get("controller.serial.device", "") or ""),
+                    allow_dummy=True,
+                ),
+                discovery_snapshot,
+            )
+            if self.manual_controller_error is not None:
+                serial_status = f"シリアル: 接続失敗 ({self.manual_controller_error})"
+            else:
+                serial_status = _format_connection_status("シリアル", serial_selection)
         self.capture_status_label.setText(capture_status)
         self.serial_status_label.setText(serial_status)
+
+    def _format_swbt_connection_status(self) -> str:
+        try:
+            status = self.services.swbt_status()
+        except Exception as exc:
+            return f"swbt: 状態取得失敗 ({exc})"
+        if status is None:
+            return "swbt: 未接続"
+        message = status.message or ("connected" if status.connected else "disconnected")
+        suffix = f" ({status.adapter})" if status.adapter else ""
+        if status.connected:
+            return f"swbt: {status.controller_type} 接続中{suffix}"
+        return f"swbt: {message}{suffix}"
 
     def _serial_display_name(self, identifier: object) -> str:
         text = str(identifier or "")
@@ -784,6 +941,12 @@ class MainWindow(QMainWindow):
             self.secrets_settings,
             device_discovery=self.device_discovery,
             ponkan_capture_available=self._ponkan_capture_available(),
+            swbt_adapter_provider=self.services.refresh_swbt_adapters,
+            swbt_pair=self._pair_swbt_controller,
+            swbt_reconnect=self._reconnect_swbt_controller,
+            swbt_disconnect=self._disconnect_swbt_controller,
+            swbt_status=self.services.swbt_status,
+            swbt_actions_enabled=not self._is_run_active(),
         )
         dlg.settings_applied.connect(self.apply_app_settings)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -863,6 +1026,15 @@ class MainWindow(QMainWindow):
         if macro_id is None:
             self.status_label.setText("マクロが選択されていません")
             return
+        self.virtual_controller.set_manual_input_enabled(False)
+        if not self._release_manual_controller(
+            event="runtime.manual_controller_release_failed",
+            message="GUI manual controller release failed before macro start.",
+            user_message="エラー: 手動入力用コントローラーを解放できません",
+        ):
+            self.virtual_controller.set_manual_input_enabled(True)
+            self.control_pane.set_run_state(RunUiState.FINISHED)
+            return
         try:
             builder = self.services.create_runtime_builder()
             self.run_handle = builder.start(
@@ -879,6 +1051,7 @@ class MainWindow(QMainWindow):
             )
             self.status_label.setText("エラー: マクロを開始できません")
             self.control_pane.set_run_state(RunUiState.FINISHED)
+            self.virtual_controller.set_manual_input_enabled(True)
             return
         self.control_pane.set_run_state(RunUiState.RUNNING)
         self.status_label.setText("実行中")
@@ -893,16 +1066,28 @@ class MainWindow(QMainWindow):
         self.preview_connection_error = outcome.preview_error
         self.manual_controller_error = outcome.manual_controller_error
         try:
-            if outcome.frame_source_changed or outcome.preview_error is not None:
-                self.preview_pane.pause()
-            self.preview_pane.set_frame_source(
-                None if outcome.preview_error is not None else outcome.preview_frame_source
-            )
-            if outcome.frame_source_changed and outcome.preview_error is None:
-                self.preview_pane.resume()
-            self.virtual_controller.model.set_controller(
-                None if outcome.manual_controller_error is not None else outcome.manual_controller
-            )
+            if (
+                outcome.frame_source_changed
+                or outcome.preview_error is not None
+                or outcome.preview_frame_source is not None
+            ):
+                if outcome.frame_source_changed or outcome.preview_error is not None:
+                    self.preview_pane.pause()
+                self.preview_pane.set_frame_source(
+                    None if outcome.preview_error is not None else outcome.preview_frame_source
+                )
+                if outcome.frame_source_changed and outcome.preview_error is None:
+                    self.preview_pane.resume()
+            if (
+                outcome.manual_controller_error is not None
+                or outcome.manual_controller is not None
+                or _controller_settings_changed(outcome.changed_keys)
+            ):
+                self.virtual_controller.model.set_controller(
+                    None
+                    if outcome.manual_controller_error is not None
+                    else outcome.manual_controller
+                )
         except Exception as exc:
             self.logger.technical(
                 "ERROR",
@@ -911,6 +1096,34 @@ class MainWindow(QMainWindow):
                 event="configuration.invalid",
                 exc=exc,
             )
+
+    def _release_manual_controller(
+        self,
+        *,
+        event: str,
+        message: str,
+        user_message: str,
+    ) -> bool:
+        previous = self.virtual_controller.model.controller
+        self.virtual_controller.model.set_controller(None)
+        if previous is None:
+            return True
+        try:
+            previous.release()
+            previous.close()
+        except Exception as exc:
+            self.manual_controller_error = exc
+            self.logger.technical(
+                "ERROR",
+                message,
+                component="MainWindow",
+                event=event,
+                exc=exc,
+            )
+            self.status_label.setText(user_message)
+            self._update_connection_status()
+            return False
+        return True
 
     def cancel_macro(self):
         if self.run_handle is not None and not self.run_handle.done():
@@ -976,6 +1189,7 @@ class MainWindow(QMainWindow):
     def on_finished(self, status: str):
         self.status_label.setText(status)
         self.control_pane.set_run_state(RunUiState.FINISHED)
+        self.virtual_controller.set_manual_input_enabled(True)
 
         if status.startswith("エラー"):
             dlg = QMessageBox(self)
@@ -1128,6 +1342,15 @@ def _same_number_or_none(left: object, right: object) -> bool:
         return False
 
 
+def _controller_settings_changed(changed_keys: frozenset[str]) -> bool:
+    return any(
+        key == "controller.backend"
+        or key.startswith("controller.serial.")
+        or key.startswith("controller.swbt.")
+        for key in changed_keys
+    )
+
+
 def _supported_baudrates(protocol_name: str) -> tuple[int, ...]:
     try:
         return ProtocolFactory.get_descriptor(protocol_name).supported_baudrates
@@ -1137,11 +1360,14 @@ def _supported_baudrates(protocol_name: str) -> tuple[int, ...]:
 
 def _protocol_setting_updates(protocol_name: str, current_baud: object) -> dict[str, SettingValue]:
     descriptor = ProtocolFactory.get_descriptor(protocol_name)
-    updates: dict[str, SettingValue] = {"serial_protocol": descriptor.name}
+    updates: dict[str, SettingValue] = {
+        "controller.backend": "serial",
+        "controller.serial.protocol": descriptor.name,
+    }
     try:
         baudrate = int(str(current_baud))
     except (TypeError, ValueError):
         baudrate = descriptor.default_baudrate
     if baudrate not in descriptor.supported_baudrates:
-        updates["serial_baud"] = descriptor.default_baudrate
+        updates["controller.serial.baudrate"] = descriptor.default_baudrate
     return updates
