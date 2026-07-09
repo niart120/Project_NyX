@@ -1,196 +1,200 @@
 # レイヤードアーキテクチャ上の配置
 
-`swbt-python` 連携は、NyXPy の既存レイヤーに沿って配置します。マクロから見える抽象は `Command` と `ControllerOutputPort` で止め、Bluetooth HID の詳細は `hardware` 層へ閉じ込めます。
+swbt backend は、NyXPy の controller 出力を Bluetooth HID 経由で実現する backend である。マクロから見える抽象は `Command` と `ControllerOutputPort` に止め、`swbt-python` の非同期 API と Bluetooth lifecycle は `hardware.swbt` package に閉じ込める。
 
-## 既存レイヤー
-
-NyXPy の controller 出力に関係する既存の責務は次のように分かれています。
+## 全体構造
 
 ```text
 macro
   MacroBase / Command
-  マクロ作者が触る API
-
+        ↓
 runtime
   ExecutionContext / MacroRuntime / MacroRuntimeBuilder
-  実行単位の依存関係を組み立て、Command へ context を渡す
-
+        ↓
 io
-  ControllerOutputPort / FrameSourcePort / NotificationPort
-  runtime が依存する port と port adapter
-
-hardware
-  SerialProtocolInterface / SerialComm / capture device / discovery
-  実デバイス、外部ライブラリ、通信方式に近い処理
-
-cli / gui
-  ユーザー入力、設定編集、実行開始、manual input
+  ControllerOutputPort
+        ├─ SerialControllerOutputPort
+        └─ SwbtControllerOutputPort
+                ↓
+hardware.swbt
+  config.py       SwbtControllerType / SwbtControllerModel / SwbtControllerConfig
+  factory.py      SwbtControllerOutputPortFactory
+  controller.py   SwbtControllerOutputPort
+  session.py      SwbtControllerSession
+  discovery.py    SwbtAdapterDiscoveryService
+  mapper.py       NyxSwbtInputMapper / NyxSwbtState
+  errors.py       exception mapping
+        ↓
+swbt-python
+  ProController / JoyConL / JoyConR
+  list_adapters()
+  InputState / Button / Stick / IMUFrame
+        ↓
+Bumble USB Bluetooth HID transport
 ```
 
-`ControllerOutputPort` は、runtime が controller 入力を送るための port です。`SerialControllerOutputPort` は `SerialProtocolInterface` で bytes を作り、`SerialComm` へ送る adapter です。
+`manual.py` や `SwbtManualInputSession` は追加しない。GUI manual input の入力経路は既存の `VirtualControllerModel -> ControllerOutputPort` で足りている。
 
-## swbt 連携後の配置
+## 責務分担
 
-追加後は次の構造にします。
+| 層 | 責務 |
+|---|---|
+| `macro` | `Command` API を使う。swbt を import しない |
+| `runtime` | 実行 context を作り、controller port を注入する。swbt の詳細を知らない |
+| `io` | `ControllerOutputPort` の契約を定義する |
+| `hardware.swbt` | controller 種別解決、adapter discovery、pairing、reconnect、event loop、input mapping を扱う |
+| `gui` | adapter 更新、pair、reconnect、controller 種別指定、既存仮想コントローラーからの manual input を扱う |
+| `cli` | adapter 一覧、pair、reconnect、run option を公開する |
 
-```text
-macro.Command
-  ↓
-runtime.ExecutionContext.controller
-  ↓
-io.ports.ControllerOutputPort
-  ├─ io.adapters.SerialControllerOutputPort
-  └─ io.swbt_adapter.SwbtControllerOutputPort
-        ↓
-hardware.swbt_gamepad.SwbtGamepadService
-        ↓
-swbt.SwitchGamepad
-        ↓
-Bumble HID transport
-```
+## 推奨ファイル配置
 
-`SwbtControllerOutputPort` は NyXPy の port 契約を満たす adapter です。Bluetooth adapter の open、pairing、reconnect、async event loop、diagnostics trace は `SwbtGamepadService` が担当します。
-
-## 置くファイル
-
-推奨する追加・変更ファイルは次です。
+swbt 専用実装は 1 つの package にまとめる。`swbt_config.py`、`swbt_gamepad.py` のような接頭辞付き file は作らない。
 
 ```text
 src/nyxpy/framework/core/io/ports.py
-  ControllerOutputPort                    # 変更しない
+  ControllerOutputPort
 
-src/nyxpy/framework/core/io/adapters.py
-  SerialControllerOutputPort              # 既存。移動しない場合はそのまま
+src/nyxpy/framework/core/macro/command.py
+  Command / DefaultCommand
 
-src/nyxpy/framework/core/io/swbt_adapter.py
-  SwbtControllerOutputPort                # 新規
+src/nyxpy/framework/core/constants/
+  controller.py  Button / Hat / ThreeDSButton / TouchState
+  stick.py       LStick / RStick
+  imu.py         IMUFrame
 
-src/nyxpy/framework/core/hardware/swbt_gamepad.py
-  SwbtGamepadService                      # 新規
-  SwbtGamepadConfig                       # 新規
-  SwbtConnectionError                     # 新規
+src/nyxpy/framework/core/hardware/swbt/__init__.py
+  public re-export
 
-src/nyxpy/framework/core/hardware/swbt_mapper.py
-  NyxSwbtInputMapper                      # 新規
-  NyX KeyType → swbt InputState 変換
+src/nyxpy/framework/core/hardware/swbt/config.py
+  SwbtControllerType
+  SwbtControllerModel
+  SwbtInputCapabilities
+  SwbtControllerConfig
+  SwbtRuntimeOptions
+  supported_controller_models()
+  parse_controller_type(...)
+  resolve_controller_model(...)
 
-src/nyxpy/framework/core/io/device_factories.py
-  SerialControllerOutputPortFactory       # 既存 ControllerOutputPortFactory を改名
-  SwbtControllerOutputPortFactory         # 新規
+src/nyxpy/framework/core/hardware/swbt/discovery.py
+  SwbtAdapterDiscoveryService
+  SwbtAdapterView
+  resolve_adapter(...)
 
-src/nyxpy/framework/core/runtime/builder.py
-  make_controller_port_factory            # 新規関数、または create_device_runtime_builder 内の分岐
+src/nyxpy/framework/core/hardware/swbt/factory.py
+  SwbtControllerOutputPortFactory
 
-src/nyxpy/framework/core/settings/schema.py
-  controller.backend
-  controller.serial.*
-  controller.swbt.*
+src/nyxpy/framework/core/hardware/swbt/controller.py
+  SwbtControllerOutputPort
+
+src/nyxpy/framework/core/hardware/swbt/session.py
+  SwbtControllerSession
+  DummySwbtControllerSession
+
+src/nyxpy/framework/core/hardware/swbt/mapper.py
+  NyxSwbtState
+  NyxSwbtInputMapper
+
+src/nyxpy/framework/core/hardware/swbt/errors.py
+  SwbtIntegrationError
+  map_exception(...)
 ```
 
-`SerialControllerOutputPort` を `io/adapters.py` から分割するかどうかは別判断です。最小変更では既存位置のままにし、`SwbtControllerOutputPort` だけ `io/swbt_adapter.py` に置きます。
-
-`ControllerOutputPortFactory` の改名では互換 alias を残しません。呼び出し元、テスト、公開 export を同じ変更で `SerialControllerOutputPortFactory` へ更新します。
-
-## 依存方向
-
-守る依存方向は次です。
-
-```text
-cli / gui
-  ↓
-runtime builder
-  ↓
-io factory
-  ↓
-io adapter
-  ↓
-hardware service
-  ↓
-swbt-python
-```
-
-マクロ側は次で止めます。
-
-```text
-macro
-  ↓
-Command
-  ↓
-ControllerOutputPort
-```
-
-`macro`、`DefaultCommand`、`ExecutionContext`、`MacroRuntime` から `swbt` を import しません。
-
-## SerialProtocolInterface に入れない理由
-
-`SerialProtocolInterface` は controller 入力をシリアル送信用 bytes に変換するための protocol です。`swbt-python` は Bluetooth HID の resource lifecycle と input report loop を持つため、ここへ入れると抽象の意味が変わります。
-
-避ける実装:
-
-```python
-class SwbtSerialProtocol(SerialProtocolInterface):
-    ...
-```
-
-```python
-ProtocolFactory.create_protocol("SWBT")
-```
-
-採用する実装:
-
-```python
-class SwbtControllerOutputPort(ControllerOutputPort):
-    ...
-```
-
-```python
-def make_controller_port_factory(config: ControllerConfig) -> PortFactory[ControllerOutputPort]:
-    ...
-```
+`SwbtControllerSession` は、serial backend における `SerialComm` と `SerialProtocolInterface` の組み合わせに近い backend 内部部品である。GUI の専用 layer ではない。
 
 ## import policy
 
-`swbt-python` の公開 API は `swbt` module root から import します。`swbt.gamepad.*` や `swbt.transport.*` の deep import は、NyXPy 側ではテスト用 fake か transport 差し替えが必要な場合だけに限定します。
+`swbt-python` は optional dependency なので、swbt backend が無効な環境で top-level import error を起こさない。
 
-推奨:
+| 場所 | import 方針 |
+|---|---|
+| `hardware.swbt.*` | `swbt` を import してよい |
+| `io.ports` | `swbt` を import しない |
+| `macro.command` | `swbt` を import しない |
+| `runtime.builder` | `swbt` を直接 import しない。factory 注入に止める |
+| `gui` | `swbt` を直接 import しない。app service / factory 経由で扱う |
 
-```python
-from swbt import Button, DiagnosticsConfig, InputState, Stick, SwitchGamepad
+`swbt` が未導入の場合、backend 選択時または swbt CLI 実行時に `ConfigurationError(code="NYX_SWBT_DEPENDENCY_MISSING")` として扱う。
+
+## GUI manual input の配置
+
+GUI 仮想コントローラーは既存の `VirtualControllerModel` を使う。
+
+```text
+VirtualControllerPane
+  -> VirtualControllerModel
+  -> ControllerOutputPort
 ```
 
-避ける:
+backend 切り替えは `ControllerOutputPort` の下で行う。
 
-```python
-from swbt.gamepad.core import SwitchGamepad
-from swbt.transport._bumble_transport import ...
+```text
+VirtualControllerModel
+  -> ControllerOutputPort
+       ├─ SerialControllerOutputPort
+       └─ SwbtControllerOutputPort
 ```
 
-## レイヤー違反になりやすい実装
+このため、GUI 層に `SwbtManualInputSession`、`SwbtManualInputModel`、`SwbtVirtualControllerAdapter` のような中間 layer は作らない。
 
-次の実装は避けます。
+## lifecycle の分離
 
-```python
-# Command が外部ライブラリを知る
-from swbt import SwitchGamepad
+pairing / reconnect は入力反映ではなく、controller port を使用可能にするための lifecycle 操作である。
 
-class DefaultCommand:
-    ...
+```text
+adapter refresh / pair / reconnect
+  -> hardware.swbt factory/session lifecycle
+  -> GUI lifetime ControllerOutputPort が使用可能になる
+  -> VirtualControllerModel.set_controller(port)
 ```
 
-```python
-# ControllerOutputPort が backend 選択を毎回行う
-class DispatchingControllerOutputPort(ControllerOutputPort):
-    def press(self, keys):
-        if self.backend == "serial":
-            self.serial.press(keys)
-        else:
-            self.swbt.press(keys)
+button / D-pad / stick 入力は lifecycle 操作を経由しない。
+
+```text
+button / D-pad / stick
+  -> VirtualControllerModel
+  -> ControllerOutputPort.press/release
+  -> SwbtControllerOutputPort
 ```
 
-```python
-# GUI が直接 Bluetooth HID 接続を開始する
-pad = SwitchGamepad(adapter="usb:0", key_store_path="switch-bond.json")
-await pad.connect(timeout=30.0, allow_pairing=True)
+## IMU の配置
+
+IMU は GUI manual input ではなく、`Command` / `ControllerOutputPort` の command surface に追加する。swbt backend は実装し、非対応 backend は `NotImplementedError` を返す。
+
+```text
+Command.imu(...)
+  -> ControllerOutputPort.imu(...)
+       ├─ SwbtControllerOutputPort.imu(...)
+       └─ default unsupported
 ```
 
-GUI / CLI は設定値とユーザー操作を runtime builder へ渡します。接続手順は factory と hardware service に閉じ込めます。
+GUI には IMU preset、pose editor、raw editor を置かない。
+
+## 命名方針
+
+| 対象 | 方針 | 例 |
+|---|---|---|
+| package | `swbt` namespace を切る | `hardware/swbt/session.py` |
+| file | `swbt_` 接頭辞を付けない | `config.py`, `factory.py` |
+| public class | backend 判別のため `Swbt...` を残す | `SwbtControllerConfig`, `SwbtControllerSession` |
+| package-local helper | `swbt_` を重ねない | `map_exception`, `to_button` |
+
+## 依存方向
+
+```text
+macro -> io.ports
+runtime -> io.ports
+runtime -> injected factories
+gui -> app service -> runtime builder / hardware.swbt factory
+hardware.swbt -> io.ports
+hardware.swbt -> swbt-python
+```
+
+禁止する依存:
+
+```text
+gui -> swbt-python
+gui -> SwbtControllerOutputPort internals
+macro -> hardware.swbt
+io.ports -> swbt-python
+runtime.builder -> concrete swbt controller class
+```
