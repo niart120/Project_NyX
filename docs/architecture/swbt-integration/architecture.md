@@ -1,6 +1,6 @@
 # レイヤードアーキテクチャ上の配置
 
-swbt backend は、NyXPy の controller 出力を Bluetooth HID 経由で実現する backend である。マクロから見える抽象は `Command` と `ControllerOutputPort` に止め、`swbt-python` の非同期 API と Bluetooth lifecycle は `hardware.swbt` package に閉じ込める。
+swbt backend は、NyXPy の controller 出力を Bluetooth HID 経由で実現する backend である。マクロから見える抽象は `Command` と `ControllerOutputPort` に止め、`swbt-python` の公開 API と Bluetooth lifecycle は `hardware.swbt` package に閉じ込める。
 
 ## 全体構造
 
@@ -42,7 +42,7 @@ Bumble USB Bluetooth HID transport
 | `macro` | `Command` API を使う。swbt を import しない |
 | `runtime` | 実行 context を作り、controller port を注入する。swbt の詳細を知らない |
 | `io` | `ControllerOutputPort` の契約を定義する |
-| `hardware.swbt` | controller 種別解決、adapter discovery、pairing、reconnect、event loop、input mapping を扱う |
+| `hardware.swbt` | controller 種別解決、adapter discovery、pairing、reconnect、awaitable bridge、input mapping を扱う |
 | `gui` | adapter 更新、pair、reconnect、controller 種別指定、既存仮想コントローラーからの manual input を扱う |
 | `cli` | adapter 一覧、pair、reconnect、disconnect、run option を公開する |
 

@@ -21,9 +21,9 @@ uv run nyxpy gui
 ## 初回の流れ
 
 1. workspace で `nyxpy init` を実行する。
-2. キャプチャデバイスとシリアルデバイスを接続する。
+2. キャプチャデバイスと controller backend 用デバイスを接続する。`serial` ならシリアル通信デバイス、`swbt` なら専用 USB Bluetooth adapter を使う。
 3. `nyxpy gui` を起動する。
-4. `設定` でキャプチャデバイスとシリアルデバイスを選ぶ。
+4. `設定` でキャプチャデバイスと controller backend を選ぶ。
 5. `リロード` でマクロ一覧を更新する。
 6. 実行するマクロを選んで `実行` を押す。
 
@@ -44,6 +44,29 @@ uv run nyxpy gui
 | `設定` | デバイス、通知、ログ、表示設定を変更する |
 | マクロログ | マクロ実行中の利用者向けログを表示する |
 | ツールログ | デバイス接続や設定反映など、NyX 本体側のログを表示する |
+
+## controller backend の設定
+
+`設定` のデバイス設定で `Controller Backend` を選びます。
+
+| backend | 使うもの |
+|---------|----------|
+| `serial` | CH552 などのシリアル通信デバイス |
+| `swbt` | Bumble が直接開く専用 USB Bluetooth adapter |
+
+`swbt` を選んだ場合は、次の項目を設定します。
+
+| 項目 | 内容 |
+|------|------|
+| Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` |
+| Adapter | `リロード` で候補を取得し、使う adapter を選ぶ |
+| Key Store | pairing key の保存先 |
+| Pair | 初回 pairing を実行する |
+| Reconnect | 保存済み key store で再接続する |
+| Disconnect | GUI が管理する swbt session を閉じる |
+| Status | GUI が持つ swbt session の状態 |
+
+adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。`Pair` または `Reconnect` に成功すると、下部の仮想コントローラーから button / D-pad / stick を送れます。マクロ開始時は GUI の手動入力用 controller を解放し、マクロ用 controller に切り替えます。
 
 ## マクロの配置
 

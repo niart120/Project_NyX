@@ -67,16 +67,11 @@ from swbt import Stick as SwbtStick
 
 @dataclass
 class NyxSwbtState:
-    buttons: set[SwbtButton] = field(default_factory=set)
-    left_stick: SwbtStick = field(default_factory=SwbtStick.center)
-    right_stick: SwbtStick = field(default_factory=SwbtStick.center)
-    imu_frames: tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame] = field(
-        default_factory=lambda: (
-            SwbtIMUFrame.neutral(),
-            SwbtIMUFrame.neutral(),
-            SwbtIMUFrame.neutral(),
-        )
-    )
+    buttons: frozenset[Button] = field(default_factory=frozenset)
+    dpad_buttons: frozenset[object] = field(default_factory=frozenset)
+    left_stick: LStick | None = None
+    right_stick: RStick | None = None
+    imu_frames: tuple[IMUFrame, IMUFrame, IMUFrame] = field(default_factory=_neutral_imu_frames)
 ```
 
 完全状態の構築は mapper に集約する。
@@ -111,11 +106,12 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         self,
         *,
         session: SwbtControllerSession,
-        mapper: NyxSwbtInputMapper,
+        model: SwbtControllerModel,
+        mapper: NyxSwbtInputMapper | None = None,
     ) -> None:
         self._session = session
-        self._mapper = mapper
-        self._state = NyxSwbtState()
+        self._mapper = mapper or NyxSwbtInputMapper(model)
+        self._state = NyxSwbtState.neutral()
         self._lock = RLock()
         self._closed = False
         self._session.neutral()
@@ -123,37 +119,36 @@ class SwbtControllerOutputPort(ControllerOutputPort):
     def press(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
             self._ensure_open()
-            self._mapper.add_to_state(self._state, keys)
+            self._state = self._mapper.press(self._state, keys)
             self._apply_locked()
 
     def hold(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
             self._ensure_open()
-            self._state = NyxSwbtState()
-            self._mapper.add_to_state(self._state, keys)
+            self._state = self._mapper.hold(keys)
             self._apply_locked()
 
     def release(self, keys: tuple[KeyType, ...] = ()) -> None:
         with self._lock:
             self._ensure_open()
             if not keys:
-                self._state = NyxSwbtState()
+                self._state = NyxSwbtState.neutral()
                 self._session.neutral()
                 return
-            self._mapper.remove_from_state(self._state, keys)
+            self._state = self._mapper.release(self._state, keys)
             self._apply_locked()
 
     def imu(self, *frames: IMUFrame) -> None:
         with self._lock:
             self._ensure_open()
-            self._mapper.set_imu(self._state, frames)
+            self._state = self._mapper.set_imu(self._state, frames)
             self._apply_locked()
 
     def close(self) -> None:
         with self._lock:
             if self._closed:
                 return
-            self._state = NyxSwbtState()
+            self._state = NyxSwbtState.neutral()
             self._session.neutral()
             self._closed = True
 

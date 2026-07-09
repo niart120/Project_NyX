@@ -23,7 +23,9 @@ uv run nyxpy run sample_macro --serial <serial-device> --capture "Capture Device
 | workspace | `nyxpy init` 済みで `.nyxpy/` がある |
 | マクロ | `macros/<macro_id>/` に配置されている |
 | リソース | マクロが必要とする `resources/<macro_id>/` がある |
-| シリアルデバイス | OS 上のデバイス名を `--serial` に指定する |
+| controller backend | シリアル通信なら `serial`、専用 USB Bluetooth adapter なら `swbt` |
+| シリアルデバイス | `serial` backend では OS 上のデバイス名を `--serial` に指定する |
+| swbt adapter | `swbt` backend では `nyxpy swbt adapters` で候補を確認し、`--swbt-adapter` に指定する |
 | キャプチャデバイス | GUI または OS の表示名を `--capture` に指定する |
 
 ## 主なオプション
@@ -34,9 +36,47 @@ uv run nyxpy run sample_macro --serial <serial-device> --capture "Capture Device
 | `--capture`, `-c` | キャプチャデバイス名または識別子 |
 | `--protocol`, `-p` | 通信プロトコル。既定値は `CH552` |
 | `--baud` | シリアルボーレート。未指定時は protocol の既定値 |
+| `--controller` | controller backend。`serial` または `swbt` |
+| `--swbt-adapter` | swbt 用 USB Bluetooth adapter 名。候補が 1 件でも自動採用しない |
+| `--swbt-controller-type` | `pro-controller`、`joy-con-l`、`joy-con-r` |
+| `--swbt-key-store` | pairing key store の path |
+| `--swbt-timeout` | pair / reconnect の timeout 秒 |
 | `--define` | マクロへ渡す `key=value` 形式の引数 |
 | `--verbose` | 詳細ログを出す |
 | `--silence` | コンソールログを最小限にする |
+
+## swbt backend を使う
+
+adapter 候補を表示します。
+
+```console
+nyxpy swbt adapters
+nyxpy swbt adapters --json
+```
+
+初回は pairing を行い、controller type ごとに key store を分けます。
+
+```console
+nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+```
+
+保存済み key store で reconnect します。
+
+```console
+nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+```
+
+同じ NyX プロセスが管理している session を閉じます。
+
+```console
+nyxpy swbt disconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+```
+
+マクロ実行では `--controller swbt` を指定します。key store がない場合でも暗黙の pairing は行いません。
+
+```console
+nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-key-store .nyxpy/swbt/pro-controller-bond.json --capture "Capture Device"
+```
 
 ## 終了時の見方
 

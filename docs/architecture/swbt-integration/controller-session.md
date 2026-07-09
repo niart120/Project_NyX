@@ -1,20 +1,20 @@
 # SwbtControllerSession 設計
 
-`SwbtControllerSession` は、`swbt-python` の非同期 controller API を NyXPy の同期 `ControllerOutputPort` から使うための backend 内部部品である。
+`SwbtControllerSession` は、`swbt-python` controller の lifecycle を NyXPy の同期 `ControllerOutputPort` から使うための backend 内部部品である。
 
 実装 module は `nyxpy.framework.core.hardware.swbt.session` とする。
 
-`SwbtControllerOutputPort` は `apply()` と `neutral()` を session に依頼する。Bluetooth HID の接続、pairing、reconnect、event loop、diagnostics writer は session が所有する。
+`SwbtControllerOutputPort` は `apply()` と `neutral()` を session に依頼する。Bluetooth HID の open、pairing、reconnect、diagnostics writer、close は session が所有する。
 
 ## なぜ session が必要か
 
-serial backend は `SerialControllerOutputPort` から `SerialComm.send(...)` を同期的に呼べる。一方、swbt controller は async resource と report loop を持つ。
+serial backend は `SerialControllerOutputPort` から `SerialComm.send(...)` を呼ぶ。swbt backend は controller class の選択、adapter 未指定の拒否、key store、diagnostics writer、swbt 例外の変換を同じ入力 port から扱う必要がある。
 
-`SwbtControllerSession` はこの差を吸収する。
+`SwbtControllerSession` はこの lifecycle 差分を吸収する。swbt-python 0.2 系の公開 API は同期呼び出しを前提とする。controller method が awaitable を返した場合だけ、session 内部で完了待ちして上位には同期 method として見せる。
 
 ```text
 SwbtControllerOutputPort  # sync ControllerOutputPort implementation
-  -> SwbtControllerSession  # async swbt resource adapter
+  -> SwbtControllerSession  # swbt controller lifecycle adapter
   -> swbt-python controller
 ```
 
@@ -25,9 +25,9 @@ SwbtControllerOutputPort  # sync ControllerOutputPort implementation
 `SwbtControllerSession` が担当するもの:
 
 - `SwbtControllerModel.controller_type` から swbt controller class を解決し、controller を生成する
-- `open()`、`pair()`、`reconnect()`、`try_reconnect()` の実行
+- `open()`、`pair()`、`reconnect()` の実行
 - macro 実行前の reconnect
-- `asyncio` event loop thread の所有
+- awaitable を返す controller method の完了待ち
 - `InputState` の `apply()`
 - `neutral()`
 - `status()` の取得
@@ -46,12 +46,12 @@ SwbtControllerOutputPort  # sync ControllerOutputPort implementation
 ```python
 class SwbtControllerSession:
     def open(self) -> None:
-        """event loop と gamepad resource を準備する。接続は開始しない。"""
+        """controller resource を開く。接続は開始しない。"""
 
-    def pair(self, *, timeout_sec: float) -> ConnectionResult:
+    def pair(self, *, timeout_sec: float) -> object:
         """pairing を明示実行する。成功時は key store に pairing 情報が保存される。"""
 
-    def reconnect(self, *, timeout_sec: float) -> ConnectionResult:
+    def reconnect(self, *, timeout_sec: float) -> object:
         """保存済み pairing key に基づく reconnect を明示実行する。"""
 
     def apply(self, state: InputState) -> None:
@@ -64,50 +64,48 @@ class SwbtControllerSession:
         """接続状態と診断 snapshot を返す。"""
 
     def close(self) -> None:
-        """neutral=True で gamepad を閉じ、event loop を停止する。"""
+        """neutral=True で controller を閉じる。"""
 ```
 
 `SwbtControllerSession.start()` は作らない。CLI / GUI の `pair`、`reconnect` は明示操作である。macro 実行時は factory が `open()` 後に `reconnect()` を呼ぶ。
 
-## Gamepad 作成
+## Controller 作成
 
 `SwbtControllerModel` は swbt runtime class を保持しない。session は `controller_type` から swbt controller class を解決する。
 
 ```python
-from swbt import DiagnosticsConfig, SwitchGamepad
+from swbt import DiagnosticsConfig
 
 
-def create_gamepad(
+def create_swbt_controller(
     config: SwbtControllerConfig,
-    *,
     diagnostics_writer=None,
-) -> SwitchGamepad:
+) -> object:
     controller_cls = resolve_swbt_controller_class(config.model.controller_type)
+    diagnostics = None
+    if diagnostics_writer is not None:
+        diagnostics = DiagnosticsConfig(trace_writer=diagnostics_writer)
     return controller_cls(
         adapter=config.adapter,
-        key_store_path=config.key_store_path,
+        key_store_path=str(config.key_store_path),
         report_period_us=config.report_period_us,
-        diagnostics=DiagnosticsConfig(trace_writer=diagnostics_writer) if diagnostics_writer else None,
+        diagnostics=diagnostics,
     )
 ```
 
 diagnostics writer は NyX 内部 adapter で `LoggerPort.technical(...)` に流す。settings、GUI、CLI に diagnostics path は出さない。
 
-## event loop bridge
+## awaitable bridge
 
-`ControllerOutputPort` は同期 interface なので、session は内部で event loop thread を持つ。
+`ControllerOutputPort` は同期 interface である。controller method の戻り値が awaitable なら、session は内部 event loop thread へ渡して完了を待つ。同期 API の戻り値はそのまま使う。
 
 ```python
-class SwbtControllerSession:
-    def _run(self, coro):
-        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result(timeout=self._operation_timeout_sec)
-
-    def apply(self, state: InputState) -> None:
-        self._run(self._pad.apply(state))
+def _run_awaitable(self, awaitable):
+    future = asyncio.run_coroutine_threadsafe(awaitable, self._loop)
+    return future.result(timeout=self._operation_timeout_sec)
 ```
 
-GUI thread で async loop を回さない。`_operation_timeout_sec` は session 内部の既定値であり、通常 settings には出さない。
+GUI thread で event loop を回さない。`_operation_timeout_sec` は session 内部の既定値であり、通常 settings には出さない。
 
 ## lifecycle state
 
@@ -124,7 +122,7 @@ new
 
 ## close semantics
 
-`close()` は接続中なら `pad.close(neutral=True)` を呼ぶ。port close で neutral 済みでも、session close 時の trailing neutral は残す。
+`close()` は接続中なら `controller.close(neutral=True)` を呼ぶ。port close で neutral 済みでも、session close 時の trailing neutral は残す。
 
 transport が壊れて neutral に失敗した場合でも、close 処理は可能な限り最後まで進める。error は technical log に残し、必要に応じて `ExceptionGroup` として集約する。
 
@@ -144,8 +142,8 @@ class DummySwbtControllerSession:
     states: list[InputState]
 
     def open(self) -> None: ...
-    def pair(self, *, timeout_sec: float) -> ConnectionResult: ...
-    def reconnect(self, *, timeout_sec: float) -> ConnectionResult: ...
+    def pair(self, *, timeout_sec: float) -> object: ...
+    def reconnect(self, *, timeout_sec: float) -> object: ...
     def apply(self, state: InputState) -> None: ...
     def neutral(self) -> None: ...
     def status(self) -> GamepadStatus: ...

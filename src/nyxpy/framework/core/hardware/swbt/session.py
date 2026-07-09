@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import asyncio
+import inspect
+from collections.abc import Awaitable, Callable
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
-from threading import RLock
+from threading import Event, RLock, Thread, current_thread
 from typing import Protocol, TextIO
 
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, SwbtControllerType
@@ -62,6 +65,10 @@ class SwbtControllerSession:
         self._diagnostics_writer = diagnostics_writer
         self._controller: object | None = None
         self._lock = RLock()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._loop_thread: Thread | None = None
+        self._loop_ready = Event()
+        self._operation_timeout_sec = max(5.0, config.connect_timeout_sec)
         self._opened = False
         self._connected = False
         self._closed = False
@@ -82,10 +89,11 @@ class SwbtControllerSession:
                     code="NYX_SWBT_ADAPTER_NOT_SELECTED",
                     component=type(self).__name__,
                 )
-            controller = self._controller_factory(self.config, self._diagnostics_writer)
             try:
-                getattr(controller, "open")()
+                controller = self._controller_factory(self.config, self._diagnostics_writer)
+                self._call_controller(controller, "open")
             except Exception as exc:
+                self._stop_loop_locked()
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
             self._controller = controller
             self._opened = True
@@ -97,7 +105,7 @@ class SwbtControllerSession:
             self.open()
             controller = self._require_controller()
             try:
-                result = getattr(controller, "pair")(timeout=timeout_sec)
+                result = self._call_controller(controller, "pair", timeout=timeout_sec)
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
             self._connected = True
@@ -109,7 +117,7 @@ class SwbtControllerSession:
             self.open()
             controller = self._require_controller()
             try:
-                result = getattr(controller, "reconnect")(timeout=timeout_sec)
+                result = self._call_controller(controller, "reconnect", timeout=timeout_sec)
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
             self._connected = True
@@ -120,7 +128,7 @@ class SwbtControllerSession:
         with self._lock:
             controller = self._require_connected_controller()
             try:
-                getattr(controller, "apply")(state)
+                self._call_controller(controller, "apply", state)
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
@@ -129,7 +137,7 @@ class SwbtControllerSession:
         with self._lock:
             controller = self._require_connected_controller()
             try:
-                getattr(controller, "neutral")()
+                self._call_controller(controller, "neutral")
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
@@ -138,7 +146,7 @@ class SwbtControllerSession:
         with self._lock:
             controller = self._require_controller()
             try:
-                return getattr(controller, "status")()
+                return self._call_controller(controller, "status")
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
@@ -152,11 +160,14 @@ class SwbtControllerSession:
             self._opened = False
             self._closed = True
             if controller is None:
+                self._stop_loop_locked()
                 return
             try:
-                getattr(controller, "close")(neutral=True)
+                self._call_controller(controller, "close", neutral=True)
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
+            finally:
+                self._stop_loop_locked()
 
     def _require_controller(self) -> object:
         if self._controller is None:
@@ -167,6 +178,74 @@ class SwbtControllerSession:
         if not self._connected:
             raise swbt_not_connected(type(self).__name__)
         return self._require_controller()
+
+    def _call_controller(self, controller: object, method_name: str, *args, **kwargs) -> object:
+        result = getattr(controller, method_name)(*args, **kwargs)
+        if inspect.isawaitable(result):
+            self._ensure_loop_locked()
+            return self._run_awaitable(result)
+        return result
+
+    def _run_awaitable(self, awaitable: Awaitable[object]) -> object:
+        loop = self._loop
+        if loop is None or not loop.is_running():
+            raise swbt_configuration_error(
+                "swbt event loop is not running",
+                code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
+                component=type(self).__name__,
+            )
+        future = asyncio.run_coroutine_threadsafe(_await_result(awaitable), loop)
+        try:
+            return future.result(timeout=self._operation_timeout_sec)
+        except FutureTimeoutError:
+            future.cancel()
+            raise
+
+    def _ensure_loop_locked(self) -> None:
+        if self._loop is not None and self._loop.is_running():
+            return
+
+        self._loop_ready.clear()
+
+        def run_loop() -> None:
+            loop = asyncio.new_event_loop()
+            self._loop = loop
+            asyncio.set_event_loop(loop)
+            self._loop_ready.set()
+            loop.run_forever()
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            loop.close()
+
+        self._loop_thread = Thread(
+            target=run_loop,
+            name="SwbtControllerSessionLoop",
+            daemon=True,
+        )
+        self._loop_thread.start()
+        if not self._loop_ready.wait(timeout=self._operation_timeout_sec):
+            raise swbt_configuration_error(
+                "swbt event loop did not start",
+                code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
+                component=type(self).__name__,
+            )
+
+    def _stop_loop_locked(self) -> None:
+        loop = self._loop
+        thread = self._loop_thread
+        self._loop = None
+        self._loop_thread = None
+        if loop is not None and loop.is_running():
+            loop.call_soon_threadsafe(loop.stop)
+        if thread is not None and thread.is_alive() and thread is not current_thread():
+            thread.join(timeout=self._operation_timeout_sec)
+
+
+async def _await_result(awaitable: Awaitable[object]) -> object:
+    return await awaitable
 
 
 class DummySwbtControllerSession:

@@ -16,10 +16,11 @@
 ```python
 @dataclass
 class NyxSwbtState:
-    buttons: set[SwbtButton]
-    left_stick: SwbtStick
-    right_stick: SwbtStick
-    imu_frames: tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame]
+    buttons: frozenset[Button]
+    dpad_buttons: frozenset[object]
+    left_stick: LStick | None
+    right_stick: RStick | None
+    imu_frames: tuple[IMUFrame, IMUFrame, IMUFrame]
 ```
 
 この state は `SwbtControllerOutputPort` の内部状態である。GUI manual input 専用の state ではない。
@@ -69,22 +70,21 @@ D-pad は button set として扱う。
 
 ## Stick
 
-NyX の `LStick(angle, strength)` / `RStick(angle, strength)` を swbt `Stick` に変換する。
+NyX の `LStick` / `RStick` は、Project_NyX 側で既に raw `x/y` を持つ。mapper はその値を swbt `Stick.raw(x=..., y=...)` に渡す。
 
 ```python
-def to_stick(angle: float, strength: float) -> SwbtStick:
-    # angle/strength -> normalized x/y -> swbt.Stick.normalized(...)
-    ...
+def to_stick(stick: LStick | RStick | None) -> SwbtStick:
+    if stick is None:
+        return Stick.center()
+    return Stick.raw(x=stick.x, y=stick.y)
 ```
-
-`strength` は `0.0..1.0` に clamp する。中央は `Stick.center()` を使う。
 
 | NyX | swbt |
 |---|---|
 | `LStick.CENTER` | `Stick.center()` |
 | `RStick.CENTER` | `Stick.center()` |
-| `LStick(angle, strength)` | left stick `Stick.normalized(...)` |
-| `RStick(angle, strength)` | right stick `Stick.normalized(...)` |
+| `LStick.UP` など | left stick `Stick.raw(x=..., y=...)` |
+| `RStick.UP` など | right stick `Stick.raw(x=..., y=...)` |
 
 Joy-Con L は right stick を持たない。Joy-Con R は left stick を持たない。mapper は `SwbtControllerModel.capabilities` を見て拒否する。
 
@@ -107,12 +107,11 @@ def to_imu_frame(frame: NyxIMUFrame) -> SwbtIMUFrame:
 1 frame が渡された場合は 3 frame に複製する。3 frame が渡された場合は順に使う。それ以外は `NYX_IMU_FRAME_COUNT_INVALID` にする。
 
 ```python
-def normalize_imu_frames(frames: tuple[NyxIMUFrame, ...]) -> tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame]:
+def normalize_imu_frames(frames: tuple[NyxIMUFrame, ...]) -> tuple[NyxIMUFrame, NyxIMUFrame, NyxIMUFrame]:
     if len(frames) == 1:
-        converted = to_imu_frame(frames[0])
-        return (converted, converted, converted)
+        return (frames[0], frames[0], frames[0])
     if len(frames) == 3:
-        return tuple(to_imu_frame(frame) for frame in frames)  # type: ignore[return-value]
+        return (frames[0], frames[1], frames[2])
     raise InvalidSwbtInputError(
         "imu input requires 1 or 3 frames",
         code="NYX_IMU_FRAME_COUNT_INVALID",

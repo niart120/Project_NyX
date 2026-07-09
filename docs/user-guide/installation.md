@@ -7,9 +7,12 @@
 | uv | [uv 公式のインストール手順](https://docs.astral.sh/uv/getting-started/installation/)に従って導入する |
 | キャプチャデバイス | Switch の映像を PC に取り込む |
 | シリアル通信デバイス | CH552 プロトコルなど NyX が対応する方式で入力を送る |
+| swbt 用 USB Bluetooth adapter | swbt backend を使う場合だけ必要。PC 内蔵 Bluetooth ではなく Bumble が直接開ける専用 adapter を使う |
 | Git | リポジトリの内容を直接使う場合だけ使う |
 
 NyX は uv が管理する Python 環境で動作します。Python 本体を個別に導入する手順は不要です。
+
+swbt backend は `nyxpy-fw` の通常依存として導入されます。swbt 用の extra 指定や追加同期手順は不要です。
 
 uv の導入確認:
 
