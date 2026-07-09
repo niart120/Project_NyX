@@ -32,12 +32,19 @@ nav:
       - swbt 連携:
           - 概要: architecture/swbt-integration/index.md
           - レイヤード配置: architecture/swbt-integration/architecture.md
+          - 抽象レイヤー検証: architecture/swbt-integration/abstraction-audit.md
+          - Public API: architecture/swbt-integration/public-api.md
+          - Controller model: architecture/swbt-integration/controller-models.md
+          - デバイス列挙: architecture/swbt-integration/adapter-discovery.md
           - Runtime composition: architecture/swbt-integration/runtime-composition.md
+          - Controller session: architecture/swbt-integration/controller-session.md
+          - Manual input: architecture/swbt-integration/manual-input.md
+          - IMU command: architecture/swbt-integration/imu-command.md
           - Controller port 契約: architecture/swbt-integration/controller-port-contract.md
-          - swbt service: architecture/swbt-integration/swbt-service.md
-          - 入力マッピング: architecture/swbt-integration/input-mapping.md
+          - 入力 mapping: architecture/swbt-integration/input-mapping.md
           - 設定・CLI・GUI: architecture/swbt-integration/configuration-cli-gui.md
-          - テストと段階導入: architecture/swbt-integration/testing-rollout.md
+          - テスト: architecture/swbt-integration/testing.md
+          - Testing / rollout: architecture/swbt-integration/testing-rollout.md
   - API リファレンス:
       - フレームワーク API: api/framework.md
 
