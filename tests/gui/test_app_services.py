@@ -5,6 +5,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
     DeviceInfo,
     WindowDiscoveryResult,
 )
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.gui.app_services import GuiAppServices, _frame_source_key
 
@@ -95,6 +96,56 @@ class FakeBuilder:
         return self.controller
 
 
+class FakeSwbtDiscovery:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.adapters = (
+            SwbtAdapterView(
+                name="hci0",
+                aliases=("usb-1",),
+                display_name="hci0 - Nintendo Adapter",
+                vendor_id=0x057E,
+                product_id=0x2009,
+                manufacturer="Nintendo",
+                product="Adapter",
+                serial_number=None,
+                bus_number=1,
+                device_address=2,
+                port_numbers=(1,),
+                is_bluetooth_hci=True,
+            ),
+        )
+
+    def list_adapters(self):
+        self.calls += 1
+        return self.adapters
+
+
+class FakeSwbtStatus:
+    connected = True
+    message = "connected"
+
+
+class FakeSwbtFactory:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def pair(self, config, *, timeout_sec):
+        self.calls.append(("pair", config, timeout_sec))
+        return FakeSwbtStatus()
+
+    def reconnect(self, config, *, timeout_sec):
+        self.calls.append(("reconnect", config, timeout_sec))
+        return FakeSwbtStatus()
+
+    def disconnect(self, config):
+        self.calls.append(("disconnect", config, None))
+
+    def status(self, config):
+        self.calls.append(("status", config, None))
+        return FakeSwbtStatus()
+
+
 def make_services(
     settings,
     *,
@@ -103,6 +154,7 @@ def make_services(
     ponkan_capture_available=True,
 ):
     services = object.__new__(GuiAppServices)
+    services.project_root = None
     services.global_settings = FakeSettings(settings)
     services.secrets_settings = FakeSettings({})
     services.logger = FakeLogger()
@@ -125,7 +177,7 @@ def make_services(
     )
     services._pending_settings_apply = False
 
-    def replace_runtime_builder(self):
+    def replace_runtime_builder(self, **_kwargs):
         self.runtime_builder = FakeBuilder()
         from nyxpy.gui.app_services import _frame_source_key
 
@@ -157,14 +209,14 @@ def test_app_services_does_not_rebuild_for_unrelated_setting() -> None:
     settings = {
         "capture_source_type": "camera",
         "capture_device": "Camera1",
-        "serial_baud": 115200,
+        "controller.serial.baudrate": 115200,
     }
     services = make_services(
         settings,
         previous_builder_settings={
             "capture_source_type": "camera",
             "capture_device": "Camera1",
-            "serial_baud": 9600,
+            "controller.serial.baudrate": 9600,
         },
     )
 
@@ -332,6 +384,43 @@ def test_app_services_does_not_rebuild_for_gui_only_setting() -> None:
     assert services.runtime_builder is previous_builder
 
 
+def test_app_services_refresh_swbt_adapters_uses_discovery_only() -> None:
+    services = make_services({"capture_source_type": "camera", "capture_device": "Camera1"})
+    discovery = FakeSwbtDiscovery()
+    factory = FakeSwbtFactory()
+    services.swbt_adapter_discovery = discovery
+    services.swbt_controller_factory = factory
+
+    adapters = services.refresh_swbt_adapters()
+
+    assert adapters == discovery.adapters
+    assert discovery.calls == 1
+    assert factory.calls == []
+
+
+def test_app_services_pair_swbt_returns_gui_status_view() -> None:
+    settings = {
+        "capture_source_type": "camera",
+        "capture_device": "Camera1",
+        "controller.backend": "swbt",
+        "controller.swbt.controller_type": "joy-con-l",
+        "controller.swbt.adapter": "hci0",
+        "controller.swbt.connect_timeout_sec": 4.0,
+    }
+    services = make_services(settings)
+    factory = FakeSwbtFactory()
+    services.swbt_controller_factory = factory
+
+    status = services.pair_swbt()
+
+    assert factory.calls[0][0] == "pair"
+    assert factory.calls[0][1].adapter == "hci0"
+    assert factory.calls[0][2] == 4.0
+    assert status.connected is True
+    assert status.controller_type == "joy-con-l"
+    assert status.adapter == "hci0"
+
+
 def test_app_services_reports_preview_start_failure_without_failing_settings() -> None:
     settings = {
         "capture_source_type": "window",
@@ -345,7 +434,7 @@ def test_app_services_reports_preview_start_failure_without_failing_settings() -
         device_discovery=FakeDiscovery(windows=(WindowInfo("Missing Viewer", "hwnd-2", None),)),
     )
 
-    def replace_runtime_builder(self):
+    def replace_runtime_builder(self, **_kwargs):
         self.runtime_builder = FakeBuilder()
         self.runtime_builder.preview_error = RuntimeError("window capture failed to start")
         from nyxpy.gui.app_services import _frame_source_key
@@ -359,7 +448,7 @@ def test_app_services_reports_preview_start_failure_without_failing_settings() -
     assert outcome.builder_replaced is True
     assert outcome.preview_frame_source is None
     assert str(outcome.preview_error) == "window capture failed to start"
-    assert outcome.manual_controller is services.runtime_builder.controller
+    assert outcome.manual_controller is None
     assert services.logger.technical_events[-1][1]["event"] == "configuration.preview_failed"
 
 
@@ -367,14 +456,14 @@ def test_app_services_discards_unavailable_serial_setting() -> None:
     settings = {
         "capture_source_type": "camera",
         "capture_device": "Camera1",
-        "serial_device": "COM9",
+        "controller.serial.device": "COM9",
     }
     services = make_services(settings, device_discovery=FakeDiscovery(capture=("Camera1",)))
 
     outcome = services.apply_settings(is_run_active=False)
 
-    assert services.global_settings.get("serial_device") == ""
-    assert "serial_device" in outcome.changed_keys
+    assert services.global_settings.get("controller.serial.device") == ""
+    assert "controller.serial.device" in outcome.changed_keys
     assert outcome.builder_replaced is True
 
 
@@ -382,7 +471,7 @@ def test_app_services_discards_unavailable_camera_setting() -> None:
     settings = {
         "capture_source_type": "camera",
         "capture_device": "Missing Camera",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(settings, device_discovery=FakeDiscovery(serial=("COM1",)))
 
@@ -399,7 +488,7 @@ def test_app_services_discards_unavailable_window_setting() -> None:
         "capture_window_title": "Closed Viewer",
         "capture_window_identifier": "hwnd-old",
         "capture_window_match_mode": "exact",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(settings, device_discovery=FakeDiscovery(serial=("COM1",)))
 
@@ -417,7 +506,7 @@ def test_app_services_keeps_identifier_only_window_setting_when_window_exists() 
         "capture_window_title": "",
         "capture_window_identifier": "hwnd-1",
         "capture_window_match_mode": "exact",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,
@@ -439,7 +528,7 @@ def test_app_services_keeps_window_setting_when_window_discovery_failed() -> Non
         "capture_window_title": "Viewer",
         "capture_window_identifier": "hwnd-1",
         "capture_window_match_mode": "exact",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,
@@ -461,7 +550,7 @@ def test_app_services_keeps_window_setting_when_window_discovery_raises() -> Non
         "capture_window_title": "Viewer",
         "capture_window_identifier": "hwnd-1",
         "capture_window_match_mode": "exact",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,
@@ -483,7 +572,7 @@ def test_app_services_keeps_camera_window_settings_for_capture_source() -> None:
         "capture_window_match_mode": "exact",
         "capture_provider": "ponkan",
         "capture_device_profile": "n3dsxl",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,
@@ -503,7 +592,7 @@ def test_app_services_falls_back_from_capture_when_ponkan_unavailable() -> None:
         "capture_device": "Camera1",
         "capture_provider": "ponkan",
         "capture_device_profile": "n3dsxl",
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,
@@ -535,7 +624,7 @@ def test_app_services_preserves_hidden_ponkan_settings_on_fallback() -> None:
         "ponkan_read_timeout": 0.5,
         "ponkan_collect_timing": True,
         "n3dsxl_hd_aspect_box_enabled": False,
-        "serial_device": "COM1",
+        "controller.serial.device": "COM1",
     }
     services = make_services(
         settings,

@@ -1,5 +1,7 @@
 """Device 設定 tab。"""
 
+from collections.abc import Callable
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -14,6 +16,8 @@ from PySide6.QtWidgets import (
 
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.config import supported_controller_models
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.gui.capture_availability import is_ponkan_capture_available
@@ -37,12 +41,24 @@ class DeviceSettingsTab(QWidget):
         *,
         device_discovery: DeviceDiscoveryService | None = None,
         ponkan_capture_available: bool | None = None,
+        swbt_adapter_provider: Callable[[], tuple[SwbtAdapterView, ...]] | None = None,
+        swbt_pair: Callable[[], object] | None = None,
+        swbt_reconnect: Callable[[], object] | None = None,
+        swbt_disconnect: Callable[[], None] | None = None,
+        swbt_status: Callable[[], object | None] | None = None,
+        swbt_actions_enabled: bool = True,
     ):
         """Settings store と device discovery service を保持し、選択 UI を作ります。"""
         super().__init__(parent)
         self.settings = settings
         self.secrets = secrets
         self.device_discovery = device_discovery or DeviceDiscoveryService()
+        self.swbt_adapter_provider = swbt_adapter_provider
+        self.swbt_pair = swbt_pair
+        self.swbt_reconnect = swbt_reconnect
+        self.swbt_disconnect = swbt_disconnect
+        self.swbt_status = swbt_status
+        self.swbt_actions_enabled = bool(swbt_actions_enabled)
         self.ponkan_capture_available = (
             is_ponkan_capture_available()
             if ponkan_capture_available is None
@@ -139,7 +155,22 @@ class DeviceSettingsTab(QWidget):
         cap_group_layout.addLayout(cap_form)
         layout.addWidget(cap_group)
 
-        ser_group = QGroupBox("シリアルデバイス")
+        self.controller_group = QGroupBox("コントローラー出力")
+        controller_group_layout = QVBoxLayout(self.controller_group)
+        controller_form = QFormLayout()
+
+        self.controller_backend = QComboBox()
+        self.controller_backend.addItem("Serial", "serial")
+        self.controller_backend.addItem("swbt", "swbt")
+        self._set_controller_backend(self.settings.get("controller.backend", "serial"))
+        self.controller_backend.currentIndexChanged.connect(
+            lambda _index: self._update_controller_field_state()
+        )
+        controller_form.addRow(QLabel("Backend:"), self.controller_backend)
+        controller_group_layout.addLayout(controller_form)
+
+        self.ser_group = QGroupBox("Serial")
+        ser_group = self.ser_group
         ser_group_layout = QVBoxLayout(ser_group)
         ser_form = QFormLayout()
 
@@ -156,7 +187,7 @@ class DeviceSettingsTab(QWidget):
         self.ser_protocol = QComboBox()
         protocol_options = ProtocolFactory.get_protocol_names()
         self.ser_protocol.addItems(protocol_options)
-        current_protocol = self.settings.get("serial_protocol", "")
+        current_protocol = self.settings.get("controller.serial.protocol", "")
         if current_protocol in protocol_options:
             self.ser_protocol.setCurrentText(current_protocol)
         self.ser_protocol.currentTextChanged.connect(self._apply_protocol_default_baud)
@@ -174,7 +205,7 @@ class DeviceSettingsTab(QWidget):
             "115200",
         ]
         self.ser_baud.addItems(baud_options)
-        current_baud = str(self.settings.get("serial_baud", 9600))
+        current_baud = str(self.settings.get("controller.serial.baudrate", 9600))
         if current_baud in baud_options:
             self.ser_baud.setCurrentText(current_baud)
         else:
@@ -182,7 +213,56 @@ class DeviceSettingsTab(QWidget):
         ser_form.addRow(QLabel("Protocol:"), self.ser_protocol)
         ser_form.addRow(QLabel("Baud Rate:"), self.ser_baud)
         ser_group_layout.addLayout(ser_form)
-        layout.addWidget(ser_group)
+        controller_group_layout.addWidget(ser_group)
+
+        self.swbt_group = QGroupBox("swbt")
+        swbt_group_layout = QVBoxLayout(self.swbt_group)
+        swbt_form = QFormLayout()
+
+        self.swbt_controller_type = QComboBox()
+        for model in supported_controller_models():
+            self.swbt_controller_type.addItem(model.display_name, model.settings_value)
+        self._set_combo_data(
+            self.swbt_controller_type,
+            self.settings.get("controller.swbt.controller_type", "pro-controller"),
+        )
+        swbt_form.addRow(QLabel("Controller:"), self.swbt_controller_type)
+
+        adapter_row = QHBoxLayout()
+        self.swbt_adapter = QComboBox()
+        self.swbt_adapter.setEditable(True)
+        self.refresh_swbt_btn = QPushButton("リロード")
+        self.refresh_swbt_btn.setFixedWidth(60)
+        self.refresh_swbt_btn.clicked.connect(self.refresh_swbt_adapters)
+        adapter_row.addWidget(self.swbt_adapter)
+        adapter_row.addWidget(self.refresh_swbt_btn)
+        swbt_form.addRow(QLabel("Adapter:"), adapter_row)
+
+        self.swbt_key_store = QComboBox()
+        self.swbt_key_store.setEditable(True)
+        current_key_store = str(self.settings.get("controller.swbt.key_store_path", "") or "")
+        if current_key_store:
+            self.swbt_key_store.addItem(current_key_store, current_key_store)
+            self.swbt_key_store.setCurrentText(current_key_store)
+        swbt_form.addRow(QLabel("Key Store:"), self.swbt_key_store)
+
+        lifecycle_row = QHBoxLayout()
+        self.swbt_pair_btn = QPushButton("Pair")
+        self.swbt_reconnect_btn = QPushButton("Reconnect")
+        self.swbt_disconnect_btn = QPushButton("Disconnect")
+        self.swbt_pair_btn.clicked.connect(self._pair_swbt)
+        self.swbt_reconnect_btn.clicked.connect(self._reconnect_swbt)
+        self.swbt_disconnect_btn.clicked.connect(self._disconnect_swbt)
+        lifecycle_row.addWidget(self.swbt_pair_btn)
+        lifecycle_row.addWidget(self.swbt_reconnect_btn)
+        lifecycle_row.addWidget(self.swbt_disconnect_btn)
+        swbt_form.addRow(QLabel("Connection:"), lifecycle_row)
+
+        self.swbt_status_label = QLabel("disconnected")
+        swbt_form.addRow(QLabel("Status:"), self.swbt_status_label)
+        swbt_group_layout.addLayout(swbt_form)
+        controller_group_layout.addWidget(self.swbt_group)
+        layout.addWidget(self.controller_group)
 
         self.appearance_group = QGroupBox("外観", self)
         appearance_group = self.appearance_group
@@ -207,7 +287,11 @@ class DeviceSettingsTab(QWidget):
         layout.addWidget(appearance_group)
         layout.addStretch(1)
 
+        self.refresh_swbt_adapters()
+        if self._controller_backend() == "swbt":
+            self._refresh_swbt_status()
         self._update_source_field_state(self._capture_source_type())
+        self._update_controller_field_state()
 
     def _apply_protocol_default_baud(self, protocol_name: str):
         default_baud = str(ProtocolFactory.get_default_baudrate(protocol_name))
@@ -245,13 +329,30 @@ class DeviceSettingsTab(QWidget):
     def refresh_serial_devices(self):
         serials = self.device_discovery.detect(timeout_sec=2.0).serial_devices
         self.ser_device.clear()
-        current_ser = str(self.settings.get("serial_device", "") or "")
+        current_ser = str(self.settings.get("controller.serial.device", "") or "")
         for device in serials:
             self.ser_device.addItem(device.display_name, str(device.identifier))
         for index in range(self.ser_device.count()):
             if self.ser_device.itemData(index) == current_ser:
                 self.ser_device.setCurrentIndex(index)
                 return
+
+    def refresh_swbt_adapters(self) -> None:
+        current_adapter = str(self.settings.get("controller.swbt.adapter", "") or "")
+        current_data = self.swbt_adapter.currentData() if self.swbt_adapter.count() else None
+        current_text = self.swbt_adapter.currentText().strip() if self.swbt_adapter.count() else ""
+        selected = str(current_data or current_adapter or current_text)
+        self.swbt_adapter.clear()
+        if self.swbt_adapter_provider is not None:
+            try:
+                for adapter in self.swbt_adapter_provider():
+                    self.swbt_adapter.addItem(adapter.display_name, adapter.name)
+            except Exception as exc:
+                self.swbt_status_label.setText(f"adapter refresh failed: {exc}")
+                return
+        if selected and self.swbt_adapter.findData(selected) < 0:
+            self.swbt_adapter.addItem(selected, selected)
+        self._set_combo_data(self.swbt_adapter, selected)
 
     def apply(self):
         source_type = self._capture_source_type()
@@ -281,21 +382,43 @@ class DeviceSettingsTab(QWidget):
                 self.n3dsxl_hd_aspect_box_enabled.isChecked(),
             )
         self.settings.set("preview_fps", int(self.preview_fps.currentText()))
+        self.settings.set("controller.backend", self._controller_backend())
         self.settings.set(
-            "serial_device",
+            "controller.serial.device",
             self.ser_device.currentData() or self.ser_device.currentText(),
         )
-        self.settings.set("serial_protocol", self.ser_protocol.currentText())
-        self.settings.set("serial_baud", int(self.ser_baud.currentText()))
+        self.settings.set("controller.serial.protocol", self.ser_protocol.currentText())
+        self.settings.set("controller.serial.baudrate", int(self.ser_baud.currentText()))
+        self.settings.set(
+            "controller.swbt.controller_type",
+            self.swbt_controller_type.currentData() or self.swbt_controller_type.currentText(),
+        )
+        swbt_adapter = self.swbt_adapter.currentData() or self.swbt_adapter.currentText().strip()
+        self.settings.set("controller.swbt.adapter", swbt_adapter or None)
+        swbt_key_store = self.swbt_key_store.currentText().strip()
+        self.settings.set("controller.swbt.key_store_path", swbt_key_store or None)
         self.settings.set("gui.window_size_preset", self.window_size_preset.currentData())
 
     def _capture_source_type(self) -> str:
         value = self.capture_source_type.currentData()
         return str(value or "camera")
 
+    def _controller_backend(self) -> str:
+        value = self.controller_backend.currentData()
+        return str(value or "serial")
+
     def _set_capture_source_type(self, value: object) -> None:
         index = self.capture_source_type.findData(str(value or "camera"))
         self.capture_source_type.setCurrentIndex(index if index >= 0 else 0)
+
+    def _set_controller_backend(self, value: object) -> None:
+        self._set_combo_data(self.controller_backend, str(value or "serial"))
+
+    def _set_combo_data(self, combo: QComboBox, value: object) -> None:
+        index = combo.findData(value)
+        if index < 0:
+            index = combo.findText(str(value or ""))
+        combo.setCurrentIndex(index if index >= 0 else 0)
 
     def _update_source_field_state(self, source_type: str) -> None:
         is_camera = source_type == "camera"
@@ -315,6 +438,70 @@ class DeviceSettingsTab(QWidget):
         for label, widget in self.capture_setting_rows:
             label.setVisible(is_capture)
             widget.setVisible(is_capture)
+
+    def _update_controller_field_state(self) -> None:
+        is_swbt = self._controller_backend() == "swbt"
+        self.ser_group.setEnabled(not is_swbt)
+        self.swbt_group.setEnabled(is_swbt)
+        lifecycle_enabled = is_swbt and self.swbt_actions_enabled
+        for button in (self.swbt_pair_btn, self.swbt_reconnect_btn, self.swbt_disconnect_btn):
+            button.setEnabled(lifecycle_enabled)
+
+    def _pair_swbt(self) -> None:
+        self.apply()
+        self._run_swbt_lifecycle(self.swbt_pair)
+
+    def _reconnect_swbt(self) -> None:
+        self.apply()
+        self._run_swbt_lifecycle(self.swbt_reconnect)
+
+    def _disconnect_swbt(self) -> None:
+        self.apply()
+        if self.swbt_disconnect is None:
+            self.swbt_status_label.setText("swbt lifecycle is unavailable")
+            return
+        try:
+            self.swbt_disconnect()
+        except Exception as exc:
+            self.swbt_status_label.setText(f"disconnect failed: {exc}")
+            return
+        self.swbt_status_label.setText("disconnected")
+
+    def _run_swbt_lifecycle(self, action: Callable[[], object] | None) -> None:
+        if action is None:
+            self.swbt_status_label.setText("swbt lifecycle is unavailable")
+            return
+        try:
+            status = action()
+        except Exception as exc:
+            self.swbt_status_label.setText(f"connection failed: {exc}")
+            return
+        self._set_swbt_status(status)
+
+    def _refresh_swbt_status(self) -> None:
+        if self.swbt_status is None:
+            return
+        if self._controller_backend() != "swbt":
+            self.swbt_status_label.setText("disconnected")
+            return
+        try:
+            self._set_swbt_status(self.swbt_status())
+        except Exception as exc:
+            self.swbt_status_label.setText(f"status failed: {exc}")
+
+    def _set_swbt_status(self, status: object | None) -> None:
+        if status is None:
+            self.swbt_status_label.setText("disconnected")
+            return
+        message = str(getattr(status, "message", "connected"))
+        controller_type = str(getattr(status, "controller_type", ""))
+        adapter = str(getattr(status, "adapter", ""))
+        parts = [message]
+        if controller_type:
+            parts.append(controller_type)
+        if adapter:
+            parts.append(adapter)
+        self.swbt_status_label.setText(" / ".join(parts))
 
 
 def _layout_container(layout: QHBoxLayout) -> QWidget:

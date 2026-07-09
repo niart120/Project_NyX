@@ -12,9 +12,13 @@ class FakeSettings:
             "gui.window_size_preset": "full_hd",
             "capture_source_type": "camera",
             "capture_device": "",
-            "serial_device": "",
-            "serial_protocol": "CH552",
-            "serial_baud": 9600,
+            "controller.backend": "serial",
+            "controller.serial.device": "",
+            "controller.serial.protocol": "CH552",
+            "controller.serial.baudrate": 9600,
+            "controller.swbt.controller_type": "pro-controller",
+            "controller.swbt.adapter": None,
+            "controller.swbt.key_store_path": None,
             "preview_fps": 60,
         }
 

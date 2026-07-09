@@ -16,6 +16,12 @@ from nyxpy.framework.core.hardware.device_discovery import (
     WindowDiscoveryResult,
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig
+from nyxpy.framework.core.hardware.swbt.discovery import (
+    SwbtAdapterDiscoveryService,
+    SwbtAdapterView,
+)
+from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.controller_config import controller_config_from_settings
 from nyxpy.framework.core.io.device_factories import (
@@ -50,6 +56,16 @@ class SettingsApplyOutcome:
     preview_error: BaseException | None = None
     manual_controller_error: BaseException | None = None
     deferred: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SwbtControllerStatusView:
+    """GUI 表示用の swbt controller status。"""
+
+    connected: bool
+    controller_type: str
+    adapter: str
+    message: str
 
 
 PONKAN_FRAME_SOURCE_SETTING_KEYS = frozenset(
@@ -131,6 +147,8 @@ class GuiAppServices:
         )
         self.logger = self.logging.logger
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
+        self.swbt_adapter_discovery = SwbtAdapterDiscoveryService()
+        self.swbt_controller_factory = SwbtControllerOutputPortFactory()
         self.ponkan_capture_available = is_ponkan_capture_available()
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)
@@ -181,6 +199,18 @@ class GuiAppServices:
             _changed_keys(self._builder_settings, current_settings) & RUNTIME_BUILDER_SETTING_KEYS
         ) | _changed_keys(self._builder_secrets, current_secrets)
         builder_needs_update = self.runtime_builder is None or bool(builder_changed_keys)
+        builder_port_setting_keys = FRAME_SOURCE_SETTING_KEYS | CONTROLLER_SETTING_KEYS
+        shared_builder_changed = bool(builder_changed_keys - builder_port_setting_keys)
+        frame_source_needs_update = (
+            self.runtime_builder is None
+            or shared_builder_changed
+            or bool(FRAME_SOURCE_SETTING_KEYS & builder_changed_keys)
+        )
+        manual_controller_needs_update = (
+            self.runtime_builder is None
+            or shared_builder_changed
+            or bool(CONTROLLER_SETTING_KEYS & builder_changed_keys)
+        )
         if builder_needs_update and is_run_active:
             self._pending_settings_apply = True
             self._last_settings = current_settings
@@ -203,33 +233,38 @@ class GuiAppServices:
         builder_replaced = False
 
         if builder_needs_update:
-            self._replace_runtime_builder()
+            self._replace_runtime_builder(
+                keep_preview_frame_source=not frame_source_needs_update,
+                keep_manual_controller=not manual_controller_needs_update,
+            )
             builder_replaced = True
             builder = self.runtime_builder
             if builder is None:
                 raise RuntimeError("runtime builder was not created")
-            try:
-                preview_frame_source = builder.frame_source_for_preview()
-            except Exception as exc:
-                preview_error = exc
-                self.logger.technical(
-                    "WARNING",
-                    "GUI preview frame source startup failed.",
-                    component="GuiAppServices",
-                    event="configuration.preview_failed",
-                    exc=exc,
-                )
-            try:
-                manual_controller = builder.controller_output_for_manual_input()
-            except Exception as exc:
-                manual_controller_error = exc
-                self.logger.technical(
-                    "WARNING",
-                    "GUI manual controller startup failed.",
-                    component="GuiAppServices",
-                    event="configuration.controller_failed",
-                    exc=exc,
-                )
+            if frame_source_needs_update:
+                try:
+                    preview_frame_source = builder.frame_source_for_preview()
+                except Exception as exc:
+                    preview_error = exc
+                    self.logger.technical(
+                        "WARNING",
+                        "GUI preview frame source startup failed.",
+                        component="GuiAppServices",
+                        event="configuration.preview_failed",
+                        exc=exc,
+                    )
+            if manual_controller_needs_update:
+                try:
+                    manual_controller = builder.controller_output_for_manual_input()
+                except Exception as exc:
+                    manual_controller_error = exc
+                    self.logger.technical(
+                        "WARNING",
+                        "GUI manual controller startup failed.",
+                        component="GuiAppServices",
+                        event="configuration.controller_failed",
+                        exc=exc,
+                    )
 
         self._last_settings = current_settings
         self._last_secrets = current_secrets
@@ -262,6 +297,16 @@ class GuiAppServices:
         self._closed = True
         self._shutdown_runtime_builder()
         try:
+            self.swbt_controller_factory.close()
+        except Exception as exc:
+            self.logger.technical(
+                "WARNING",
+                "swbt controller factory cleanup failed.",
+                component="GuiAppServices",
+                event="resource.cleanup_failed",
+                exc=exc,
+            )
+        try:
             self.logging.close()
         except Exception as exc:
             self.logger.technical(
@@ -272,7 +317,12 @@ class GuiAppServices:
                 exc=exc,
             )
 
-    def _replace_runtime_builder(self) -> None:
+    def _replace_runtime_builder(
+        self,
+        *,
+        keep_preview_frame_source: bool = False,
+        keep_manual_controller: bool = False,
+    ) -> None:
         previous_builder = self.runtime_builder
         controller_config = controller_config_from_settings(
             self.global_settings.data,
@@ -291,6 +341,7 @@ class GuiAppServices:
             registry=self.registry,
             device_discovery=self.device_discovery,
             controller_config=controller_config,
+            swbt_controller_factory=self.swbt_controller_factory,
             frame_source_factory=frame_factory,
             capture_name=self.global_settings.get("capture_device"),
             notification_handler=notification_handler,
@@ -300,7 +351,60 @@ class GuiAppServices:
         )
         self._active_frame_source_key = _frame_source_key(self.global_settings.data)
         if previous_builder is not None:
+            _transfer_lifetime_resources(
+                previous_builder,
+                self.runtime_builder,
+                keep_preview_frame_source=keep_preview_frame_source,
+                keep_manual_controller=keep_manual_controller,
+            )
             self._shutdown_builder(previous_builder)
+
+    def refresh_swbt_adapters(self) -> tuple[SwbtAdapterView, ...]:
+        """Swbt adapter 候補を列挙する。pair / reconnect は行わない。"""
+        return self.swbt_adapter_discovery.list_adapters()
+
+    def pair_swbt(self) -> SwbtControllerStatusView:
+        """現在設定で swbt pairing を明示実行する。"""
+        config = self._swbt_controller_config()
+        status = self.swbt_controller_factory.pair(
+            config,
+            timeout_sec=config.connect_timeout_sec,
+        )
+        return _swbt_status_view(config, status)
+
+    def reconnect_swbt(self) -> SwbtControllerStatusView:
+        """現在設定で swbt reconnect を明示実行する。"""
+        config = self._swbt_controller_config()
+        status = self.swbt_controller_factory.reconnect(
+            config,
+            timeout_sec=config.connect_timeout_sec,
+        )
+        return _swbt_status_view(config, status)
+
+    def disconnect_swbt(self) -> None:
+        """Factory-managed swbt session を閉じる。"""
+        self.swbt_controller_factory.disconnect(self._swbt_controller_config())
+
+    def swbt_status(self) -> SwbtControllerStatusView | None:
+        """Factory-managed swbt session の状態を GUI DTO として返す。"""
+        config = self._swbt_controller_config()
+        status = self.swbt_controller_factory.status(config)
+        if status is None:
+            return None
+        return _swbt_status_view(config, status)
+
+    def _swbt_controller_config(self) -> SwbtControllerConfig:
+        config = controller_config_from_settings(
+            self.global_settings.data,
+            workspace_root=self.project_root,
+        )
+        if not isinstance(config, SwbtControllerConfig):
+            raise ConfigurationError(
+                "swbt backend is not selected",
+                code="NYX_SWBT_BACKEND_NOT_SELECTED",
+                component="GuiAppServices",
+            )
+        return config
 
     def _shutdown_runtime_builder(self) -> None:
         if self.runtime_builder is None:
@@ -554,6 +658,8 @@ def _flatten_keys(mapping: Mapping[str, Any], prefix: str = "") -> set[str]:
 
 
 def _dotted_get(mapping: Mapping[str, Any], key: str, default: Any = None) -> Any:
+    if key in mapping:
+        return mapping[key]
     value: Any = mapping
     for part in key.split("."):
         if not isinstance(value, Mapping) or part not in value:
@@ -609,4 +715,35 @@ def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
         _normalize_name(_dotted_get(settings, "capture_device", "")),
         capture_fps,
         aspect_box_enabled,
+    )
+
+
+def _transfer_lifetime_resources(
+    previous_builder: MacroRuntimeBuilder,
+    next_builder: MacroRuntimeBuilder,
+    *,
+    keep_preview_frame_source: bool,
+    keep_manual_controller: bool,
+) -> None:
+    if keep_preview_frame_source and getattr(previous_builder, "_preview_frame_source", None):
+        callbacks = previous_builder.detach_frame_source_shutdown_callbacks()
+        next_builder.attach_preview_frame_source(previous_builder.detach_preview_frame_source())
+        next_builder.extend_frame_source_shutdown_callbacks(callbacks)
+    if keep_manual_controller and getattr(previous_builder, "_manual_controller", None):
+        callbacks = previous_builder.detach_controller_shutdown_callbacks()
+        next_builder.attach_manual_controller(previous_builder.detach_manual_controller())
+        next_builder.extend_controller_shutdown_callbacks(callbacks)
+
+
+def _swbt_status_view(
+    config: SwbtControllerConfig,
+    status: object,
+) -> SwbtControllerStatusView:
+    connected = bool(getattr(status, "connected", False))
+    message = str(getattr(status, "message", "connected" if connected else "disconnected"))
+    return SwbtControllerStatusView(
+        connected=connected,
+        controller_type=config.model.settings_value,
+        adapter=config.adapter or "",
+        message=message,
     )

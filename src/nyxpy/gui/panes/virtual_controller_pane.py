@@ -135,6 +135,32 @@ class VirtualControllerPane(QWidget):
     def minimumSizeHint(self) -> QSize:
         return self._layout_size
 
+    def set_manual_input_enabled(self, enabled: bool) -> None:
+        self.model.set_manual_input_enabled(enabled)
+        for widget in self._input_widgets():
+            widget.setEnabled(enabled)
+
+    def _input_widgets(self) -> tuple[QWidget, ...]:
+        return (
+            self.btn_zl,
+            self.btn_l,
+            self.btn_ls,
+            self.btn_rs,
+            self.btn_r,
+            self.btn_zr,
+            self.btn_minus,
+            self.btn_capture,
+            self.btn_home,
+            self.btn_plus,
+            self.btn_x,
+            self.btn_y,
+            self.btn_a,
+            self.btn_b,
+            self.left_stick,
+            self.dpad,
+            self.right_stick,
+        )
+
     def _scaled_rect(
         self,
         base_rect: _WidgetRect,
