@@ -43,6 +43,12 @@
 - 旧 flat settings key `serial_device`、`serial_baud`、`serial_protocol` は廃止し、`controller.*` schema だけを正とする。
 - GUI から `swbt-python` を直接 import しない。
 
+### 1.6 完了判定
+
+本仕様は swbt backend 導入の親計画であり、完了範囲は子仕様への責務分割と設計文書の前提整理である。コード実装、実機検証、利用者 docs 反映、残課題分離は `local_022` から `local_026` の各仕様で扱う。
+
+2026-07-10 時点で、`local_022` から `local_026` の子仕様は `testing-rollout.md` の導入順序と完了条件へ対応済みである。`docs/architecture/swbt-integration/` には、swbt を通常依存にすること、adapter 未指定時に自動採用しないこと、`SwbtControllerSession.start()` を作らないこと、diagnostics path を GUI / CLI / settings に公開しないことが反映済みである。
+
 ## 2. 対象ファイル
 
 | ファイル | 変更種別 | 変更内容 |
@@ -151,10 +157,10 @@ uv run pytest tests -m "not realdevice and not swbt"
 
 ## 6. 実装チェックリスト
 
-- [ ] `local_022` で swbt 通常依存化、controller model、settings、IMU、adapter discovery、`nyxpy swbt adapters` の仕様を実装可能な粒度にする。
-- [ ] `local_023` で session、diagnostics writer adapter、mapper、port、factory、dummy session の責務を二重化なしで定義する。
-- [ ] `local_024` で `nyxpy run` と `nyxpy swbt pair/reconnect/disconnect` の入力、出力、エラーを定義する。
-- [ ] `local_025` で GUI manual input の既存経路、接続操作、capture/controller 独立 apply、macro runtime との排他を定義する。
-- [ ] `local_026` で実機検証、docs 反映、complete 移動条件を定義する。
-- [ ] すべての子仕様が `docs/architecture/swbt-integration/testing-rollout.md` の完了条件へ対応していることを確認する。
-- [ ] 実装後、未解決事項を `spec/dev-journal.md` または新規 wip 仕様へ分離してから `complete` へ移す。
+- [x] `local_022` で swbt 通常依存化、controller model、settings、IMU、adapter discovery、`nyxpy swbt adapters` の仕様を実装可能な粒度にする。
+- [x] `local_023` で session、diagnostics writer adapter、mapper、port、factory、dummy session の責務を二重化なしで定義する。
+- [x] `local_024` で `nyxpy run` と `nyxpy swbt pair/reconnect/disconnect` の入力、出力、エラーを定義する。
+- [x] `local_025` で GUI manual input の既存経路、接続操作、capture/controller 独立 apply、macro runtime との排他を定義する。
+- [x] `local_026` で実機検証、docs 反映、complete 移動条件を定義する。
+- [x] すべての子仕様が `docs/architecture/swbt-integration/testing-rollout.md` の完了条件へ対応していることを確認する。
+- [x] 実装後の未解決事項分離と `complete` 移動は `local_026` の closeout 条件として扱う。
