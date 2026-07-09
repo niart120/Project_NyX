@@ -415,6 +415,132 @@ def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path
     assert manual_controller.closed is True
 
 
+def test_runtime_builder_can_transfer_manual_controller_without_closing_factory(
+    tmp_path: Path,
+) -> None:
+    registry = Registry(definition(tmp_path))
+    manual_controller = FakeControllerOutputPort()
+    controller_shutdowns: list[str] = []
+
+    previous_builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+        manual_controller_factory=lambda: manual_controller,
+        controller_shutdown_callbacks=(lambda: controller_shutdowns.append("previous"),),
+    )
+    next_builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+    )
+
+    assert previous_builder.controller_output_for_manual_input() is manual_controller
+    controller_callbacks = previous_builder.detach_controller_shutdown_callbacks()
+    next_builder.attach_manual_controller(previous_builder.detach_manual_controller())
+    next_builder.extend_controller_shutdown_callbacks(controller_callbacks)
+    previous_builder.shutdown()
+
+    assert manual_controller.closed is False
+    assert controller_shutdowns == []
+
+    next_builder.shutdown()
+
+    assert manual_controller.closed is True
+    assert controller_shutdowns == ["previous"]
+
+
+def test_runtime_builder_can_transfer_preview_source_without_closing_factory(
+    tmp_path: Path,
+) -> None:
+    registry = Registry(definition(tmp_path))
+    preview_source = FakeFrameSourcePort()
+    frame_shutdowns: list[str] = []
+
+    previous_builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+        preview_frame_source_factory=lambda: preview_source,
+        frame_source_shutdown_callbacks=(lambda: frame_shutdowns.append("previous"),),
+    )
+    next_builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+    )
+
+    assert previous_builder.frame_source_for_preview() is preview_source
+    frame_callbacks = previous_builder.detach_frame_source_shutdown_callbacks()
+    next_builder.attach_preview_frame_source(previous_builder.detach_preview_frame_source())
+    next_builder.extend_frame_source_shutdown_callbacks(frame_callbacks)
+    previous_builder.shutdown()
+
+    assert preview_source.closed is False
+    assert frame_shutdowns == []
+
+    next_builder.shutdown()
+
+    assert preview_source.closed is True
+    assert frame_shutdowns == ["previous"]
+
+
 def test_runtime_builder_does_not_cache_failed_preview_source(tmp_path: Path) -> None:
     registry = Registry(definition(tmp_path))
 

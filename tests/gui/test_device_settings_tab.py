@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QLabel
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.gui.dialogs.settings.device_tab import DeviceSettingsTab
 
@@ -29,9 +30,13 @@ class FakeSettings:
             "ponkan_collect_timing": False,
             "n3dsxl_hd_aspect_box_enabled": True,
             "preview_fps": 60,
-            "serial_device": "COM1",
-            "serial_protocol": "CH552",
-            "serial_baud": 9600,
+            "controller.backend": "serial",
+            "controller.serial.device": "COM1",
+            "controller.serial.protocol": "CH552",
+            "controller.serial.baudrate": 9600,
+            "controller.swbt.controller_type": "pro-controller",
+            "controller.swbt.adapter": None,
+            "controller.swbt.key_store_path": None,
             "gui.window_size_preset": "full_hd",
         }
 
@@ -73,6 +78,30 @@ class EmptyDiscovery:
 
     def detect_window_sources(self, timeout_sec=2.0):
         return ()
+
+
+class FakeSwbtAdapterProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self) -> tuple[SwbtAdapterView, ...]:
+        self.calls += 1
+        return (
+            SwbtAdapterView(
+                name="hci0",
+                aliases=("usb-1",),
+                display_name="hci0 - Nintendo Adapter",
+                vendor_id=0x057E,
+                product_id=0x2009,
+                manufacturer="Nintendo",
+                product="Adapter",
+                serial_number=None,
+                bus_number=1,
+                device_address=2,
+                port_numbers=(1,),
+                is_bluetooth_hci=True,
+            ),
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -308,12 +337,81 @@ def test_device_settings_tab_saves_serial_identifier(qtbot):
     assert tab.ser_device.currentText() == "USB Serial Device (COM1)"
     tab.apply()
 
-    assert settings.data["serial_device"] == "COM1"
+    assert settings.data["controller.serial.device"] == "COM1"
+
+
+def test_device_tab_switches_serial_and_swbt_fields(qtbot):
+    settings = FakeSettings()
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.ser_group.isEnabled()
+    assert not tab.swbt_group.isEnabled()
+
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+
+    assert not tab.ser_group.isEnabled()
+    assert tab.swbt_group.isEnabled()
+
+
+def test_device_tab_uses_supported_controller_models_for_choices(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    assert [
+        tab.swbt_controller_type.itemData(i) for i in range(tab.swbt_controller_type.count())
+    ] == ["pro-controller", "joy-con-l", "joy-con-r"]
+
+
+def test_refresh_adapters_does_not_pair_or_reconnect(qtbot):
+    settings = FakeSettings()
+    adapter_provider = FakeSwbtAdapterProvider()
+    calls: list[str] = []
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_adapter_provider=adapter_provider,
+        swbt_pair=lambda: calls.append("pair"),
+        swbt_reconnect=lambda: calls.append("reconnect"),
+    )
+    qtbot.addWidget(tab)
+    settings_before = dict(settings.data)
+
+    tab.refresh_swbt_adapters()
+
+    assert adapter_provider.calls == 2
+    assert calls == []
+    assert settings.data == settings_before
+    assert tab.swbt_adapter.currentData() == "hci0"
+
+
+def test_device_settings_tab_applies_swbt_settings(qtbot):
+    settings = FakeSettings()
+    adapter_provider = FakeSwbtAdapterProvider()
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_adapter_provider=adapter_provider,
+    )
+    qtbot.addWidget(tab)
+
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
+    tab.swbt_adapter.setCurrentIndex(tab.swbt_adapter.findData("hci0"))
+    tab.swbt_key_store.setEditText(".nyxpy/swbt/joy-con-l-bond.json")
+    tab.apply()
+
+    assert settings.data["controller.backend"] == "swbt"
+    assert settings.data["controller.swbt.controller_type"] == "joy-con-l"
+    assert settings.data["controller.swbt.adapter"] == "hci0"
+    assert settings.data["controller.swbt.key_store_path"] == ".nyxpy/swbt/joy-con-l-bond.json"
 
 
 def test_device_settings_tab_does_not_list_stale_serial_setting(qtbot):
     settings = FakeSettings()
-    settings.data["serial_device"] = "COM9"
+    settings.data["controller.serial.device"] = "COM9"
     tab = DeviceSettingsTab(settings, None, device_discovery=EmptyDiscovery())
     qtbot.addWidget(tab)
 

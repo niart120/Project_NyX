@@ -68,9 +68,19 @@ class FakeSettings:
             "capture_source_type": "camera",
             "capture_window_title": "",
             "capture_window_identifier": "",
-            "serial_device": "",
-            "serial_protocol": "CH552",
-            "serial_baud": 9600,
+            "controller": {
+                "backend": "serial",
+                "serial": {
+                    "device": "",
+                    "protocol": "CH552",
+                    "baudrate": 9600,
+                },
+                "swbt": {
+                    "controller_type": "pro-controller",
+                    "adapter": None,
+                    "key_store_path": None,
+                },
+            },
             "capture_fps": None,
             "capture_provider": "ponkan",
             "capture_device_profile": "n3dsxl",
@@ -178,6 +188,10 @@ class FakeBuilder:
     def __init__(self, handle=None) -> None:
         self.handle = handle
         self.start = MagicMock(return_value=handle)
+        self.manual_controller = FakeControllerOutputPort()
+
+    def controller_output_for_manual_input(self):
+        return self.manual_controller
 
 
 class FakeServices:
@@ -191,6 +205,7 @@ class FakeServices:
         self.macro_catalog = FakeCatalog()
         self.ponkan_capture_available = True
         self.builder = FakeBuilder()
+        self.swbt_calls = []
         self.apply_calls = []
         self.next_apply_outcome = SettingsApplyOutcome(
             changed_keys=frozenset(),
@@ -215,6 +230,34 @@ class FakeServices:
 
     def flush_deferred_settings(self):
         return self.next_flush_outcome
+
+    def refresh_swbt_adapters(self):
+        self.swbt_calls.append("refresh")
+        return ()
+
+    def pair_swbt(self):
+        self.swbt_calls.append("pair")
+        return SimpleNamespace(
+            connected=True,
+            controller_type="pro-controller",
+            adapter="hci0",
+            message="connected",
+        )
+
+    def reconnect_swbt(self):
+        self.swbt_calls.append("reconnect")
+        return SimpleNamespace(
+            connected=True,
+            controller_type="pro-controller",
+            adapter="hci0",
+            message="connected",
+        )
+
+    def disconnect_swbt(self):
+        self.swbt_calls.append("disconnect")
+
+    def swbt_status(self):
+        return None
 
     def close(self) -> None:
         self.closed = True
@@ -338,7 +381,7 @@ def test_connection_menu_has_required_children(window: MainWindow) -> None:
         if action.menu() is not None
     ]
 
-    assert child_menus[:3] == ["キャプチャ入力", "シリアルデバイス", "プロトコル"]
+    assert child_menus[:4] == ["キャプチャ入力", "コントローラー", "シリアルデバイス", "プロトコル"]
 
 
 def test_capture_input_menu_nests_candidates_under_input_source(window: MainWindow) -> None:
@@ -496,7 +539,7 @@ def test_connection_menu_applies_capture_device_setting(window: MainWindow) -> N
 
 def test_connection_menu_checks_explicit_dummy_actions(window: MainWindow) -> None:
     window.global_settings.set("capture_device", DUMMY_DEVICE_NAME)
-    window.global_settings.set("serial_device", DUMMY_DEVICE_NAME)
+    window.global_settings.set("controller.serial.device", DUMMY_DEVICE_NAME)
 
     window._refresh_connection_menu()
 
@@ -537,14 +580,14 @@ def test_connection_menu_applies_dummy_device_setting(window: MainWindow) -> Non
 
     serial_dummy.trigger()
 
-    assert window.global_settings.get("serial_device") == DUMMY_DEVICE_NAME
+    assert window.global_settings.get("controller.serial.device") == DUMMY_DEVICE_NAME
 
 
 def test_connection_menu_shows_auto_fallback_without_checking_dummy(
     window: MainWindow,
 ) -> None:
     window.global_settings.set("capture_device", "Missing Camera")
-    window.global_settings.set("serial_device", "COM9")
+    window.global_settings.set("controller.serial.device", "COM9")
 
     window._refresh_connection_menu()
 
@@ -615,14 +658,14 @@ def test_connection_menu_preserves_inactive_source_settings(window: MainWindow) 
 
 
 def test_connection_menu_clamps_baudrate_when_protocol_changes(window: MainWindow) -> None:
-    window.global_settings.set("serial_baud", 115200)
+    window.global_settings.set("controller.serial.baudrate", 115200)
     assert window.protocol_menu is not None
     action = next(action for action in window.protocol_menu.actions() if action.text() == "CH552")
 
     action.trigger()
 
-    assert window.global_settings.get("serial_protocol") == "CH552"
-    assert window.global_settings.get("serial_baud") == 9600
+    assert window.global_settings.get("controller.serial.protocol") == "CH552"
+    assert window.global_settings.get("controller.serial.baudrate") == 9600
 
 
 def test_main_window_wires_preview_touch_to_virtual_controller_model(window: MainWindow) -> None:
@@ -761,7 +804,7 @@ def test_connection_status_is_not_rendered_in_macro_explorer(window: MainWindow)
 
 def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServices):
     services.global_settings.set("capture_device", "Camera1")
-    services.global_settings.set("serial_device", "COM1")
+    services.global_settings.set("controller.serial.device", "COM1")
 
     w = MainWindow(services=services)
     qtbot.addWidget(w)
@@ -773,7 +816,7 @@ def test_status_bar_displays_capture_and_serial_state(qtbot, services: FakeServi
 
 def test_status_bar_does_not_mark_missing_saved_devices_as_connected(qtbot, services: FakeServices):
     services.global_settings.set("capture_device", "Missing Camera")
-    services.global_settings.set("serial_device", "COM9")
+    services.global_settings.set("controller.serial.device", "COM9")
 
     w = MainWindow(services=services)
     qtbot.addWidget(w)
@@ -799,7 +842,7 @@ def test_status_bar_resolves_window_status_by_title_when_identifier_is_stale(
 
 def test_status_bar_displays_capture_profile_state(qtbot, services: FakeServices):
     services.global_settings.set("capture_source_type", "capture")
-    services.global_settings.set("serial_device", "COM1")
+    services.global_settings.set("controller.serial.device", "COM1")
 
     w = MainWindow(services=services)
     qtbot.addWidget(w)
@@ -1019,6 +1062,83 @@ def test_main_window_start_logs_start_exception(window: MainWindow, services: Fa
     assert window.control_pane.run_btn.isEnabled()
 
 
+def test_macro_start_closes_manual_port_before_runtime(window: MainWindow, services: FakeServices):
+    handle = FakeRunHandle()
+    manual = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(manual)
+    select_macro(window)
+
+    def start(_request):
+        assert manual.closed is True
+        return handle
+
+    services.builder.start.side_effect = start
+
+    window._start_macro({})
+
+    assert window.run_handle is handle
+    assert manual.events == [("release", ()), ("close", None)]
+    assert window.virtual_controller.model.controller is None
+    assert window.virtual_controller.model.manual_input_enabled is False
+
+
+def test_pair_success_sets_manual_controller(window: MainWindow, services: FakeServices):
+    services.global_settings.set("controller.backend", "swbt")
+    old_manual = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(old_manual)
+
+    status = window._pair_swbt_controller()
+
+    assert status.connected is True
+    assert services.swbt_calls == ["pair"]
+    assert old_manual.events == [("release", ()), ("close", None)]
+    assert window.virtual_controller.model.controller is services.builder.manual_controller
+    assert window.virtual_controller.model.manual_input_enabled is True
+
+
+def test_reconnect_success_sets_manual_controller(window: MainWindow, services: FakeServices):
+    services.global_settings.set("controller.backend", "swbt")
+
+    window._reconnect_swbt_controller()
+
+    assert services.swbt_calls == ["reconnect"]
+    assert window.virtual_controller.model.controller is services.builder.manual_controller
+
+
+def test_disconnect_releases_and_clears_manual_controller(
+    window: MainWindow, services: FakeServices
+):
+    services.global_settings.set("controller.backend", "swbt")
+    manual = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(manual)
+
+    window._disconnect_swbt_controller()
+
+    assert services.swbt_calls == ["disconnect"]
+    assert manual.events == [("release", ()), ("close", None)]
+    assert window.virtual_controller.model.controller is None
+
+
+def test_runtime_finish_does_not_auto_reconnect(window: MainWindow, services: FakeServices):
+    services.global_settings.set("controller.backend", "swbt")
+    window.virtual_controller.set_manual_input_enabled(False)
+
+    window.on_finished("完了")
+
+    assert services.swbt_calls == []
+    assert window.virtual_controller.model.manual_input_enabled is True
+
+
+def test_swbt_lifecycle_rejected_while_macro_running(window: MainWindow, services: FakeServices):
+    services.global_settings.set("controller.backend", "swbt")
+    window.run_handle = FakeRunHandle(done=False)
+
+    with pytest.raises(RuntimeError):
+        window._pair_swbt_controller()
+
+    assert services.swbt_calls == []
+
+
 def test_execute_macro_with_params_logs_parse_exception(
     window: MainWindow, services: FakeServices, monkeypatch
 ):
@@ -1132,13 +1252,12 @@ def test_apply_settings_pauses_only_for_active_capture_change(
     window: MainWindow, services: FakeServices
 ):
     frame_source = object()
-    controller = object()
     services.next_apply_outcome = SettingsApplyOutcome(
         changed_keys=frozenset({"capture_device"}),
         builder_replaced=True,
         frame_source_changed=True,
         preview_frame_source=frame_source,
-        manual_controller=controller,
+        manual_controller=None,
     )
     window.preview_pane.pause = MagicMock()
     window.preview_pane.set_frame_source = MagicMock()
@@ -1150,24 +1269,26 @@ def test_apply_settings_pauses_only_for_active_capture_change(
     window.preview_pane.pause.assert_called_once_with()
     window.preview_pane.set_frame_source.assert_called_once_with(frame_source)
     window.preview_pane.resume.assert_called_once_with()
-    window.virtual_controller.model.set_controller.assert_called_once_with(controller)
+    window.virtual_controller.model.set_controller.assert_not_called()
 
 
 def test_apply_settings_updates_ports_without_pause_when_capture_unchanged(
     window: MainWindow, services: FakeServices
 ):
     services.next_apply_outcome = SettingsApplyOutcome(
-        changed_keys=frozenset({"serial_device"}),
+        changed_keys=frozenset({"controller.serial.device"}),
         builder_replaced=True,
         frame_source_changed=False,
-        preview_frame_source=object(),
+        preview_frame_source=None,
         manual_controller=object(),
     )
     window.preview_pane.pause = MagicMock()
+    window.preview_pane.set_frame_source = MagicMock()
     window.preview_pane.resume = MagicMock()
 
     window.apply_app_settings()
 
+    window.preview_pane.set_frame_source.assert_not_called()
     window.preview_pane.pause.assert_not_called()
     window.preview_pane.resume.assert_not_called()
 
@@ -1181,7 +1302,7 @@ def test_apply_settings_reports_preview_connection_failure(
         builder_replaced=True,
         frame_source_changed=True,
         preview_frame_source=None,
-        manual_controller=object(),
+        manual_controller=None,
         preview_error=error,
     )
     window.preview_pane.pause = MagicMock()
@@ -1201,7 +1322,7 @@ def test_apply_settings_reports_manual_controller_failure(
 ):
     error = RuntimeError("serial device not found")
     services.next_apply_outcome = SettingsApplyOutcome(
-        changed_keys=frozenset({"serial_device"}),
+        changed_keys=frozenset({"controller.serial.device"}),
         builder_replaced=True,
         frame_source_changed=False,
         preview_frame_source=object(),

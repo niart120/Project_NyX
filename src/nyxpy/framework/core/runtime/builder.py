@@ -78,6 +78,8 @@ class MacroRuntimeBuilder:
         logger_factory: PortFactory[LoggerPort],
         preview_frame_source_factory: LifetimePortFactory[FrameSourcePort] | None = None,
         manual_controller_factory: LifetimePortFactory[ControllerOutputPort] | None = None,
+        controller_shutdown_callbacks: tuple[ShutdownCallback, ...] = (),
+        frame_source_shutdown_callbacks: tuple[ShutdownCallback, ...] = (),
         shutdown_callbacks: tuple[ShutdownCallback, ...] = (),
     ) -> None:
         """Registry、各 port factory、settings snapshot、runtime を保持します。"""
@@ -93,6 +95,8 @@ class MacroRuntimeBuilder:
         self._logger_factory = logger_factory
         self._preview_frame_source_factory = preview_frame_source_factory
         self._manual_controller_factory = manual_controller_factory
+        self._controller_shutdown_callbacks = controller_shutdown_callbacks
+        self._frame_source_shutdown_callbacks = frame_source_shutdown_callbacks
         self._shutdown_callbacks = shutdown_callbacks
         self._preview_frame_source: FrameSourcePort | None = None
         self._manual_controller: ControllerOutputPort | None = None
@@ -156,6 +160,54 @@ class MacroRuntimeBuilder:
             self._manual_controller = self._manual_controller_factory()
         return self._manual_controller
 
+    def detach_preview_frame_source(self) -> FrameSourcePort | None:
+        """GUI lifetime preview port を builder shutdown 対象から外す。"""
+        port = self._preview_frame_source
+        self._preview_frame_source = None
+        self._frame_source_shutdown_callbacks = ()
+        return port
+
+    def attach_preview_frame_source(self, port: FrameSourcePort | None) -> None:
+        """既存 GUI lifetime preview port をこの builder の管理下へ移す。"""
+        self._preview_frame_source = port
+
+    def detach_frame_source_shutdown_callbacks(self) -> tuple[ShutdownCallback, ...]:
+        """Preview port が依存する shutdown callback を builder shutdown 対象から外す。"""
+        callbacks = self._frame_source_shutdown_callbacks
+        self._frame_source_shutdown_callbacks = ()
+        return callbacks
+
+    def extend_frame_source_shutdown_callbacks(
+        self,
+        callbacks: tuple[ShutdownCallback, ...],
+    ) -> None:
+        """移管された preview port 用の shutdown callback を追加する。"""
+        self._frame_source_shutdown_callbacks += callbacks
+
+    def detach_manual_controller(self) -> ControllerOutputPort | None:
+        """GUI lifetime manual controller port を builder shutdown 対象から外す。"""
+        port = self._manual_controller
+        self._manual_controller = None
+        self._controller_shutdown_callbacks = ()
+        return port
+
+    def attach_manual_controller(self, port: ControllerOutputPort | None) -> None:
+        """既存 GUI lifetime manual controller port をこの builder の管理下へ移す。"""
+        self._manual_controller = port
+
+    def detach_controller_shutdown_callbacks(self) -> tuple[ShutdownCallback, ...]:
+        """Manual controller port が依存する shutdown callback を builder shutdown 対象から外す。"""
+        callbacks = self._controller_shutdown_callbacks
+        self._controller_shutdown_callbacks = ()
+        return callbacks
+
+    def extend_controller_shutdown_callbacks(
+        self,
+        callbacks: tuple[ShutdownCallback, ...],
+    ) -> None:
+        """移管された manual controller 用の shutdown callback を追加する。"""
+        self._controller_shutdown_callbacks += callbacks
+
     def shutdown(self) -> None:
         errors: list[Exception] = []
         for port in (self._manual_controller, self._preview_frame_source):
@@ -167,11 +219,24 @@ class MacroRuntimeBuilder:
                 errors.append(exc)
         self._manual_controller = None
         self._preview_frame_source = None
+        for callback in self._controller_shutdown_callbacks:
+            try:
+                callback()
+            except Exception as exc:
+                errors.append(exc)
+        self._controller_shutdown_callbacks = ()
+        for callback in self._frame_source_shutdown_callbacks:
+            try:
+                callback()
+            except Exception as exc:
+                errors.append(exc)
+        self._frame_source_shutdown_callbacks = ()
         for callback in self._shutdown_callbacks:
             try:
                 callback()
             except Exception as exc:
                 errors.append(exc)
+        self._shutdown_callbacks = ()
         if errors:
             raise ExceptionGroup("Runtime builder shutdown failed", errors)
 
@@ -237,11 +302,12 @@ def create_device_runtime_builder(
         allow_dummy=allow_dummy,
         detection_timeout_sec=detection_timeout_sec,
     )
-    shutdown_callbacks = _controller_shutdown_callbacks(
+    controller_shutdown_callbacks = _controller_shutdown_callbacks(
         config=controller_config,
         serial_factory=serial_factory,
         swbt_factory=swbt_factory,
-    ) + (frame_factory.close,)
+    )
+    frame_source_shutdown_callbacks = (frame_factory.close,)
 
     return MacroRuntimeBuilder(
         project_root=project_root,
@@ -285,7 +351,8 @@ def create_device_runtime_builder(
             allow_dummy=lifetime_dummy(),
             detection_timeout_sec=detection_timeout_sec,
         ),
-        shutdown_callbacks=shutdown_callbacks,
+        controller_shutdown_callbacks=controller_shutdown_callbacks,
+        frame_source_shutdown_callbacks=frame_source_shutdown_callbacks,
     )
 
 

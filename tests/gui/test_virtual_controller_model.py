@@ -59,6 +59,31 @@ def test_missing_controller_is_noop() -> None:
     assert model.pressed_buttons == set()
 
 
+def test_manual_input_disabled_is_noop() -> None:
+    controller = FakeControllerOutputPort()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+
+    model.set_manual_input_enabled(False)
+    model.button_press(Button.B)
+    model.set_hat_direction(Hat.UP)
+
+    assert model.pressed_buttons == set()
+    assert controller.events == []
+
+
+def test_release_all_clears_state_and_releases_controller() -> None:
+    controller = FakeControllerOutputPort()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+    model.button_press(Button.A)
+    model.set_hat_direction(Hat.UP)
+
+    model.release_all()
+
+    assert model.pressed_buttons == set()
+    assert model.current_hat == Hat.CENTER
+    assert controller.events[-1] == ("release", ())
+
+
 def test_set_controller_replaces_controller_output_port() -> None:
     first = FakeControllerOutputPort()
     second = FakeControllerOutputPort()
