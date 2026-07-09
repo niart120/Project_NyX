@@ -1,202 +1,148 @@
-# 入力マッピング設計
+# 入力 mapping
 
-この文書は、NyXPy の `Button`、`Hat`、`LStick`、`RStick` を swbt-python の `Button`、`Stick`、`InputState` へ変換する規則を定義します。
+`NyxSwbtInputMapper` は Project_NyX の controller 入力 model を swbt input model へ変換する。
 
-## 方針
+実装 module は `nyxpy.framework.core.hardware.swbt.mapper` である。
 
-- マッピングは `NyxSwbtInputMapper` に集約する。
+## 原則
+
+- GUI と macro は swbt の `Button` / `Stick` / `IMUFrame` を直接使わない。
 - `SwbtControllerOutputPort` は mapper を呼び、変換規則を持たない。
-- 差分操作を swbt へ連続で投げず、最終的な `InputState` を作って `apply()` する。
-- `ThreeDSButton`、`TouchState`、keyboard 入力は非対応として明示的に落とす。
+- `SwbtControllerSession` は `InputState` を受け取り、入力内容を解釈しない。
+- 非対応 input は silent no-op にしない。
+
+## state
+
+```python
+@dataclass
+class NyxSwbtState:
+    buttons: set[SwbtButton]
+    left_stick: SwbtStick
+    right_stick: SwbtStick
+    imu_frames: tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame]
+```
+
+この state は `SwbtControllerOutputPort` の内部状態である。GUI manual input 専用の state ではない。
 
 ## Button
 
-NyXPy の button と swbt の button は名前が近いため、明示 dict で変換します。
+Project_NyX `Button` を swbt `Button` へ変換する。
 
-```python
-from swbt import Button as SwbtButton
-from nyxpy.framework.core.constants import Button as NyxButton
+| NyX | swbt |
+|---|---|
+| `Button.A` | `swbt.Button.A` |
+| `Button.B` | `swbt.Button.B` |
+| `Button.X` | `swbt.Button.X` |
+| `Button.Y` | `swbt.Button.Y` |
+| `Button.L` | `swbt.Button.L` |
+| `Button.R` | `swbt.Button.R` |
+| `Button.ZL` | `swbt.Button.ZL` |
+| `Button.ZR` | `swbt.Button.ZR` |
+| `Button.PLUS` | `swbt.Button.PLUS` |
+| `Button.MINUS` | `swbt.Button.MINUS` |
+| `Button.HOME` | `swbt.Button.HOME` |
+| `Button.CAPTURE` | `swbt.Button.CAPTURE` |
+| `Button.LCLICK` | `swbt.Button.LEFT_STICK` |
+| `Button.RCLICK` | `swbt.Button.RIGHT_STICK` |
 
-
-BUTTON_MAP: dict[NyxButton, SwbtButton] = {
-    NyxButton.A: SwbtButton.A,
-    NyxButton.B: SwbtButton.B,
-    NyxButton.X: SwbtButton.X,
-    NyxButton.Y: SwbtButton.Y,
-    NyxButton.L: SwbtButton.L,
-    NyxButton.R: SwbtButton.R,
-    NyxButton.ZL: SwbtButton.ZL,
-    NyxButton.ZR: SwbtButton.ZR,
-    NyxButton.PLUS: SwbtButton.PLUS,
-    NyxButton.MINUS: SwbtButton.MINUS,
-    NyxButton.HOME: SwbtButton.HOME,
-    NyxButton.CAP: SwbtButton.CAPTURE,
-    NyxButton.LS: SwbtButton.LEFT_STICK,
-    NyxButton.RS: SwbtButton.RIGHT_STICK,
-}
-```
-
-NyXPy 側は capture button を `CAP`、stick click を `LS` / `RS` として定義しています。swbt-python 側は `CAPTURE`、`LEFT_STICK`、`RIGHT_STICK` です。自動変換ではなく明示 dict にする理由は、名前の違いと偶然一致の両方へ依存しないためです。
+Project_NyX 側に backend 固有ではないが swbt が扱えない button がある場合は `NYX_SWBT_INPUT_UNSUPPORTED` にする。
 
 ## Hat
 
-`Hat` は swbt 側の D-pad button set へ変換します。斜め方向は 2 button 同時押しとして扱います。
+D-pad は button set として扱う。
 
-```python
-from swbt import Button as SwbtButton
-from nyxpy.framework.core.constants import Hat
-
-
-HAT_MAP: dict[Hat, tuple[SwbtButton, ...]] = {
-    Hat.UP: (SwbtButton.DPAD_UP,),
-    Hat.DOWN: (SwbtButton.DPAD_DOWN,),
-    Hat.LEFT: (SwbtButton.DPAD_LEFT,),
-    Hat.RIGHT: (SwbtButton.DPAD_RIGHT,),
-    Hat.UPRIGHT: (SwbtButton.DPAD_UP, SwbtButton.DPAD_RIGHT),
-    Hat.DOWNRIGHT: (SwbtButton.DPAD_DOWN, SwbtButton.DPAD_RIGHT),
-    Hat.DOWNLEFT: (SwbtButton.DPAD_DOWN, SwbtButton.DPAD_LEFT),
-    Hat.UPLEFT: (SwbtButton.DPAD_UP, SwbtButton.DPAD_LEFT),
-    Hat.CENTER: (),
-}
-
-DPAD_BUTTONS = {
-    SwbtButton.DPAD_UP,
-    SwbtButton.DPAD_DOWN,
-    SwbtButton.DPAD_LEFT,
-    SwbtButton.DPAD_RIGHT,
-}
-```
-
-`press(Hat.CENTER)` は D-pad 全解除として扱うか、no-op として扱うかを決める必要があります。既存 serial protocol では `Hat.CENTER` を状態へ入れると方向入力が中央に戻るため、swbt backend でも D-pad 全解除に寄せます。
-
-| 操作 | 扱い |
+| NyX `Hat` | swbt buttons |
 |---|---|
-| `press(Hat.UP)` | D-pad button を全解除してから `DPAD_UP` を追加 |
-| `hold(Hat.UP)` | state 初期化後に `DPAD_UP` を追加 |
-| `release(Hat.UP)` | D-pad button を全解除 |
-| `press(Hat.CENTER)` | D-pad button を全解除 |
-| `hold(Hat.CENTER)` | state 初期化後、D-pad は空 |
-| `release(Hat.CENTER)` | D-pad button を全解除 |
+| `UP` | `DPAD_UP` |
+| `DOWN` | `DPAD_DOWN` |
+| `LEFT` | `DPAD_LEFT` |
+| `RIGHT` | `DPAD_RIGHT` |
+| `UPLEFT` | `DPAD_UP`, `DPAD_LEFT` |
+| `UPRIGHT` | `DPAD_UP`, `DPAD_RIGHT` |
+| `DOWNLEFT` | `DPAD_DOWN`, `DPAD_LEFT` |
+| `DOWNRIGHT` | `DPAD_DOWN`, `DPAD_RIGHT` |
+| `CENTER` | no D-pad button |
+
+`VirtualControllerModel` は `CENTER` に戻ると previous direction を release する。swbt port 側は release に従って state を更新する。
 
 ## Stick
 
-swbt の `Stick.raw()` は `0..4095` の raw 値を受けます。NyXPy の `LStick` / `RStick` が `0..255` の座標を持つ前提では、次の変換を使います。
+NyX の `LStick(angle, strength)` / `RStick(angle, strength)` を swbt `Stick` に変換する。
 
 ```python
-from swbt import Stick as SwbtStick
+def to_stick(angle: float, strength: float) -> SwbtStick:
+    # angle/strength -> normalized x/y -> swbt.Stick.normalized(...)
+    ...
+```
+
+`strength` は `0.0..1.0` に clamp する。中央は `Stick.center()` を使う。
+
+| NyX | swbt |
+|---|---|
+| `LStick.CENTER` | `Stick.center()` |
+| `RStick.CENTER` | `Stick.center()` |
+| `LStick(angle, strength)` | left stick `Stick.normalized(...)` |
+| `RStick(angle, strength)` | right stick `Stick.normalized(...)` |
+
+Joy-Con L は right stick を持たない。Joy-Con R は left stick を持たない。mapper は `SwbtControllerModel.capabilities` を見て拒否する。
+
+## IMU
+
+NyX の `IMUFrame` を swbt `IMUFrame` へ変換する。
+
+```python
+from nyxpy.framework.core.constants import IMUFrame as NyxIMUFrame
+from swbt import IMUFrame as SwbtIMUFrame
 
 
-def stick_8bit_to_12bit(value: int) -> int:
-    if not 0 <= value <= 255:
-        raise ValueError(f"stick value out of range: {value}")
-    return round(value * 4095 / 255)
-
-
-def to_swbt_stick(x: int, y: int, *, invert_y: bool = False) -> SwbtStick:
-    raw_y = 255 - y if invert_y else y
-    return SwbtStick.raw(
-        x=stick_8bit_to_12bit(x),
-        y=stick_8bit_to_12bit(raw_y),
+def to_imu_frame(frame: NyxIMUFrame) -> SwbtIMUFrame:
+    return SwbtIMUFrame.raw(
+        accel=frame.accelerometer,
+        gyro=frame.gyroscope,
     )
 ```
 
-Y 軸の向きは実機で確認します。既存マクロ資産を壊さないため、`controller.swbt.invert_stick_y` を設定として持たせます。既定値は `false` です。
-
-## add_to_state
+1 frame が渡された場合は 3 frame に複製する。3 frame が渡された場合は順に使う。それ以外は `NYX_IMU_FRAME_COUNT_INVALID` にする。
 
 ```python
-from nyxpy.framework.core.constants import Button, Hat, LStick, RStick, ThreeDSButton, TouchState
-
-
-class NyxSwbtInputMapper:
-    def __init__(self, *, invert_stick_y: bool = False) -> None:
-        self._invert_stick_y = invert_stick_y
-
-    def add_to_state(self, state: NyxSwbtState, keys: tuple[KeyType, ...]) -> None:
-        for key in keys:
-            match key:
-                case Button():
-                    state.buttons.add(BUTTON_MAP[key])
-                case Hat():
-                    self._set_hat(state, key)
-                case LStick():
-                    state.left_stick = to_swbt_stick(
-                        key.x,
-                        key.y,
-                        invert_y=self._invert_stick_y,
-                    )
-                case RStick():
-                    state.right_stick = to_swbt_stick(
-                        key.x,
-                        key.y,
-                        invert_y=self._invert_stick_y,
-                    )
-                case ThreeDSButton() | TouchState():
-                    raise UnsupportedSwbtInputError(f"swbt backend does not support {key!r}")
-                case _:
-                    raise UnsupportedSwbtInputError(f"unsupported key for swbt backend: {key!r}")
-
-    def _set_hat(self, state: NyxSwbtState, hat: Hat) -> None:
-        state.buttons.difference_update(DPAD_BUTTONS)
-        state.buttons.update(HAT_MAP[hat])
+def normalize_imu_frames(frames: tuple[NyxIMUFrame, ...]) -> tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame]:
+    if len(frames) == 1:
+        converted = to_imu_frame(frames[0])
+        return (converted, converted, converted)
+    if len(frames) == 3:
+        return tuple(to_imu_frame(frame) for frame in frames)  # type: ignore[return-value]
+    raise InvalidSwbtInputError(
+        "imu input requires 1 or 3 frames",
+        code="NYX_IMU_FRAME_COUNT_INVALID",
+    )
 ```
 
-## remove_from_state
+GUI manual input からこの変換を呼ぶ導線は作らない。
+
+## to_input_state
 
 ```python
-class NyxSwbtInputMapper:
-    ...
-
-    def remove_from_state(self, state: NyxSwbtState, keys: tuple[KeyType, ...]) -> None:
-        for key in keys:
-            match key:
-                case Button():
-                    state.buttons.discard(BUTTON_MAP[key])
-                case Hat():
-                    state.buttons.difference_update(DPAD_BUTTONS)
-                case LStick():
-                    state.left_stick = SwbtStick.center()
-                case RStick():
-                    state.right_stick = SwbtStick.center()
-                case ThreeDSButton() | TouchState():
-                    raise UnsupportedSwbtInputError(f"swbt backend does not support {key!r}")
-                case _:
-                    raise UnsupportedSwbtInputError(f"unsupported key for swbt backend: {key!r}")
-```
-
-## complete state
-
-```python
-from swbt import InputState
-
-
-class NyxSwbtInputMapper:
-    ...
-
-    def to_input_state(self, state: NyxSwbtState) -> InputState:
-        return (
-            InputState.neutral()
-            .with_buttons(state.buttons)
-            .with_sticks(
-                left_stick=state.left_stick,
-                right_stick=state.right_stick,
-            )
+def to_input_state(self, state: NyxSwbtState) -> InputState:
+    return (
+        InputState.neutral()
+        .with_buttons(state.buttons)
+        .with_sticks(
+            left_stick=state.left_stick,
+            right_stick=state.right_stick,
         )
+        .with_imu(*state.imu_frames)
+    )
 ```
 
-`InputState` は immutable な完全入力状態です。button と stick を同一 HID report に入れたい場合は、複数の state update API を分けて呼ばず、`InputState` を作って `apply()` します。
+button、stick、IMU を同一 report に入れる必要がある場合は、port が完全 state を作って `apply(state)` する。
 
-## unsupported feature
+## Unsupported input
 
-swbt backend では次を非対応にします。
-
-| NyXPy 入力 | 理由 |
+| case | error |
 |---|---|
-| `keyboard(text)` | NX Pro Controller 相当の gamepad 入力であり、keyboard text input ではない |
-| `type_key(key)` | 同上 |
-| `ThreeDSButton` | 対象が異なる |
-| `TouchState` / `touch_down` / `touch_up` | NX Pro Controller 相当入力には touch surface がない |
-| `disable_sleep` | serial protocol 固有の追加 command であり swbt public API にない |
-| IMU | NyXPy 側の公開 `Command` API に motion 入力がないため初期連携対象外 |
-
-将来 IMU を扱う場合は、`Command` へ直接追加するのではなく、NyXPy の controller 抽象として motion 入力の port 契約を先に設計します。
+| Joy-Con L で right stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| Joy-Con R で left stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| unsupported button | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| touch input | `NotImplementedError` |
+| keyboard input | `NotImplementedError` |
+| invalid IMU frame count | `NYX_IMU_FRAME_COUNT_INVALID` |

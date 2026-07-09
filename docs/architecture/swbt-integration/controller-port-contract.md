@@ -1,19 +1,17 @@
 # SwbtControllerOutputPort の契約
 
-`SwbtControllerOutputPort` は NyXPy の `ControllerOutputPort` を実装します。責務は、NyXPy の `KeyType` 入力を内部状態へ反映し、その完全状態を `SwbtGamepadService` へ渡すことです。
+`SwbtControllerOutputPort` は NyXPy の `ControllerOutputPort` を実装する。責務は、NyXPy の `KeyType` / `IMUFrame` 入力を内部状態へ反映し、完全な `swbt.InputState` として `SwbtControllerSession.apply()` へ渡すことに限定する。
+
+実装 module は `nyxpy.framework.core.hardware.swbt.controller` である。
 
 ## public surface
 
 ```python
 class SwbtControllerOutputPort(ControllerOutputPort):
-    def press(self, keys: tuple[KeyType, ...]) -> None:
-        ...
-
-    def hold(self, keys: tuple[KeyType, ...]) -> None:
-        ...
-
-    def release(self, keys: tuple[KeyType, ...] = ()) -> None:
-        ...
+    def press(self, keys: tuple[KeyType, ...]) -> None: ...
+    def hold(self, keys: tuple[KeyType, ...]) -> None: ...
+    def release(self, keys: tuple[KeyType, ...] = ()) -> None: ...
+    def imu(self, *frames: IMUFrame) -> None: ...
 
     def keyboard(self, text: str) -> None:
         raise NotImplementedError("swbt backend does not support keyboard input.")
@@ -21,15 +19,18 @@ class SwbtControllerOutputPort(ControllerOutputPort):
     def type_key(self, key: KeyCode | SpecialKeyCode) -> None:
         raise NotImplementedError("swbt backend does not support keyboard input.")
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
+
+    @property
+    def supports_imu(self) -> bool:
+        return True
 ```
 
-`supports_touch` は既定値 `False` のままにします。`touch_down()`、`touch_up()`、`disable_sleep()` は `ControllerOutputPort` の既定実装に任せ、非対応を明示します。
+`supports_touch` は `False` である。`touch_down()`、`touch_up()`、`disable_sleep()` は非対応を明示する。
 
 ## 操作の意味
 
-NyXPy の `Command.press()` は次の意味です。
+NyXPy の `Command.press()` は次の手順である。
 
 ```text
 controller.press(keys)
@@ -38,16 +39,17 @@ controller.release(keys)
 wait(wait)
 ```
 
-このため、`SwbtControllerOutputPort.press()` の中で `swbt.tap()` は使いません。`tap()` は押下 report と release report を即時送信する action API であり、NyXPy の `press()` / `release()` の分離と意味がずれます。
+そのため、`SwbtControllerOutputPort.press()` では `swbt.tap()` を使わない。`tap()` は押下 report と押上 report を含む action API であり、NyXPy port の `press()` / `release()` 分離と一致しない。
 
-swbt backend では次の対応にします。
+NyXPy の `Command.hold()` は、現在のキー入力の内部状態を破棄し、指定されたキー入力に変更する操作である。swbt backend でもこの意味に合わせる。
 
-| NyXPy port 操作 | swbt 側の処理 |
+| NyXPy port 操作 | swbt backend の処理 |
 |---|---|
-| `press(keys)` | 現在状態へ keys を追加し、完全状態を service へ反映する |
-| `hold(keys)` | 現在状態を破棄し、keys のみを保持する状態を service へ反映する |
-| `release(keys)` | 現在状態から keys を除去し、完全状態を service へ反映する |
-| `release()` | 全入力を neutral へ戻す |
+| `press(keys)` | 現在状態へ keys を追加し、完全状態を `apply()` する |
+| `hold(keys)` | 現在状態を破棄し、keys だけを保持する状態を `apply()` する |
+| `release(keys)` | 現在状態から keys を除去し、完全状態を `apply()` する |
+| `release()` | 全入力を neutral へ戻す。IMU も neutral に戻す |
+| `imu(*frames)` | 現在状態の IMU 部分だけを置き換え、完全状態を `apply()` する |
 | `keyboard(text)` | 非対応として `NotImplementedError` |
 | `type_key(key)` | 非対応として `NotImplementedError` |
 | `touch_down` / `touch_up` | 非対応として `NotImplementedError` |
@@ -55,39 +57,44 @@ swbt backend では次の対応にします。
 
 ## 状態管理
 
-port 側に NyXPy 用の状態を持たせます。service に差分操作を連続で投げるより、毎回 `InputState` を作って `apply()` へ渡す方が同時入力の扱いが明確です。
-
-GUI manual input とマクロ runtime は同じ `SwbtGamepadService` を共有します。ただし `SwbtControllerOutputPort` 自体は共有しません。factory は `create()` ごとに新しい port を返し、port の内部状態は常に neutral から始めます。新しい runtime 用 port を作る時点で service へも neutral を送って、manual input 側の残存状態を引き継がないようにします。
+port 側に NyXPy 用の入力状態を持たせる。session に部分更新を投げ続けるのではなく、毎回 `InputState` を構築して `apply()` する。
 
 ```python
 from dataclasses import dataclass, field
-
 from swbt import Button as SwbtButton
+from swbt import IMUFrame as SwbtIMUFrame
 from swbt import Stick as SwbtStick
-
 
 @dataclass
 class NyxSwbtState:
     buttons: set[SwbtButton] = field(default_factory=set)
     left_stick: SwbtStick = field(default_factory=SwbtStick.center)
     right_stick: SwbtStick = field(default_factory=SwbtStick.center)
+    imu_frames: tuple[SwbtIMUFrame, SwbtIMUFrame, SwbtIMUFrame] = field(
+        default_factory=lambda: (
+            SwbtIMUFrame.neutral(),
+            SwbtIMUFrame.neutral(),
+            SwbtIMUFrame.neutral(),
+        )
+    )
 ```
 
-完全状態の生成は mapper に集約します。
+完全状態の構築は mapper に集約する。
 
 ```python
 from swbt import InputState
 
-
-def to_input_state(state: NyxSwbtState) -> InputState:
-    return (
-        InputState.neutral()
-        .with_buttons(state.buttons)
-        .with_sticks(
-            left_stick=state.left_stick,
-            right_stick=state.right_stick,
+class NyxSwbtInputMapper:
+    def to_input_state(self, state: NyxSwbtState) -> InputState:
+        return (
+            InputState.neutral()
+            .with_buttons(state.buttons)
+            .with_sticks(
+                left_stick=state.left_stick,
+                right_stick=state.right_stick,
+            )
+            .with_imu(*state.imu_frames)
         )
-    )
 ```
 
 ## 実装骨子
@@ -95,7 +102,7 @@ def to_input_state(state: NyxSwbtState) -> InputState:
 ```python
 from threading import RLock
 
-from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
+from nyxpy.framework.core.constants import IMUFrame, KeyCode, KeyType, SpecialKeyCode
 from nyxpy.framework.core.io.ports import ControllerOutputPort
 
 
@@ -103,17 +110,17 @@ class SwbtControllerOutputPort(ControllerOutputPort):
     def __init__(
         self,
         *,
-        service: SwbtGamepadService,
+        session: SwbtControllerSession,
         mapper: NyxSwbtInputMapper,
-        reset_on_open: bool = True,
+        reset_on_create: bool = True,
     ) -> None:
-        self._service = service
+        self._session = session
         self._mapper = mapper
         self._state = NyxSwbtState()
         self._lock = RLock()
         self._closed = False
-        if reset_on_open:
-            self._service.neutral()
+        if reset_on_create:
+            self._session.neutral()
 
     def press(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
@@ -133,61 +140,38 @@ class SwbtControllerOutputPort(ControllerOutputPort):
             self._ensure_open()
             if not keys:
                 self._state = NyxSwbtState()
-                self._service.neutral()
+                self._session.neutral()
                 return
             self._mapper.remove_from_state(self._state, keys)
             self._apply_locked()
 
-    def keyboard(self, text: str) -> None:
-        raise NotImplementedError("swbt backend does not support keyboard input.")
-
-    def type_key(self, key: KeyCode | SpecialKeyCode) -> None:
-        raise NotImplementedError("swbt backend does not support keyboard input.")
+    def imu(self, *frames: IMUFrame) -> None:
+        with self._lock:
+            self._ensure_open()
+            self._mapper.set_imu(self._state, frames)
+            self._apply_locked()
 
     def close(self) -> None:
         with self._lock:
             if self._closed:
                 return
             self._state = NyxSwbtState()
-            self._service.neutral()
+            self._session.neutral()
             self._closed = True
 
     def _apply_locked(self) -> None:
         state = self._mapper.to_input_state(self._state)
-        self._service.apply(state)
-
-    def _ensure_open(self) -> None:
-        if self._closed:
-            raise RuntimeError("controller output port is closed")
+        self._session.apply(state)
 ```
-
-この skeleton では `RuntimeError` を使っていますが、最終実装では NyXPy の例外体系に合わせて `DeviceError` または `ConfigurationError` 派生の専用例外へ寄せます。
-
-## 例外変換
-
-`swbt-python` の例外は NyXPy の framework error へ変換します。macro 側へ `SwbtError` をそのまま漏らさない方針です。
-
-| swbt 側 | NyXPy 側 |
-|---|---|
-| `TransportOpenError` | `ConfigurationError(code="NYX_SWBT_TRANSPORT_OPEN_FAILED")` |
-| `ConnectionTimeoutError` | `ConfigurationError(code="NYX_SWBT_CONNECTION_TIMED_OUT")` |
-| `ConnectionFailedError` | `ConfigurationError(code="NYX_SWBT_CONNECTION_FAILED")` |
-| `InvalidKeyStoreError` | `ConfigurationError(code="NYX_SWBT_KEY_STORE_INVALID")` |
-| `InvalidInputError` | `ValueError` または `DeviceError(code="NYX_SWBT_INPUT_INVALID")` |
-| `ClosedError` | `DeviceError(code="NYX_SWBT_NOT_CONNECTED")` |
-
-`ConfigurationError` に寄せるのは、adapter、key store、pairing 許可、connect timeout といった構成問題が多いためです。実行中の切断は `DeviceError` として扱います。
 
 ## close と finalize
 
-`MacroRuntime` は実行終了時に controller port を close します。swbt backend では `close()` で neutral を送るため、マクロの `finalize()` でも `cmd.release()` を呼ぶと二重 neutral になります。これは許容します。二重 neutral は安全側の操作であり、状態を壊しません。
+`MacroRuntime` は実行終了時に controller port を close する。swbt backend では `close()` で neutral を試みる。マクロの `finalize()` でも `cmd.release()` を呼ぶ場合、neutral が重なるが、安全側の操作として許容する。
 
-`close()` は transport を閉じません。共有 service の完全終了は `SwbtControllerOutputPortFactory.close()` が担当します。CLI では `runtime_builder.shutdown()` が実行直後に呼ばれるため、そのタイミングで transport も閉じます。GUI では backend 設定変更、アプリ終了、または明示的な disconnect 操作まで transport を維持できます。
+transport の完全 close は `SwbtControllerOutputPortFactory.close()` から `SwbtControllerSession.close()` を呼ぶことで行う。
 
-GUI はマクロ実行中に manual input を無効化します。同じ service に対して manual input port と runtime port が同時に state update を送る運用は対象外です。
+## 短い押下の扱い
 
-## 即時送信について
+swbt の state update API は即時送信を保証しない。NyXPy の `press(dur=...)` は、report loop による反映を前提にする。
 
-`swbt-python` の `press()`、`release()`、`sticks()`、`neutral()` は state update API であり、即時送信を保証しません。`tap()` は即時 report を送る action API ですが、NyXPy の port 契約とは一致しません。
-
-そのため、初期実装では「NyXPy の状態を swbt の local state へ反映し、周期 report loop で送る」設計にします。厳密な即時送信が必要になった場合は、`swbt-python` 側に public `flush()` または `send_current()` 相当を追加してから使います。private method へ依存しません。
+`dur` が `report_period_us` より短い場合、対象機器が押下を観測できない可能性がある。実機で短い入力を多用するマクロは、backend ごとの最小押下時間を検証する。

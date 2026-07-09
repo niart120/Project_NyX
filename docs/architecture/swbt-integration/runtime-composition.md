@@ -1,59 +1,38 @@
 # Runtime composition と factory 設計
 
-この設計では、backend 選択を実行時 port に持たせません。構成起点で `serial` または `swbt` の具象 factory を一度だけ選び、`MacroRuntimeBuilder` には `PortFactory[ControllerOutputPort]` を渡します。
+controller backend の選択は、runtime builder を作る構成起点で完了させる。`MacroRuntimeBuilder` は `PortFactory[ControllerOutputPort]` を受け取り、実行時には controller backend を判定しない。
 
-## 結論
+`SwbtControllerOutputPortFactory` の実装 module は `nyxpy.framework.core.hardware.swbt.factory` である。
 
-実行時の依存は次で十分です。
-
-```text
-MacroRuntimeBuilder
-  controller_factory: PortFactory[ControllerOutputPort]
-```
-
-backend 選択は `MacroRuntimeBuilder` の手前で終えます。
+## 構成の流れ
 
 ```text
 settings / CLI / GUI
   ↓
+controller_config_from_settings(...)
+  ↓
 make_controller_port_factory(...)
-  ├─ serial なら SerialControllerOutputPortFactory を束縛
-  └─ swbt なら SwbtControllerOutputPortFactory を束縛
+  ├─ serial: existing serial ControllerOutputPort factory
+  └─ swbt: SwbtControllerOutputPortFactory
   ↓
-MacroRuntimeBuilder(controller_factory=...)
-```
-
-`ControllerOutputPort` の具象実装を隠蔽境界にします。`press()` や `release()` のたびに backend を見て分岐する port は作りません。
-
-## factory 名の整理
-
-現在の `ControllerOutputPortFactory` は名前だけ見ると汎用 factory ですが、実体は serial 専用です。`SerialProtocolInterface` と serial discovery に依存し、`create()` も `name` と `baudrate` を受けます。
-
-推奨する整理:
-
-```text
-ControllerOutputPortFactory
+MacroRuntimeBuilder(controller_factory=..., manual_controller_factory=...)
   ↓
-SerialControllerOutputPortFactory
+ExecutionContext(controller=ControllerOutputPort)
 ```
 
-新規追加:
+GUI manual input は runtime port を迂回しない。現行と同じく `MacroRuntimeBuilder.controller_output_for_manual_input()` から GUI lifetime の `ControllerOutputPort` を受け取り、`VirtualControllerModel.set_controller(...)` へ渡す。
 
-```text
-SwbtControllerOutputPortFactory
-```
-
-この改名では互換 alias を残しません。Project NyX のフレームワーク本体はアルファ版として扱うため、`ControllerOutputPortFactory` の import 利用箇所とテストを同じ変更で `SerialControllerOutputPortFactory` へ更新します。
-
-この 2 つは同じ interface class を実装する必要はありません。どちらも最終的に `ControllerOutputPort` を返せばよいです。
-
-## controller config
-
-設定は controller backend ごとに型を分けます。
+## Controller config
 
 ```python
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+
+
+class ControllerBackend(str, Enum):
+    SERIAL = "serial"
+    SWBT = "swbt"
 
 
 @dataclass(frozen=True)
@@ -65,25 +44,22 @@ class SerialControllerConfig:
 
 @dataclass(frozen=True)
 class SwbtControllerConfig:
+    model: SwbtControllerModel
     adapter: str = "usb:0"
-    key_store_path: Path | None = Path(".nyxpy/swbt/switch-bond.json")
+    key_store_path: Path | None = Path(".nyxpy/swbt/pro-controller-bond.json")
     connect_timeout_sec: float = 30.0
-    allow_pairing: bool = False
-    report_period_us: int = 8000
-    device_name: str = "Pro Controller"
+    operation_timeout_sec: float = 5.0
+    report_period_us: int | None = 8000
     diagnostics_path: Path | None = None
-    connect_on_open: bool = True
-    invert_stick_y: bool = False
+    reset_on_port_create: bool = True
 
 
 ControllerConfig = SerialControllerConfig | SwbtControllerConfig
 ```
 
-`allow_pairing` は通常実行で `False` を既定にします。初回 pairing は CLI option または GUI 操作で明示的に許可します。
+`SwbtControllerConfig` は `controller_type` 文字列を持たない。設定正規化の時点で `SwbtControllerModel` へ解決する。
 
 ## make_controller_port_factory
-
-説明用の形です。実装では既存の `create_device_runtime_builder` 内の `allow_dummy()` と lifetime 設定を使います。
 
 ```python
 from collections.abc import Callable
@@ -91,128 +67,177 @@ from collections.abc import Callable
 from nyxpy.framework.core.io.ports import ControllerOutputPort
 from nyxpy.framework.core.runtime.builder import PortFactory
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
-from nyxpy.framework.core.macro.registry import MacroDefinition
 
 
 def make_controller_port_factory(
     *,
     config: ControllerConfig,
-    serial_factory: SerialControllerOutputPortFactory,
+    serial_factory,
     swbt_factory: SwbtControllerOutputPortFactory,
     allow_dummy: Callable[[RuntimeBuildRequest], bool],
-    timeout_sec: float,
+    detection_timeout_sec: float,
 ) -> PortFactory[ControllerOutputPort]:
     match config:
         case SerialControllerConfig():
-            def create_serial(
-                request: RuntimeBuildRequest,
-                _definition: MacroDefinition,
-            ) -> ControllerOutputPort:
+            def create_serial(request: RuntimeBuildRequest, _definition) -> ControllerOutputPort:
                 return serial_factory.create(
                     name=config.device,
                     baudrate=config.baudrate,
                     allow_dummy=allow_dummy(request),
-                    timeout_sec=timeout_sec,
+                    timeout_sec=detection_timeout_sec,
                 )
-
             return create_serial
 
         case SwbtControllerConfig():
-            def create_swbt(
-                request: RuntimeBuildRequest,
-                _definition: MacroDefinition,
-            ) -> ControllerOutputPort:
+            def create_swbt(request: RuntimeBuildRequest, _definition) -> ControllerOutputPort:
                 return swbt_factory.create(
+                    config=config,
                     allow_dummy=allow_dummy(request),
                     timeout_sec=config.connect_timeout_sec,
                 )
-
             return create_swbt
 ```
 
-ここで `match` は backend 選択のための構成処理です。`ControllerOutputPort` 実装ではありません。
+ここでの `match` は構成処理である。`ControllerOutputPort` 実装内で backend dispatch を行うものではない。
 
-## create_device_runtime_builder の扱い
+## GUI lifetime controller
 
-既存の `create_device_runtime_builder` は serial 名、baudrate、`ControllerOutputPortFactory.create(name=..., baudrate=...)` を前提にしています。swbt を入れるなら、次のどちらかにします。
+既存の runtime builder は GUI lifetime 用 controller を別 factory で受け取れる。swbt backend でもこの仕組みを使う。
 
-| 案 | 内容 | 評価 |
-|---|---|---|
-| A | 既存 helper を serial 用として残し、swbt 用 helper を追加する | 変更範囲は小さいが CLI / GUI 側の分岐が増える |
-| B | helper 内で controller config を正規化し、`PortFactory[ControllerOutputPort]` を作る | controller 以外の組み立てを共通化できる |
+```text
+GuiAppServices.apply_settings(...)
+  -> builder.controller_output_for_manual_input()
+  -> SettingsApplyOutcome.manual_controller
+  -> MainWindow._apply_runtime_ports(...)
+  -> VirtualControllerModel.set_controller(port)
+```
 
-推奨は案 B です。capture、notification、resource、logger の組み立ては既存 helper にまとまっているため、controller だけ helper を分けるより、controller factory 生成だけを差し替える方が保守しやすいです。
+swbt の manual input 用に別 session を作らない。
 
-## lifetime port
+```text
+VirtualControllerModel
+  -> ControllerOutputPort
+  -> SwbtControllerOutputPort
+```
 
-GUI の preview と manual input を考えると、factory は device / service を cache できる必要があります。既存 serial factory は serial device を cache して `SerialControllerOutputPort` を返します。swbt でも同じ考え方にします。
+## SwbtControllerOutputPortFactory
+
+swbt factory は session を cache できる。`create()` ごとに新しい `SwbtControllerOutputPort` を返すが、同じ adapter / controller model / key store の transport resource は `SwbtControllerSession` に集約する。
 
 ```text
 SwbtControllerOutputPortFactory
-  ├─ service key ごとに SwbtGamepadService を cache
+  ├─ config から session key を作る
+  ├─ session key ごとに SwbtControllerSession を cache する
+  ├─ create() で reconnect 済み session を得る
   ├─ create() で SwbtControllerOutputPort を返す
-  └─ close() で service.close() を呼ぶ
+  ├─ pair(config) で明示 pairing を行う
+  ├─ reconnect(config) で明示 reconnect を行う
+  └─ close() で cached session をすべて close する
 ```
 
-service key は少なくとも次を含めます。
+session key に含める値:
 
 ```text
+model.controller_type
 adapter
 key_store_path
 report_period_us
-device_name
 diagnostics_path
-connect_on_open
+operation_timeout_sec
 ```
 
-`allow_pairing` と `connect_timeout_sec` は接続試行ごとの値です。既存 service が未接続なら次の `start()` / `connect()` に使えますが、接続済み service の key には含めません。設定変更で service key が変わる場合は runtime builder を再生成し、古い factory を `close()` します。
-
-GUI と runtime は同じ接続を共有します。CLI 実行だけなら port が service を所有して `close()` で完全終了しても動きますが、実装方針としては CLI でも GUI でも factory が service を所有します。これにより manual input とマクロ実行で reconnect を繰り返さずに済みます。
-
-## close の責務分担
-
-`SwbtControllerOutputPort.close()` は安全停止として `neutral()` を呼びます。完全な transport close は service の所有者が呼びます。
-
-推奨:
+接続試行ごとの値:
 
 ```text
-MacroRuntime finally
-  └─ context.controller.close()
-       └─ neutral を送る
+connect_timeout_sec
+allow_dummy
+```
 
+macro 実行時の接続は reconnect のみである。pairing は runtime の副作用として行わない。
+
+## port 作成
+
+```python
+class SwbtControllerOutputPortFactory:
+    def create(
+        self,
+        *,
+        config: SwbtControllerConfig,
+        allow_dummy: bool,
+        timeout_sec: float,
+    ) -> ControllerOutputPort:
+        session = self._session_for_config(config, allow_dummy=allow_dummy)
+        session.start(timeout_sec=timeout_sec)  # open + reconnect
+        return SwbtControllerOutputPort(
+            session=session,
+            mapper=NyxSwbtInputMapper(model=config.model),
+            reset_on_create=config.reset_on_port_create,
+        )
+```
+
+`session.start()` は保存済み pairing key に基づく reconnect を行う。key store がない場合や key store が不正な場合は `ConfigurationError` に変換する。
+
+## GUI pair / reconnect
+
+GUI の pair / reconnect は入力反映経路ではない。app service から `SwbtControllerOutputPortFactory` の lifecycle method を呼ぶ。
+
+```text
+Pair button
+  -> swbt_factory.pair(config)
+  -> session.open()
+  -> session.pair(timeout_sec=...)
+  -> success: settings / status update
+  -> builder.controller_output_for_manual_input()
+  -> VirtualControllerModel.set_controller(port)
+```
+
+```text
+Reconnect button
+  -> swbt_factory.reconnect(config)
+  -> session.open()
+  -> session.reconnect(timeout_sec=...)
+  -> success: settings / status update
+  -> builder.controller_output_for_manual_input()
+  -> VirtualControllerModel.set_controller(port)
+```
+
+`Pair` / `Reconnect` が成功したあとに GUI manual input を有効化する。失敗した場合は `VirtualControllerModel.set_controller(None)` に戻す。
+
+## macro runtime との排他
+
+GUI lifetime controller と macro runtime controller が同じ adapter を同時に使うと、USB transport の所有権と入力状態が競合する。GUI は次のルールを守る。
+
+| 状態 | 許可する操作 |
+|---|---|
+| disconnected | adapter refresh、pair、reconnect |
+| connected for manual input | 仮想コントローラー操作、release all、disconnect |
+| macro running | manual input、pair、reconnect を無効化 |
+| macro start requested while manual connected | GUI lifetime port を `release()` / `close()` してから runtime を開始 |
+
+runtime 終了後、GUI は自動で reconnect しない。利用者が `Reconnect from pairing key` を押した時だけ GUI lifetime port を再作成する。
+
+## shutdown
+
+```text
 MacroRuntimeBuilder.shutdown()
-  └─ SwbtControllerOutputPortFactory.close()
-       └─ SwbtGamepadService.close()
-            └─ close(neutral=True)
+  ├─ manual ControllerOutputPort.close()
+  ├─ preview FrameSourcePort.close()
+  └─ factory close callbacks
+       └─ SwbtControllerOutputPortFactory.close()
+            └─ SwbtControllerSession.close()
 ```
 
-CLI でも GUI でも port close は neutral だけを担当します。完全 close は factory close に寄せます。CLI では `runtime_builder.shutdown()` がすぐ呼ばれるため、その時点で transport も閉じます。GUI では runtime 終了後も builder が生きている限り transport を維持できます。
+`SwbtControllerOutputPort.close()` は neutral を試みる。transport の完全 close は factory / session close で行う。
 
-## shared service と port state
+## dummy
 
-`SwbtControllerOutputPort` は NyXPy 側の入力状態を持ちます。GUI manual input とマクロ runtime は別 port でも同じ service を共有するため、runtime 開始時は必ず neutral から始めます。
+`allow_dummy=True` の swbt backend では、Bluetooth 接続を開始しない `DummySwbtControllerSession` を使える。
 
-```text
-SwbtControllerOutputPortFactory.create()
-  └─ 新しい SwbtControllerOutputPort を返す
-       ├─ port 内部状態は NyxSwbtState() で初期化
-       └─ 必要に応じて service.neutral() を呼び、共有 service 側も neutral に揃える
-```
+用途:
 
-port の `close()` は内部状態を破棄し、service に neutral を送るだけです。別 port が直前に持っていた状態は維持しません。manual input と runtime 実行を同時に動かさない前提にし、GUI は macro 実行中に manual input 操作を無効化します。
+- mapper test
+- port contract test
+- GUI model test
+- runtime builder test
 
-## dummy fallback
-
-serial backend は dummy serial を持ちます。swbt backend の dummy は、実機なしで macro を走らせる用途に限定します。
-
-```text
-allow_dummy=True
-  serial: DummySerialComm を使う
-  swbt: DummySwbtGamepadService を使う
-
-allow_dummy=False
-  serial: device 未選択または open 失敗で ConfigurationError
-  swbt: adapter 未選択、open 失敗、connect 失敗で ConfigurationError
-```
-
-swbt dummy は実際の Bluetooth 接続を開始しません。`press` / `hold` / `release` を記録し、テストや dry run で検証できるようにします。
+`DummySwbtControllerSession` は受け取った `InputState` を記録する。GUI manual input 専用 session ではない。

@@ -1,236 +1,90 @@
-# テストと段階導入
+# Testing / rollout plan
 
-swbt backend は Bluetooth HID と実機条件に依存するため、テストを単体、fake service 結合、実機の三層に分けます。
+swbt backend は、設定 model、adapter discovery、session、port、runtime integration、GUI 接続操作、実機接続の順に導入する。
 
-## テスト対象
+## 導入順序
 
-| 層 | 対象 | 実機 |
-|---|---|---|
-| mapper unit test | `NyxSwbtInputMapper` の button / hat / stick 変換 | 不要 |
-| port unit test | `SwbtControllerOutputPort` の状態遷移 | 不要 |
-| service unit test | event loop wrapper と例外変換 | 不要。fake `SwitchGamepad` を使う |
-| runtime integration test | `MacroRuntimeBuilder` が swbt port を注入すること | 不要。dummy service を使う |
-| realdevice test | pairing / reconnect / input reflection | 必要 |
-
-## mapper tests
-
-確認する入力:
-
-```text
-Button.A -> SwbtButton.A
-Button.ZL + Hat.UP -> buttons {ZL, DPAD_UP}
-Hat.UP -> Hat.RIGHT -> D-pad が RIGHT のみになる
-release(Hat.UP) -> D-pad 全解除
-LStick(0, 128) -> left stick raw x=0, y=約2056
-RStick(255, 128) -> right stick raw x=4095, y=約2056
-release(LStick(...)) -> left stick center
-```
-
-`invert_stick_y=true` の場合、Y 値が反転することを別テストにします。
-
-## port state tests
-
-```python
-def test_press_then_release_button(dummy_service):
-    port = SwbtControllerOutputPort(service=dummy_service, mapper=NyxSwbtInputMapper())
-
-    port.press((Button.A,))
-    port.release((Button.A,))
-
-    assert dummy_service.states[0].buttons == frozenset({SwbtButton.A})
-    assert dummy_service.states[1].buttons == frozenset()
-```
-
-確認する状態遷移:
-
-```text
-press(A) -> A が追加される
-press(B) -> A と B が残る
-hold(X) -> A/B は消え X のみ残る
-release(X) -> button なし
-release() -> stick も含め neutral
-close() -> neutral が呼ばれる
-close() 二回目 -> 例外なし
-```
-
-## unsupported feature tests
-
-```text
-keyboard("abc") -> NotImplementedError
-type_key(KeyCode("a")) -> NotImplementedError
-touch_down(100, 100) -> NotImplementedError
-disable_sleep(True) -> NotImplementedError
-ThreeDSButton を含む press -> UnsupportedSwbtInputError
-TouchState を含む press -> UnsupportedSwbtInputError
-```
-
-## service tests
-
-`SwitchGamepad` の fake を注入できるよう、service 内部で作成関数を受け取ります。
-
-```python
-class FakeSwitchGamepad:
-    def __init__(self) -> None:
-        self.opened = False
-        self.connected = False
-        self.closed = False
-        self.states: list[InputState] = []
-
-    async def open(self) -> None:
-        self.opened = True
-
-    async def connect(self, *, timeout: float | None, allow_pairing: bool) -> None:
-        self.connected = True
-
-    async def apply(self, state: InputState) -> None:
-        self.states.append(state)
-
-    async def neutral(self) -> None:
-        self.states.append(InputState.neutral())
-
-    async def close(self, *, neutral: bool = True) -> None:
-        self.closed = True
-```
-
-service test の観点:
-
-```text
-start() が open -> connect の順で呼ぶ
-allow_pairing が設定どおり渡る
-apply() が event loop thread 上で実行される
-close() が close(neutral=True) を呼ぶ
-TransportOpenError が ConfigurationError へ変換される
-ConnectionTimeoutError が ConfigurationError へ変換される
-close 後の apply が DeviceError になる
-```
-
-## runtime builder tests
-
-設定ごとに `MacroRuntimeBuilder` へ渡される controller factory を確認します。
-
-```text
-controller.backend 未指定 -> serial factory
-controller.backend="serial" -> SerialControllerOutputPortFactory
-controller.backend="swbt" -> SwbtControllerOutputPortFactory
-CLI override --controller swbt -> serial protocol を生成せず swbt factory
-CLI override --controller serial -> --serial が必須
-CLI override --controller swbt -> --serial は不要
-allow_dummy=True + swbt open 失敗 -> DummySwbtGamepadService
-allow_dummy=False + swbt open 失敗 -> ConfigurationError
-```
-
-`MacroRuntime` の実行テストでは、簡単なマクロを使います。
-
-```python
-class PressAMacro(MacroBase):
-    def run(self, cmd: Command) -> None:
-        cmd.press(Button.A, dur=0.01, wait=0.01)
-```
-
-期待:
-
-```text
-DummySwbtGamepadService に A 押下 state と neutral state が入る
-Command / MacroRuntime / ExecutionContext が swbt を import しない
-```
-
-## realdevice tests
-
-実機テストは既存の `realdevice` marker を使うか、swbt 用 marker を追加します。
-
-```toml
-[tool.pytest.ini_options]
-markers = [
-    "realdevice: tests requiring real hardware devices",
-    "swbt: tests requiring swbt-compatible Bluetooth HID setup",
-]
-```
-
-実行例:
-
-```console
-uv run pytest tests -m "not realdevice and not swbt"
-uv run pytest tests -m swbt --bt-adapter usb:0 --bt-key-store .nyxpy/swbt/test-switch.json
-```
-
-実機テストの内容:
-
-```text
-swbt-probe adapters --json で adapter が見える
-allow_pairing=true で初回 pairing が成功する
-allow_pairing=false で保存済み bond reconnect が成功する
-Button.A が対象機器側に反映される
-D-pad が反映される
-left / right stick が反映される
-close 後に入力が残らない
-```
-
-入力反映の自動判定は難しいため、初期段階では人手確認を含めます。trace の `report_tx`、`connected`、`disconnected` を補助証跡として保存します。
-
-## 段階導入
-
-### Phase 1: 内部構造
-
-- `ControllerOutputPortFactory` を `SerialControllerOutputPortFactory` へ改名する。
-- 互換 alias は残さない。呼び出し元とテストを同じ変更で正 API へ更新する。
-- `make_controller_port_factory()` を追加する。
-- 既存 serial backend のテストを通す。
-
-### Phase 2: swbt backend 最小実装
-
-- optional dependency `swbt` を追加する。
-- `SwbtGamepadConfig`、`SwbtGamepadService`、`SwbtControllerOutputPort` を追加する。
-- button / hat / stick の mapper を追加する。
-- CLI から `--controller swbt` を選べるようにする。
-- swbt backend では `--serial` を不要にし、serial backend では `--serial` を必須にする。
-- swbt backend では `ProtocolFactory.resolve_baudrate()` と `create_protocol()` が呼ばれないことをテストする。
-- dummy service を使った runtime integration test を追加する。
-
-### Phase 3: pairing / reconnect UX
-
-- `--bt-pair`、`--bt-adapter`、`--bt-key-store` を追加する。
-- GUI に backend 選択と adapter refresh を追加する。
-- reconnect 失敗時に no bond / timeout / invalid key store を分けて表示する。
-- diagnostics trace を保存できるようにする。
-
-### Phase 4: 実機検証
-
-- Windows + 専用 USB Bluetooth dongle で pairing / reconnect を確認する。
-- macOS は experimental として adapter open / reconnect を確認する。
-- Linux は未確認なら docs に未確認と明記する。
-- stick Y 軸向きを確認し、`invert_stick_y` の既定値を確定する。
+1. `swbt` optional dependency を追加する。
+2. `nyxpy.framework.core.hardware.swbt` package を追加する。
+3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
+4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。
+5. `SwbtAdapterDiscoveryService` を追加し、CLI `nyxpy swbt adapters` を実装する。
+6. `SwbtControllerSession` と fake session を追加する。
+7. `NyxSwbtInputMapper` に button / D-pad / stick / IMU mapping を追加する。
+8. `SwbtControllerOutputPort` を追加する。
+9. `SwbtControllerOutputPortFactory` を追加し、macro 用 port と GUI lifetime port の両方を生成できるようにする。
+10. runtime builder の構成起点で serial / swbt の factory 選択を行う。
+11. CLI `nyxpy swbt pair` / `nyxpy swbt reconnect` を追加する。
+12. GUI に adapter refresh、controller type、pair、reconnect、disconnect を追加する。
+13. 既存 `VirtualControllerModel` へ swbt port が差し込まれることを確認する。
+14. 実機 test で Pro Controller / Joy-Con L / Joy-Con R の接続と入力を確認する。
 
 ## 完了条件
 
 ```text
-既存 serial backend の挙動が変わらない
-既存マクロが swbt backend でも同じ Command API で動く
-Command / MacroRuntime が swbt を import していない
-SerialProtocolInterface / ProtocolFactory に swbt が入っていない
-swbt なし install で serial backend が動く
-swbt extra install で swbt backend が選べる
-close / cancellation / failure で neutral が試みられる
-unsupported feature が silent failure にならない
+[ ] swbt 固有実装が nyxpy.framework.core.hardware.swbt に収まっている
+[ ] swbt_*.py という module が増えていない
+[ ] hardware/swbt/manual.py が存在しない
+[ ] SwbtManualInputSession が存在しない
+[ ] SwbtGamepadService と SwbtControllerSession が二重化していない
+[ ] runtime config に controller_type 文字列 field が残っていない
+[ ] Literal による controller 種別分岐がない
+[ ] CLI / GUI choices が supported_controller_models() から導出される
+[ ] list_adapters() が GUI / CLI から使える
+[ ] adapter refresh が pairing / reconnect / report loop を開始しない
+[ ] macro run で pairing が暗黙実行されない
+[ ] Command.imu(...) が追加されている
+[ ] 非対応 backend の imu(...) が NotImplementedError になる
+[ ] swbt backend が IMUFrame を InputState.with_imu(...) に入れられる
+[ ] GUI manual input が既存 VirtualControllerModel -> ControllerOutputPort 経路を使う
+[ ] GUI model が swbt を import しない
+[ ] GUI manual input と macro runtime が同じ adapter を同時に開かない
+[ ] GUI に clipboard / CLI command 生成がない
+[ ] GUI に diagnostics editor / controller color editor がない
+[ ] GUI manual input に IMU gesture / pose / raw frame editor がない
+[ ] Joy-Con type ごとの unsupported input が明確に失敗する
+[ ] close 時に neutral を試みる
 ```
 
-## リスク
+## リスクと対策
 
 | リスク | 対策 |
 |---|---|
-| swbt state update API が即時送信を保証しない | NyXPy port 契約では周期 report 反映とし、厳密な即時送信が必要なら swbt-python に public flush を追加する |
-| adapter 名が環境で変わる | GUI / CLI で `swbt-probe adapters --json` を案内する |
-| key store に複数 current peers が入る | 対象機器ごとに key store を分け、`InvalidKeyStoreError` を明示表示する |
-| GUI lifetime と runtime close が競合する | factory が service を所有し、port close は neutral、factory close は完全終了に分ける |
-| serial 既存設定との互換性 | `serial_device` / `serial_baud` を読み続け、新 schema へ正規化する |
-| swbt 依存が通常 install を重くする | optional dependency にする |
-| manual input と runtime が同じ service を更新する | GUI は実行中の manual input を無効化し、runtime port 作成時に neutral へ揃える |
-| diagnostics path 変更が cached service に反映されない | `diagnostics_path` を service key に含め、変更時に builder を再生成する |
+| adapter 名が接続状態で変わる | `list_adapters()` の結果で `aliases` と VID/PID も表示する |
+| key store に複数候補が入る | controller type と対象機器ごとに file を分け、`InvalidKeyStoreError` を明示表示する |
+| GUI manual input と macro runtime が競合する | macro start 前に GUI lifetime port を release/close する |
+| IMU command が非対応 backend で silent no-op になる | 共通 default を `NotImplementedError` にする |
+| Joy-Con type で存在しない入力を送る | `SwbtControllerModel.capabilities` で mapper が拒否する |
+| 短い押下が report loop に載らない | 実機 test で最小 dur を確認し、ドキュメントへ反映する |
+| diagnostics が GUI の通常機能として肥大化する | CLI / 設定 file の developer option に止める |
 
-## 未確定事項
+## 実機確認 checklist
 
-| 項目 | 決める方法 |
-|---|---|
-| stick Y 軸の既定 | 実機で上方向、下方向を確認する |
-| `close()` で完全 disconnect するか | 決定済み。port close は neutral のみ、完全 disconnect は factory close |
-| diagnostics の既定保存先 | CLI は未指定なら無効。GUI は固定 path または無効を既定にし、run artifact 連携は別 PR で決める |
-| swbt public flush の要否 | `press` duration が短いマクロで実機確認し、必要なら swbt-python 側へ追加する |
+```text
+Adapter discovery
+  [ ] adapter が 1 件以上表示される
+  [ ] aliases / VID/PID が表示される
+  [ ] refresh だけでは pairing 待ち受けが開始されない
+
+Pair / reconnect
+  [ ] Pro Controller で pair 成功
+  [ ] 同じ key store で reconnect 成功
+  [ ] Joy-Con L で pair/reconnect 成功
+  [ ] Joy-Con R で pair/reconnect 成功
+  [ ] invalid key store が明確に表示される
+
+Macro input
+  [ ] Button.A press/release
+  [ ] D-pad diagonal
+  [ ] left stick / right stick
+  [ ] Command.imu(...) による IMU neutral / gyro frame
+  [ ] release all / close neutral
+
+GUI manual input
+  [ ] reconnect 後に virtual controller が有効になる
+  [ ] button down/up が反映される
+  [ ] D-pad が反映される
+  [ ] stick が反映される
+  [ ] macro start 前に GUI lifetime port が閉じられる
+  [ ] GUI に IMU 操作 UI がない
+```
