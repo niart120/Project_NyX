@@ -15,12 +15,14 @@ controller_type = "pro-controller"
 adapter = "usb:0"
 key_store_path = ".nyxpy/swbt/pro-controller-bond.json"
 connect_timeout_sec = 30.0
-operation_timeout_sec = 5.0
 report_period_us = 8000
-reset_on_port_create = true
 ```
 
 `controller_type` は settings / CLI / GUI の境界でだけ文字列として扱う。runtime 内部では `SwbtControllerType` と `SwbtControllerModel` に正規化し、`Literal[...]` や raw string key による controller class dispatch を残さない。
+
+`swbt-python` は通常依存である。`nyxpy-fw[swbt]` や `uv sync --extra swbt` を利用者に求めない。
+
+`adapter` が空文字または未指定のまま接続操作を行った場合は、候補が 1 件でも自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。`key_store_path` が未指定なら `.nyxpy/swbt/<controller>-bond.json` を使う。
 
 ## 入力反映の基本方針
 
@@ -100,9 +102,11 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 | adapter refresh | Python API の `list_adapters()` を直接呼ぶ |
 | pairing | 明示操作として扱い、通常の macro run では勝手に pairing しない |
 | reconnect | key store に保存済み pairing 情報があることを前提にする |
+| disconnect | factory-managed cached session を明示的に閉じる。別 process や Switch 側状態は保証しない |
 | input | NyX state から `InputState` を構成し、`apply(state)` を使う |
 | manual input | 既存 `VirtualControllerModel` と `ControllerOutputPort` 経路を使う |
 | unsupported input | silent no-op にせず明示的に失敗させる |
+| diagnostics | swbt diagnostics writer を NyX の `LoggerPort.technical(...)` へ流す。GUI / CLI / settings に path は出さない |
 
 ## 文書一覧
 
@@ -132,6 +136,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 - Pro Controller / Joy-Con L / Joy-Con R の選択
 - pairing と key store への保存
 - 保存済み pairing key に基づく reconnect
+- factory-managed cached session の disconnect
 - `ControllerOutputPort` からの button / D-pad / stick / IMU 入力
 - GUI 仮想コントローラーによる manual input
 
@@ -141,5 +146,6 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 - 左右 Joy-Con を 1 つの controller として扱うこと
 - GUI から CLI 用の値を生成・コピーすること
 - GUI で swbt diagnostics や controller colors を編集すること
+- CLI / GUI / settings に diagnostics path を公開すること
 - GUI manual input から IMU gesture / pose / raw frame を送ること
 - PC の通常 Bluetooth stack をそのまま使うこと

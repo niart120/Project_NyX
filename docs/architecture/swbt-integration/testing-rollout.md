@@ -4,7 +4,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 
 ## 導入順序
 
-1. `swbt` optional dependency を追加する。
+1. `swbt-python>=0.2.0,<0.3.0` を通常依存として追加する。
 2. `nyxpy.framework.core.hardware.swbt` package を追加する。
 3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
 4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。
@@ -14,7 +14,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 8. `SwbtControllerOutputPort` を追加する。
 9. `SwbtControllerOutputPortFactory` を追加し、macro 用 port と GUI lifetime port の両方を生成できるようにする。
 10. runtime builder の構成起点で serial / swbt の factory 選択を行う。
-11. CLI `nyxpy swbt pair` / `nyxpy swbt reconnect` を追加する。
+11. CLI `nyxpy swbt pair` / `nyxpy swbt reconnect` / `nyxpy swbt disconnect` を追加する。
 12. GUI に adapter refresh、controller type、pair、reconnect、disconnect を追加する。
 13. 既存 `VirtualControllerModel` へ swbt port が差し込まれることを確認する。
 14. 実機 test で Pro Controller / Joy-Con L / Joy-Con R の接続と入力を確認する。
@@ -44,6 +44,11 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 [ ] GUI manual input に IMU gesture / pose / raw frame editor がない
 [ ] Joy-Con type ごとの unsupported input が明確に失敗する
 [ ] close 時に neutral を試みる
+[ ] swbt が通常依存であり、`[project.optional-dependencies].swbt` がない
+[ ] adapter 未指定時に自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` になる
+[ ] key store 未指定時に `.nyxpy/swbt/<controller>-bond.json` を使う
+[ ] 実機 test が `@pytest.mark.realdevice` と環境変数 gate で制御される
+[ ] 実機 evidence が `tmp/hardware/swbt/<timestamp>/` に残る
 ```
 
 ## リスクと対策
@@ -56,7 +61,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 | IMU command が非対応 backend で silent no-op になる | 共通 default を `NotImplementedError` にする |
 | Joy-Con type で存在しない入力を送る | `SwbtControllerModel.capabilities` で mapper が拒否する |
 | 短い押下が report loop に載らない | 実機 test で最小 dur を確認し、ドキュメントへ反映する |
-| diagnostics が GUI の通常機能として肥大化する | CLI / 設定 file の developer option に止める |
+| diagnostics が GUI の通常機能として肥大化する | swbt diagnostics writer を `LoggerPort.technical(...)` に流し、GUI / CLI / settings には path を出さない |
 
 ## 実機確認 checklist
 
@@ -72,9 +77,11 @@ Pair / reconnect
   [ ] Joy-Con L で pair/reconnect 成功
   [ ] Joy-Con R で pair/reconnect 成功
   [ ] invalid key store が明確に表示される
+  [ ] disconnect が factory-managed cached session を閉じる
 
 Macro input
   [ ] Button.A press/release
+  [ ] 16ms / 33ms / 50ms の短い押下を確認
   [ ] D-pad diagonal
   [ ] left stick / right stick
   [ ] Command.imu(...) による IMU neutral / gyro frame

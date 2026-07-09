@@ -130,4 +130,6 @@ swbt 例外は Project_NyX の framework error へ変換し、macro / GUI へ `S
 
 ## Diagnostics
 
-`DiagnosticsConfig` は developer option として扱う。GUI の通常操作には diagnostics editor を置かない。
+`DiagnosticsConfig` は swbt の diagnostics writer interface を使うためだけに扱う。NyX は writer を `LoggerPort.technical(...)` へ接続する内部 adapter を持つ。
+
+GUI / CLI / settings には diagnostics path や diagnostics editor を出さない。実機 test でファイル証跡が必要な場合だけ、writer を `tmp/hardware/swbt/<timestamp>/swbt-trace.jsonl` へ tee する。

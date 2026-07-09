@@ -40,6 +40,8 @@ swbt 連携は unit test、session test、CLI test、GUI model test、port contr
 | one adapter | `name` と `aliases` が保持される |
 | discovery exception | `NYX_SWBT_ADAPTER_DISCOVERY_FAILED` |
 | strict match by alias | alias 指定で adapter が解決される |
+| alias ambiguity | `NYX_SWBT_ADAPTER_AMBIGUOUS` |
+| empty adapter | `NYX_SWBT_ADAPTER_NOT_SELECTED` |
 | strict mismatch | `NYX_SWBT_ADAPTER_NOT_FOUND` |
 
 ## session test
@@ -61,7 +63,6 @@ class FakeGamepad:
 検証項目:
 
 - `open()` が event loop と gamepad resource を準備する。
-- `start()` が `open()` 後に `reconnect()` を呼ぶ。
 - `pair()` が `pair(timeout=...)` を呼ぶ。
 - `reconnect()` が `try_reconnect(timeout=...)` または `reconnect(timeout=...)` を呼ぶ。
 - `apply()` が event loop thread へ coroutine を渡し、完了を待つ。
@@ -110,7 +111,8 @@ class FakeGamepad:
 | `nyxpy swbt adapters --json` | JSON を出力 |
 | `nyxpy swbt pair` | session `pair()` を呼ぶ |
 | `nyxpy swbt reconnect` | session `reconnect()` を呼ぶ |
-| dependency missing | `NYX_SWBT_DEPENDENCY_MISSING` |
+| `nyxpy swbt disconnect` | factory-managed cached session を閉じる |
+| adapter 未指定で pair/reconnect/run | `NYX_SWBT_ADAPTER_NOT_SELECTED` |
 
 ## abstraction regression test
 
@@ -128,8 +130,24 @@ class FakeGamepad:
 marker:
 
 ```python
-@pytest.mark.swbt_real_device
+@pytest.mark.realdevice
 ```
+
+実行 gate は pytest option ではなく環境変数で制御する。stdin で operator 確認を待たない。
+
+```powershell
+$env:NYX_REALDEVICE = "1"
+$env:NYX_SWBT = "1"
+$env:NYX_SWBT_ADAPTER = "usb:0"
+$env:NYX_SWBT_CONTROLLER_TYPE = "pro-controller"
+$env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/pro-controller-bond.json"
+$env:NYX_SWBT_OPERATOR_CONFIRMATION = "1"
+uv run pytest tests/hardware/ -m realdevice
+```
+
+必要な環境変数が欠ける場合は skip する。
+
+実機 test の証跡は `tmp/hardware/swbt/<timestamp>/` に置く。`NYX_SWBT_EVIDENCE_DIR` が指定された場合はその directory を使う。diagnostics writer は `LoggerPort.technical(...)` と `tmp/hardware/swbt/<timestamp>/swbt-trace.jsonl` の tee にする。
 
 実機確認:
 
@@ -137,9 +155,11 @@ marker:
 - Pro Controller pair / reconnect
 - Joy-Con L pair / reconnect
 - Joy-Con R pair / reconnect
+- disconnect
 - button press/release
 - D-pad diagonal
 - left/right stick
 - `Command.imu(...)`
+- short press durations: 16ms / 33ms / 50ms
 - close neutral
 - GUI manual input via `ControllerOutputPort`

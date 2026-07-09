@@ -43,3 +43,31 @@
 ### 方針
 
 次の ponkan capture redesign では `ponkan_backend` と `ponkan_read_timeout` 以外の `ponkan_*` を内部 default または開発者向け設定へ落とす破壊的変更を検討する。
+
+## 2026-07-09: swbt backend の通常依存化
+
+### 現状
+
+`spec/agent/wip/local_021` から `local_026` は swbt backend を `ControllerOutputPort` の正式 backend として GUI、CLI、runtime、docs へ入れる前提だが、仕様上は `swbt-python` を optional dependency として扱っている。
+
+### 観察
+
+通常依存には `pyserial`、`PySide6`、`opencv-python`、`paddlepaddle` が既に含まれている。swbt だけを optional にすると、`supported_controller_models()` や CLI / GUI choices に未導入時の分岐が増える。
+
+### 方針
+
+`swbt-python>=0.2.0,<0.3.0` は `[project].dependencies` へ格上げする。`spec/agent/wip/local_021` から `local_026` に加えて、`docs/architecture/swbt-integration/` も optional extra 前提から通常 backend 前提へ更新する。
+
+## 2026-07-09: 実機テスト gate の見直し
+
+### 現状
+
+既存の実機テストは `@pytest.mark.realdevice` と `NYX_REALDEVICE`、`NYX_REAL_SERIAL_PORT`、`NYX_N3DSXL_CAPTURE` などの環境変数で制御している。swbt 実機テストも当面は同じ方式に合わせる。
+
+### 観察
+
+環境変数だけで実機テスト条件を表す方式は、必要条件、operator confirmation、証跡保存先、controller type の組み合わせが増えると実行手順が読みにくくなる。
+
+### 方針
+
+今回の swbt 仕様修正では既存方式に合わせる。実機テスト全体の gate、設定入力、証跡保存、operator confirmation の扱いは別途見直す。

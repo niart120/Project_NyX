@@ -44,7 +44,7 @@ Bumble USB Bluetooth HID transport
 | `io` | `ControllerOutputPort` の契約を定義する |
 | `hardware.swbt` | controller 種別解決、adapter discovery、pairing、reconnect、event loop、input mapping を扱う |
 | `gui` | adapter 更新、pair、reconnect、controller 種別指定、既存仮想コントローラーからの manual input を扱う |
-| `cli` | adapter 一覧、pair、reconnect、run option を公開する |
+| `cli` | adapter 一覧、pair、reconnect、disconnect、run option を公開する |
 
 ## 推奨ファイル配置
 
@@ -103,7 +103,7 @@ src/nyxpy/framework/core/hardware/swbt/errors.py
 
 ## import policy
 
-`swbt-python` は optional dependency なので、swbt backend が無効な環境で top-level import error を起こさない。
+`swbt-python` は通常依存である。ただし依存方向を明確にするため、`swbt` の import は `hardware.swbt` package と swbt public API を説明する文書内に閉じる。
 
 | 場所 | import 方針 |
 |---|---|
@@ -113,7 +113,7 @@ src/nyxpy/framework/core/hardware/swbt/errors.py
 | `runtime.builder` | `swbt` を直接 import しない。factory 注入に止める |
 | `gui` | `swbt` を直接 import しない。app service / factory 経由で扱う |
 
-`swbt` が未導入の場合、backend 選択時または swbt CLI 実行時に `ConfigurationError(code="NYX_SWBT_DEPENDENCY_MISSING")` として扱う。
+`swbt` 未導入を通常の runtime 分岐として扱わない。依存解決に失敗する環境は packaging / installation の問題であり、backend ごとの追加導入案内は出さない。
 
 ## GUI manual input の配置
 
