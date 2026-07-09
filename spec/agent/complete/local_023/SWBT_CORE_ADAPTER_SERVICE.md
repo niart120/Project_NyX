@@ -4,13 +4,13 @@
 
 ### 1.1 目的
 
-`swbt-python` の async controller API を NyX の同期 `ControllerOutputPort` として扱う core 部品を追加する。対象は `SwbtControllerSession`、diagnostics writer adapter、`NyxSwbtInputMapper`、`SwbtControllerOutputPort`、`SwbtControllerOutputPortFactory`、`DummySwbtControllerSession` である。
+`swbt-python` の同期 controller API を NyX の `ControllerOutputPort` として扱う core 部品を追加する。対象は `SwbtControllerSession`、diagnostics writer adapter、`NyxSwbtInputMapper`、`SwbtControllerOutputPort`、`SwbtControllerOutputPortFactory`、`DummySwbtControllerSession` である。
 
 ### 1.2 用語定義
 
 | 用語 | 定義 |
 |------|------|
-| `SwbtControllerSession` | swbt controller instance、event loop thread、pair/reconnect、apply、neutral、close を所有する backend 内部部品 |
+| `SwbtControllerSession` | swbt controller instance、pair/reconnect、apply、neutral、close を所有する backend 内部部品 |
 | diagnostics writer adapter | swbt 側 diagnostics writer を NyX の `LoggerPort` と実機 evidence writer へ接続する adapter |
 | `DummySwbtControllerSession` | 実機なしテストで `InputState` を記録する session double |
 | `NyxSwbtState` | port が持つ現在入力状態。button、left stick、right stick、IMU frames を含む |
@@ -21,7 +21,7 @@
 
 ### 1.3 背景・問題
 
-serial backend は同期 `send()` で入力を送れる。一方、swbt backend は async resource と report loop を持つため、`ControllerOutputPort` から直接 `swbt-python` の coroutine を呼べない。session が event loop thread と lifecycle を所有し、port は入力状態と mapper に集中する必要がある。
+serial backend は同期 `send()` で入力を送れる。swbt backend も `swbt-python 0.2.0` の公開 controller API は同期呼び出しで扱えるため、NyX 側では session が controller lifecycle と直列化を所有し、port は入力状態と mapper に集中する。
 
 GUI manual input と macro runtime は同じ adapter を同時に開けない。factory は同じ session key の session を cache し、serial factory と同じく接続資源の lifetime を所有する。ただし同じ port object は共有しない。
 
@@ -43,11 +43,17 @@ GUI manual input と macro runtime は同じ adapter を同時に開けない。
 - `hardware/swbt/manual.py`、`SwbtManualInputSession`、`swbt_*.py` module は追加しない。
 - CLI、GUI、runtime builder の接続は `local_024` と `local_025` に残す。
 
+### 1.6 完了結果
+
+- `SwbtControllerSession` は `swbt-python 0.2.0` の同期公開 API に合わせ、event loop thread を持たずに `RLock` で lifecycle と入力適用を直列化する形で実装した。
+- `SwbtControllerOutputPortFactory` は同一 session key の session を再利用し、`create()` では `open()` と `reconnect()` だけを行う。`pair()` は GUI / CLI からの明示操作用として分離した。
+- `SwbtControllerOutputPort` は現在入力状態を保持し、`press` / `hold` / `release` / `imu` ごとに完全な `InputState` を session へ渡す。port close は neutral だけを送り、session close は factory が担う。
+
 ## 2. 対象ファイル
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `src/nyxpy/framework/core/hardware/swbt/session.py` | 新規 | `SwbtControllerSession`、`DummySwbtControllerSession`、event loop bridge、connection lifecycle を実装する |
+| `src/nyxpy/framework/core/hardware/swbt/session.py` | 新規 | `SwbtControllerSession`、`DummySwbtControllerSession`、connection lifecycle を実装する |
 | `src/nyxpy/framework/core/hardware/swbt/diagnostics.py` | 新規 | swbt diagnostics writer を `LoggerPort` と JSONL evidence writer へ接続する adapter を実装する |
 | `src/nyxpy/framework/core/hardware/swbt/mapper.py` | 新規 | `NyxSwbtState`、`NyxSwbtInputMapper`、button / D-pad / stick / IMU mapping を実装する |
 | `src/nyxpy/framework/core/hardware/swbt/controller.py` | 新規 | `SwbtControllerOutputPort` を実装する |
@@ -76,7 +82,7 @@ GUI manual input と macro runtime は同じ adapter を同時に開けない。
 
 ### レイヤー構成
 
-`controller.py` は port contract、`mapper.py` は入力変換、`session.py` は async lifecycle、`factory.py` は session cache と pair/reconnect/disconnect/status 操作を担当する。factory 以外が GUI state や runtime builder を知らない。
+`controller.py` は port contract、`mapper.py` は入力変換、`session.py` は controller lifecycle、`factory.py` は session cache と pair/reconnect/disconnect/status 操作を担当する。factory 以外が GUI state や runtime builder を知らない。
 
 ### 性能要件
 
@@ -90,7 +96,7 @@ GUI manual input と macro runtime は同じ adapter を同時に開けない。
 
 ### 並行性・スレッド安全性
 
-session は event loop thread と `RLock` を持ち、connection operation と input apply を直列化する。`Future.result()` を待つ間に不要な lock を保持し続けない。port は自身の `NyxSwbtState` を `RLock` で守る。
+session は `RLock` を持ち、connection operation と input apply を直列化する。swbt 公開 API が同期 API であるため、event loop thread は追加しない。port は自身の `NyxSwbtState` を `RLock` で守る。
 
 ## 4. 実装仕様
 
@@ -224,7 +230,9 @@ reset_on_port_create
 |------------|----------|----------|
 | ユニット | `test_session_open_does_not_pair_or_reconnect` | `open()` が接続操作を開始しない |
 | ユニット | `test_factory_create_reconnects_without_pairing` | `create()` が reconnect のみ行う |
-| ユニット | `test_session_close_trails_neutral_and_stops_loop` | close 時に neutral と loop stop を行う |
+| ユニット | `test_session_pair_reconnect_apply_status_and_close` | pair / reconnect / apply / status / close の同期 lifecycle |
+| ユニット | `test_session_requires_adapter_before_open` | adapter 未選択時の session open 失敗 |
+| ユニット | `test_dummy_session_records_state_without_bluetooth_transport` | dummy session が Bluetooth transport を開かず state を記録する |
 | ユニット | `test_diagnostics_writer_logs_to_logger_port` | swbt diagnostics が technical log へ流れる |
 | ユニット | `test_diagnostics_writer_can_tee_to_jsonl` | 実機 evidence 用 tee writer |
 | ユニット | `test_mapper_maps_buttons_with_current_nyx_names` | `CAP` / `LS` / `RS` を swbt 名へ変換する |
@@ -232,11 +240,13 @@ reset_on_port_create
 | ユニット | `test_mapper_converts_stick_xy_and_rejects_joycon_missing_stick` | stick 変換と Joy-Con capability |
 | ユニット | `test_mapper_normalizes_imu_one_or_three_frames` | IMU frame 数の規則 |
 | ユニット | `test_port_press_hold_release_apply_complete_state` | port 操作が完全 state を apply する |
+| ユニット | `test_port_imu_and_release_all_use_neutral` | IMU と release all が neutral state を使う |
 | ユニット | `test_port_close_sends_neutral_without_session_close` | port close は transport を閉じない |
-| ユニット | `test_factory_reuses_session_for_same_key` | 同じ key で session を共有し port は新規 |
-| ユニット | `test_factory_pair_reconnect_are_explicit_operations` | pair/reconnect が明示操作として session へ渡る |
-| ユニット | `test_factory_disconnect_closes_cached_session_only` | disconnect が cached session だけを閉じる |
-| ユニット | `test_factory_status_returns_cached_session_status` | status が factory-managed session 状態を返す |
+| ユニット | `test_port_rejects_backend_unsupported_apis` | touch / keyboard / sleep control を silent no-op にしない |
+| ユニット | `test_factory_reuses_session_for_same_key_and_ports_are_new` | 同じ key で session を共有し port は新規 |
+| ユニット | `test_factory_allows_dummy_fallback_only_for_create` | dummy fallback が create だけに限定される |
+| ユニット | `test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations` | pair / reconnect / disconnect / status が明示操作として session へ渡る |
+| ユニット | `test_factory_close_closes_cached_sessions` | factory close が cached session を閉じる |
 | ユニット | `test_factory_does_not_create_manual_session_type` | `SwbtManualInputSession` が存在しない |
 
 検証コマンド:
@@ -246,22 +256,24 @@ uv run ruff format .
 uv run ruff check .
 uv run ty check src/nyxpy --output-format concise --no-progress
 uv run pytest tests/unit/framework/hardware/swbt/test_session.py tests/unit/framework/hardware/swbt/test_diagnostics.py tests/unit/framework/hardware/swbt/test_mapper.py tests/unit/framework/hardware/swbt/test_controller.py tests/unit/framework/hardware/swbt/test_factory.py
+uv run pytest tests/unit/framework/hardware/swbt tests/unit/framework/io/test_controller_config.py tests/unit/framework/io/test_ports.py tests/unit/framework/runtime/test_default_command_ports.py tests/unit/cli/test_swbt_cli.py tests/unit/cli/test_run_cli_parser.py tests/unit/framework/settings/test_settings_schema.py
+uv run pytest tests/unit -m "not realdevice and not swbt"
 ```
 
 ## 6. 実装チェックリスト
 
-- [ ] `SwbtControllerSession` を実装し、open と pair/reconnect を分離する。
-- [ ] `start()` を追加せず、factory `create()` から `open()` + `reconnect()` を呼ぶ。
-- [ ] session の event loop thread、operation timeout、close idempotency を実装する。
-- [ ] swbt diagnostics writer を `LoggerPort` と JSONL evidence writer へ接続する adapter を実装する。
-- [ ] `DummySwbtControllerSession` を実装し、Bluetooth transport を開かず state を記録する。
-- [ ] `NyxSwbtState` と `NyxSwbtInputMapper` を実装する。
-- [ ] button、D-pad、stick、IMU、Joy-Con capability の mapper test を追加する。
-- [ ] `SwbtControllerOutputPort` を実装し、非対応入力を silent no-op にしない。
-- [ ] port close と release all で IMU を含め neutral に戻す。
-- [ ] port close が session を閉じないことを確認する。
-- [ ] `SwbtControllerOutputPortFactory` を実装し、session key と session cache を管理する。
-- [ ] `create()` が暗黙 pairing せず reconnect のみ行うことを確認する。
-- [ ] `pair()` / `reconnect()` / `disconnect()` / `status()` を明示 lifecycle 操作として実装する。
-- [ ] `pair()` / `reconnect()` が dummy fallback しないことを確認する。
-- [ ] `hardware/swbt/manual.py`、`SwbtManualInputSession`、`swbt_*.py` module がないことを静的に確認する。
+- [x] `SwbtControllerSession` を実装し、open と pair/reconnect を分離する。
+- [x] `start()` を追加せず、factory `create()` から `open()` + `reconnect()` を呼ぶ。
+- [x] `swbt-python 0.2.0` の同期公開 API に合わせ、session の直列化と close idempotency を実装する。
+- [x] swbt diagnostics writer を `LoggerPort` と JSONL evidence writer へ接続する adapter を実装する。
+- [x] `DummySwbtControllerSession` を実装し、Bluetooth transport を開かず state を記録する。
+- [x] `NyxSwbtState` と `NyxSwbtInputMapper` を実装する。
+- [x] button、D-pad、stick、IMU、Joy-Con capability の mapper test を追加する。
+- [x] `SwbtControllerOutputPort` を実装し、非対応入力を silent no-op にしない。
+- [x] port close と release all で IMU を含め neutral に戻す。
+- [x] port close が session を閉じないことを確認する。
+- [x] `SwbtControllerOutputPortFactory` を実装し、session key と session cache を管理する。
+- [x] `create()` が暗黙 pairing せず reconnect のみ行うことを確認する。
+- [x] `pair()` / `reconnect()` / `disconnect()` / `status()` を明示 lifecycle 操作として実装する。
+- [x] `pair()` / `reconnect()` が dummy fallback しないことを確認する。
+- [x] `hardware/swbt/manual.py`、`SwbtManualInputSession`、`swbt_*.py` module がないことを静的に確認する。
