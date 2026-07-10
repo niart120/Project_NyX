@@ -11,7 +11,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 class RecordingSession:
-    def __init__(self, *, fail_reconnect: bool = False) -> None:
+    def __init__(self, *, fail_pair: bool = False, fail_reconnect: bool = False) -> None:
+        self.fail_pair = fail_pair
         self.fail_reconnect = fail_reconnect
         self.open_calls = 0
         self.pair_calls = 0
@@ -25,6 +26,8 @@ class RecordingSession:
 
     def pair(self, *, timeout_sec: float):
         self.pair_calls += 1
+        if self.fail_pair:
+            raise ConfigurationError("pair failed", code="NYX_SWBT_CONNECTION_FAILED")
         self.connected = True
         return ("pair", timeout_sec)
 
@@ -97,12 +100,43 @@ def test_factory_allows_dummy_fallback_only_for_create() -> None:
 
     assert port.supports_imu is True
     assert real.reconnect_calls == 1
+    assert real.close_calls == 1
 
     explicit = RecordingSession(fail_reconnect=True)
     explicit_factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: explicit)
 
     with pytest.raises(ConfigurationError):
         explicit_factory.reconnect(config(), timeout_sec=1.0)
+
+    assert explicit.close_calls == 1
+
+
+def test_factory_discards_failed_create_session_without_dummy() -> None:
+    session = RecordingSession(fail_reconnect=True)
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    with pytest.raises(ConfigurationError):
+        factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+
+    assert session.open_calls == 1
+    assert session.reconnect_calls == 1
+    assert session.close_calls == 1
+    assert factory.status(cfg) is None
+
+
+def test_factory_discards_failed_pair_session() -> None:
+    session = RecordingSession(fail_pair=True)
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    with pytest.raises(ConfigurationError):
+        factory.pair(cfg, timeout_sec=1.0)
+
+    assert session.open_calls == 1
+    assert session.pair_calls == 1
+    assert session.close_calls == 1
+    assert factory.status(cfg) is None
 
 
 def test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations() -> None:

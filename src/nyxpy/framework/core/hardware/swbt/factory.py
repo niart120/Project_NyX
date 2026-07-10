@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,6 +62,7 @@ class SwbtControllerOutputPortFactory:
             if not session.connected:
                 session.reconnect(timeout_sec=timeout_sec or config.connect_timeout_sec)
         except (ConfigurationError, DeviceError):
+            self._discard_session(key, session)
             if not allow_dummy:
                 raise
             session = self._dummy_session_factory()
@@ -71,17 +73,27 @@ class SwbtControllerOutputPortFactory:
 
     def pair(self, config: SwbtControllerConfig, *, timeout_sec: float | None = None) -> object:
         """明示 pairing を実行する。dummy fallback はしない。"""
+        key = session_key(config)
         session = self._session_for(config)
-        session.open()
-        return session.pair(timeout_sec=timeout_sec or config.connect_timeout_sec)
+        try:
+            session.open()
+            return session.pair(timeout_sec=timeout_sec or config.connect_timeout_sec)
+        except (ConfigurationError, DeviceError):
+            self._discard_session(key, session)
+            raise
 
     def reconnect(
         self, config: SwbtControllerConfig, *, timeout_sec: float | None = None
     ) -> object:
         """明示 reconnect を実行する。dummy fallback はしない。"""
+        key = session_key(config)
         session = self._session_for(config)
-        session.open()
-        return session.reconnect(timeout_sec=timeout_sec or config.connect_timeout_sec)
+        try:
+            session.open()
+            return session.reconnect(timeout_sec=timeout_sec or config.connect_timeout_sec)
+        except (ConfigurationError, DeviceError):
+            self._discard_session(key, session)
+            raise
 
     def disconnect(self, config: SwbtControllerConfig) -> None:
         """factory-managed cached session だけを閉じる。"""
@@ -120,6 +132,17 @@ class SwbtControllerOutputPortFactory:
             session = self._session_factory(config)
             self._sessions[key] = session
         return session
+
+    def _discard_session(
+        self,
+        key: SwbtSessionKey,
+        session: SwbtControllerSessionProtocol,
+    ) -> None:
+        """失敗した session を cache から外し、adapter を解放する。"""
+        if self._sessions.get(key) is session:
+            self._sessions.pop(key, None)
+        with suppress(Exception):
+            session.close()
 
 
 def session_key(config: SwbtControllerConfig) -> SwbtSessionKey:
