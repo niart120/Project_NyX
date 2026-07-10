@@ -160,6 +160,11 @@ class MacroRuntimeBuilder:
             self._manual_controller = self._manual_controller_factory()
         return self._manual_controller
 
+    def discard_manual_controller(self, port: ControllerOutputPort | None) -> None:
+        """GUI が解放した manual controller を builder cache から外す。"""
+        if port is not None and self._manual_controller is port:
+            self._manual_controller = None
+
     def detach_preview_frame_source(self) -> FrameSourcePort | None:
         """GUI lifetime preview port を builder shutdown 対象から外す。"""
         port = self._preview_frame_source

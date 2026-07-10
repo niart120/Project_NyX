@@ -10,6 +10,7 @@ from PySide6.QtCore import QPoint
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog
 
+from nyxpy.framework.core.constants import Button, Hat
 from nyxpy.framework.core.hardware.device_discovery import (
     DUMMY_DEVICE_NAME,
     DeviceDiscoveryResult,
@@ -205,6 +206,7 @@ class FakeServices:
         self.macro_catalog = FakeCatalog()
         self.ponkan_capture_available = True
         self.builder = FakeBuilder()
+        self.discarded_manual_controllers = []
         self.swbt_calls = []
         self.apply_calls = []
         self.next_apply_outcome = SettingsApplyOutcome(
@@ -230,6 +232,11 @@ class FakeServices:
 
     def flush_deferred_settings(self):
         return self.next_flush_outcome
+
+    def discard_manual_controller(self, controller) -> None:
+        self.discarded_manual_controllers.append(controller)
+        if self.builder.manual_controller is controller:
+            self.builder.manual_controller = FakeControllerOutputPort()
 
     def refresh_swbt_adapters(self):
         self.swbt_calls.append("refresh")
@@ -1080,6 +1087,39 @@ def test_macro_start_closes_manual_port_before_runtime(window: MainWindow, servi
     assert manual.events == [("release", ()), ("close", None)]
     assert window.virtual_controller.model.controller is None
     assert window.virtual_controller.model.manual_input_enabled is False
+    assert services.discarded_manual_controllers == [manual]
+
+
+def test_macro_start_clears_manual_controller_visual_state(
+    window: MainWindow, services: FakeServices
+):
+    handle = FakeRunHandle()
+    manual = FakeControllerOutputPort()
+    window.virtual_controller.model.set_controller(manual)
+    window.virtual_controller.model.pressed_buttons.add(Button.A)
+    window.virtual_controller.model.current_hat = Hat.UP
+    select_macro(window)
+    services.builder.start.return_value = handle
+
+    window._start_macro({})
+
+    assert window.virtual_controller.model.pressed_buttons == set()
+    assert window.virtual_controller.model.current_hat == Hat.CENTER
+
+
+def test_macro_start_discards_builder_cached_manual_controller(
+    window: MainWindow, services: FakeServices
+):
+    handle = FakeRunHandle()
+    manual = services.builder.manual_controller
+    window.virtual_controller.model.set_controller(manual)
+    select_macro(window)
+    services.builder.start.return_value = handle
+
+    window._start_macro({})
+
+    assert services.discarded_manual_controllers == [manual]
+    assert services.builder.manual_controller is not manual
 
 
 def test_pair_success_sets_manual_controller(window: MainWindow, services: FakeServices):

@@ -39,6 +39,14 @@ class VirtualControllerModel(QObject):
         self.manual_input_enabled = bool(enabled)
         self.stateChanged.emit()
 
+    def reset_state(self) -> None:
+        """GUI が保持する入力表示状態を neutral に戻す。"""
+        self.pressed_buttons.clear()
+        self.current_hat = Hat.CENTER
+        self.current_l_stick = LStick.CENTER
+        self.current_r_stick = RStick.CENTER
+        self.stateChanged.emit()
+
     def supports_touch_input(self) -> bool:
         return (
             self.manual_input_enabled
@@ -180,10 +188,7 @@ class VirtualControllerModel(QObject):
 
     def release_all(self) -> None:
         """Manual input の保持状態を解除し、controller へ全解除を送る。"""
-        self.pressed_buttons.clear()
-        self.current_hat = Hat.CENTER
-        self.current_l_stick = LStick.CENTER
-        self.current_r_stick = RStick.CENTER
+        self.reset_state()
         self.send_release_command(())
 
     def _can_send_input(self) -> bool:

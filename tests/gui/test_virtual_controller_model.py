@@ -84,6 +84,19 @@ def test_release_all_clears_state_and_releases_controller() -> None:
     assert controller.events[-1] == ("release", ())
 
 
+def test_reset_state_clears_gui_state_without_sending_controller_input() -> None:
+    controller = FakeControllerOutputPort()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+    model.button_press(Button.A)
+    model.set_hat_direction(Hat.UP)
+
+    model.reset_state()
+
+    assert model.pressed_buttons == set()
+    assert model.current_hat == Hat.CENTER
+    assert controller.events == [("press", (Button.A,)), ("press", (Hat.UP,))]
+
+
 def test_set_controller_replaces_controller_output_port() -> None:
     first = FakeControllerOutputPort()
     second = FakeControllerOutputPort()

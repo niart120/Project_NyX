@@ -184,6 +184,11 @@ class GuiAppServices:
         assert self.runtime_builder is not None
         return self.runtime_builder
 
+    def discard_manual_controller(self, controller: ControllerOutputPort | None) -> None:
+        """GUI が解放した manual controller を runtime builder cache から外す。"""
+        if self.runtime_builder is not None:
+            self.runtime_builder.discard_manual_controller(controller)
+
     def apply_settings(self, *, is_run_active: bool = False) -> SettingsApplyOutcome:
         self._discard_unavailable_connection_settings()
         current_settings = deepcopy(self.global_settings.data)

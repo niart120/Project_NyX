@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, resolve_controller_model
 from nyxpy.framework.core.hardware.swbt.factory import (
     SwbtControllerOutputPortFactory,
@@ -89,7 +90,26 @@ def test_factory_reuses_session_for_same_key_and_ports_are_new() -> None:
 
     assert first is not second
     assert session.reconnect_calls == 1
+    assert session.neutral_calls == 3
     assert session_key(config()) == session_key(config())
+    with pytest.raises(Exception) as exc_info:
+        first.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
+
+
+def test_factory_closes_active_port_before_explicit_reconnect() -> None:
+    session = RecordingSession()
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+    assert factory.reconnect(cfg, timeout_sec=2.0) == ("reconnect", 2.0)
+
+    assert session.reconnect_calls == 2
+    assert session.neutral_calls == 2
+    with pytest.raises(Exception) as exc_info:
+        port.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
 
 
 def test_factory_allows_dummy_fallback_only_for_create() -> None:
@@ -155,6 +175,22 @@ def test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations() 
     assert session.reconnect_calls == 1
     assert session.neutral_calls == 1
     assert session.close_calls == 1
+    assert factory.status(cfg) is None
+
+
+def test_factory_disconnect_closes_active_port_and_session() -> None:
+    session = RecordingSession()
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+    factory.disconnect(cfg)
+
+    assert session.neutral_calls == 2
+    assert session.close_calls == 1
+    with pytest.raises(Exception) as exc_info:
+        port.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
     assert factory.status(cfg) is None
 
 
