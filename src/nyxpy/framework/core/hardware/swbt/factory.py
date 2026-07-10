@@ -44,6 +44,7 @@ class SwbtControllerOutputPortFactory:
         self._session_factory = session_factory or (lambda config: SwbtControllerSession(config))
         self._dummy_session_factory = dummy_session_factory or DummySwbtControllerSession
         self._sessions: dict[SwbtSessionKey, SwbtControllerSessionProtocol] = {}
+        self._dummy_session_keys: set[SwbtSessionKey] = set()
         self._active_ports: dict[SwbtSessionKey, SwbtControllerOutputPort] = {}
         self._lock = RLock()
 
@@ -58,9 +59,13 @@ class SwbtControllerOutputPortFactory:
         with self._lock:
             key = session_key(config)
             session = self._sessions.get(key)
+            if session is not None and key in self._dummy_session_keys and not allow_dummy:
+                self._discard_session(key, session)
+                session = None
             if session is None:
                 session = self._session_factory(config)
                 self._sessions[key] = session
+                self._dummy_session_keys.discard(key)
             try:
                 session.open()
                 if not session.connected:
@@ -73,6 +78,7 @@ class SwbtControllerOutputPortFactory:
                 session.open()
                 session.reconnect(timeout_sec=timeout_sec or config.connect_timeout_sec)
                 self._sessions[key] = session
+                self._dummy_session_keys.add(key)
             return self._activate_port(key, session, config)
 
     def pair(self, config: SwbtControllerConfig, *, timeout_sec: float | None = None) -> object:
@@ -108,6 +114,7 @@ class SwbtControllerOutputPortFactory:
         with self._lock:
             key = session_key(config)
             session = self._sessions.pop(key, None)
+            self._dummy_session_keys.discard(key)
             active_port = self._active_ports.pop(key, None)
             if session is None and active_port is None:
                 return
@@ -136,6 +143,7 @@ class SwbtControllerOutputPortFactory:
             sessions = tuple(self._sessions.values())
             self._active_ports.clear()
             self._sessions.clear()
+            self._dummy_session_keys.clear()
             for port in ports:
                 try:
                     port.close()
@@ -152,9 +160,13 @@ class SwbtControllerOutputPortFactory:
     def _session_for(self, config: SwbtControllerConfig) -> SwbtControllerSessionProtocol:
         key = session_key(config)
         session = self._sessions.get(key)
+        if session is not None and key in self._dummy_session_keys:
+            self._discard_session(key, session)
+            session = None
         if session is None:
             session = self._session_factory(config)
             self._sessions[key] = session
+            self._dummy_session_keys.discard(key)
         return session
 
     def _activate_port(
@@ -200,6 +212,7 @@ class SwbtControllerOutputPortFactory:
                 active_port.close()
         if self._sessions.get(key) is session:
             self._sessions.pop(key, None)
+        self._dummy_session_keys.discard(key)
         with suppress(Exception):
             session.close()
 

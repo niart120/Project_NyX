@@ -131,6 +131,47 @@ def test_factory_allows_dummy_fallback_only_for_create() -> None:
     assert explicit.close_calls == 1
 
 
+def test_factory_pair_discards_cached_dummy_session() -> None:
+    failed_real = RecordingSession(fail_reconnect=True)
+    next_real = RecordingSession()
+    dummy = RecordingSession()
+    sessions = iter((failed_real, next_real))
+    factory = SwbtControllerOutputPortFactory(
+        session_factory=lambda _config: next(sessions),
+        dummy_session_factory=lambda: dummy,
+    )
+    cfg = config()
+
+    factory.create(config=cfg, allow_dummy=True, timeout_sec=1.0)
+    assert factory.pair(cfg, timeout_sec=2.0) == ("pair", 2.0)
+
+    assert failed_real.close_calls == 1
+    assert dummy.close_calls == 1
+    assert dummy.pair_calls == 0
+    assert next_real.open_calls == 1
+    assert next_real.pair_calls == 1
+
+
+def test_factory_create_without_dummy_discards_cached_dummy_session() -> None:
+    failed_real = RecordingSession(fail_reconnect=True)
+    next_real = RecordingSession()
+    dummy = RecordingSession()
+    sessions = iter((failed_real, next_real))
+    factory = SwbtControllerOutputPortFactory(
+        session_factory=lambda _config: next(sessions),
+        dummy_session_factory=lambda: dummy,
+    )
+    cfg = config()
+
+    factory.create(config=cfg, allow_dummy=True, timeout_sec=1.0)
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=2.0)
+
+    assert port.supports_imu is True
+    assert dummy.close_calls == 1
+    assert next_real.open_calls == 1
+    assert next_real.reconnect_calls == 1
+
+
 def test_factory_discards_failed_create_session_without_dummy() -> None:
     session = RecordingSession(fail_reconnect=True)
     factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
