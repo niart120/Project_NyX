@@ -66,11 +66,11 @@ nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .ny
 nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
 ```
 
-同じ NyX プロセスが管理している session を閉じます。
+`--adapter` には一覧の代表名または alias を指定できます。alias は接続前に代表名へ正規化されます。候補が 1 件でも未指定値を自動補完しません。不一致または曖昧な alias は `NYX_SWBT_ADAPTER_NOT_FOUND` / `NYX_SWBT_ADAPTER_AMBIGUOUS` で失敗します。
 
-```console
-nyxpy swbt disconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
-```
+相対 key store path は、コマンドを実行した子ディレクトリではなく workspace root を基準に解決されます。
+
+CLI の各操作は別プロセスで新しい factory を作るため、以前のプロセスが持っていた session を閉じる subcommand はありません。継続中の GUI session は GUI の `Disconnect` で閉じてください。
 
 マクロ実行では `--controller swbt` を指定します。key store がない場合でも暗黙の pairing は行いません。
 
@@ -88,6 +88,8 @@ nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-
 | `130` | ユーザ操作で中断された |
 
 失敗時はコンソール表示に加えて `logs/` と `runs/` を確認してください。
+
+swbt の設定・接続エラーでは、説明本文と `NYX_SWBT_*` のエラーコードが表示されます。問い合わせ時は両方を記録してください。
 
 ## マクロ引数を渡す
 

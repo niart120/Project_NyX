@@ -240,6 +240,7 @@ def test_cli_presenter_exit_codes() -> None:
     assert presenter.exit_code(result(RunStatus.SUCCESS)) == 0
     assert presenter.exit_code(result(RunStatus.CANCELLED)) == 130
     assert presenter.exit_code(result(RunStatus.FAILED, "boom")) == 2
+    assert presenter.render_result(result(RunStatus.FAILED, "boom")).code == "NYX_MACRO_FAILED"
 
 
 def test_cli_does_not_accept_notification_secret_args() -> None:

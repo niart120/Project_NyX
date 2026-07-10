@@ -35,13 +35,13 @@ nyxpy gui
 | Baud Rate | protocol の既定値を使う。CH552 の既定値は `9600` |
 | swbt Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` から選ぶ |
 | swbt Adapter | `リロード` で候補を取得し、使う adapter を明示的に選ぶ。候補が 1 件でも自動選択しない |
-| swbt Key Store | pairing key の保存先。未指定時は `.nyxpy/swbt/<controller>-bond.json` |
+| swbt Key Store | pairing key の保存先。未指定時は `.nyxpy/swbt/<controller>-bond.json`。相対 path は workspace root 基準 |
 | swbt Connection | `Pair`、`Reconnect`、`Disconnect` を実行する |
 | Preview FPS | GUI プレビューの更新頻度 |
 
 設定は workspace の `.nyxpy/global.toml` に保存されます。
 
-`Pair` は初回 pairing で key store を作ります。2 回目以降は `Reconnect` を使います。`Disconnect` は NyX の同一プロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
+`Pair` は初回 pairing で key store を作ります。2 回目以降は `Reconnect` を使います。接続状態は操作後の実際の status で判定されます。`Disconnect` は GUI と同じプロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
 
 ## CLI で指定する
 
@@ -72,6 +72,8 @@ nyxpy swbt adapters
 nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
 nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
 ```
+
+一覧に表示された alias も指定できますが、接続時には代表名へ正規化されます。候補が 1 件でも adapter を省略できません。CLI は操作ごとに別プロセスを起動するため、前回の cached session を閉じる subcommand はありません。
 
 マクロ実行時は controller backend を明示します。`swbt` は保存済み key store に基づいて reconnect し、暗黙の pairing は行いません。
 

@@ -22,7 +22,7 @@
 
 現行 controller 出力は serial backend を前提にしており、`ControllerOutputPortFactory` も serial device と protocol に依存している。`swbt-python` は serial protocol ではなく、専用 USB Bluetooth adapter、pairing key、reconnect、周期 report loop を持つ controller 実装である。serial protocol の分岐として追加すると、adapter discovery、session lifetime、GUI manual input、runtime 実行の責務が混ざる。
 
-`docs/architecture/swbt-integration/testing-rollout.md` は、設定 model、adapter discovery、session、port、runtime、GUI、実機検証の順に導入する方針を定めている。本仕様はその導入順序を Project NyX の `spec/agent/wip/local_022` から `local_026` へ分割する親計画である。
+`docs/architecture/swbt-integration/testing-rollout.md` は、設定 model、adapter discovery、session、port、runtime、GUI、実機検証の順に導入する方針を定めている。本仕様はその導入順序を Project NyX の `local_022` から `local_026` へ分割する親計画である。
 
 ### 1.4 期待効果
 
@@ -47,16 +47,16 @@
 
 本仕様は swbt backend 導入の親計画であり、完了範囲は子仕様への責務分割と設計文書の前提整理である。コード実装、実機検証、利用者 docs 反映、残課題分離は `local_022` から `local_026` の各仕様で扱う。
 
-2026-07-10 時点で、`local_022` から `local_026` の子仕様は `testing-rollout.md` の導入順序と完了条件へ対応済みである。`docs/architecture/swbt-integration/` には、swbt を通常依存にすること、adapter 未指定時に自動採用しないこと、`SwbtControllerSession.start()` を作らないこと、diagnostics path を GUI / CLI / settings に公開しないことが反映済みである。
+2026-07-10 時点で、`local_022` から `local_025` は complete、実機検証を担う `local_026` は wip である。本仕様は親計画の作成完了記録であり、swbt rollout 全体の完了を意味しない。
 
 ## 2. 対象ファイル
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
-| `spec/agent/wip/local_022/SWBT_CONTROLLER_FOUNDATION.md` | 変更 | dependency、controller model、settings、IMU command、adapter discovery、`nyxpy swbt adapters` の仕様 |
-| `spec/agent/wip/local_023/SWBT_CORE_ADAPTER_SERVICE.md` | 変更 | session、diagnostics writer adapter、mapper、port、factory、dummy session の仕様 |
-| `spec/agent/wip/local_024/SWBT_RUNTIME_CLI_INTEGRATION.md` | 変更 | runtime builder、`nyxpy run`、`nyxpy swbt pair/reconnect/disconnect` CLI の仕様 |
-| `spec/agent/wip/local_025/SWBT_GUI_SHARED_SERVICE.md` | 変更 | GUI backend 選択、adapter refresh、pair/reconnect/disconnect/status、manual input 排他の仕様 |
+| `spec/agent/complete/local_022/SWBT_CONTROLLER_FOUNDATION.md` | 変更 | dependency、controller model、settings、IMU command、adapter discovery、`nyxpy swbt adapters` の仕様 |
+| `spec/agent/complete/local_023/SWBT_CORE_ADAPTER_SERVICE.md` | 変更 | session、diagnostics writer adapter、mapper、port、factory、dummy session の仕様 |
+| `spec/agent/complete/local_024/SWBT_RUNTIME_CLI_INTEGRATION.md` | 変更 | runtime builder、`nyxpy run`、`nyxpy swbt pair/reconnect` CLI の仕様 |
+| `spec/agent/complete/local_025/SWBT_GUI_SHARED_SERVICE.md` | 変更 | GUI backend 選択、adapter refresh、pair/reconnect/disconnect/status、manual input 排他の仕様 |
 | `spec/agent/wip/local_026/SWBT_REALDEVICE_DOCS_CLOSEOUT.md` | 変更 | 実機検証、docs、完了判定の仕様 |
 | `docs/architecture/swbt-integration/` | 変更 | optional dependency、adapter 自動採用、session start、button 名、diagnostics path 前提を修正する |
 
@@ -77,7 +77,7 @@ macro Command
 
 ### 公開 API 方針
 
-マクロ向けには `Command.imu(...)` を追加する。既存 `press` / `hold` / `release` は backend 非依存のまま維持する。CLI には `nyxpy swbt adapters`、`nyxpy swbt pair`、`nyxpy swbt reconnect`、`nyxpy swbt disconnect` と、`nyxpy run --controller swbt` を追加する。
+マクロ向けには `Command.imu(...)` を追加する。既存 `press` / `hold` / `release` は backend 非依存のまま維持する。CLI には `nyxpy swbt adapters`、`nyxpy swbt pair`、`nyxpy swbt reconnect` と、`nyxpy run --controller swbt` を追加する。CLI は操作ごとに fresh factory を作るため、cached session を閉じる `disconnect` は提供しない。
 
 ### 後方互換性
 
@@ -109,7 +109,7 @@ Project NyX のフレームワーク本体はアルファ版であり、互換 s
 |--------|----------|------|----------|
 | `local_022` | swbt 通常依存化、controller schema、controller model/capabilities、IMU command、adapter discovery、`nyxpy swbt adapters` | `local_021` | `hardware/swbt/config.py` と discovery API の仕様が確定し、adapter 列挙 CLI が no-open で動く |
 | `local_023` | `SwbtControllerSession`、diagnostics writer adapter、mapper、port、factory、dummy session、status/disconnect | `local_022` | 実機なしで button、D-pad、stick、IMU、session lifecycle を検証できる |
-| `local_024` | runtime builder、`nyxpy run`、`nyxpy swbt pair/reconnect/disconnect` | `local_022`, `local_023` | swbt backend で serial protocol 生成を通らず、CLI から明示 pair/reconnect/disconnect できる |
+| `local_024` | runtime builder、`nyxpy run`、`nyxpy swbt pair/reconnect` | `local_022`, `local_023` | swbt backend で serial protocol 生成を通らず、CLI から明示 pair/reconnect できる |
 | `local_025` | GUI backend 選択、adapter refresh、pair/reconnect/disconnect/status、manual input 排他、capture/controller 独立 apply | `local_024` | 既存 `VirtualControllerModel` に swbt port を差し込み、macro 実行中の manual input を止める |
 | `local_026` | 実機検証、docs、完了記録 | `local_022` から `local_025` | Pro Controller / Joy-Con L / Joy-Con R の実機結果と docs 反映が残る |
 
@@ -131,7 +131,7 @@ Project NyX のフレームワーク本体はアルファ版であり、互換 s
 
 ### 未確定事項の扱い
 
-stick Y 軸既定値、短押しの最小 duration、public flush 要否は実機検証で確定する。仕様作成時点では `report_period_us=8000` と NyX 現行 `LStick.x/y` / `RStick.x/y` を前提にし、実機結果で `local_023` または follow-up 仕様へ戻す。実機検証前は swbt backend 固有の最小押下時間を docs で保証しない。
+NyX `0..255`、Y-down から `Stick.normalized`、Y-up への変換規則は単体テストで固定する。Switch 画面上の方向、短押しの最小 duration、public flush 要否は実機検証で確定する。実機検証前は swbt backend 固有の最小押下時間を docs で保証しない。
 
 ## 5. テスト方針
 
@@ -159,8 +159,14 @@ uv run pytest tests -m "not realdevice and not swbt"
 
 - [x] `local_022` で swbt 通常依存化、controller model、settings、IMU、adapter discovery、`nyxpy swbt adapters` の仕様を実装可能な粒度にする。
 - [x] `local_023` で session、diagnostics writer adapter、mapper、port、factory、dummy session の責務を二重化なしで定義する。
-- [x] `local_024` で `nyxpy run` と `nyxpy swbt pair/reconnect/disconnect` の入力、出力、エラーを定義する。
+- [x] `local_024` で `nyxpy run` と `nyxpy swbt pair/reconnect` の入力、出力、エラーを定義する。
 - [x] `local_025` で GUI manual input の既存経路、接続操作、capture/controller 独立 apply、macro runtime との排他を定義する。
 - [x] `local_026` で実機検証、docs 反映、complete 移動条件を定義する。
 - [x] すべての子仕様が `docs/architecture/swbt-integration/testing-rollout.md` の完了条件へ対応していることを確認する。
 - [x] 実装後の未解決事項分離と `complete` 移動は `local_026` の closeout 条件として扱う。
+
+## 7. 2026-07-10 監査追補
+
+本仕様を complete へ移した後の統合監査で、swbt-python 0.2 の async API、stick 座標系、GUI status、CLI process lifetime に不整合が見つかった。`local_022` から `local_025` の完了記録は当時の作業結果として維持し、監査修正は各仕様の追補へ記録する。
+
+Pro Controller、Joy-Con L、Joy-Con R を使う実機検証は未実施である。`local_026` と rollout 全体は未完了のままとする。

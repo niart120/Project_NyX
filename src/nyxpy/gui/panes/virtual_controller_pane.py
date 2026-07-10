@@ -58,6 +58,7 @@ class VirtualControllerPane(QWidget):
         self._create_widgets()
         self._connect_buttons()
         self.apply_layout_size(self._layout_size.width(), self._layout_size.height())
+        self.set_manual_input_enabled(False)
 
     def _create_widgets(self) -> None:
         self.btn_zl = ControllerButton("ZL", self, Button.ZL, is_rectangular=True)
@@ -137,8 +138,9 @@ class VirtualControllerPane(QWidget):
 
     def set_manual_input_enabled(self, enabled: bool) -> None:
         self.model.set_manual_input_enabled(enabled)
+        effective_enabled = self.model.manual_input_enabled
         for widget in self._input_widgets():
-            widget.setEnabled(enabled)
+            widget.setEnabled(effective_enabled)
 
     def _input_widgets(self) -> tuple[QWidget, ...]:
         return (

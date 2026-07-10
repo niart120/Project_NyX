@@ -22,7 +22,7 @@ swbt 連携は unit test、session test、CLI test、GUI model test、port contr
 |---|---|
 | button enum mapping | Project_NyX `Button` が swbt `Button` へ変換される |
 | hat diagonal mapping | `Hat.UPRIGHT` が D-pad 2 button へ変換される |
-| left stick y axis | `LStick.UP` が swbt stick へ変換される |
+| left stick y axis | NyX `0..255`、Y-down の `LStick.UP` が `Stick.normalized`、Y-up へ反転変換される |
 | right stick center | `RStick.CENTER` が `SwbtStick.center()` になる |
 | IMU one frame | 1 frame が 3 frame に複製される |
 | IMU three frames | 3 frame が順に保存される |
@@ -51,12 +51,13 @@ swbt controller の fake class を使う。
 ```python
 class FakeGamepad:
     def __init__(self, **kwargs): ...
-    def open(self): ...
-    def pair(self, *, timeout=None): ...
-    def reconnect(self, *, timeout=None): ...
-    def apply(self, state): ...
-    def neutral(self): ...
-    def close(self, *, neutral=True): ...
+    async def open(self): ...
+    async def pair(self, *, timeout=None): ...
+    async def reconnect(self, *, timeout=None): ...
+    async def apply(self, state): ...
+    async def neutral(self): ...
+    def status(self): ...
+    async def close(self, *, neutral=True): ...
 ```
 
 検証項目:
@@ -64,7 +65,8 @@ class FakeGamepad:
 - `open()` が controller resource を準備する。
 - `pair()` が `pair(timeout=...)` を呼ぶ。
 - `reconnect()` が `reconnect(timeout=...)` を呼ぶ。
-- `apply()` が完全な `InputState` を同期 method として完了する。
+- async `apply()` が session の同期 facade 内で完了する。
+- `pair()` / `reconnect()` 後に同期 `status().connection_state` を確認する。
 - `close()` が `close(neutral=True)` を呼び、複数回呼んでも安全。
 - transport error が `NYX_SWBT_TRANSPORT_OPEN_FAILED` になる。
 - connection timeout が `NYX_SWBT_CONNECTION_TIMED_OUT` になる。
@@ -110,8 +112,9 @@ class FakeGamepad:
 | `nyxpy swbt adapters --json` | JSON を出力 |
 | `nyxpy swbt pair` | session `pair()` を呼ぶ |
 | `nyxpy swbt reconnect` | session `reconnect()` を呼ぶ |
-| `nyxpy swbt disconnect` | factory-managed cached session を閉じる |
 | adapter 未指定で pair/reconnect/run | `NYX_SWBT_ADAPTER_NOT_SELECTED` |
+| adapter alias 指定 | discovery 結果の代表 `name` へ正規化する |
+| framework error | 本文と `NYX_SWBT_*` code をコンソールへ出す |
 
 ## abstraction regression test
 
@@ -132,7 +135,7 @@ marker:
 @pytest.mark.realdevice
 ```
 
-実行 gate は pytest option ではなく環境変数で制御する。stdin で operator 確認を待たない。
+実行 gate は pytest option ではなく環境変数で制御する。画面観察結果は `NYX_SWBT_OPERATOR_RESULTS` の test 別 JSON、`NYX_SWBT_OPERATOR_RESULT` の既定値、stdin の順で解決する。値は `pass` / `fail` / `skip` のいずれかとし、未指定で stdin が利用できない場合は成功扱いにせず失敗する。
 
 ```powershell
 $env:NYX_REALDEVICE = "1"
@@ -141,7 +144,15 @@ $env:NYX_SWBT_ADAPTER = "usb:0"
 $env:NYX_SWBT_CONTROLLER_TYPE = "pro-controller"
 $env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/pro-controller-bond.json"
 $env:NYX_SWBT_OPERATOR_CONFIRMATION = "1"
+$env:NYX_SWBT_OPERATOR_RESULT = "pass"
 uv run pytest tests/hardware/ -m realdevice
+```
+
+test ごとに結果を固定する場合は、たとえば次の JSON を指定する。環境変数を使わない対話実行では `pytest -s` を付け、stdin へ明示入力する。
+
+```powershell
+$env:NYX_SWBT_OPERATOR_RESULTS = '{"test_swbt_pair_realdevice":"pass","test_swbt_stick_manual_realdevice":"skip"}'
+uv run pytest tests/hardware/ -m realdevice -s
 ```
 
 必要な環境変数が欠ける場合は skip する。
@@ -154,7 +165,7 @@ uv run pytest tests/hardware/ -m realdevice
 - Pro Controller pair / reconnect
 - Joy-Con L pair / reconnect
 - Joy-Con R pair / reconnect
-- disconnect
+- GUI Disconnect
 - button press/release
 - D-pad diagonal
 - left/right stick

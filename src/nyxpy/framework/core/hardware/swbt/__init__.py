@@ -29,6 +29,7 @@ from nyxpy.framework.core.hardware.swbt.session import (
     DummySwbtControllerSession,
     DummySwbtStatus,
     SwbtControllerSession,
+    is_swbt_status_connected,
 )
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "NyxSwbtInputMapper",
     "NyxSwbtState",
     "normalize_imu_frames",
+    "is_swbt_status_connected",
     "parse_controller_type",
     "resolve_adapter",
     "resolve_controller_model",

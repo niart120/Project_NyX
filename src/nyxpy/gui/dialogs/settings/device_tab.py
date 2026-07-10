@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
@@ -20,6 +21,7 @@ from nyxpy.framework.core.hardware.swbt.config import supported_controller_model
 from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
+from nyxpy.gui.background_task import BackgroundTask
 from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
 
@@ -28,6 +30,11 @@ _CAPTURE_SOURCE_OPTIONS = (
     ("ウィンドウ", "window"),
 )
 _CAPTURE_SOURCE_OPTION = ("キャプチャ", "capture")
+
+type SwbtLifecycleAction = Callable[
+    [Callable[[object], None], Callable[[BaseException], None]],
+    None,
+]
 
 
 class DeviceSettingsTab(QWidget):
@@ -42,9 +49,9 @@ class DeviceSettingsTab(QWidget):
         device_discovery: DeviceDiscoveryService | None = None,
         ponkan_capture_available: bool | None = None,
         swbt_adapter_provider: Callable[[], tuple[SwbtAdapterView, ...]] | None = None,
-        swbt_pair: Callable[[], object] | None = None,
-        swbt_reconnect: Callable[[], object] | None = None,
-        swbt_disconnect: Callable[[], None] | None = None,
+        swbt_pair: SwbtLifecycleAction | None = None,
+        swbt_reconnect: SwbtLifecycleAction | None = None,
+        swbt_disconnect: SwbtLifecycleAction | None = None,
         swbt_status: Callable[[], object | None] | None = None,
         swbt_actions_enabled: bool = True,
     ):
@@ -59,6 +66,9 @@ class DeviceSettingsTab(QWidget):
         self.swbt_disconnect = swbt_disconnect
         self.swbt_status = swbt_status
         self.swbt_actions_enabled = bool(swbt_actions_enabled)
+        self._swbt_busy = False
+        self._swbt_connected = False
+        self._background_tasks: set[BackgroundTask] = set()
         self.ponkan_capture_available = (
             is_ponkan_capture_available()
             if ponkan_capture_available is None
@@ -231,6 +241,12 @@ class DeviceSettingsTab(QWidget):
         adapter_row = QHBoxLayout()
         self.swbt_adapter = QComboBox()
         self.swbt_adapter.setEditable(True)
+        saved_adapter = str(self.settings.get("controller.swbt.adapter", "") or "")
+        self.swbt_adapter.setCurrentIndex(-1)
+        self.swbt_adapter.setEditText(saved_adapter)
+        adapter_editor = self.swbt_adapter.lineEdit()
+        if adapter_editor is not None:
+            adapter_editor.textChanged.connect(lambda _text: self._update_controller_field_state())
         self.refresh_swbt_btn = QPushButton("リロード")
         self.refresh_swbt_btn.setFixedWidth(60)
         self.refresh_swbt_btn.clicked.connect(self.refresh_swbt_adapters)
@@ -338,21 +354,60 @@ class DeviceSettingsTab(QWidget):
                 return
 
     def refresh_swbt_adapters(self) -> None:
-        current_adapter = str(self.settings.get("controller.swbt.adapter", "") or "")
-        current_data = self.swbt_adapter.currentData() if self.swbt_adapter.count() else None
-        current_text = self.swbt_adapter.currentText().strip() if self.swbt_adapter.count() else ""
-        selected = str(current_data or current_adapter or current_text)
+        if self.swbt_adapter_provider is None or self._swbt_busy:
+            return
+        selected = _editable_combo_value(self.swbt_adapter) or str(
+            self.settings.get("controller.swbt.adapter", "") or ""
+        )
+        self._set_swbt_busy(True)
+        self.swbt_status_label.setText("adapter を検索中...")
+        task = BackgroundTask(self.swbt_adapter_provider, parent=self)
+        task.succeeded.connect(
+            lambda adapters: (
+                self._replace_swbt_adapters(tuple(adapters), selected) if isValid(self) else None
+            )
+        )
+        task.failed.connect(
+            lambda error: self._on_swbt_adapter_refresh_failed(error) if isValid(self) else None
+        )
+        task.finished.connect(lambda: self._set_swbt_busy(False) if isValid(self) else None)
+        self._track_background_task(task)
+        task.start()
+
+    def _replace_swbt_adapters(
+        self,
+        adapters: tuple[SwbtAdapterView, ...],
+        selected: str,
+    ) -> None:
         self.swbt_adapter.clear()
-        if self.swbt_adapter_provider is not None:
-            try:
-                for adapter in self.swbt_adapter_provider():
-                    self.swbt_adapter.addItem(adapter.display_name, adapter.name)
-            except Exception as exc:
-                self.swbt_status_label.setText(f"adapter refresh failed: {exc}")
-                return
-        if selected and self.swbt_adapter.findData(selected) < 0:
-            self.swbt_adapter.addItem(selected, selected)
-        self._set_combo_data(self.swbt_adapter, selected)
+        for adapter in adapters:
+            self.swbt_adapter.addItem(adapter.display_name, adapter.name)
+        alias_matches = [
+            adapter
+            for adapter in adapters
+            if selected == adapter.name or selected in adapter.aliases
+        ]
+        if len(alias_matches) == 1:
+            selected = alias_matches[0].name
+        selected_index = self.swbt_adapter.findData(selected) if selected else -1
+        self.swbt_adapter.setCurrentIndex(selected_index)
+        if selected_index < 0:
+            self.swbt_adapter.setEditText(selected)
+        if adapters:
+            self.swbt_status_label.setText(f"adapter {len(adapters)} 件")
+        else:
+            self.swbt_status_label.setText("利用可能な swbt adapter がありません")
+
+    def _on_swbt_adapter_refresh_failed(self, error: BaseException) -> None:
+        self.swbt_status_label.setText(f"adapter refresh failed: {error}")
+
+    def _track_background_task(self, task: BackgroundTask) -> None:
+        self._background_tasks.add(task)
+        task.finished.connect(lambda: self._finish_background_task(task) if isValid(self) else None)
+
+    def _finish_background_task(self, task: BackgroundTask) -> None:
+        self._background_tasks.discard(task)
+        task.deleteLater()
 
     def apply(self):
         source_type = self._capture_source_type()
@@ -389,15 +444,20 @@ class DeviceSettingsTab(QWidget):
         )
         self.settings.set("controller.serial.protocol", self.ser_protocol.currentText())
         self.settings.set("controller.serial.baudrate", int(self.ser_baud.currentText()))
+        self._save_swbt_settings()
+        self.settings.set("gui.window_size_preset", self.window_size_preset.currentData())
+
+    def _save_swbt_settings(self, *, select_backend: bool = False) -> None:
+        if select_backend:
+            self.settings.set("controller.backend", "swbt")
         self.settings.set(
             "controller.swbt.controller_type",
             self.swbt_controller_type.currentData() or self.swbt_controller_type.currentText(),
         )
-        swbt_adapter = self.swbt_adapter.currentData() or self.swbt_adapter.currentText().strip()
+        swbt_adapter = _editable_combo_value(self.swbt_adapter)
         self.settings.set("controller.swbt.adapter", swbt_adapter or None)
         swbt_key_store = self.swbt_key_store.currentText().strip()
         self.settings.set("controller.swbt.key_store_path", swbt_key_store or None)
-        self.settings.set("gui.window_size_preset", self.window_size_preset.currentData())
 
     def _capture_source_type(self) -> str:
         value = self.capture_source_type.currentData()
@@ -441,42 +501,74 @@ class DeviceSettingsTab(QWidget):
 
     def _update_controller_field_state(self) -> None:
         is_swbt = self._controller_backend() == "swbt"
-        self.ser_group.setEnabled(not is_swbt)
-        self.swbt_group.setEnabled(is_swbt)
-        lifecycle_enabled = is_swbt and self.swbt_actions_enabled
-        for button in (self.swbt_pair_btn, self.swbt_reconnect_btn, self.swbt_disconnect_btn):
-            button.setEnabled(lifecycle_enabled)
+        settings_enabled = self.swbt_actions_enabled and not self._swbt_busy
+        self.controller_backend.setEnabled(self.swbt_actions_enabled and not self._swbt_busy)
+        self.ser_group.setEnabled(not is_swbt and settings_enabled)
+        self.swbt_group.setEnabled(is_swbt and settings_enabled)
+        adapter_selected = bool(_editable_combo_value(self.swbt_adapter))
+        connect_enabled = is_swbt and settings_enabled and adapter_selected
+        self.swbt_pair_btn.setEnabled(connect_enabled)
+        self.swbt_reconnect_btn.setEnabled(connect_enabled)
+        self.swbt_disconnect_btn.setEnabled(is_swbt and settings_enabled and self._swbt_connected)
+        self.refresh_swbt_btn.setEnabled(is_swbt and settings_enabled)
+
+    def _set_swbt_busy(self, busy: bool) -> None:
+        self._swbt_busy = bool(busy)
+        self._update_controller_field_state()
+
+    @property
+    def swbt_lifecycle_busy(self) -> bool:
+        """Pair/Reconnect/Disconnectの完了待ちかを返す。"""
+        return getattr(self, "_swbt_lifecycle_running", False)
 
     def _pair_swbt(self) -> None:
-        self.apply()
+        self._save_swbt_settings(select_backend=True)
         self._run_swbt_lifecycle(self.swbt_pair)
 
     def _reconnect_swbt(self) -> None:
-        self.apply()
+        self._save_swbt_settings(select_backend=True)
         self._run_swbt_lifecycle(self.swbt_reconnect)
 
     def _disconnect_swbt(self) -> None:
-        self.apply()
-        if self.swbt_disconnect is None:
-            self.swbt_status_label.setText("swbt lifecycle is unavailable")
-            return
-        try:
-            self.swbt_disconnect()
-        except Exception as exc:
-            self.swbt_status_label.setText(f"disconnect failed: {exc}")
-            return
-        self.swbt_status_label.setText("disconnected")
+        self._run_swbt_lifecycle(self.swbt_disconnect, disconnect=True)
 
-    def _run_swbt_lifecycle(self, action: Callable[[], object] | None) -> None:
+    def _run_swbt_lifecycle(
+        self,
+        action: SwbtLifecycleAction | None,
+        *,
+        disconnect: bool = False,
+    ) -> None:
         if action is None:
             self.swbt_status_label.setText("swbt lifecycle is unavailable")
             return
+        self._set_swbt_busy(True)
+        self._swbt_lifecycle_running = True
+        self.swbt_status_label.setText("disconnecting..." if disconnect else "connecting...")
+
+        def succeeded(status: object) -> None:
+            if not isValid(self):
+                return
+            if disconnect:
+                self._swbt_connected = False
+                self.swbt_status_label.setText("disconnected")
+            else:
+                self._set_swbt_status(status)
+            self._swbt_lifecycle_running = False
+            self._set_swbt_busy(False)
+
+        def failed(error: BaseException) -> None:
+            if not isValid(self):
+                return
+            self._swbt_connected = False
+            operation = "disconnect" if disconnect else "connection"
+            self.swbt_status_label.setText(f"{operation} failed: {error}")
+            self._swbt_lifecycle_running = False
+            self._set_swbt_busy(False)
+
         try:
-            status = action()
+            action(succeeded, failed)
         except Exception as exc:
-            self.swbt_status_label.setText(f"connection failed: {exc}")
-            return
-        self._set_swbt_status(status)
+            failed(exc)
 
     def _refresh_swbt_status(self) -> None:
         if self.swbt_status is None:
@@ -491,17 +583,26 @@ class DeviceSettingsTab(QWidget):
 
     def _set_swbt_status(self, status: object | None) -> None:
         if status is None:
+            self._swbt_connected = False
             self.swbt_status_label.setText("disconnected")
+            self._update_controller_field_state()
             return
+        self._swbt_connected = bool(getattr(status, "connected", False))
         message = str(getattr(status, "message", "connected"))
         controller_type = str(getattr(status, "controller_type", ""))
         adapter = str(getattr(status, "adapter", ""))
+        if self._swbt_connected and adapter:
+            adapter_index = self.swbt_adapter.findData(adapter)
+            self.swbt_adapter.setCurrentIndex(adapter_index)
+            if adapter_index < 0:
+                self.swbt_adapter.setEditText(adapter)
         parts = [message]
         if controller_type:
             parts.append(controller_type)
         if adapter:
             parts.append(adapter)
         self.swbt_status_label.setText(" / ".join(parts))
+        self._update_controller_field_state()
 
 
 def _layout_container(layout: QHBoxLayout) -> QWidget:
@@ -509,3 +610,11 @@ def _layout_container(layout: QHBoxLayout) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     container.setLayout(layout)
     return container
+
+
+def _editable_combo_value(combo: QComboBox) -> str:
+    text = combo.currentText().strip()
+    index = combo.currentIndex()
+    if index >= 0 and text == combo.itemText(index):
+        return str(combo.itemData(index) or text).strip()
+    return text

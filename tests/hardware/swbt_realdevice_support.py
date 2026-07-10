@@ -5,8 +5,8 @@ import os
 import platform
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -21,6 +21,8 @@ class SwbtRealDeviceOptions:
     evidence_dir: Path
     timeout_sec: float = 30.0
     operator_confirmation: bool = False
+    operator_result: str | None = None
+    operator_results: Mapping[str, str] = field(default_factory=dict)
     short_press_ms: tuple[int, ...] = (16, 33, 50)
 
 
@@ -29,6 +31,12 @@ class SwbtEvidenceResult:
     test_name: str
     status: str
     details: Mapping[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class SwbtOperatorResult:
+    status: str
+    source: str
 
 
 class SwbtRealDeviceEnvironmentMissing(RuntimeError):
@@ -60,6 +68,11 @@ def load_swbt_realdevice_options(
     evidence_dir = Path(values.get("NYX_SWBT_EVIDENCE_DIR", f"tmp/hardware/swbt/{timestamp}"))
     timeout_sec = _parse_positive_float(values.get("NYX_SWBT_TIMEOUT", "30.0"))
     short_press_ms = _parse_short_press_ms(values.get("NYX_SWBT_SHORT_PRESS_MS", "16,33,50"))
+    operator_result = _parse_optional_operator_result(
+        values.get("NYX_SWBT_OPERATOR_RESULT"),
+        name="NYX_SWBT_OPERATOR_RESULT",
+    )
+    operator_results = _parse_operator_results(values.get("NYX_SWBT_OPERATOR_RESULTS"))
 
     return SwbtRealDeviceOptions(
         adapter=adapter,
@@ -68,7 +81,42 @@ def load_swbt_realdevice_options(
         evidence_dir=evidence_dir,
         timeout_sec=timeout_sec,
         operator_confirmation=values.get("NYX_SWBT_OPERATOR_CONFIRMATION") == "1",
+        operator_result=operator_result,
+        operator_results=operator_results,
         short_press_ms=short_press_ms,
+    )
+
+
+def resolve_operator_result(
+    options: SwbtRealDeviceOptions,
+    test_name: str,
+    *,
+    prompt: str | None = None,
+    input_func: Callable[[str], str] = input,
+) -> SwbtOperatorResult:
+    """実機観察結果を per-test env、default env、stdin の順で取得する。"""
+    if test_name in options.operator_results:
+        return SwbtOperatorResult(
+            status=options.operator_results[test_name],
+            source="NYX_SWBT_OPERATOR_RESULTS",
+        )
+    if options.operator_result is not None:
+        return SwbtOperatorResult(
+            status=options.operator_result,
+            source="NYX_SWBT_OPERATOR_RESULT",
+        )
+
+    question = prompt or f"[{test_name}] observation result (pass/fail/skip): "
+    try:
+        value = input_func(question)
+    except (EOFError, OSError) as exc:
+        raise SwbtRealDeviceEnvironmentMissing(
+            "operator result input is unavailable; run pytest -s or set "
+            "NYX_SWBT_OPERATOR_RESULT / NYX_SWBT_OPERATOR_RESULTS"
+        ) from exc
+    return SwbtOperatorResult(
+        status=_parse_operator_result(value, name="operator input"),
+        source="stdin",
     )
 
 
@@ -119,6 +167,8 @@ class SwbtEvidenceWriter:
             "timeout_sec": options.timeout_sec,
             "short_press_ms": list(options.short_press_ms),
             "operator_confirmation": options.operator_confirmation,
+            "operator_result": options.operator_result,
+            "operator_results": dict(options.operator_results),
             "test_command": list(command),
         }
         self.run_metadata_path.write_text(
@@ -214,6 +264,40 @@ def _parse_short_press_ms(value: str) -> tuple[int, ...]:
     if any(duration <= 0 for duration in parsed):
         raise ValueError("short press duration must be positive")
     return parsed
+
+
+def _parse_optional_operator_result(value: str | None, *, name: str) -> str | None:
+    if value is None:
+        return None
+    return _parse_operator_result(value, name=name)
+
+
+def _parse_operator_results(value: str | None) -> dict[str, str]:
+    if value is None:
+        return {}
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("NYX_SWBT_OPERATOR_RESULTS must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("NYX_SWBT_OPERATOR_RESULTS must be a JSON object")
+
+    results: dict[str, str] = {}
+    for test_name, result in payload.items():
+        if not isinstance(result, str):
+            raise ValueError("NYX_SWBT_OPERATOR_RESULTS values must be pass, fail, or skip")
+        results[str(test_name)] = _parse_operator_result(
+            result,
+            name=f"NYX_SWBT_OPERATOR_RESULTS[{test_name!r}]",
+        )
+    return results
+
+
+def _parse_operator_result(value: str, *, name: str) -> str:
+    result = value.strip().lower()
+    if result not in {"pass", "fail", "skip"}:
+        raise ValueError(f"{name} must be pass, fail, or skip: {value!r}")
+    return result
 
 
 def _display_path(path: Path) -> str:

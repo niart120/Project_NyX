@@ -81,7 +81,7 @@ adapter refresh は `SwbtAdapterDiscoveryService.list_adapters()` を呼ぶ。GU
 | 指標 | 目標値 |
 |------|--------|
 | adapter refresh | GUI main thread を 100ms 以上止めない |
-| pair/reconnect/disconnect | swbt 0.2.0 の public API は同期 API。local_025 では GUI service 経由で同期呼び出しし、実機時の応答性評価は `local_026` に残す |
+| pair/reconnect/disconnect | GUI service は同期 facade を提供し、MainWindow は worker から呼ぶ。swbt 0.2.0 の async API は session 内部で完了待ちする |
 | macro start 前 close | manual port release/close を 1 回行い、失敗時は runtime start を止める |
 | runtime 終了後 | 自動 reconnect しない |
 | controller backend 変更 | preview frame source を不要に再作成しない |
@@ -89,7 +89,7 @@ adapter refresh は `SwbtAdapterDiscoveryService.list_adapters()` を呼ぶ。GU
 
 ### 並行性・スレッド安全性
 
-Qt widget 更新は main thread で行う。swbt lifecycle 操作は `GuiAppServices` の同期 API へ委譲する。macro 実行中は manual input、pair、reconnect、disconnect、backend 切替を無効化する。内部的に設定反映が入った場合は deferred として扱う。
+Qt widget 更新は main thread で行う。adapter refresh、swbt lifecycle、manual port 作成、macro start は worker から `GuiAppServices` の同期 facade を呼ぶ。macro 実行中または worker 実行中は manual input、pair、reconnect、disconnect、backend 切替を無効化する。内部的に設定反映が入った場合は deferred として扱う。
 
 ## 4. 実装仕様
 
@@ -112,7 +112,7 @@ class GuiAppServices:
     def swbt_status(self) -> SwbtControllerStatusView | None: ...
 ```
 
-`SwbtControllerStatusView` は GUI 表示用 DTO である。`swbt.GamepadStatus` を widget 層へ返さない。`swbt_status()` は factory-managed cached session の状態だけを表示する。外部 process や Switch 側状態の live inquiry ではない。
+`SwbtControllerStatusView` は GUI 表示用 DTO である。`swbt.GamepadStatus` を widget 層へ返さない。`connected` は実 status の `connection_state == "connected"` から求める。pair / reconnect の戻り値 `None` や dummy 専用 field を接続判定に使わない。
 
 ### GUI 項目
 
@@ -139,6 +139,8 @@ GUI に置かない項目:
 - IMU preset / pose / raw editor
 - IMU recorder / replay
 
+候補が 1 件でも adapter を自動選択しない。保存値が一意な alias に一致した場合だけ代表 `name` へ正規化する。refresh 失敗時は保存値と現在の選択を維持する。
+
 ### 操作仕様
 
 | 操作 | 入力条件 | 成功時 | 失敗時 |
@@ -151,7 +153,7 @@ GUI に置かない項目:
 
 ### manual input
 
-`VirtualControllerModel.set_controller(...)` は controller 参照の差し替えだけを行う。release / close は行わない。controller が `None` のとき manual input は no-op にする。接続済み port が error を返した場合は silent no-op にせず technical log と user-visible error を出し、必要に応じて controller を `None` に戻す。
+`VirtualControllerModel.set_controller(...)` は controller 参照の差し替えだけを行う。release / close は行わない。controller が `None` のとき manual input は no-op とし、widget も無効にする。接続済み port が error を返した場合は state 更新を確定せず、technical log と user-visible error を出し、失敗した controller を `None` に戻す。
 
 macro start 前の処理:
 
@@ -170,6 +172,8 @@ runtime start
 controller backend、controller type、adapter、key store、report period、connect timeout が変わった場合、controller factory / manual controller port を更新する。capture source / backend が変わった場合、preview frame source を更新する。両者は独立して扱う。
 
 macro 実行中は controller change と capture change を別々に deferred とし、実行完了後に必要な port だけ反映する。
+
+settings dialog の draft 値で lifecycle 操作する前に、同じ値を反映した runtime builder を用意する。pair / reconnect 成功時だけ canonical config を active config として保持する。secrets / log だけの変更では controller と preview port を再作成しない。deferred apply が失敗した場合は status と利用者向け error を更新する。
 
 ### エラーハンドリング
 
@@ -258,3 +262,9 @@ uv run pytest tests\gui -m "not realdevice and not swbt"
 - `ty check`: All checks passed
 - `pytest tests\unit\framework\runtime\test_runtime_builder.py -m "not realdevice and not swbt"`: 16 passed
 - `pytest tests\gui -m "not realdevice and not swbt"`: 195 passed
+
+## 8. 2026-07-10 監査追補
+
+当初完了後の統合監査で、実 status と dummy status の形の違い、Qt main thread の block、draft settings と active builder の不一致、port のない manual widget が有効になる問題を修正した。swbt 選択時の production GUI は dummy fallback を許可しない。serial manual controller と preview frame source の既存 dummy fallback は維持する。
+
+この追補は fake / dummy による非実機契約の修正記録である。GUI からの実機 pair、reconnect、入力、disconnect は `local_026` の未検証項目である。

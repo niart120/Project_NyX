@@ -11,14 +11,18 @@ from nyxpy.framework.core.hardware.swbt.config import (
     SwbtControllerConfig,
     supported_controller_models,
 )
+from nyxpy.framework.core.hardware.swbt.diagnostics import LoggerDiagnosticsWriter
 from nyxpy.framework.core.hardware.swbt.discovery import (
     SwbtAdapterDiscoveryService,
     SwbtAdapterView,
 )
 from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.io.controller_config import controller_config_from_overrides
+from nyxpy.framework.core.logger import LoggingComponents, create_default_logging
 from nyxpy.framework.core.settings.global_settings import SettingsStore
 from nyxpy.framework.core.settings.workspace import ensure_workspace, resolve_project_root
+
+from .swbt_adapter import canonicalize_swbt_adapter
 
 
 def add_swbt_arguments(subparsers: argparse._SubParsersAction) -> None:
@@ -34,7 +38,7 @@ def add_swbt_arguments(subparsers: argparse._SubParsersAction) -> None:
         help="List swbt USB Bluetooth adapters",
     )
     adapters_parser.add_argument("--json", action="store_true", help="Print full JSON output")
-    for command in ("pair", "reconnect", "disconnect"):
+    for command in ("pair", "reconnect"):
         lifecycle_parser = swbt_subparsers.add_parser(
             command,
             help=f"{command} swbt controller",
@@ -61,26 +65,43 @@ def cli_main(
         else:
             _print_adapters(adapters, output)
         return 0
-    if args.swbt_command in {"pair", "reconnect", "disconnect"}:
-        factory = controller_factory or SwbtControllerOutputPortFactory()
+    if args.swbt_command in {"pair", "reconnect"}:
+        factory = controller_factory
+        logging: LoggingComponents | None = None
         try:
             config = _controller_config_from_args(
                 args,
                 settings_store=settings_store,
                 project_root=project_root,
             )
+            config = canonicalize_swbt_adapter(
+                config,
+                discovery_service=discovery_service,
+            )
+            if factory is None:
+                resolved_root = resolve_project_root(
+                    explicit_root=project_root,
+                    allow_current_as_new=False,
+                )
+                paths = ensure_workspace(resolved_root)
+                logging = create_default_logging(base_dir=paths.logs_dir)
+                factory = SwbtControllerOutputPortFactory(
+                    diagnostics_writer=LoggerDiagnosticsWriter(logging.logger)
+                )
             if args.swbt_command == "pair":
                 factory.pair(config, timeout_sec=config.connect_timeout_sec)
                 print("swbt pair completed.", file=output)
-            elif args.swbt_command == "reconnect":
+            else:
                 factory.reconnect(config, timeout_sec=config.connect_timeout_sec)
                 print("swbt reconnect completed.", file=output)
-            else:
-                factory.disconnect(config)
-                print("swbt disconnect completed.", file=output)
             return 0
         finally:
-            factory.close()
+            try:
+                if factory is not None:
+                    factory.close()
+            finally:
+                if logging is not None:
+                    logging.close()
     raise ValueError(f"Unknown swbt command: {args.swbt_command}")
 
 

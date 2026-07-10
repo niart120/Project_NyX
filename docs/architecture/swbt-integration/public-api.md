@@ -7,7 +7,6 @@ from swbt import (
     AdapterInfo,
     AdapterDiscoveryError,
     Button,
-    ConnectionResult,
     DiagnosticsConfig,
     GamepadStatus,
     IMUFrame,
@@ -85,6 +84,8 @@ Project_NyX は connection operation を明示的に分ける。
 macro 実行時は reconnect のみを行う。key store がないからといって暗黙に pairing しない。
 
 現行の Project_NyX 実装は `pair()` と `reconnect()` を使い、接続結果を返す別 API には依存しない。失敗理由は swbt 例外を NyX の framework error に変換して扱う。
+
+`open()`、`pair()`、`reconnect()`、`apply()`、`neutral()`、`close()` は async API であり、`status()` だけは同期 API である。`pair()` / `reconnect()` の戻り値は `None` なので、Project_NyX は操作後に `status()` を取得し、`GamepadStatus.connection_state == "connected"` を接続成功条件とする。
 
 ## Input APIs
 

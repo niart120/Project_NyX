@@ -34,7 +34,7 @@ jobs:
             uv.lock
 
       - name: 依存関係のインストール
-        run: uv sync --locked --all-extras --dev
+        run: uv sync --locked --all-extras --dev --group docs
 
       - name: 型検査の実行
         run: uv run ty check src/nyxpy --output-format concise --no-progress

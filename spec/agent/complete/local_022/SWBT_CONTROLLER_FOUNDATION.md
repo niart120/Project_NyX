@@ -322,3 +322,9 @@ uv run pytest tests/unit -m "not realdevice and not swbt"
 - [x] `hardware/swbt/errors.py` に swbt 例外 mapping を追加する。
 - [x] `nyxpy swbt adapters` を追加し、adapter refresh が接続を開始しないことをテストする。
 - [x] GUI / CLI choices が `supported_controller_models()` から導出できることをテストする。
+
+## 7. 2026-07-10 監査追補
+
+統合監査で、相対 `key_store_path` の基準と adapter alias の利用箇所を明文化した。相対 path は workspace root を基準に解決する。CLI / GUI の pair、reconnect、run は discovery 結果の `name` / `aliases` を解決し、一意な alias を代表 `name` へ正規化する。候補が 1 件でも未指定 adapter を自動採用しない。
+
+この追補は foundation の非実機契約を補うものであり、adapter の実機列挙や接続成功を確認済みとはしない。

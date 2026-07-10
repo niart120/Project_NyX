@@ -88,6 +88,24 @@ def test_swbt_controller_config_does_not_keep_controller_type_string() -> None:
     assert config.key_store_path == Path(".nyxpy/swbt/pro.json")
 
 
+def test_swbt_relative_key_store_is_resolved_from_workspace_root(tmp_path: Path) -> None:
+    config = controller_config_from_settings(
+        {
+            "controller": {
+                "backend": "swbt",
+                "swbt": {
+                    "adapter": "usb:0",
+                    "key_store_path": ".nyxpy/swbt/pro.json",
+                },
+            }
+        },
+        workspace_root=tmp_path,
+    )
+
+    assert isinstance(config, SwbtControllerConfig)
+    assert config.key_store_path == tmp_path / ".nyxpy" / "swbt" / "pro.json"
+
+
 def test_controller_config_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
     settings = {
         "controller": {

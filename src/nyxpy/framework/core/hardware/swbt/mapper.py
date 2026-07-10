@@ -15,6 +15,7 @@ from nyxpy.framework.core.constants import (
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerModel
 from nyxpy.framework.core.hardware.swbt.errors import (
     imu_frame_count_invalid,
+    map_swbt_exception,
     swbt_input_invalid,
     swbt_input_unsupported,
 )
@@ -80,16 +81,19 @@ class NyxSwbtInputMapper:
 
     def to_input_state(self, state: NyxSwbtState):
         """NyX 側状態を swbt.InputState に変換する。"""
-        from swbt import InputState
+        from swbt import InputState, InvalidInputError
 
-        buttons = {_swbt_button(button) for button in state.buttons}
-        buttons.update(state.dpad_buttons)
-        input_state = InputState.neutral().with_buttons(buttons)
-        input_state = input_state.with_sticks(
-            left_stick=_swbt_stick(state.left_stick),
-            right_stick=_swbt_stick(state.right_stick),
-        )
-        return input_state.with_imu(*(_swbt_imu_frame(frame) for frame in state.imu_frames))
+        try:
+            buttons = {_swbt_button(button) for button in state.buttons}
+            buttons.update(state.dpad_buttons)
+            input_state = InputState.neutral().with_buttons(buttons)
+            input_state = input_state.with_sticks(
+                left_stick=_swbt_stick(state.left_stick),
+                right_stick=_swbt_stick(state.right_stick),
+            )
+            return input_state.with_imu(*(_swbt_imu_frame(frame) for frame in state.imu_frames))
+        except InvalidInputError as exc:
+            raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
     def _press_one(self, state: NyxSwbtState, key: KeyType) -> NyxSwbtState:
         if isinstance(key, Button):
@@ -235,7 +239,17 @@ def _swbt_stick(stick: LStick | RStick | None):
 
     if stick is None:
         return Stick.center()
-    return Stick.raw(x=stick.x, y=stick.y)
+    return Stick.normalized(
+        x=_nyx_stick_axis_to_normalized(stick.x),
+        y=-_nyx_stick_axis_to_normalized(stick.y),
+    )
+
+
+def _nyx_stick_axis_to_normalized(value: int) -> float:
+    """NyX の 0..255 軸を中心 128 の -1.0..1.0 へ変換する。"""
+    if value < 128:
+        return (value - 128) / 128
+    return (value - 128) / 127
 
 
 def _swbt_imu_frame(frame: IMUFrame):

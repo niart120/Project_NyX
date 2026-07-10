@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TextIO
+from typing import Protocol, TextIO
 
 from nyxpy.framework.core.logger.ports import LoggerPort
+
+
+class DiagnosticsWriter(Protocol):
+    """swbt diagnostics が必要とする最小 writer 契約。"""
+
+    def write(self, text: str) -> int: ...
+
+    def flush(self) -> None: ...
 
 
 class LoggerDiagnosticsWriter:
@@ -35,7 +43,7 @@ class LoggerDiagnosticsWriter:
 class TeeDiagnosticsWriter:
     """複数 writer へ同じ diagnostics trace を流す writer。"""
 
-    def __init__(self, writers: Iterable[TextIO]) -> None:
+    def __init__(self, writers: Iterable[DiagnosticsWriter]) -> None:
         """Tee 先 writer を tuple として保持する。"""
         self._writers = tuple(writers)
 

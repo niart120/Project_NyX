@@ -63,7 +63,7 @@ swbt backend の場合、その port は `SwbtControllerOutputPort` である。
 virtual_controller.model.set_controller(None)
 ```
 
-controller が `None` の間、GUI 操作は送信されない。
+controller が `None` の間、GUI 操作は送信されず、入力 widget も無効にする。model の有効状態は `controller is not None`、macro 実行状態、lifecycle worker 実行状態から決める。
 
 ## 操作 mapping
 
@@ -129,9 +129,11 @@ GUI manual input から IMU を変更しないため、`VirtualControllerModel` 
 | case | 動作 |
 |---|---|
 | controller is `None` | no-op |
-| port operation fails | error log、controller を `None` に戻すか reconnect を促す |
+| port operation fails | user-visible error と technical log を出し、失敗した controller を model から外して reconnect を促す |
 | unsupported input | user-visible error + technical log |
 | macro running | input widgets disabled |
 | reconnect lost | input widgets disabled |
 
 silent no-op は controller 未設定時だけ許容する。接続済み port が error を返した場合は明示的に表示する。
+
+入力状態は port 操作が成功してから model へ反映する。送信失敗時に押下済み button や stick state を成功扱いで残さない。

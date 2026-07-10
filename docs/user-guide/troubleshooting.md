@@ -41,6 +41,8 @@ GUI では `設定` 画面のリロードボタンでデバイス一覧を読み
 - PC 内蔵 Bluetooth ではなく、Bumble が直接開ける専用 USB Bluetooth adapter を接続している。
 - `nyxpy swbt adapters` で表示された adapter 名または alias を指定している。
 - GUI の `swbt Adapter` で候補を選んでいる。候補が 1 件でも NyX は自動選択しない。
+- 保存済み adapter が alias の場合、候補更新後に代表名へ正規化されている。
+- 候補更新に失敗した場合、保存済み adapter は維持されるため、表示された更新エラーを先に解消する。
 - OS や別アプリが同じ adapter を使用していない。
 - USB ハブを避け、PC 本体の USB ポートに接続している。
 
@@ -88,7 +90,10 @@ nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-stor
 - swbt backend が扱うのは Switch controller の button / D-pad / stick / IMU であり、3DS touch や keyboard は代替しない。
 - 16ms など短い押下は実機・adapter・report 周期の影響を受ける。安定しない場合は `dur=0.05` 以上から確認する。
 - マクロ実行中は GUI の手動入力用 controller が解放される。実行後に GUI から手動入力する場合は `Reconnect` を実行する。
+- GUI で入力エラーが表示された場合、失敗した controller port は切り離される。接続状態を確認して `Reconnect` する。
 - GUI の `Disconnect` は NyX の同一プロセスが管理している session を閉じる操作であり、Switch 側の接続一覧を必ず消す操作ではない。
+
+stick の `0..255` 座標と Y 軸反転は単体テストで固定されていますが、Switch 画面上の方向確認は実機検証が完了していません。short press の最小保証値も未確定です。`dur=0.05` は切り分けを始める値であり、動作保証値ではありません。
 
 ## プレビューが表示されない
 
