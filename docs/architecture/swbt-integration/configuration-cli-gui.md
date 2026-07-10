@@ -8,7 +8,7 @@
 
 `swbt-python>=0.2.0,<0.3.0` は通常依存として追加する。`[project.optional-dependencies].swbt` は作らない。
 
-NyX はすでに serial backend のために PySerial を通常依存として持つ。swbt backend も controller backend の正式な選択肢として扱い、利用者に `nyxpy-fw[swbt]` や `uv sync --extra swbt` を要求しない。
+NyX はすでに serial backend のために PySerial を通常依存として持つ。swbt backend も controller backend の正式な選択肢として扱い、利用者に swbt 用の extra 指定や追加同期手順を要求しない。
 
 ## settings
 

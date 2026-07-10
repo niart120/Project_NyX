@@ -62,9 +62,13 @@ pad: SwitchGamepad = ProController(
 `SwbtControllerSession` は `open()` と `close(neutral=True)` の scope を所有する。`open()` は transport と report loop の準備であり、pairing や reconnect を開始しない。
 
 ```python
-async with ProController(adapter="usb:0", key_store_path="switch-bond.json") as pad:
+pad = ProController(adapter="usb:0", key_store_path="switch-bond.json")
+await pad.open()
+try:
     await pad.reconnect(timeout=30.0)
     await pad.apply(InputState.neutral().with_buttons([Button.A]))
+finally:
+    await pad.close(neutral=True)
 ```
 
 ## Connection APIs
@@ -75,11 +79,12 @@ Project_NyX は connection operation を明示的に分ける。
 |---|---|---|
 | pair | `pair(timeout=...)` | 初回 pairing。key store に保存する |
 | reconnect | `reconnect(timeout=...)` | 保存済み pairing key に基づく再接続 |
-| reconnect result | `try_reconnect(timeout=...)` | GUI / CLI で失敗理由を表示したい場合 |
 | connect | `connect(timeout=..., allow_pairing=False)` | 原則使わない。pairing の暗黙実行を避ける |
 | connect result | `try_connect(timeout=..., allow_pairing=False)` | 原則使わない |
 
 macro 実行時は reconnect のみを行う。key store がないからといって暗黙に pairing しない。
+
+現行の Project_NyX 実装は `pair()` と `reconnect()` を使い、接続結果を返す別 API には依存しない。失敗理由は swbt 例外を NyX の framework error に変換して扱う。
 
 ## Input APIs
 

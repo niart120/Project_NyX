@@ -28,6 +28,66 @@ nyxpy run sample_macro --serial <serial-device> --capture "Capture Device"
 
 GUI では `設定` 画面のリロードボタンでデバイス一覧を読み直します。別アプリがキャプチャデバイスを使っている場合は、そのアプリを閉じてから再確認してください。
 
+## swbt adapter が使えない
+
+症状:
+
+- `NYX_SWBT_ADAPTER_NOT_SELECTED` が表示される。
+- `nyxpy swbt adapters` に adapter が表示されない。
+- pair または reconnect が timeout する。
+
+確認するもの:
+
+- PC 内蔵 Bluetooth ではなく、Bumble が直接開ける専用 USB Bluetooth adapter を接続している。
+- `nyxpy swbt adapters` で表示された adapter 名または alias を指定している。
+- GUI の `swbt Adapter` で候補を選んでいる。候補が 1 件でも NyX は自動選択しない。
+- OS や別アプリが同じ adapter を使用していない。
+- USB ハブを避け、PC 本体の USB ポートに接続している。
+
+adapter 一覧を JSON で確認します。
+
+```console
+nyxpy swbt adapters --json
+```
+
+## swbt pair / reconnect が失敗する
+
+症状:
+
+- pair が timeout する。
+- reconnect が失敗する。
+- `NYX_SWBT_KEY_STORE_INVALID` または key store 関連のエラーが出る。
+
+確認するもの:
+
+- Switch 側が controller の pairing を受け付ける画面になっている。
+- `--swbt-controller-type` と実機が一致している。
+- controller type ごとに別の key store を使っている。
+- key store を手で編集していない。
+- 初回は `nyxpy swbt pair`、2 回目以降は `nyxpy swbt reconnect` を使っている。
+
+```console
+nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+```
+
+`nyxpy run --controller swbt` は暗黙に pairing しません。key store がない場合は、先に pair を実行してください。
+
+## swbt 入力が反映されない
+
+症状:
+
+- Joy-Con L で右 stick、Joy-Con R で左 stick を送ると失敗する。
+- 3DS touch、keyboard、sleep control が swbt backend で失敗する。
+- 短い `cmd.press(..., dur=...)` が画面上で取りこぼされる。
+
+確認するもの:
+
+- 送っている入力が controller type の capability に含まれている。
+- swbt backend が扱うのは Switch controller の button / D-pad / stick / IMU であり、3DS touch や keyboard は代替しない。
+- 16ms など短い押下は実機・adapter・report 周期の影響を受ける。安定しない場合は `dur=0.05` 以上から確認する。
+- GUI の `Disconnect` は NyX の同一プロセスが管理している session を閉じる操作であり、Switch 側の接続一覧を必ず消す操作ではない。
+
 ## プレビューが表示されない
 
 症状:

@@ -19,6 +19,19 @@ cmd.wait(1.0)
 cmd.release()
 ```
 
+## IMU 入力
+
+swbt backend では `cmd.imu(...)` で IMU frame を送れます。1 frame を渡した場合は swbt の規則に合わせて 3 frame 分に複製します。3 frame を渡した場合は、その順番で送信します。0、2、4 個以上の frame は不正です。
+
+```python
+from nyxpy.framework.core.constants import IMUFrame
+
+cmd.imu(IMUFrame.neutral())
+cmd.imu(IMUFrame.gyro(x=100, y=0, z=0))
+```
+
+IMU は現在の入力状態の一部として扱われます。`cmd.imu(...)` は button や stick を解放しません。IMU を扱わない backend では `NotImplementedError` が送出されます。
+
 ## キャプチャ
 
 ```python
@@ -72,3 +85,7 @@ cmd.notify("macro completed with image", frame)
 | `cmd.disable_sleep(enabled=True)` | 対応プロトコルでスリープ制御を切り替えます。 |
 
 対応していないプロトコルでは `NotImplementedError` が送出されます。
+
+## backend ごとの非対応入力
+
+`swbt` backend は Switch controller 入力を扱うため、3DS touch、keyboard、sleep control は対応しません。Joy-Con L は右 stick、Joy-Con R は左 stick を持たないため、その入力は `NYX_SWBT_INPUT_UNSUPPORTED` として失敗します。非対応入力は silent no-op にはしません。

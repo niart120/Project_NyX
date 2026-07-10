@@ -95,3 +95,16 @@ GUI manual input
   [ ] macro start 前に GUI lifetime port が閉じられる
   [ ] GUI に IMU 操作 UI がない
 ```
+
+## local_026 時点の実機未確定項目
+
+unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認できる。次の項目は Switch、専用 USB Bluetooth adapter、operator がそろった環境で確定するまで未検証として扱う。
+
+```text
+[ ] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
+[ ] Stick.UP が Switch 画面上で上方向として反映されること
+[ ] 16ms / 33ms / 50ms short press の安定性
+[ ] public flush / send_current 相当 API が必要かどうか
+```
+
+実機で short press が取りこぼされる場合、この文書と利用者向け docs に最小推奨 duration を反映する。実機確認前の段階では、NyX は swbt backend 固有の最小押下時間を保証しない。

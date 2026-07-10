@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 
@@ -15,7 +17,10 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     """--realdevice が指定されていない場合、realdevice マーク付きテストをスキップする。"""
     if config.getoption("--realdevice"):
         return
+    swbt_env_enabled = os.environ.get("NYX_REALDEVICE") == "1" and os.environ.get("NYX_SWBT") == "1"
     skip_real = pytest.mark.skip(reason="need --realdevice option to run")
     for item in items:
         if "realdevice" in item.keywords:
+            if "swbt" in item.keywords and swbt_env_enabled:
+                continue
             item.add_marker(skip_real)

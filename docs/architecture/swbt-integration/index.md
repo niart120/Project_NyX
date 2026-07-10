@@ -20,7 +20,7 @@ report_period_us = 8000
 
 `controller_type` は settings / CLI / GUI の境界でだけ文字列として扱う。runtime 内部では `SwbtControllerType` と `SwbtControllerModel` に正規化し、`Literal[...]` や raw string key による controller class dispatch を残さない。
 
-`swbt-python` は通常依存である。`nyxpy-fw[swbt]` や `uv sync --extra swbt` を利用者に求めない。
+`swbt-python` は通常依存である。利用者に swbt 用の extra 指定や追加同期手順を求めない。
 
 `adapter` が空文字または未指定のまま接続操作を行った場合は、候補が 1 件でも自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。`key_store_path` が未指定なら `.nyxpy/swbt/<controller>-bond.json` を使う。
 
@@ -61,7 +61,7 @@ GUI widget
   -> SerialComm
 ```
 
-`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の async resource、connection、event loop、`InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。
+`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の controller lifecycle、connection、`InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。
 
 ## GUI の範囲
 

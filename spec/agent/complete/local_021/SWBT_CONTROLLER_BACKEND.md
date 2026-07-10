@@ -13,7 +13,7 @@
 | swbt backend | `swbt-python` を使って Nintendo Switch へ Bluetooth HID controller 入力を送る backend |
 | controller backend | NyX の controller 出力方式。`serial` または `swbt` |
 | `ControllerOutputPort` | Runtime が controller 入力を送る抽象 port |
-| `SwbtControllerSession` | `swbt-python` の async controller lifecycle を同期 port から使う backend 内部部品 |
+| `SwbtControllerSession` | `swbt-python` の coroutine controller lifecycle を同期 port から使う backend 内部部品 |
 | `SwbtControllerModel` | controller type、表示名、capabilities、既定 key store 名を束ねる NyX 側定義 |
 | `NyxSwbtInputMapper` | NyX の `Button`、`Hat`、`LStick`、`RStick`、`IMUFrame` を swbt の `InputState` へ変換する mapper |
 | GUI manual input | GUI の既存 `VirtualControllerModel -> ControllerOutputPort` 経路から送る入力 |
@@ -99,7 +99,7 @@ Project NyX のフレームワーク本体はアルファ版であり、互換 s
 
 ### 並行性・スレッド安全性
 
-`SwbtControllerSession` が event loop thread と connection lock を所有する。factory は session cache を持つが、GUI manual input と macro runtime が同じ adapter を同時に使わないよう GUI 上位層で制御する。macro start 前に GUI lifetime port を `release()` / `close()` してから runtime port を作る。
+`SwbtControllerSession` が event loop thread、connection lock、controller lifecycle を所有する。factory は session cache を持つが、GUI manual input と macro runtime が同じ adapter を同時に使わないよう GUI 上位層で制御する。macro start 前に GUI lifetime port を `release()` / `close()` してから runtime port を作る。
 
 ## 4. 実装仕様
 
