@@ -66,7 +66,9 @@ uv run nyxpy gui
 | Disconnect | GUI が管理する swbt session を閉じる |
 | Status | GUI が持つ swbt session の状態 |
 
-adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。`Pair` または `Reconnect` に成功すると、下部の仮想コントローラーから button / D-pad / stick を送れます。マクロ開始時は GUI の手動入力用 controller を解放し、マクロ用 controller に切り替えます。
+adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。`Pair` または `Reconnect` に成功すると、下部の仮想コントローラーから button / D-pad / stick を送れます。
+
+マクロ実行中は GUI の仮想コントローラー入力を送信しません。マクロ開始時に GUI の手動入力用 controller を解放し、マクロ用 controller に切り替えます。マクロ完了後に手動入力を使う場合は、必要に応じて `Reconnect` を実行してください。
 
 ## マクロの配置
 

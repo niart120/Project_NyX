@@ -1106,6 +1106,8 @@ class MainWindow(QMainWindow):
     ) -> bool:
         previous = self.virtual_controller.model.controller
         self.virtual_controller.model.set_controller(None)
+        self.virtual_controller.model.reset_state()
+        self._discard_manual_controller_cache(previous)
         if previous is None:
             return True
         try:
@@ -1124,6 +1126,11 @@ class MainWindow(QMainWindow):
             self._update_connection_status()
             return False
         return True
+
+    def _discard_manual_controller_cache(self, controller) -> None:
+        discard = getattr(self.services, "discard_manual_controller", None)
+        if callable(discard):
+            discard(controller)
 
     def cancel_macro(self):
         if self.run_handle is not None and not self.run_handle.done():

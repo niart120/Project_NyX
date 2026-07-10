@@ -108,9 +108,11 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         session: SwbtControllerSession,
         model: SwbtControllerModel,
         mapper: NyxSwbtInputMapper | None = None,
+        on_close: CloseCallback | None = None,
     ) -> None:
         self._session = session
         self._mapper = mapper or NyxSwbtInputMapper(model)
+        self._on_close = on_close
         self._state = NyxSwbtState.neutral()
         self._lock = RLock()
         self._closed = False
@@ -149,8 +151,12 @@ class SwbtControllerOutputPort(ControllerOutputPort):
             if self._closed:
                 return
             self._state = NyxSwbtState.neutral()
-            self._session.neutral()
-            self._closed = True
+            try:
+                self._session.neutral()
+            finally:
+                self._closed = True
+                if self._on_close is not None:
+                    self._on_close(self)
 
     def _apply_locked(self) -> None:
         state = self._mapper.to_input_state(self._state)
@@ -162,6 +168,8 @@ class SwbtControllerOutputPort(ControllerOutputPort):
 `MacroRuntime` は実行終了時に controller port を close する。swbt backend では `close()` で neutral を試みる。マクロの `finalize()` でも `cmd.release()` を呼ぶ場合、neutral が重なるが、安全側の操作として許容する。
 
 transport の完全 close は `SwbtControllerOutputPortFactory.close()` から `SwbtControllerSession.close()` を呼ぶことで行う。
+
+`SwbtControllerOutputPort` は close 時に factory へ通知し、factory は session key ごとの active port cache から閉じた port を外す。これにより、GUI manual input と macro runtime が同じ session に対して別々の state holder として残らない。
 
 port 作成時の neutral は常に試みる。`reset_on_port_create` という設定や constructor 引数は持たない。
 

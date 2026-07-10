@@ -123,19 +123,21 @@ VirtualControllerModel
 
 ## SwbtControllerOutputPortFactory
 
-swbt factory は session を cache する。`create()` ごとに新しい `SwbtControllerOutputPort` を返すが、同じ adapter / controller model / key store / report period の transport resource は `SwbtControllerSession` に集約する。
+swbt factory は session と active port を cache する。同じ adapter / controller model / key store / report period の transport resource は `SwbtControllerSession` に集約し、有効な `SwbtControllerOutputPort` は session key ごとに 1 つだけにする。
 
 ```text
 SwbtControllerOutputPortFactory
   ├─ config から session key を作る
   ├─ session key ごとに SwbtControllerSession を cache する
+  ├─ session key ごとに active SwbtControllerOutputPort を 1 つだけ管理する
   ├─ create() で open + reconnect 済み session を得る
-  ├─ create() で SwbtControllerOutputPort を返す
+  ├─ create() で旧 active port を close してから新しい SwbtControllerOutputPort を返す
   ├─ pair(config) で明示 pairing を行う
   ├─ reconnect(config) で明示 reconnect を行う
-  ├─ disconnect(config) で factory-managed cached session を閉じる
+  ├─ pair/reconnect/disconnect 前に active port を close する
+  ├─ disconnect(config) で factory-managed cached session と active port を閉じる
   ├─ status(config) で factory-managed cached session の状態を返す
-  └─ close() で cached session をすべて close する
+  └─ close() で active port と cached session をすべて close する
 ```
 
 session key に含める値:
@@ -182,9 +184,11 @@ class SwbtControllerOutputPortFactory:
         session = self._session_for_config(config, allow_dummy=allow_dummy)
         session.open()
         session.reconnect(timeout_sec=timeout_sec)
+        self._close_active_port(session_key(config))
         return SwbtControllerOutputPort(
             session=session,
             mapper=NyxSwbtInputMapper(model=config.model),
+            on_close=lambda port: self._discard_active_port(session_key(config), port),
         )
 ```
 
@@ -193,6 +197,8 @@ class SwbtControllerOutputPortFactory:
 key store がない場合に pairing へ fallback しない。key store がない場合や不正な場合は `ConfigurationError` に変換する。
 
 port 作成時は `SwbtControllerOutputPort` が neutral を常に試みる。`reset_on_port_create` という設定や引数は持たない。
+
+`create()` が既存 active port を close できない場合、新しい port は返さない。接続失敗で session を cache から捨てる場合は、同じ key の active port も閉じて再利用対象から外す。
 
 ## diagnostics writer
 
@@ -227,6 +233,8 @@ Reconnect button
 ```text
 Disconnect button
   -> VirtualControllerModel.set_controller(None)
+  -> VirtualControllerModel.reset_state()
+  -> builder.discard_manual_controller(previous port)
   -> previous manual port.release()
   -> previous manual port.close()
   -> swbt_factory.disconnect(config)
@@ -244,11 +252,11 @@ GUI lifetime controller と macro runtime controller が同じ adapter を同時
 | disconnected | adapter refresh、pair、reconnect |
 | connected for manual input | 仮想コントローラー操作、release all、disconnect |
 | macro running | manual input、pair、reconnect、disconnect を無効化 |
-| macro start requested while manual connected | `VirtualControllerModel.set_controller(None)` 後に GUI lifetime port を `release()` / `close()` してから runtime を開始 |
+| macro start requested while manual connected | `VirtualControllerModel.set_controller(None)` と `reset_state()` 後に GUI lifetime port を `release()` / `close()` し、builder cache からも外してから runtime を開始 |
 
 runtime 終了後、GUI は自動で reconnect しない。利用者が `Reconnect from pairing key` を押した時だけ GUI lifetime port を再作成する。
 
-factory は session cache を持つが、初期実装では active lease 管理や `NYX_SWBT_ADAPTER_BUSY` を入れない。排他は GUI の macro start sequence と port close で担保する。
+排他は GUI の macro start sequence と、factory の active port 管理で担保する。manual input と runtime input を混ぜる mixer は作らない。新しい port を払い出す操作は同じ session key の旧 port を閉じる。
 
 ## shutdown
 

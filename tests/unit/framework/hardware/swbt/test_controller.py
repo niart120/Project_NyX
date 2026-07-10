@@ -75,6 +75,21 @@ def test_port_close_sends_neutral_without_session_close() -> None:
     assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
 
 
+def test_port_close_notifies_owner_once() -> None:
+    session = RecordingSession()
+    closed = []
+    controller = SwbtControllerOutputPort(
+        session=session,
+        model=resolve_controller_model("pro-controller"),
+        on_close=closed.append,
+    )
+
+    controller.close()
+    controller.close()
+
+    assert closed == [controller]
+
+
 def test_port_rejects_backend_unsupported_apis() -> None:
     controller, _session = port()
 

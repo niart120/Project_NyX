@@ -99,12 +99,16 @@ macro start 前に GUI lifetime port を閉じる。
 ```text
 macro start requested
   -> virtual_controller.model.set_controller(None)
+  -> virtual_controller.model.reset_state()
+  -> builder.discard_manual_controller(previous port)
   -> previous manual port.release()
   -> previous manual port.close()
   -> macro runtime start
 ```
 
 runtime 終了後、自動で再接続しない。利用者が reconnect を押した場合だけ GUI lifetime port を再作成する。
+
+backend factory も同じ排他を守る。swbt backend では、同じ session key に対して新しい `SwbtControllerOutputPort` を作る前に旧 active port を close する。GUI 上位層の macro start sequence だけに依存せず、backend 内にも「有効な入力 port は 1 つだけ」という制約を置く。
 
 ## IMU の扱い
 

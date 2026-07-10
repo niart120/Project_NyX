@@ -80,12 +80,14 @@ nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-stor
 - Joy-Con L で右 stick、Joy-Con R で左 stick を送ると失敗する。
 - 3DS touch、keyboard、sleep control が swbt backend で失敗する。
 - 短い `cmd.press(..., dur=...)` が画面上で取りこぼされる。
+- マクロ実行中または実行直後に GUI の仮想コントローラー操作が反映されない。
 
 確認するもの:
 
 - 送っている入力が controller type の capability に含まれている。
 - swbt backend が扱うのは Switch controller の button / D-pad / stick / IMU であり、3DS touch や keyboard は代替しない。
 - 16ms など短い押下は実機・adapter・report 周期の影響を受ける。安定しない場合は `dur=0.05` 以上から確認する。
+- マクロ実行中は GUI の手動入力用 controller が解放される。実行後に GUI から手動入力する場合は `Reconnect` を実行する。
 - GUI の `Disconnect` は NyX の同一プロセスが管理している session を閉じる操作であり、Switch 側の接続一覧を必ず消す操作ではない。
 
 ## プレビューが表示されない

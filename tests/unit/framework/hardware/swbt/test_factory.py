@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, resolve_controller_model
 from nyxpy.framework.core.hardware.swbt.factory import (
     SwbtControllerOutputPortFactory,
@@ -11,7 +12,8 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 
 
 class RecordingSession:
-    def __init__(self, *, fail_reconnect: bool = False) -> None:
+    def __init__(self, *, fail_pair: bool = False, fail_reconnect: bool = False) -> None:
+        self.fail_pair = fail_pair
         self.fail_reconnect = fail_reconnect
         self.open_calls = 0
         self.pair_calls = 0
@@ -25,6 +27,8 @@ class RecordingSession:
 
     def pair(self, *, timeout_sec: float):
         self.pair_calls += 1
+        if self.fail_pair:
+            raise ConfigurationError("pair failed", code="NYX_SWBT_CONNECTION_FAILED")
         self.connected = True
         return ("pair", timeout_sec)
 
@@ -86,7 +90,26 @@ def test_factory_reuses_session_for_same_key_and_ports_are_new() -> None:
 
     assert first is not second
     assert session.reconnect_calls == 1
+    assert session.neutral_calls == 3
     assert session_key(config()) == session_key(config())
+    with pytest.raises(Exception) as exc_info:
+        first.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
+
+
+def test_factory_closes_active_port_before_explicit_reconnect() -> None:
+    session = RecordingSession()
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+    assert factory.reconnect(cfg, timeout_sec=2.0) == ("reconnect", 2.0)
+
+    assert session.reconnect_calls == 2
+    assert session.neutral_calls == 2
+    with pytest.raises(Exception) as exc_info:
+        port.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
 
 
 def test_factory_allows_dummy_fallback_only_for_create() -> None:
@@ -97,12 +120,84 @@ def test_factory_allows_dummy_fallback_only_for_create() -> None:
 
     assert port.supports_imu is True
     assert real.reconnect_calls == 1
+    assert real.close_calls == 1
 
     explicit = RecordingSession(fail_reconnect=True)
     explicit_factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: explicit)
 
     with pytest.raises(ConfigurationError):
         explicit_factory.reconnect(config(), timeout_sec=1.0)
+
+    assert explicit.close_calls == 1
+
+
+def test_factory_pair_discards_cached_dummy_session() -> None:
+    failed_real = RecordingSession(fail_reconnect=True)
+    next_real = RecordingSession()
+    dummy = RecordingSession()
+    sessions = iter((failed_real, next_real))
+    factory = SwbtControllerOutputPortFactory(
+        session_factory=lambda _config: next(sessions),
+        dummy_session_factory=lambda: dummy,
+    )
+    cfg = config()
+
+    factory.create(config=cfg, allow_dummy=True, timeout_sec=1.0)
+    assert factory.pair(cfg, timeout_sec=2.0) == ("pair", 2.0)
+
+    assert failed_real.close_calls == 1
+    assert dummy.close_calls == 1
+    assert dummy.pair_calls == 0
+    assert next_real.open_calls == 1
+    assert next_real.pair_calls == 1
+
+
+def test_factory_create_without_dummy_discards_cached_dummy_session() -> None:
+    failed_real = RecordingSession(fail_reconnect=True)
+    next_real = RecordingSession()
+    dummy = RecordingSession()
+    sessions = iter((failed_real, next_real))
+    factory = SwbtControllerOutputPortFactory(
+        session_factory=lambda _config: next(sessions),
+        dummy_session_factory=lambda: dummy,
+    )
+    cfg = config()
+
+    factory.create(config=cfg, allow_dummy=True, timeout_sec=1.0)
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=2.0)
+
+    assert port.supports_imu is True
+    assert dummy.close_calls == 1
+    assert next_real.open_calls == 1
+    assert next_real.reconnect_calls == 1
+
+
+def test_factory_discards_failed_create_session_without_dummy() -> None:
+    session = RecordingSession(fail_reconnect=True)
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    with pytest.raises(ConfigurationError):
+        factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+
+    assert session.open_calls == 1
+    assert session.reconnect_calls == 1
+    assert session.close_calls == 1
+    assert factory.status(cfg) is None
+
+
+def test_factory_discards_failed_pair_session() -> None:
+    session = RecordingSession(fail_pair=True)
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    with pytest.raises(ConfigurationError):
+        factory.pair(cfg, timeout_sec=1.0)
+
+    assert session.open_calls == 1
+    assert session.pair_calls == 1
+    assert session.close_calls == 1
+    assert factory.status(cfg) is None
 
 
 def test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations() -> None:
@@ -121,6 +216,22 @@ def test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations() 
     assert session.reconnect_calls == 1
     assert session.neutral_calls == 1
     assert session.close_calls == 1
+    assert factory.status(cfg) is None
+
+
+def test_factory_disconnect_closes_active_port_and_session() -> None:
+    session = RecordingSession()
+    factory = SwbtControllerOutputPortFactory(session_factory=lambda _config: session)
+    cfg = config()
+
+    port = factory.create(config=cfg, allow_dummy=False, timeout_sec=1.0)
+    factory.disconnect(cfg)
+
+    assert session.neutral_calls == 2
+    assert session.close_calls == 1
+    with pytest.raises(Exception) as exc_info:
+        port.press((Button.A,))
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PORT_CLOSED"
     assert factory.status(cfg) is None
 
 

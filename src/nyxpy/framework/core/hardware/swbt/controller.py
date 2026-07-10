@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from threading import RLock
 
 from nyxpy.framework.core.constants import IMUFrame, KeyCode, KeyType, SpecialKeyCode
@@ -9,6 +10,8 @@ from nyxpy.framework.core.hardware.swbt.config import SwbtControllerModel
 from nyxpy.framework.core.hardware.swbt.errors import swbt_port_closed
 from nyxpy.framework.core.hardware.swbt.mapper import NyxSwbtInputMapper, NyxSwbtState
 from nyxpy.framework.core.io.ports import ControllerOutputPort
+
+type CloseCallback = Callable[["SwbtControllerOutputPort"], None]
 
 
 class SwbtControllerOutputPort(ControllerOutputPort):
@@ -20,10 +23,12 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         session,
         model: SwbtControllerModel,
         mapper: NyxSwbtInputMapper | None = None,
+        on_close: CloseCallback | None = None,
     ) -> None:
         """session、model、mapper、初期 state を保持し、neutral を送る。"""
         self._session = session
         self._mapper = mapper or NyxSwbtInputMapper(model)
+        self._on_close = on_close
         self._state = NyxSwbtState.neutral()
         self._lock = RLock()
         self._closed = False
@@ -95,6 +100,8 @@ class SwbtControllerOutputPort(ControllerOutputPort):
                 self._session.neutral()
             finally:
                 self._closed = True
+                if self._on_close is not None:
+                    self._on_close(self)
 
     def _apply_locked(self) -> None:
         self._session.apply(self._mapper.to_input_state(self._state))

@@ -415,6 +415,49 @@ def test_runtime_builder_exposes_and_shutdowns_gui_lifetime_ports(tmp_path: Path
     assert manual_controller.closed is True
 
 
+def test_runtime_builder_discards_manual_controller_cache_without_closing_factory(
+    tmp_path: Path,
+) -> None:
+    registry = Registry(definition(tmp_path))
+    first_manual = FakeControllerOutputPort()
+    second_manual = FakeControllerOutputPort()
+    manual_controllers = iter((first_manual, second_manual))
+    controller_shutdowns: list[str] = []
+    builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: FakeControllerOutputPort(),
+        frame_source_factory=lambda _request, _definition: FakeFrameSourcePort(),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "resources" / definition.id / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+        manual_controller_factory=lambda: next(manual_controllers),
+        controller_shutdown_callbacks=(lambda: controller_shutdowns.append("closed"),),
+    )
+
+    assert builder.controller_output_for_manual_input() is first_manual
+    builder.discard_manual_controller(first_manual)
+    assert builder.controller_output_for_manual_input() is second_manual
+
+    assert first_manual.closed is False
+    assert controller_shutdowns == []
+
+    builder.shutdown()
+
+    assert second_manual.closed is True
+    assert controller_shutdowns == ["closed"]
+
+
 def test_runtime_builder_can_transfer_manual_controller_without_closing_factory(
     tmp_path: Path,
 ) -> None:
