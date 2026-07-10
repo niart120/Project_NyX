@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from nyxpy.cli.run_cli import add_run_arguments, cli_main
+from nyxpy.cli.run_cli import add_run_arguments, cli_main, format_cli_error
 from nyxpy.cli.swbt_cli import add_swbt_arguments
 from nyxpy.cli.swbt_cli import cli_main as swbt_cli_main
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Use --force to overwrite existing scaffold files.")
         return 1
     except ConfigurationError as exc:
-        print(f"エラー: {exc.message}")
+        print(format_cli_error(exc.message, code=exc.code))
         return 1
     except Exception:
         print("Unexpected error. See logs for details.")

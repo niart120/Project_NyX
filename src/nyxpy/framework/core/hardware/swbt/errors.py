@@ -102,7 +102,7 @@ def map_swbt_exception(exc: BaseException, *, component: str) -> ConfigurationEr
             component=component,
             cause=exc,
         )
-    if name == "ConnectionTimeoutError":
+    if name in {"ConnectionTimeoutError", "TimeoutError"}:
         return ConfigurationError(
             "swbt connection timed out",
             code="NYX_SWBT_CONNECTION_TIMED_OUT",

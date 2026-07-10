@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -678,6 +679,7 @@ def test_connection_menu_clamps_baudrate_when_protocol_changes(window: MainWindo
 def test_main_window_wires_preview_touch_to_virtual_controller_model(window: MainWindow) -> None:
     controller = FakeFullCapabilityController()
     window.virtual_controller.model.set_controller(controller)
+    window._sync_manual_input_state()
     window.touch_panel_checkbox.setChecked(True)
 
     window.preview_pane.touch_down_requested.emit(10, 20)
@@ -1042,12 +1044,13 @@ def test_macro_explorer_footer_unifies_control_button_height(window: MainWindow)
     assert window.control_pane.run_btn.dropdownButton.maximumHeight() == 34
 
 
-def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeServices):
+def test_main_window_uses_selected_macro_id(qtbot, window: MainWindow, services: FakeServices):
     handle = FakeRunHandle()
     services.builder = FakeBuilder(handle)
     select_macro(window)
 
     window._start_macro({"count": 1})
+    qtbot.waitUntil(lambda: window.run_handle is handle)
 
     assert window.run_handle is handle
     request = services.builder.start.call_args.args[0]
@@ -1057,11 +1060,17 @@ def test_main_window_uses_selected_macro_id(window: MainWindow, services: FakeSe
     assert window.control_pane.cancel_btn.isEnabled()
 
 
-def test_main_window_start_logs_start_exception(window: MainWindow, services: FakeServices):
+def test_main_window_start_logs_start_exception(qtbot, window: MainWindow, services: FakeServices):
     services.builder.start.side_effect = RuntimeError("start failed")
     select_macro(window)
 
     window._start_macro({"count": 1})
+    qtbot.waitUntil(
+        lambda: (
+            bool(services.logger.technical_events)
+            and services.logger.technical_events[-1][3] == "runtime.start_failed"
+        )
+    )
 
     assert window.run_handle is None
     assert window.status_label.text() == "エラー: マクロを開始できません"
@@ -1069,7 +1078,9 @@ def test_main_window_start_logs_start_exception(window: MainWindow, services: Fa
     assert window.control_pane.run_btn.isEnabled()
 
 
-def test_macro_start_closes_manual_port_before_runtime(window: MainWindow, services: FakeServices):
+def test_macro_start_closes_manual_port_before_runtime(
+    qtbot, window: MainWindow, services: FakeServices
+):
     handle = FakeRunHandle()
     manual = FakeControllerOutputPort()
     window.virtual_controller.model.set_controller(manual)
@@ -1082,6 +1093,7 @@ def test_macro_start_closes_manual_port_before_runtime(window: MainWindow, servi
     services.builder.start.side_effect = start
 
     window._start_macro({})
+    qtbot.waitUntil(lambda: window.run_handle is handle)
 
     assert window.run_handle is handle
     assert manual.events == [("release", ()), ("close", None)]
@@ -1091,7 +1103,7 @@ def test_macro_start_closes_manual_port_before_runtime(window: MainWindow, servi
 
 
 def test_macro_start_clears_manual_controller_visual_state(
-    window: MainWindow, services: FakeServices
+    qtbot, window: MainWindow, services: FakeServices
 ):
     handle = FakeRunHandle()
     manual = FakeControllerOutputPort()
@@ -1102,13 +1114,14 @@ def test_macro_start_clears_manual_controller_visual_state(
     services.builder.start.return_value = handle
 
     window._start_macro({})
+    qtbot.waitUntil(lambda: window.run_handle is handle)
 
     assert window.virtual_controller.model.pressed_buttons == set()
     assert window.virtual_controller.model.current_hat == Hat.CENTER
 
 
 def test_macro_start_discards_builder_cached_manual_controller(
-    window: MainWindow, services: FakeServices
+    qtbot, window: MainWindow, services: FakeServices
 ):
     handle = FakeRunHandle()
     manual = services.builder.manual_controller
@@ -1117,6 +1130,7 @@ def test_macro_start_discards_builder_cached_manual_controller(
     services.builder.start.return_value = handle
 
     window._start_macro({})
+    qtbot.waitUntil(lambda: window.run_handle is handle)
 
     assert services.discarded_manual_controllers == [manual]
     assert services.builder.manual_controller is not manual
@@ -1159,6 +1173,65 @@ def test_disconnect_releases_and_clears_manual_controller(
     assert window.virtual_controller.model.controller is None
 
 
+def test_async_disconnect_succeeds_when_detached_controller_close_fails(
+    qtbot, window: MainWindow, services: FakeServices
+) -> None:
+    class FailingCloseController(FakeControllerOutputPort):
+        def close(self) -> None:
+            self.events.append(("close", None))
+            raise RuntimeError("manual close failed")
+
+    services.global_settings.set("controller.backend", "swbt")
+    manual = FailingCloseController()
+    window.virtual_controller.model.set_controller(manual)
+    succeeded: list[object] = []
+    failed: list[BaseException] = []
+
+    window._disconnect_swbt_controller_async(succeeded.append, failed.append)
+
+    qtbot.waitUntil(lambda: succeeded == [None])
+    assert failed == []
+    assert services.swbt_calls == ["disconnect"]
+    assert manual.events == [("release", ()), ("close", None)]
+    assert window.virtual_controller.model.controller is None
+    assert window.status_label.text() == "swbt を切断しました"
+    assert services.logger.technical_events[-1][0] == "WARNING"
+    assert services.logger.technical_events[-1][3] == "swbt.manual_controller_release_retried"
+    assert isinstance(services.logger.technical_events[-1][5], RuntimeError)
+
+
+def test_async_disconnect_groups_controller_and_factory_failures(
+    qtbot, window: MainWindow, services: FakeServices
+) -> None:
+    class FailingCloseController(FakeControllerOutputPort):
+        def close(self) -> None:
+            raise RuntimeError("manual close failed")
+
+    def fail_disconnect() -> None:
+        services.swbt_calls.append("disconnect")
+        raise RuntimeError("factory disconnect failed")
+
+    services.global_settings.set("controller.backend", "swbt")
+    services.disconnect_swbt = fail_disconnect
+    window.virtual_controller.model.set_controller(FailingCloseController())
+    succeeded: list[object] = []
+    failed: list[BaseException] = []
+
+    window._disconnect_swbt_controller_async(succeeded.append, failed.append)
+
+    qtbot.waitUntil(lambda: bool(failed))
+    assert succeeded == []
+    assert services.swbt_calls == ["disconnect"]
+    assert isinstance(failed[0], ExceptionGroup)
+    assert [str(error) for error in failed[0].exceptions] == [
+        "manual close failed",
+        "factory disconnect failed",
+    ]
+    assert window._swbt_lifecycle_busy is False
+    assert window.status_label.text() == "エラー: swbt を切断できません"
+    assert services.logger.technical_events[-1][3] == "swbt.lifecycle_failed"
+
+
 def test_runtime_finish_does_not_auto_reconnect(window: MainWindow, services: FakeServices):
     services.global_settings.set("controller.backend", "swbt")
     window.virtual_controller.set_manual_input_enabled(False)
@@ -1166,7 +1239,127 @@ def test_runtime_finish_does_not_auto_reconnect(window: MainWindow, services: Fa
     window.on_finished("完了")
 
     assert services.swbt_calls == []
+    assert window.virtual_controller.model.manual_input_enabled is False
+
+
+def test_pair_and_close_wait_for_background_operation(qtbot, services: FakeServices) -> None:
+    started = Event()
+    release = Event()
+
+    def pair():
+        started.set()
+        release.wait(2.0)
+        return SimpleNamespace(
+            connected=True,
+            controller_type="pro-controller",
+            adapter="hci0",
+            message="connected",
+        )
+
+    services.pair_swbt = pair
+    services.global_settings.set("controller.backend", "swbt")
+    services.global_settings.set("controller.swbt.adapter", "hci0")
+    window = MainWindow(services=services)
+    qtbot.addWidget(window)
+    window.deferred_init()
+
+    window._pair_swbt_controller_async()
+    qtbot.waitUntil(started.is_set)
+    assert window._swbt_lifecycle_busy is True
+
+    close_event = QCloseEvent()
+    window.closeEvent(close_event)
+    assert close_event.isAccepted() is False
+    assert services.closed is False
+
+    release.set()
+    qtbot.waitUntil(lambda: services.closed)
+
+
+def test_manual_send_failure_is_visible_and_closes_port_in_worker(
+    qtbot, window: MainWindow
+) -> None:
+    class FailingController(FakeControllerOutputPort):
+        def press(self, keys) -> None:
+            raise RuntimeError("link lost")
+
+    controller = FailingController()
+    window.virtual_controller.model.set_controller(controller)
+    window._sync_manual_input_state()
+
+    window.virtual_controller.model.button_press(Button.A)
+
+    assert window.virtual_controller.model.controller is None
+    assert window.virtual_controller.model.manual_input_enabled is False
+    assert "Reconnect" in window.status_label.text()
+    qtbot.waitUntil(lambda: controller.closed)
+
+
+def test_serial_manual_controller_is_restored_after_run(qtbot, window: MainWindow, services):
+    manual = services.builder.manual_controller
+    window.virtual_controller.model.set_controller(None)
+    window.run_handle = FakeRunHandle(run_result(RunStatus.SUCCESS), done=True)
+
+    window._poll_run_handle()
+
+    qtbot.waitUntil(lambda: window.virtual_controller.model.controller is manual)
     assert window.virtual_controller.model.manual_input_enabled is True
+
+
+def test_deferred_settings_failure_still_restores_serial_manual_controller(
+    qtbot, window: MainWindow, services: FakeServices
+) -> None:
+    manual = services.builder.manual_controller
+
+    def fail_flush_deferred_settings():
+        raise RuntimeError("deferred apply failed")
+
+    services.flush_deferred_settings = fail_flush_deferred_settings
+    window.virtual_controller.model.set_controller(None)
+    window.run_handle = FakeRunHandle(run_result(RunStatus.SUCCESS), done=True)
+
+    window._poll_run_handle()
+
+    qtbot.waitUntil(lambda: window.virtual_controller.model.controller is manual)
+    assert window.virtual_controller.model.manual_input_enabled is True
+    assert window.status_label.text() == ("実行後の設定を反映できません: deferred apply failed")
+    assert services.logger.technical_events[-1][3] == "configuration.deferred_apply_failed"
+
+
+def test_stale_serial_manual_restore_is_discarded_and_closed_in_worker(
+    qtbot, window: MainWindow, services: FakeServices
+) -> None:
+    started = Event()
+    release = Event()
+    controller = FakeControllerOutputPort()
+
+    class BlockingBuilder:
+        manual_controller = controller
+
+        def controller_output_for_manual_input(self):
+            started.set()
+            release.wait(2.0)
+            return controller
+
+    services.builder = BlockingBuilder()
+    window.virtual_controller.model.set_controller(None)
+
+    window._restore_serial_manual_controller()
+    qtbot.waitUntil(started.is_set)
+    assert window._manual_controller_restoring is True
+
+    window._apply_connection_settings({"controller.backend": "swbt"})
+    assert services.global_settings.get("controller.backend") == "serial"
+    assert "変更できません" in window.status_label.text()
+
+    services.global_settings.set("controller.backend", "swbt")
+    release.set()
+
+    qtbot.waitUntil(lambda: controller.closed)
+    assert services.discarded_manual_controllers == [controller]
+    assert controller.events == [("release", ()), ("close", None)]
+    assert window.virtual_controller.model.controller is None
+    assert window._manual_controller_restoring is False
 
 
 def test_swbt_lifecycle_rejected_while_macro_running(window: MainWindow, services: FakeServices):

@@ -43,32 +43,30 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         """Keys を現在状態へ追加して送信する。"""
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.press(self._state, keys)
-            self._apply_locked()
+            self._apply_locked(self._mapper.press(self._state, keys))
 
     def hold(self, keys: tuple[KeyType, ...]) -> None:
         """現在状態を破棄し、keys だけを保持して送信する。"""
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.hold(keys)
-            self._apply_locked()
+            self._apply_locked(self._mapper.hold(keys))
 
     def release(self, keys: tuple[KeyType, ...] = ()) -> None:
         """Keys を解放する。keys が空なら全入力を neutral に戻す。"""
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.release(self._state, keys)
+            next_state = self._mapper.release(self._state, keys)
             if keys:
-                self._apply_locked()
+                self._apply_locked(next_state)
             else:
                 self._session.neutral()
+                self._state = next_state
 
     def imu(self, *frames: IMUFrame) -> None:
         """IMU frame を現在状態へ反映して送信する。"""
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.set_imu(self._state, frames)
-            self._apply_locked()
+            self._apply_locked(self._mapper.set_imu(self._state, frames))
 
     def keyboard(self, text: str) -> None:
         """Swbt backend は keyboard 入力を持たない。"""
@@ -95,16 +93,25 @@ class SwbtControllerOutputPort(ControllerOutputPort):
         with self._lock:
             if self._closed:
                 return
+            self._session.neutral()
             self._state = NyxSwbtState.neutral()
-            try:
-                self._session.neutral()
-            finally:
-                self._closed = True
-                if self._on_close is not None:
-                    self._on_close(self)
+            self._closed = True
+            if self._on_close is not None:
+                self._on_close(self)
 
-    def _apply_locked(self) -> None:
-        self._session.apply(self._mapper.to_input_state(self._state))
+    def _invalidate_after_session_close(self) -> None:
+        """終端 session close 後に追加送信せず port を無効化する。"""
+        with self._lock:
+            if self._closed:
+                return
+            self._state = NyxSwbtState.neutral()
+            self._closed = True
+            if self._on_close is not None:
+                self._on_close(self)
+
+    def _apply_locked(self, next_state: NyxSwbtState) -> None:
+        self._session.apply(self._mapper.to_input_state(next_state))
+        self._state = next_state
 
     def _ensure_open(self) -> None:
         if self._closed:

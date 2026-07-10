@@ -64,11 +64,15 @@ uv run nyxpy gui
 | Pair | 初回 pairing を実行する |
 | Reconnect | 保存済み key store で再接続する |
 | Disconnect | GUI が管理する swbt session を閉じる |
-| Status | GUI が持つ swbt session の状態 |
+| Status | `GamepadStatus.connection_state` に基づく GUI session の状態 |
 
-adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。`Pair` または `Reconnect` に成功すると、下部の仮想コントローラーから button / D-pad / stick を送れます。
+adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。保存済み alias が候補に一致した場合は代表名へ正規化されます。候補の更新に失敗した場合、保存済み値と更新前の選択は消去されません。
 
-マクロ実行中は GUI の仮想コントローラー入力を送信しません。マクロ開始時に GUI の手動入力用 controller を解放し、マクロ用 controller に切り替えます。マクロ完了後に手動入力を使う場合は、必要に応じて `Reconnect` を実行してください。
+adapter 更新、`Pair`、`Reconnect`、`Disconnect`、マクロ開始は background worker で処理されます。処理中は対象操作が無効になり、GUI の表示更新は処理完了後に行われます。
+
+`Pair` または `Reconnect` の完了後、実際の接続状態が `connected` で、手動入力用 controller port を取得できた場合だけ、下部の仮想コントローラーから button / D-pad / stick を送れます。送信に失敗した場合はエラーを表示し、失敗した port を切り離します。その後は `Reconnect` してください。
+
+controller port がない間、接続処理中、マクロ実行中は GUI の仮想コントローラー操作自体が無効になります。マクロ開始時に GUI の手動入力用 controller を解放し、マクロ用 controller に切り替えます。マクロ完了後に手動入力を使う場合は、必要に応じて `Reconnect` を実行してください。
 
 ## マクロの配置
 

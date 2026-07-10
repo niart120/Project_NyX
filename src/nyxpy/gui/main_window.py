@@ -1,5 +1,6 @@
 """NyX GUI の main window。"""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -27,6 +28,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
+from nyxpy.framework.core.io.ports import ControllerOutputPort
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.device_selection import (
@@ -43,6 +45,7 @@ from nyxpy.framework.core.runtime.handle import RunHandle
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.framework.core.settings.schema import SettingValue
 from nyxpy.gui.app_services import GuiAppServices, SettingsApplyOutcome
+from nyxpy.gui.background_task import BackgroundTask
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.macro_params_dialog import MacroParamsDialog
 from nyxpy.gui.layout import (
@@ -80,6 +83,13 @@ _SERIAL_BAUD_OPTIONS = (
     "57600",
     "115200",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _SwbtLifecycleResult:
+    settings_outcome: SettingsApplyOutcome
+    status: object
+    manual_controller: ControllerOutputPort
 
 
 class _VirtualControllerPanel(QWidget):
@@ -170,6 +180,11 @@ class MainWindow(QMainWindow):
         self.preview_connection_error: BaseException | None = None
         self.manual_controller_error: BaseException | None = None
         self._preview_touch_active = False
+        self._swbt_lifecycle_busy = False
+        self._macro_starting = False
+        self._manual_controller_restoring = False
+        self._close_pending = False
+        self._background_tasks: set[BackgroundTask] = set()
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
         self.connection_menu: QMenu | None = None
@@ -283,6 +298,11 @@ class MainWindow(QMainWindow):
             action.setCheckable(True)
             action.setData(backend)
             action.setChecked(current == backend)
+            action.setEnabled(
+                not self._is_run_active()
+                and not self._swbt_lifecycle_busy
+                and not self._manual_controller_restoring
+            )
             action.triggered.connect(
                 lambda _checked=False, value=backend: self._apply_connection_settings(
                     {"controller.backend": value}
@@ -291,13 +311,19 @@ class MainWindow(QMainWindow):
             self.controller_backend_action_group.addAction(action)
             menu.addAction(action)
         menu.addSeparator()
-        lifecycle_enabled = current == "swbt" and not self._is_run_active()
+        adapter_selected = bool(self.global_settings.get("controller.swbt.adapter"))
+        lifecycle_enabled = (
+            current == "swbt"
+            and not self._is_run_active()
+            and not self._swbt_lifecycle_busy
+            and not self._manual_controller_restoring
+        )
         pair_action = QAction("Pair", self)
         reconnect_action = QAction("Reconnect", self)
         disconnect_action = QAction("Disconnect", self)
-        pair_action.setEnabled(lifecycle_enabled)
-        reconnect_action.setEnabled(lifecycle_enabled)
-        disconnect_action.setEnabled(lifecycle_enabled)
+        pair_action.setEnabled(lifecycle_enabled and adapter_selected)
+        reconnect_action.setEnabled(lifecycle_enabled and adapter_selected)
+        disconnect_action.setEnabled(lifecycle_enabled and self._swbt_is_connected())
         pair_action.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
         reconnect_action.triggered.connect(
             lambda _checked=False: self._invoke_swbt_action("reconnect")
@@ -569,6 +595,13 @@ class MainWindow(QMainWindow):
             menu.addAction(action)
 
     def _apply_connection_settings(self, updates: dict[str, SettingValue]) -> None:
+        if (
+            _controller_settings_changed(frozenset(updates)) or "controller.backend" in updates
+        ) and (
+            self._is_run_active() or self._swbt_lifecycle_busy or self._manual_controller_restoring
+        ):
+            self.status_label.setText("実行中または接続操作中はコントローラー設定を変更できません")
+            return
         for key, value in updates.items():
             if self.global_settings.get(key) != value:
                 self.global_settings.set(key, value)
@@ -576,21 +609,18 @@ class MainWindow(QMainWindow):
         self._refresh_connection_menu()
 
     def _invoke_swbt_action(self, action: str) -> None:
-        try:
-            if action == "pair":
-                self._pair_swbt_controller()
-            elif action == "reconnect":
-                self._reconnect_swbt_controller()
-            elif action == "disconnect":
-                self._disconnect_swbt_controller()
-        except Exception:
-            return
+        if action == "pair":
+            self._pair_swbt_controller_async()
+        elif action == "reconnect":
+            self._reconnect_swbt_controller_async()
+        elif action == "disconnect":
+            self._disconnect_swbt_controller_async()
 
     def _pair_swbt_controller(self) -> object:
-        return self._connect_swbt_manual_controller(self.services.pair_swbt)
+        return self._connect_swbt_manual_controller("pair")
 
     def _reconnect_swbt_controller(self) -> object:
-        return self._connect_swbt_manual_controller(self.services.reconnect_swbt)
+        return self._connect_swbt_manual_controller("reconnect")
 
     def _disconnect_swbt_controller(self) -> None:
         if self._is_run_active():
@@ -617,10 +647,10 @@ class MainWindow(QMainWindow):
             raise
         self.manual_controller_error = None
         self.virtual_controller.model.set_controller(None)
-        self.virtual_controller.set_manual_input_enabled(True)
+        self._sync_manual_input_state()
         self._update_connection_status()
 
-    def _connect_swbt_manual_controller(self, lifecycle_action) -> object:
+    def _connect_swbt_manual_controller(self, operation: str) -> object:
         if self._is_run_active():
             raise RuntimeError("macro is running")
         if not self._release_manual_controller(
@@ -630,7 +660,11 @@ class MainWindow(QMainWindow):
         ):
             raise RuntimeError("manual controller release failed")
         try:
-            status = lifecycle_action()
+            canonicalize = getattr(self.services, "canonicalize_swbt_adapter", None)
+            config = canonicalize() if callable(canonicalize) else None
+            outcome = self.services.apply_settings(is_run_active=False)
+            self._apply_runtime_ports(outcome)
+            status = self._call_swbt_lifecycle(operation, config)
             builder = self.services.create_runtime_builder()
             manual_controller = builder.controller_output_for_manual_input()
         except Exception as exc:
@@ -648,9 +682,222 @@ class MainWindow(QMainWindow):
             raise
         self.manual_controller_error = None
         self.virtual_controller.model.set_controller(manual_controller)
-        self.virtual_controller.set_manual_input_enabled(True)
+        self._sync_manual_input_state()
         self._update_connection_status()
         return status
+
+    def _pair_swbt_controller_async(self, succeeded=None, failed=None) -> None:
+        self._start_swbt_connect_task("pair", succeeded, failed)
+
+    def _reconnect_swbt_controller_async(self, succeeded=None, failed=None) -> None:
+        self._start_swbt_connect_task("reconnect", succeeded, failed)
+
+    def _disconnect_swbt_controller_async(self, succeeded=None, failed=None) -> None:
+        prepared, previous = self._prepare_swbt_lifecycle(failed, operation="disconnect")
+        if not prepared:
+            return
+        task = BackgroundTask(
+            lambda: self._execute_swbt_disconnect(previous),
+            parent=self,
+        )
+        task.succeeded.connect(
+            lambda release_error: self._finish_swbt_disconnect(
+                release_error,
+                succeeded,
+                failed,
+            )
+        )
+        task.failed.connect(
+            lambda error: self._fail_swbt_lifecycle(error, failed, operation="disconnect")
+        )
+        self._track_background_task(task)
+        task.start()
+
+    def _start_swbt_connect_task(self, operation: str, succeeded, failed) -> None:
+        prepared, previous = self._prepare_swbt_lifecycle(failed, operation="connect")
+        if not prepared:
+            return
+        task = BackgroundTask(
+            lambda: self._execute_swbt_connect(operation, previous),
+            parent=self,
+        )
+        task.succeeded.connect(lambda result: self._finish_swbt_connect(result, succeeded, failed))
+        task.failed.connect(
+            lambda error: self._fail_swbt_lifecycle(error, failed, operation="connect")
+        )
+        self._track_background_task(task)
+        task.start()
+
+    def _prepare_swbt_lifecycle(
+        self,
+        failed,
+        *,
+        operation: str,
+    ) -> tuple[bool, ControllerOutputPort | None]:
+        if self._is_run_active() or self._swbt_lifecycle_busy or self._manual_controller_restoring:
+            error = RuntimeError(
+                "macro is running, swbt lifecycle is busy, or controller restore is pending"
+            )
+            self._notify_async_callback(failed, error)
+            return False, None
+        if self.global_settings.get("controller.backend", "serial") != "swbt":
+            error = RuntimeError("swbt backend is not selected")
+            self._notify_async_callback(failed, error)
+            return False, None
+        if operation == "connect" and not self.global_settings.get("controller.swbt.adapter"):
+            error = RuntimeError("swbt adapter is not selected")
+            self.status_label.setText("エラー: swbt adapter を選択してください")
+            self._notify_async_callback(failed, error)
+            return False, None
+        previous = self._detach_manual_controller()
+        self._swbt_lifecycle_busy = True
+        self.status_label.setText(
+            "swbt 接続操作中..." if operation == "connect" else "swbt 切断中..."
+        )
+        self._sync_manual_input_state()
+        self._refresh_connection_menu()
+        return True, previous
+
+    def _execute_swbt_connect(
+        self,
+        operation: str,
+        previous: ControllerOutputPort | None,
+    ) -> _SwbtLifecycleResult:
+        try:
+            self._close_detached_manual_controller(previous)
+            canonicalize = getattr(self.services, "canonicalize_swbt_adapter", None)
+            config = canonicalize() if callable(canonicalize) else None
+            outcome = self.services.apply_settings(is_run_active=False)
+            status = self._call_swbt_lifecycle(operation, config)
+            builder = self.services.create_runtime_builder()
+            manual_controller = builder.controller_output_for_manual_input()
+            if manual_controller is None:
+                raise RuntimeError("swbt manual controller was not created")
+            return _SwbtLifecycleResult(outcome, status, manual_controller)
+        except Exception as exc:
+            try:
+                self.services.disconnect_swbt()
+            except Exception as cleanup_error:
+                raise ExceptionGroup(
+                    "swbt connect and cleanup failed",
+                    [exc, cleanup_error],
+                ) from exc
+            raise
+
+    def _call_swbt_lifecycle(self, operation: str, config: object | None) -> object:
+        prepared = getattr(self.services, f"{operation}_swbt_prepared", None)
+        if callable(prepared) and config is not None:
+            return prepared(config)
+        return getattr(self.services, f"{operation}_swbt")()
+
+    def _execute_swbt_disconnect(
+        self,
+        previous: ControllerOutputPort | None,
+    ) -> Exception | None:
+        release_error: Exception | None = None
+        try:
+            self._close_detached_manual_controller(previous)
+        except Exception as exc:
+            release_error = exc
+        try:
+            self.services.disconnect_swbt()
+        except Exception as disconnect_error:
+            if release_error is not None:
+                raise ExceptionGroup(
+                    "swbt disconnect failed",
+                    [release_error, disconnect_error],
+                ) from disconnect_error
+            raise
+        return release_error
+
+    def _finish_swbt_connect(self, result: _SwbtLifecycleResult, succeeded, failed) -> None:
+        try:
+            self._apply_runtime_ports(result.settings_outcome)
+            self.manual_controller_error = None
+            self.virtual_controller.model.set_controller(result.manual_controller)
+            self._swbt_lifecycle_busy = False
+            self.status_label.setText("swbt 接続完了")
+            self._sync_manual_input_state()
+            self._update_connection_status()
+            self._refresh_connection_menu()
+        except Exception as exc:
+            self._fail_swbt_lifecycle(exc, failed, operation="connect")
+            return
+        self._notify_async_callback(succeeded, result.status)
+
+    def _finish_swbt_disconnect(
+        self,
+        release_error: BaseException | None,
+        succeeded,
+        failed,
+    ) -> None:
+        try:
+            if release_error is not None:
+                self.logger.technical(
+                    "WARNING",
+                    "Detached manual controller cleanup failed before successful swbt disconnect.",
+                    component="MainWindow",
+                    event="swbt.manual_controller_release_retried",
+                    exc=release_error,
+                )
+            self.manual_controller_error = None
+            self.virtual_controller.model.set_controller(None)
+            self._swbt_lifecycle_busy = False
+            self.status_label.setText("swbt を切断しました")
+            self._sync_manual_input_state()
+            self._update_connection_status()
+            self._refresh_connection_menu()
+        except Exception as exc:
+            self._fail_swbt_lifecycle(exc, failed, operation="disconnect")
+            return
+        self._notify_async_callback(succeeded, None)
+
+    def _fail_swbt_lifecycle(self, error: BaseException, failed, *, operation: str) -> None:
+        self.manual_controller_error = error
+        self.virtual_controller.model.set_controller(None)
+        self._swbt_lifecycle_busy = False
+        self.logger.technical(
+            "ERROR",
+            "swbt lifecycle operation failed.",
+            component="MainWindow",
+            event="swbt.lifecycle_failed",
+            exc=error,
+        )
+        self.status_label.setText(
+            "エラー: swbt を切断できません"
+            if operation == "disconnect"
+            else "エラー: swbt 接続操作に失敗しました"
+        )
+        self._sync_manual_input_state()
+        self._update_connection_status()
+        self._refresh_connection_menu()
+        self._notify_async_callback(failed, error)
+
+    def _notify_async_callback(self, callback, value: object) -> None:
+        if callback is None:
+            return
+        try:
+            callback(value)
+        except RuntimeError:
+            # 設定 dialog がworker完了前に破棄された場合は通知先がない。
+            return
+
+    def _track_background_task(self, task: BackgroundTask) -> None:
+        self._background_tasks.add(task)
+        task.finished.connect(lambda: self._finish_background_task(task))
+
+    def _finish_background_task(self, task: BackgroundTask) -> None:
+        self._background_tasks.discard(task)
+        task.deleteLater()
+        if self._close_pending and not self._background_tasks:
+            QTimer.singleShot(0, self.close)
+
+    def _swbt_is_connected(self) -> bool:
+        try:
+            status = self.services.swbt_status()
+        except Exception:
+            return False
+        return bool(status is not None and status.connected)
 
     def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
         preset_key = normalize_window_size_preset_key(key)
@@ -703,6 +950,7 @@ class MainWindow(QMainWindow):
             save=False,
         )
         self.virtual_controller = self.virtual_controller_panel.controller
+        self.virtual_controller.model.inputFailed.connect(self._handle_manual_input_failure)
         left_center_layout.addWidget(self.virtual_controller_panel, 1, 0)
 
         self.preview_pane = PreviewPane(
@@ -747,6 +995,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.capture_status_label)
         self.statusBar().addPermanentWidget(self.serial_status_label)
         self._apply_layout_metrics_to_panes()
+        self._sync_manual_input_state()
         self._update_connection_status()
 
     def _apply_layout_metrics_to_panes(self) -> None:
@@ -935,6 +1184,9 @@ class MainWindow(QMainWindow):
         self.virtual_controller.model.touch_up()
 
     def open_app_settings(self):
+        if self._swbt_lifecycle_busy or self._macro_starting or self._manual_controller_restoring:
+            self.status_label.setText("接続操作またはマクロ開始処理の完了後に設定を開いてください")
+            return
         dlg = AppSettingsDialog(
             self,
             self.global_settings,
@@ -942,16 +1194,14 @@ class MainWindow(QMainWindow):
             device_discovery=self.device_discovery,
             ponkan_capture_available=self._ponkan_capture_available(),
             swbt_adapter_provider=self.services.refresh_swbt_adapters,
-            swbt_pair=self._pair_swbt_controller,
-            swbt_reconnect=self._reconnect_swbt_controller,
-            swbt_disconnect=self._disconnect_swbt_controller,
+            swbt_pair=self._pair_swbt_controller_async,
+            swbt_reconnect=self._reconnect_swbt_controller_async,
+            swbt_disconnect=self._disconnect_swbt_controller_async,
             swbt_status=self.services.swbt_status,
             swbt_actions_enabled=not self._is_run_active(),
         )
         dlg.settings_applied.connect(self.apply_app_settings)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        self.apply_app_settings()
+        dlg.exec()
 
     def apply_app_settings(self):
         try:
@@ -983,6 +1233,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("設定変更は実行完了後に反映されます")
             return
         self._apply_runtime_ports(outcome)
+        self._sync_manual_input_state()
         self._update_connection_status()
 
     def execute_macro_immediate(self):
@@ -1026,39 +1277,61 @@ class MainWindow(QMainWindow):
         if macro_id is None:
             self.status_label.setText("マクロが選択されていません")
             return
+        if self._swbt_lifecycle_busy or self._macro_starting or self._manual_controller_restoring:
+            self.status_label.setText("接続操作中または開始処理中はマクロを開始できません")
+            return
         self.virtual_controller.set_manual_input_enabled(False)
-        if not self._release_manual_controller(
-            event="runtime.manual_controller_release_failed",
-            message="GUI manual controller release failed before macro start.",
-            user_message="エラー: 手動入力用コントローラーを解放できません",
-        ):
-            self.virtual_controller.set_manual_input_enabled(True)
-            self.control_pane.set_run_state(RunUiState.FINISHED)
-            return
-        try:
-            builder = self.services.create_runtime_builder()
-            self.run_handle = builder.start(
-                RuntimeBuildRequest(macro_id=macro_id, entrypoint="gui", exec_args=exec_args)
-            )
-        except Exception as exc:
-            self.run_handle = None
-            self.logger.technical(
-                "ERROR",
-                "Macro start failed.",
-                component="MainWindow",
-                event="runtime.start_failed",
-                exc=exc,
-            )
-            self.status_label.setText("エラー: マクロを開始できません")
-            self.control_pane.set_run_state(RunUiState.FINISHED)
-            self.virtual_controller.set_manual_input_enabled(True)
-            return
+        request = RuntimeBuildRequest(macro_id=macro_id, entrypoint="gui", exec_args=exec_args)
+        previous = self._detach_manual_controller()
+        self._macro_starting = True
+        self.control_pane.set_run_state(RunUiState.STARTING)
+        self.status_label.setText("マクロ開始準備中")
+        task = BackgroundTask(
+            lambda: self._start_macro_worker(request, previous),
+            parent=self,
+        )
+        task.succeeded.connect(self._finish_macro_start)
+        task.failed.connect(self._fail_macro_start)
+        self._track_background_task(task)
+        task.start()
+
+    def _start_macro_worker(
+        self,
+        request: RuntimeBuildRequest,
+        previous: ControllerOutputPort | None,
+    ) -> RunHandle:
+        self._close_detached_manual_controller(previous)
+        if self.global_settings.get("controller.backend", "serial") == "swbt":
+            canonicalize = getattr(self.services, "canonicalize_swbt_adapter", None)
+            if callable(canonicalize):
+                canonicalize()
+            self.services.apply_settings(is_run_active=False)
+        return self.services.create_runtime_builder().start(request)
+
+    def _finish_macro_start(self, handle: RunHandle) -> None:
+        self._macro_starting = False
+        self.run_handle = handle
         self.control_pane.set_run_state(RunUiState.RUNNING)
         self.status_label.setText("実行中")
         self._run_poll_timer.start(self.global_settings.get("runtime.gui_poll_interval_ms", 100))
 
+    def _fail_macro_start(self, error: BaseException) -> None:
+        self._macro_starting = False
+        self.run_handle = None
+        self.logger.technical(
+            "ERROR",
+            "Macro start failed.",
+            component="MainWindow",
+            event="runtime.start_failed",
+            exc=error,
+        )
+        self.status_label.setText("エラー: マクロを開始できません")
+        self.control_pane.set_run_state(RunUiState.FINISHED)
+        self._sync_manual_input_state()
+        self._restore_serial_manual_controller()
+
     def _is_run_active(self) -> bool:
-        return self.run_handle is not None and not self.run_handle.done()
+        return self._macro_starting or (self.run_handle is not None and not self.run_handle.done())
 
     def _apply_runtime_ports(self, outcome: SettingsApplyOutcome) -> None:
         if not outcome.builder_replaced:
@@ -1096,6 +1369,14 @@ class MainWindow(QMainWindow):
                 event="configuration.invalid",
                 exc=exc,
             )
+        self._sync_manual_input_state()
+
+    def _sync_manual_input_state(self) -> None:
+        controller_available = self.virtual_controller.model.controller is not None
+        enabled = (
+            controller_available and not self._is_run_active() and not self._swbt_lifecycle_busy
+        )
+        self.virtual_controller.set_manual_input_enabled(enabled)
 
     def _release_manual_controller(
         self,
@@ -1104,15 +1385,11 @@ class MainWindow(QMainWindow):
         message: str,
         user_message: str,
     ) -> bool:
-        previous = self.virtual_controller.model.controller
-        self.virtual_controller.model.set_controller(None)
-        self.virtual_controller.model.reset_state()
-        self._discard_manual_controller_cache(previous)
+        previous = self._detach_manual_controller()
         if previous is None:
             return True
         try:
-            previous.release()
-            previous.close()
+            self._close_detached_manual_controller(previous)
         except Exception as exc:
             self.manual_controller_error = exc
             self.logger.technical(
@@ -1127,10 +1404,49 @@ class MainWindow(QMainWindow):
             return False
         return True
 
+    def _detach_manual_controller(self) -> ControllerOutputPort | None:
+        previous = self.virtual_controller.model.controller
+        self.virtual_controller.model.set_controller(None)
+        self.virtual_controller.model.reset_state()
+        self._discard_manual_controller_cache(previous)
+        self._sync_manual_input_state()
+        return previous
+
+    @staticmethod
+    def _close_detached_manual_controller(
+        controller: ControllerOutputPort | None,
+    ) -> None:
+        if controller is None:
+            return
+        controller.release()
+        controller.close()
+
     def _discard_manual_controller_cache(self, controller) -> None:
         discard = getattr(self.services, "discard_manual_controller", None)
         if callable(discard):
             discard(controller)
+
+    def _handle_manual_input_failure(self, error: BaseException, controller) -> None:
+        self._discard_manual_controller_cache(controller)
+        self.manual_controller_error = error
+        self.status_label.setText(
+            "エラー: 手動入力を送信できません。接続を確認して Reconnect してください"
+        )
+        self._sync_manual_input_state()
+        self._update_connection_status()
+        task = BackgroundTask(controller.close, parent=self)
+        task.failed.connect(self._log_manual_controller_cleanup_failure)
+        self._track_background_task(task)
+        task.start()
+
+    def _log_manual_controller_cleanup_failure(self, error: BaseException) -> None:
+        self.logger.technical(
+            "WARNING",
+            "Failed manual controller cleanup after input error.",
+            component="MainWindow",
+            event="controller.cleanup_failed",
+            exc=error,
+        )
 
     def cancel_macro(self):
         if self.run_handle is not None and not self.run_handle.done():
@@ -1156,9 +1472,87 @@ class MainWindow(QMainWindow):
             status = "エラー: 実行結果を取得できません"
         self.run_handle = None
         self.on_finished(status)
-        outcome = self.services.flush_deferred_settings()
+        try:
+            outcome = self.services.flush_deferred_settings()
+        except Exception as exc:
+            self.logger.technical(
+                "ERROR",
+                "Deferred GUI settings application failed.",
+                component="MainWindow",
+                event="configuration.deferred_apply_failed",
+                exc=exc,
+            )
+            self.status_label.setText(f"実行後の設定を反映できません: {exc}")
+            self._sync_manual_input_state()
+            self._update_connection_status()
+            self._restore_serial_manual_controller()
+            return
         if outcome is not None:
             self._apply_runtime_ports(outcome)
+            self._update_connection_status()
+        self._sync_manual_input_state()
+        self._restore_serial_manual_controller()
+
+    def _restore_serial_manual_controller(self) -> None:
+        if (
+            self.global_settings.get("controller.backend", "serial") != "serial"
+            or self.virtual_controller.model.controller is not None
+            or self._manual_controller_restoring
+            or self._is_run_active()
+            or self._close_pending
+        ):
+            return
+        self._manual_controller_restoring = True
+        task = BackgroundTask(
+            lambda: self.services.create_runtime_builder().controller_output_for_manual_input(),
+            parent=self,
+        )
+        task.succeeded.connect(self._finish_serial_manual_controller_restore)
+        task.failed.connect(self._fail_serial_manual_controller_restore)
+        self._track_background_task(task)
+        task.start()
+
+    def _finish_serial_manual_controller_restore(self, controller: object) -> None:
+        self._manual_controller_restoring = False
+        if not isinstance(controller, ControllerOutputPort):
+            self._fail_serial_manual_controller_restore(
+                RuntimeError("serial manual controller was not created")
+            )
+            return
+        stale = (
+            self.global_settings.get("controller.backend", "serial") != "serial"
+            or self._is_run_active()
+            or self._swbt_lifecycle_busy
+            or self._close_pending
+            or self.virtual_controller.model.controller is not None
+        )
+        if stale:
+            self._discard_manual_controller_cache(controller)
+            task = BackgroundTask(
+                lambda: self._close_detached_manual_controller(controller),
+                parent=self,
+            )
+            task.failed.connect(self._log_manual_controller_cleanup_failure)
+            self._track_background_task(task)
+            task.start()
+            return
+        self.manual_controller_error = None
+        self.virtual_controller.model.set_controller(controller)
+        self._sync_manual_input_state()
+        self._update_connection_status()
+
+    def _fail_serial_manual_controller_restore(self, error: BaseException) -> None:
+        self._manual_controller_restoring = False
+        self.manual_controller_error = error
+        self.logger.technical(
+            "ERROR",
+            "Serial manual controller restore failed.",
+            component="MainWindow",
+            event="controller.restore_failed",
+            exc=error,
+        )
+        self._sync_manual_input_state()
+        self._update_connection_status()
 
     def _format_run_result(self, result: RunResult) -> str:
         if result.status is RunStatus.SUCCESS:
@@ -1170,6 +1564,11 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """ウィンドウ終了時にリソースを確実に解放する。"""
+        if self._background_tasks:
+            self._close_pending = True
+            self.status_label.setText("処理の完了後にアプリケーションを終了します")
+            event.ignore()
+            return
         self.logger.user(
             "INFO",
             "アプリケーションを終了します...",
@@ -1196,7 +1595,7 @@ class MainWindow(QMainWindow):
     def on_finished(self, status: str):
         self.status_label.setText(status)
         self.control_pane.set_run_state(RunUiState.FINISHED)
-        self.virtual_controller.set_manual_input_enabled(True)
+        self._sync_manual_input_state()
 
         if status.startswith("エラー"):
             dlg = QMessageBox(self)

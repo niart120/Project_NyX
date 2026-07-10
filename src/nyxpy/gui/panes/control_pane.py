@@ -14,6 +14,7 @@ class RunUiState(Enum):
     """Run control pane の表示状態。"""
 
     IDLE = "idle"
+    STARTING = "starting"
     RUNNING = "running"
     CANCELLING = "cancelling"
     FINISHED = "finished"
@@ -71,7 +72,7 @@ class ControlPane(QWidget):
 
     def set_run_state(self, state: RunUiState):
         self._run_state = state
-        self.running_changed.emit(state is RunUiState.RUNNING)
+        self.running_changed.emit(state in {RunUiState.STARTING, RunUiState.RUNNING})
         self.update_buttons()
 
     def _arrange_buttons(self) -> None:
@@ -90,7 +91,11 @@ class ControlPane(QWidget):
         self.run_btn.dropdownButton.setFixedHeight(_CONTROL_BUTTON_HEIGHT)
 
     def update_buttons(self):
-        running = self._run_state in {RunUiState.RUNNING, RunUiState.CANCELLING}
+        running = self._run_state in {
+            RunUiState.STARTING,
+            RunUiState.RUNNING,
+            RunUiState.CANCELLING,
+        }
         self.run_btn.setEnabled(self._selected and not running)
         self.settings_btn.setEnabled(not running)
         self.cancel_btn.setEnabled(self._run_state is RunUiState.RUNNING)

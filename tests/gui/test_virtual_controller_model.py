@@ -109,6 +109,26 @@ def test_set_controller_replaces_controller_output_port() -> None:
     assert second.events == [("press", (Button.X,))]
 
 
+def test_input_failure_clears_controller_without_retaining_pressed_state() -> None:
+    class FailingController(FakeControllerOutputPort):
+        def press(self, keys) -> None:
+            raise RuntimeError("send failed")
+
+    controller = FailingController()
+    model = VirtualControllerModel(logger=FakeLoggerPort(), controller=controller)
+    failures = []
+    model.inputFailed.connect(
+        lambda error, failed_controller: failures.append((error, failed_controller))
+    )
+
+    model.button_press(Button.A)
+
+    assert model.controller is None
+    assert model.manual_input_enabled is False
+    assert model.pressed_buttons == set()
+    assert failures[0][1] is controller
+
+
 def test_virtual_controller_model_reports_touch_support() -> None:
     model = VirtualControllerModel(logger=FakeLoggerPort(), controller=FakeControllerOutputPort())
     assert not model.supports_touch_input()

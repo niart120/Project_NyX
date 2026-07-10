@@ -12,6 +12,7 @@ from nyxpy.framework.core.hardware.capture_source import capture_source_from_set
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig
+from nyxpy.framework.core.hardware.swbt.diagnostics import LoggerDiagnosticsWriter
 from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.io.adapters import (
     NoopNotificationAdapter,
@@ -115,34 +116,80 @@ class MacroRuntimeBuilder:
             entrypoint=request.entrypoint,
             started_at=started_at,
         )
-        logger = self._logger_factory(request, definition).bind_context(run_log_context)
         metadata = dict(request.metadata or {})
-        return ExecutionContext(
-            run_id=run_id,
-            macro_id=definition.id,
-            macro_name=definition.display_name,
-            artifact_dir_name=artifact_dir_name,
-            run_log_context=run_log_context,
-            exec_args=exec_args,
-            metadata=metadata,
-            cancellation_token=CancellationToken(),
-            controller=self._controller_factory(request, definition),
-            frame_source=self._frame_source_factory(request, definition),
-            resources=self._resource_store_factory(request, definition),
-            artifacts=self._artifact_store_factory(request, definition, run_id, artifact_dir_name),
-            notifications=self._notification_factory(request, definition),
-            logger=logger,
-            options=RuntimeOptions(
-                allow_dummy=self._allow_dummy(request),
-                command_debug_enabled=_command_debug_enabled(self.settings, exec_args, metadata),
-            ),
-        )
+        created: list[tuple[str, object]] = []
+        try:
+            controller = self._controller_factory(request, definition)
+            created.append(("controller", controller))
+            frame_source = self._frame_source_factory(request, definition)
+            created.append(("frame_source", frame_source))
+            resources = self._resource_store_factory(request, definition)
+            created.append(("resources", resources))
+            artifacts = self._artifact_store_factory(
+                request,
+                definition,
+                run_id,
+                artifact_dir_name,
+            )
+            created.append(("artifacts", artifacts))
+            notifications = self._notification_factory(request, definition)
+            base_logger = self._logger_factory(request, definition)
+            logger = base_logger.bind_context(run_log_context)
+            return ExecutionContext(
+                run_id=run_id,
+                macro_id=definition.id,
+                macro_name=definition.display_name,
+                artifact_dir_name=artifact_dir_name,
+                run_log_context=run_log_context,
+                exec_args=exec_args,
+                metadata=metadata,
+                cancellation_token=CancellationToken(),
+                controller=controller,
+                frame_source=frame_source,
+                resources=resources,
+                artifacts=artifacts,
+                notifications=notifications,
+                logger=logger,
+                options=RuntimeOptions(
+                    allow_dummy=self._allow_dummy(request),
+                    command_debug_enabled=_command_debug_enabled(
+                        self.settings,
+                        exec_args,
+                        metadata,
+                    ),
+                ),
+            )
+        except Exception as build_error:
+            cleanup_errors = _close_created_build_resources(created)
+            if cleanup_errors:
+                raise ExceptionGroup(
+                    "Runtime builder creation and cleanup failed",
+                    [build_error, *cleanup_errors],
+                ) from build_error
+            raise
 
     def run(self, request: RuntimeBuildRequest) -> RunResult:
         return self.runtime.run(self.build(request))
 
     def start(self, request: RuntimeBuildRequest) -> RunHandle:
-        return self.runtime.start(self.build(request))
+        context = self.build(request)
+        try:
+            return self.runtime.start(context)
+        except Exception as start_error:
+            cleanup_errors = _close_created_build_resources(
+                [
+                    ("controller", context.controller),
+                    ("frame_source", context.frame_source),
+                    ("resources", context.resources),
+                    ("artifacts", context.artifacts),
+                ]
+            )
+            if cleanup_errors:
+                raise ExceptionGroup(
+                    "Runtime start and cleanup failed",
+                    [start_error, *cleanup_errors],
+                ) from start_error
+            raise
 
     def frame_source_for_preview(self) -> FrameSourcePort | None:
         if self._preview_frame_source is None and self._preview_frame_source_factory is not None:
@@ -286,7 +333,9 @@ def create_device_runtime_builder(
             protocol=ProtocolFactory.create_protocol(controller_config.protocol),
         )
     if isinstance(controller_config, SwbtControllerConfig) and swbt_factory is None:
-        swbt_factory = SwbtControllerOutputPortFactory()
+        swbt_factory = SwbtControllerOutputPortFactory(
+            diagnostics_writer=LoggerDiagnosticsWriter(logger)
+        )
     frame_factory = frame_source_factory or FrameSourcePortFactory(
         discovery=discovery,
         logger=logger,
@@ -299,6 +348,13 @@ def create_device_runtime_builder(
         if lifetime_allow_dummy is not None:
             return lifetime_allow_dummy
         return allow_dummy(lifetime_request)
+
+    def manual_controller_lifetime_dummy() -> bool:
+        # swbt の dummy session は実接続と同じ port surface を持つため、GUI が
+        # 接続成功と誤認する。serial の既存 GUI fallback だけを維持する。
+        if isinstance(controller_config, SwbtControllerConfig):
+            return False
+        return lifetime_dummy()
 
     controller_port_factory = make_controller_port_factory(
         config=controller_config,
@@ -353,7 +409,7 @@ def create_device_runtime_builder(
             config=controller_config,
             serial_factory=serial_factory,
             swbt_factory=swbt_factory,
-            allow_dummy=lifetime_dummy(),
+            allow_dummy=manual_controller_lifetime_dummy(),
             detection_timeout_sec=detection_timeout_sec,
         ),
         controller_shutdown_callbacks=controller_shutdown_callbacks,
@@ -482,3 +538,19 @@ def _optional_int(value: object) -> int | None:
     if value is None or value == "":
         return None
     return int(str(value).strip())
+
+
+def _close_created_build_resources(
+    created: list[tuple[str, object]],
+) -> list[Exception]:
+    errors: list[Exception] = []
+    for name, resource in reversed(created):
+        close = getattr(resource, "close", None)
+        if not callable(close):
+            continue
+        try:
+            close()
+        except Exception as exc:
+            exc.add_note(f"runtime build resource: {name}")
+            errors.append(exc)
+    return errors

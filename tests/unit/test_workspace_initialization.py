@@ -1,6 +1,7 @@
 import pytest
 
 import nyxpy.__main__ as nyx_main
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.gui import run_gui
 
 
@@ -86,6 +87,19 @@ def test_nyxpy_run_delegates_to_cli_main(monkeypatch):
     assert captured_args["args"].serial == "COM3"
     assert captured_args["args"].capture == "Capture Device"
     assert captured_args["args"].define == ["count=3"]
+
+
+def test_nyxpy_configuration_error_prints_code(monkeypatch, capsys):
+    def fail_swbt(_args):
+        raise ConfigurationError(
+            "adapter not found",
+            code="NYX_SWBT_ADAPTER_NOT_FOUND",
+        )
+
+    monkeypatch.setattr(nyx_main, "swbt_cli_main", fail_swbt)
+
+    assert nyx_main.main(["swbt", "pair", "--adapter", "missing"]) == 1
+    assert "NYX_SWBT_ADAPTER_NOT_FOUND" in capsys.readouterr().out
 
 
 def test_nyx_cli_alias_delegates_to_run_cli(monkeypatch):

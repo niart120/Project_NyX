@@ -4,6 +4,7 @@ from swbt import Button as SwbtButton
 from nyxpy.framework.core.constants import Button, IMUFrame
 from nyxpy.framework.core.hardware.swbt.config import resolve_controller_model
 from nyxpy.framework.core.hardware.swbt.controller import SwbtControllerOutputPort
+from nyxpy.framework.core.macro.exceptions import DeviceError
 
 
 class RecordingSession:
@@ -11,12 +12,20 @@ class RecordingSession:
         self.applied = []
         self.neutral_calls = 0
         self.close_calls = 0
+        self.apply_failures = 0
+        self.neutral_failures = 0
 
     def apply(self, state) -> None:
+        if self.apply_failures:
+            self.apply_failures -= 1
+            raise DeviceError("apply failed", code="TEST_APPLY_FAILED")
         self.applied.append(state)
 
     def neutral(self) -> None:
         self.neutral_calls += 1
+        if self.neutral_failures:
+            self.neutral_failures -= 1
+            raise DeviceError("neutral failed", code="TEST_NEUTRAL_FAILED")
 
     def close(self) -> None:
         self.close_calls += 1
@@ -61,6 +70,17 @@ def test_port_imu_and_release_all_use_neutral() -> None:
     assert session.neutral_calls == 2
 
 
+def test_port_commits_state_only_after_apply_succeeds() -> None:
+    controller, session = port()
+    session.apply_failures = 1
+
+    with pytest.raises(DeviceError, match="apply failed"):
+        controller.press((Button.A,))
+    controller.press((Button.B,))
+
+    assert session.applied[-1].buttons == frozenset({SwbtButton.B})
+
+
 def test_port_close_sends_neutral_without_session_close() -> None:
     controller, session = port()
 
@@ -88,6 +108,24 @@ def test_port_close_notifies_owner_once() -> None:
     controller.close()
 
     assert closed == [controller]
+
+
+def test_port_close_can_be_retried_after_neutral_failure() -> None:
+    session = RecordingSession()
+    closed = []
+    controller = SwbtControllerOutputPort(
+        session=session,
+        model=resolve_controller_model("pro-controller"),
+        on_close=closed.append,
+    )
+    session.neutral_failures = 1
+
+    with pytest.raises(DeviceError, match="neutral failed"):
+        controller.close()
+    controller.close()
+
+    assert closed == [controller]
+    assert session.neutral_calls == 3
 
 
 def test_port_rejects_backend_unsupported_apis() -> None:

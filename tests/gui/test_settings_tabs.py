@@ -81,6 +81,41 @@ def test_settings_dialog_title_is_settings(qtbot) -> None:
     assert dialog.windowTitle() == "設定"
 
 
+def test_settings_dialog_rejects_accept_while_swbt_lifecycle_is_busy(qtbot) -> None:
+    settings = FakeSettings()
+    dialog = AppSettingsDialog(
+        None,
+        settings,
+        FakeSecrets(),
+        device_discovery=FakeDiscovery(),
+    )
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.tab_widget.device_tab._swbt_lifecycle_running = True
+
+    dialog.accept()
+
+    assert dialog.isVisible()
+
+
+def test_settings_dialog_apply_and_ok_emit_once_each(qtbot) -> None:
+    dialog = AppSettingsDialog(
+        None,
+        FakeSettings(),
+        FakeSecrets(),
+        device_discovery=FakeDiscovery(),
+    )
+    qtbot.addWidget(dialog)
+    applied = []
+    dialog.settings_applied.connect(lambda: applied.append("applied"))
+
+    dialog.apply_settings()
+    assert applied == ["applied"]
+
+    dialog.accept()
+    assert applied == ["applied", "applied"]
+
+
 def test_notification_log_tab_applies_logging_settings(qtbot) -> None:
     settings = FakeSettings()
     tab = NotificationSettingsTab(settings, FakeSecrets())

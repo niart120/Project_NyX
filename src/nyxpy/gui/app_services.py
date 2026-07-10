@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +17,14 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig
+from nyxpy.framework.core.hardware.swbt.diagnostics import LoggerDiagnosticsWriter
 from nyxpy.framework.core.hardware.swbt.discovery import (
     SwbtAdapterDiscoveryService,
     SwbtAdapterView,
+    resolve_adapter,
 )
 from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
+from nyxpy.framework.core.hardware.swbt.session import is_swbt_status_connected
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.controller_config import controller_config_from_settings
 from nyxpy.framework.core.io.device_factories import (
@@ -148,7 +151,9 @@ class GuiAppServices:
         self.logger = self.logging.logger
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
         self.swbt_adapter_discovery = SwbtAdapterDiscoveryService()
-        self.swbt_controller_factory = SwbtControllerOutputPortFactory()
+        self.swbt_controller_factory = SwbtControllerOutputPortFactory(
+            diagnostics_writer=LoggerDiagnosticsWriter(self.logger)
+        )
         self.ponkan_capture_available = is_ponkan_capture_available()
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)
@@ -158,6 +163,7 @@ class GuiAppServices:
         self._builder_settings: dict[str, Any] | None = None
         self._builder_secrets: dict[str, Any] | None = None
         self._active_frame_source_key: tuple[object, ...] | None = None
+        self._active_swbt_config: SwbtControllerConfig | None = None
         self._pending_settings_apply = False
         self._closed = False
 
@@ -204,18 +210,13 @@ class GuiAppServices:
             _changed_keys(self._builder_settings, current_settings) & RUNTIME_BUILDER_SETTING_KEYS
         ) | _changed_keys(self._builder_secrets, current_secrets)
         builder_needs_update = self.runtime_builder is None or bool(builder_changed_keys)
-        builder_port_setting_keys = FRAME_SOURCE_SETTING_KEYS | CONTROLLER_SETTING_KEYS
-        shared_builder_changed = bool(builder_changed_keys - builder_port_setting_keys)
-        frame_source_needs_update = (
-            self.runtime_builder is None
-            or shared_builder_changed
-            or bool(FRAME_SOURCE_SETTING_KEYS & builder_changed_keys)
+        frame_source_needs_update = self.runtime_builder is None or bool(
+            FRAME_SOURCE_SETTING_KEYS & builder_changed_keys
         )
-        manual_controller_needs_update = (
-            self.runtime_builder is None
-            or shared_builder_changed
-            or bool(CONTROLLER_SETTING_KEYS & builder_changed_keys)
+        manual_controller_needs_update = self.runtime_builder is None or bool(
+            CONTROLLER_SETTING_KEYS & builder_changed_keys
         )
+        controller_config_changed = bool(CONTROLLER_SETTING_KEYS & builder_changed_keys)
         if builder_needs_update and is_run_active:
             self._pending_settings_apply = True
             self._last_settings = current_settings
@@ -243,6 +244,8 @@ class GuiAppServices:
                 keep_manual_controller=not manual_controller_needs_update,
             )
             builder_replaced = True
+            if controller_config_changed:
+                self._active_swbt_config = None
             builder = self.runtime_builder
             if builder is None:
                 raise RuntimeError("runtime builder was not created")
@@ -258,7 +261,7 @@ class GuiAppServices:
                         event="configuration.preview_failed",
                         exc=exc,
                     )
-            if manual_controller_needs_update:
+            if manual_controller_needs_update and not _uses_swbt_controller(current_settings):
                 try:
                     manual_controller = builder.controller_output_for_manual_input()
                 except Exception as exc:
@@ -380,33 +383,82 @@ class GuiAppServices:
 
     def pair_swbt(self) -> SwbtControllerStatusView:
         """現在設定で swbt pairing を明示実行する。"""
-        config = self._swbt_controller_config()
-        status = self.swbt_controller_factory.pair(
-            config,
-            timeout_sec=config.connect_timeout_sec,
-        )
-        return _swbt_status_view(config, status)
+        return self.pair_swbt_prepared(self.canonicalize_swbt_adapter())
+
+    def pair_swbt_prepared(
+        self,
+        config: SwbtControllerConfig,
+    ) -> SwbtControllerStatusView:
+        """列挙済みcanonical configでpairingを1回だけ実行する。"""
+        try:
+            self.swbt_controller_factory.pair(
+                config,
+                timeout_sec=config.connect_timeout_sec,
+            )
+            view = self._connected_swbt_status(config, operation="pair")
+        except Exception:
+            self._active_swbt_config = None
+            raise
+        self._active_swbt_config = config
+        return view
 
     def reconnect_swbt(self) -> SwbtControllerStatusView:
         """現在設定で swbt reconnect を明示実行する。"""
-        config = self._swbt_controller_config()
-        status = self.swbt_controller_factory.reconnect(
-            config,
-            timeout_sec=config.connect_timeout_sec,
-        )
-        return _swbt_status_view(config, status)
+        return self.reconnect_swbt_prepared(self.canonicalize_swbt_adapter())
+
+    def reconnect_swbt_prepared(
+        self,
+        config: SwbtControllerConfig,
+    ) -> SwbtControllerStatusView:
+        """列挙済みcanonical configでreconnectを1回だけ実行する。"""
+        try:
+            self.swbt_controller_factory.reconnect(
+                config,
+                timeout_sec=config.connect_timeout_sec,
+            )
+            view = self._connected_swbt_status(config, operation="reconnect")
+        except Exception:
+            self._active_swbt_config = None
+            raise
+        self._active_swbt_config = config
+        return view
 
     def disconnect_swbt(self) -> None:
         """Factory-managed swbt session を閉じる。"""
-        self.swbt_controller_factory.disconnect(self._swbt_controller_config())
+        config = self._active_swbt_config or self._swbt_controller_config()
+        self.swbt_controller_factory.disconnect(config)
+        self._active_swbt_config = None
 
     def swbt_status(self) -> SwbtControllerStatusView | None:
         """Factory-managed swbt session の状態を GUI DTO として返す。"""
-        config = self._swbt_controller_config()
+        config = self._active_swbt_config or self._swbt_controller_config()
         status = self.swbt_controller_factory.status(config)
         if status is None:
             return None
         return _swbt_status_view(config, status)
+
+    def canonicalize_swbt_adapter(self) -> SwbtControllerConfig:
+        """現在の adapter name/alias を列挙結果の canonical name へ正規化する。"""
+        config = self._swbt_controller_config()
+        resolved = resolve_adapter(config.adapter, self.refresh_swbt_adapters())
+        if resolved.name == config.adapter:
+            return config
+        self.global_settings.set("controller.swbt.adapter", resolved.name)
+        return replace(config, adapter=resolved.name)
+
+    def _connected_swbt_status(
+        self,
+        config: SwbtControllerConfig,
+        *,
+        operation: str,
+    ) -> SwbtControllerStatusView:
+        status = self.swbt_controller_factory.status(config)
+        if status is None:
+            raise RuntimeError(f"swbt {operation} completed without a factory status")
+        view = _swbt_status_view(config, status)
+        if not view.connected:
+            raise RuntimeError(f"swbt {operation} did not connect: {view.message}")
+        return view
 
     def _swbt_controller_config(self) -> SwbtControllerConfig:
         config = controller_config_from_settings(
@@ -754,11 +806,16 @@ def _swbt_status_view(
     config: SwbtControllerConfig,
     status: object,
 ) -> SwbtControllerStatusView:
-    connected = bool(getattr(status, "connected", False))
-    message = str(getattr(status, "message", "connected" if connected else "disconnected"))
+    connected = is_swbt_status_connected(status)
+    connection_state = getattr(status, "connection_state", None)
+    message = str(connection_state or ("connected" if connected else "disconnected"))
     return SwbtControllerStatusView(
         connected=connected,
         controller_type=config.model.settings_value,
         adapter=config.adapter or "",
         message=message,
     )
+
+
+def _uses_swbt_controller(settings: Mapping[str, Any]) -> bool:
+    return _dotted_get(settings, "controller.backend", "serial") == "swbt"

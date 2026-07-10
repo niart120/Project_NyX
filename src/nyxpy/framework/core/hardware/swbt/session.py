@@ -6,18 +6,20 @@ import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Event, RLock, Thread, current_thread
-from typing import Protocol, TextIO
+from typing import Protocol, TextIO, cast
 
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, SwbtControllerType
+from nyxpy.framework.core.hardware.swbt.diagnostics import DiagnosticsWriter
 from nyxpy.framework.core.hardware.swbt.errors import (
     map_swbt_exception,
     swbt_configuration_error,
     swbt_not_connected,
 )
+from nyxpy.framework.core.macro.exceptions import ConfigurationError, DeviceError
 
-type SwbtControllerFactory = Callable[[SwbtControllerConfig, TextIO | None], object]
+type SwbtControllerFactory = Callable[[SwbtControllerConfig, DiagnosticsWriter | None], object]
 
 
 class SwbtControllerSessionProtocol(Protocol):
@@ -28,9 +30,9 @@ class SwbtControllerSessionProtocol(Protocol):
 
     def open(self) -> None: ...
 
-    def pair(self, *, timeout_sec: float) -> object: ...
+    def pair(self, *, timeout_sec: float) -> None: ...
 
-    def reconnect(self, *, timeout_sec: float) -> object: ...
+    def reconnect(self, *, timeout_sec: float) -> None: ...
 
     def apply(self, state: object) -> None: ...
 
@@ -43,10 +45,18 @@ class SwbtControllerSessionProtocol(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class DummySwbtStatus:
-    """Dummy session が返す最小 status。"""
+    """実 ``swbt.GamepadStatus`` と同じ公開形状の dummy status。"""
 
-    connected: bool
-    message: str = "dummy"
+    connection_state: str
+    report_counters: dict[int, int] = field(default_factory=dict)
+    last_subcommand_id: int | None = None
+    raw_rumble: bytes | None = None
+    last_error: object | None = None
+
+
+def is_swbt_status_connected(status: object) -> bool:
+    """Swbt status が接続完了状態かを実 API の field から判定する。"""
+    return getattr(status, "connection_state", None) == "connected"
 
 
 class SwbtControllerSession:
@@ -57,7 +67,7 @@ class SwbtControllerSession:
         config: SwbtControllerConfig,
         *,
         controller_factory: SwbtControllerFactory | None = None,
-        diagnostics_writer: TextIO | None = None,
+        diagnostics_writer: DiagnosticsWriter | None = None,
     ) -> None:
         """config、controller factory、diagnostics writer を保持する。"""
         self.config = config
@@ -68,6 +78,9 @@ class SwbtControllerSession:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_thread: Thread | None = None
         self._loop_ready = Event()
+        self._loop_stopping = False
+        self._cancellation_timeout_sec = 1.0
+        self._loop_stop_timeout_sec = 1.0
         self._operation_timeout_sec = max(5.0, config.connect_timeout_sec)
         self._opened = False
         self._connected = False
@@ -76,7 +89,18 @@ class SwbtControllerSession:
     @property
     def connected(self) -> bool:
         """Session が接続済みかどうか。"""
-        return self._connected
+        with self._lock:
+            if not self._connected or not self._opened or self._controller is None:
+                return False
+            try:
+                status = self._call_controller(self._controller, "status")
+            except (ConfigurationError, DeviceError):
+                raise
+            except Exception:
+                self._connected = False
+                return False
+            self._connected = is_swbt_status_connected(status)
+            return self._connected
 
     def open(self) -> None:
         """Controller resource を開く。pairing / reconnect は開始しない。"""
@@ -92,6 +116,9 @@ class SwbtControllerSession:
             try:
                 controller = self._controller_factory(self.config, self._diagnostics_writer)
                 self._call_controller(controller, "open")
+            except (ConfigurationError, DeviceError):
+                self._stop_loop_locked()
+                raise
             except Exception as exc:
                 self._stop_loop_locked()
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
@@ -99,29 +126,47 @@ class SwbtControllerSession:
             self._opened = True
             self._closed = False
 
-    def pair(self, *, timeout_sec: float) -> object:
+    def pair(self, *, timeout_sec: float) -> None:
         """明示 pairing を実行する。"""
         with self._lock:
             self.open()
             controller = self._require_controller()
             try:
-                result = self._call_controller(controller, "pair", timeout=timeout_sec)
+                self._call_controller(
+                    controller,
+                    "pair",
+                    timeout=timeout_sec,
+                    _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
+                )
+                status = self._call_controller(controller, "status")
+            except (ConfigurationError, DeviceError):
+                raise
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
-            self._connected = True
-            return result
+            self._connected = is_swbt_status_connected(status)
+            if not self._connected:
+                raise swbt_not_connected(type(self).__name__)
 
-    def reconnect(self, *, timeout_sec: float) -> object:
+    def reconnect(self, *, timeout_sec: float) -> None:
         """保存済み pairing key に基づく reconnect を実行する。"""
         with self._lock:
             self.open()
             controller = self._require_controller()
             try:
-                result = self._call_controller(controller, "reconnect", timeout=timeout_sec)
+                self._call_controller(
+                    controller,
+                    "reconnect",
+                    timeout=timeout_sec,
+                    _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
+                )
+                status = self._call_controller(controller, "status")
+            except (ConfigurationError, DeviceError):
+                raise
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
-            self._connected = True
-            return result
+            self._connected = is_swbt_status_connected(status)
+            if not self._connected:
+                raise swbt_not_connected(type(self).__name__)
 
     def apply(self, state: object) -> None:
         """完全な swbt InputState を controller へ適用する。"""
@@ -129,6 +174,8 @@ class SwbtControllerSession:
             controller = self._require_connected_controller()
             try:
                 self._call_controller(controller, "apply", state)
+            except (ConfigurationError, DeviceError):
+                raise
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
@@ -138,6 +185,8 @@ class SwbtControllerSession:
             controller = self._require_connected_controller()
             try:
                 self._call_controller(controller, "neutral")
+            except (ConfigurationError, DeviceError):
+                raise
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
 
@@ -146,28 +195,53 @@ class SwbtControllerSession:
         with self._lock:
             controller = self._require_controller()
             try:
-                return self._call_controller(controller, "status")
+                status = self._call_controller(controller, "status")
+            except (ConfigurationError, DeviceError):
+                raise
             except Exception as exc:
                 raise map_swbt_exception(exc, component=type(self).__name__) from exc
+            self._connected = is_swbt_status_connected(status)
+            return status
 
     def close(self) -> None:
         """neutral=True で controller を閉じる。idempotent。"""
         with self._lock:
+            if self._loop_stopping:
+                self._stop_loop_locked()
             if self._closed:
                 return
             controller = self._controller
             self._connected = False
-            self._opened = False
-            self._closed = True
             if controller is None:
+                self._opened = False
+                self._closed = True
                 self._stop_loop_locked()
                 return
+
+            controller_error: Exception | None = None
             try:
                 self._call_controller(controller, "close", neutral=True)
+            except (ConfigurationError, DeviceError) as exc:
+                controller_error = exc
             except Exception as exc:
-                raise map_swbt_exception(exc, component=type(self).__name__) from exc
-            finally:
+                controller_error = map_swbt_exception(exc, component=type(self).__name__)
+            else:
+                # controller の終端 close が成功した時点で再送信は不要。loop の
+                # thread 所有だけが残った場合は次回 close 冒頭で回収する。
+                self._opened = False
+                self._closed = True
+
+            loop_error: Exception | None = None
+            try:
                 self._stop_loop_locked()
+            except (ConfigurationError, DeviceError) as exc:
+                loop_error = exc
+
+            errors = [error for error in (controller_error, loop_error) if error is not None]
+            if len(errors) == 1:
+                raise errors[0]
+            if errors:
+                raise ExceptionGroup("swbt session close failed", errors)
 
     def _require_controller(self) -> object:
         if self._controller is None:
@@ -175,18 +249,34 @@ class SwbtControllerSession:
         return self._controller
 
     def _require_connected_controller(self) -> object:
-        if not self._connected:
+        if not self.connected:
             raise swbt_not_connected(type(self).__name__)
         return self._require_controller()
 
-    def _call_controller(self, controller: object, method_name: str, *args, **kwargs) -> object:
+    def _call_controller(
+        self,
+        controller: object,
+        method_name: str,
+        *args,
+        _wait_timeout_sec: float | None = None,
+        **kwargs,
+    ) -> object:
+        if self._loop_stopping:
+            raise swbt_configuration_error(
+                "swbt event loop is stopping",
+                code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
+                component=type(self).__name__,
+            )
         result = getattr(controller, method_name)(*args, **kwargs)
         if inspect.isawaitable(result):
             self._ensure_loop_locked()
-            return self._run_awaitable(result)
+            return self._run_awaitable(
+                result,
+                timeout_sec=_wait_timeout_sec or self._operation_timeout_sec,
+            )
         return result
 
-    def _run_awaitable(self, awaitable: Awaitable[object]) -> object:
+    def _run_awaitable(self, awaitable: Awaitable[object], *, timeout_sec: float) -> object:
         loop = self._loop
         if loop is None or not loop.is_running():
             raise swbt_configuration_error(
@@ -194,16 +284,43 @@ class SwbtControllerSession:
                 code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
                 component=type(self).__name__,
             )
-        future = asyncio.run_coroutine_threadsafe(_await_result(awaitable), loop)
+        completed = Event()
+        future = asyncio.run_coroutine_threadsafe(_await_result(awaitable, completed), loop)
         try:
-            return future.result(timeout=self._operation_timeout_sec)
+            return future.result(timeout=timeout_sec)
         except FutureTimeoutError:
             future.cancel()
+            if not completed.wait(timeout=self._cancellation_timeout_sec):
+                self._stop_loop_locked()
             raise
 
+    def _connection_wait_timeout(self, connection_timeout_sec: float) -> float:
+        """Swbt 自身の接続 timeout より外側の待機期限を長くする。"""
+        return max(self._operation_timeout_sec, connection_timeout_sec + 1.0)
+
     def _ensure_loop_locked(self) -> None:
-        if self._loop is not None and self._loop.is_running():
-            return
+        if self._loop_stopping:
+            raise swbt_configuration_error(
+                "swbt event loop is stopping",
+                code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
+                component=type(self).__name__,
+            )
+
+        loop = self._loop
+        thread = self._loop_thread
+        if thread is not None:
+            if thread.is_alive():
+                if loop is not None and loop.is_running():
+                    return
+                raise swbt_configuration_error(
+                    "swbt event loop thread is alive but not running",
+                    code="NYX_SWBT_EVENT_LOOP_NOT_RUNNING",
+                    component=type(self).__name__,
+                )
+            self._loop = None
+            self._loop_thread = None
+        elif loop is not None:
+            self._loop = None
 
         self._loop_ready.clear()
 
@@ -236,16 +353,46 @@ class SwbtControllerSession:
     def _stop_loop_locked(self) -> None:
         loop = self._loop
         thread = self._loop_thread
+        if thread is None or not thread.is_alive():
+            self._loop = None
+            self._loop_thread = None
+            self._loop_stopping = False
+            return
+        if thread is current_thread():
+            raise swbt_configuration_error(
+                "swbt event loop cannot stop itself synchronously",
+                code="NYX_SWBT_EVENT_LOOP_DID_NOT_STOP",
+                component=type(self).__name__,
+            )
+
+        self._loop_stopping = True
+        if loop is not None and loop.is_running():
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except Exception as exc:
+                raise swbt_configuration_error(
+                    "swbt event loop stop request failed",
+                    code="NYX_SWBT_EVENT_LOOP_DID_NOT_STOP",
+                    component=type(self).__name__,
+                    cause=exc,
+                ) from exc
+        thread.join(timeout=self._loop_stop_timeout_sec)
+        if thread.is_alive():
+            raise swbt_configuration_error(
+                "swbt event loop did not stop",
+                code="NYX_SWBT_EVENT_LOOP_DID_NOT_STOP",
+                component=type(self).__name__,
+            )
         self._loop = None
         self._loop_thread = None
-        if loop is not None and loop.is_running():
-            loop.call_soon_threadsafe(loop.stop)
-        if thread is not None and thread.is_alive() and thread is not current_thread():
-            thread.join(timeout=self._operation_timeout_sec)
+        self._loop_stopping = False
 
 
-async def _await_result(awaitable: Awaitable[object]) -> object:
-    return await awaitable
+async def _await_result(awaitable: Awaitable[object], completed: Event) -> object:
+    try:
+        return await awaitable
+    finally:
+        completed.set()
 
 
 class DummySwbtControllerSession:
@@ -266,19 +413,17 @@ class DummySwbtControllerSession:
         self.opened = True
         self.closed = False
 
-    def pair(self, *, timeout_sec: float) -> DummySwbtStatus:
+    def pair(self, *, timeout_sec: float) -> None:
         """Dummy pairing を記録する。"""
         self.open()
         self.pair_calls += 1
         self.connected = True
-        return DummySwbtStatus(connected=True, message="paired")
 
-    def reconnect(self, *, timeout_sec: float) -> DummySwbtStatus:
+    def reconnect(self, *, timeout_sec: float) -> None:
         """Dummy reconnect を記録する。"""
         self.open()
         self.reconnect_calls += 1
         self.connected = True
-        return DummySwbtStatus(connected=True, message="reconnected")
 
     def apply(self, state: object) -> None:
         """適用された state を記録する。"""
@@ -294,7 +439,9 @@ class DummySwbtControllerSession:
 
     def status(self) -> DummySwbtStatus:
         """Dummy status を返す。"""
-        return DummySwbtStatus(connected=self.connected)
+        return DummySwbtStatus(
+            connection_state="connected" if self.connected else "closed",
+        )
 
     def close(self) -> None:
         """Dummy session を閉じる。"""
@@ -304,7 +451,7 @@ class DummySwbtControllerSession:
 
 def create_swbt_controller(
     config: SwbtControllerConfig,
-    diagnostics_writer: TextIO | None = None,
+    diagnostics_writer: DiagnosticsWriter | None = None,
 ) -> object:
     """SwbtControllerConfig から swbt controller instance を作る。"""
     controller_cls = resolve_swbt_controller_class(config.model.controller_type)
@@ -312,7 +459,7 @@ def create_swbt_controller(
     if diagnostics_writer is not None:
         from swbt import DiagnosticsConfig
 
-        diagnostics = DiagnosticsConfig(trace_writer=diagnostics_writer)
+        diagnostics = DiagnosticsConfig(trace_writer=cast(TextIO, diagnostics_writer))
     return controller_cls(
         adapter=config.adapter,
         key_store_path=str(config.key_store_path),

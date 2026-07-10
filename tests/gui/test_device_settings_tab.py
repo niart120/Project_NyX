@@ -1,3 +1,5 @@
+from threading import Event
+
 import pytest
 from PySide6.QtWidgets import QLabel
 
@@ -372,18 +374,21 @@ def test_refresh_adapters_does_not_pair_or_reconnect(qtbot):
         None,
         device_discovery=FakeDiscovery(),
         swbt_adapter_provider=adapter_provider,
-        swbt_pair=lambda: calls.append("pair"),
-        swbt_reconnect=lambda: calls.append("reconnect"),
+        swbt_pair=lambda _success, _failure: calls.append("pair"),
+        swbt_reconnect=lambda _success, _failure: calls.append("reconnect"),
     )
     qtbot.addWidget(tab)
     settings_before = dict(settings.data)
 
+    qtbot.waitUntil(lambda: adapter_provider.calls == 1 and not tab._swbt_busy)
     tab.refresh_swbt_adapters()
+    qtbot.waitUntil(lambda: adapter_provider.calls == 2 and not tab._swbt_busy)
 
     assert adapter_provider.calls == 2
     assert calls == []
     assert settings.data == settings_before
-    assert tab.swbt_adapter.currentData() == "hci0"
+    assert tab.swbt_adapter.currentIndex() == -1
+    assert tab.swbt_adapter.currentText() == ""
 
 
 def test_device_settings_tab_applies_swbt_settings(qtbot):
@@ -396,6 +401,7 @@ def test_device_settings_tab_applies_swbt_settings(qtbot):
         swbt_adapter_provider=adapter_provider,
     )
     qtbot.addWidget(tab)
+    qtbot.waitUntil(lambda: adapter_provider.calls == 1 and not tab._swbt_busy)
 
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
@@ -407,6 +413,102 @@ def test_device_settings_tab_applies_swbt_settings(qtbot):
     assert settings.data["controller.swbt.controller_type"] == "joy-con-l"
     assert settings.data["controller.swbt.adapter"] == "hci0"
     assert settings.data["controller.swbt.key_store_path"] == ".nyxpy/swbt/joy-con-l-bond.json"
+
+
+def test_device_tab_preserves_edited_adapter_text(qtbot) -> None:
+    settings = FakeSettings()
+    provider = FakeSwbtAdapterProvider()
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_adapter_provider=provider,
+    )
+    qtbot.addWidget(tab)
+    qtbot.waitUntil(lambda: provider.calls == 1 and not tab._swbt_busy)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("custom-adapter")
+
+    tab.apply()
+
+    assert settings.data["controller.swbt.adapter"] == "custom-adapter"
+
+
+def test_pair_status_replaces_alias_with_canonical_adapter(qtbot) -> None:
+    settings = FakeSettings()
+
+    def pair(succeeded, _failed) -> None:
+        succeeded(
+            type(
+                "Status",
+                (),
+                {
+                    "connected": True,
+                    "message": "connected",
+                    "controller_type": "pro-controller",
+                    "adapter": "hci0",
+                },
+            )()
+        )
+
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_pair=pair,
+    )
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb-1")
+
+    tab._pair_swbt()
+    tab.apply()
+
+    assert tab.swbt_adapter.currentText() == "hci0"
+    assert settings.data["controller.swbt.adapter"] == "hci0"
+
+
+def test_adapter_refresh_resolves_saved_alias_without_auto_selecting_other(qtbot) -> None:
+    settings = FakeSettings()
+    settings.data["controller.swbt.adapter"] = "usb-1"
+    provider = FakeSwbtAdapterProvider()
+    tab = DeviceSettingsTab(
+        settings,
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_adapter_provider=provider,
+    )
+    qtbot.addWidget(tab)
+
+    qtbot.waitUntil(lambda: provider.calls == 1 and not tab._swbt_busy)
+
+    assert tab.swbt_adapter.currentData() == "hci0"
+
+
+def test_adapter_refresh_callback_is_safe_after_tab_deletion(qtbot) -> None:
+    started = Event()
+    release = Event()
+    finished = Event()
+
+    def provider():
+        started.set()
+        release.wait(2.0)
+        finished.set()
+        return ()
+
+    tab = DeviceSettingsTab(
+        FakeSettings(),
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_adapter_provider=provider,
+    )
+    qtbot.addWidget(tab)
+    qtbot.waitUntil(started.is_set)
+
+    tab.deleteLater()
+    qtbot.wait(0)
+    release.set()
+    qtbot.waitUntil(finished.is_set)
 
 
 def test_device_settings_tab_does_not_list_stale_serial_setting(qtbot):

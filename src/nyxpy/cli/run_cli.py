@@ -9,7 +9,12 @@ from typing import Any
 from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryService
 from nyxpy.framework.core.hardware.protocol import SerialProtocolInterface
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
-from nyxpy.framework.core.hardware.swbt.config import supported_controller_models
+from nyxpy.framework.core.hardware.swbt.config import (
+    SwbtControllerConfig,
+    supported_controller_models,
+)
+from nyxpy.framework.core.hardware.swbt.diagnostics import LoggerDiagnosticsWriter
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterDiscoveryService
 from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.io.controller_config import (
     ControllerConfig,
@@ -34,6 +39,8 @@ from nyxpy.framework.core.settings.global_settings import SettingsStore
 from nyxpy.framework.core.settings.secrets_settings import SecretsStore
 from nyxpy.framework.core.settings.workspace import ensure_workspace, resolve_project_root
 
+from .swbt_adapter import canonicalize_swbt_adapter
+
 
 @dataclass(frozen=True)
 class UserMessage:
@@ -53,7 +60,8 @@ class CliPresenter:
         if result.status is RunStatus.CANCELLED:
             return UserMessage("WARNING", "Macro execution was interrupted")
         message = result.error.message if result.error is not None else "Macro execution failed"
-        return UserMessage("ERROR", message)
+        code = result.error.code if result.error is not None else None
+        return UserMessage("ERROR", message, code=code)
 
     def exit_code(self, result: RunResult) -> int:
         if result.status is RunStatus.SUCCESS:
@@ -61,6 +69,13 @@ class CliPresenter:
         if result.status is RunStatus.CANCELLED:
             return 130
         return 2
+
+
+def format_cli_error(message: str, *, code: str | None = None) -> str:
+    """CLI の error message に framework code を付ける。"""
+    if code:
+        return f"エラー [{code}]: {message}"
+    return f"エラー: {message}"
 
 
 def configure_logging(
@@ -155,13 +170,18 @@ def create_runtime_builder(
     notification_handler = create_notification_handler_from_settings(
         secrets.snapshot(), logger=logger
     )
+    resolved_swbt_factory = swbt_controller_factory
+    if isinstance(controller_config, SwbtControllerConfig) and resolved_swbt_factory is None:
+        resolved_swbt_factory = SwbtControllerOutputPortFactory(
+            diagnostics_writer=LoggerDiagnosticsWriter(logger)
+        )
     return create_device_runtime_builder(
         project_root=paths.project_root,
         registry=registry,
         device_discovery=discovery,
         controller_config=controller_config,
         serial_controller_factory=serial_controller_factory,
-        swbt_controller_factory=swbt_controller_factory,
+        swbt_controller_factory=resolved_swbt_factory,
         frame_source_factory=frame_factory,
         capture_name=capture_name,
         detection_timeout_sec=detection_timeout_sec,
@@ -243,13 +263,18 @@ def _run_cleanup(
         _record_cleanup_failure(logger, action, exc)
 
 
-def cli_main(args: argparse.Namespace) -> int:
+def cli_main(
+    args: argparse.Namespace,
+    *,
+    swbt_adapter_discovery: SwbtAdapterDiscoveryService | None = None,
+) -> int:
     """CLIアプリケーションのメインエントリーポイント。
 
     この関数は解析済み引数から Runtime 実行要求を組み立てます。
 
     Args:
         args: コマンドライン引数
+        swbt_adapter_discovery: swbt adapter 名を正規化する discovery service
 
     Returns:
         終了コード（0:成功、0以外:エラー）
@@ -273,6 +298,11 @@ def cli_main(args: argparse.Namespace) -> int:
             settings_snapshot=settings.snapshot(),
             workspace_root=paths.project_root,
         )
+        if isinstance(controller_config, SwbtControllerConfig):
+            controller_config = canonicalize_swbt_adapter(
+                controller_config,
+                discovery_service=swbt_adapter_discovery,
+            )
         runtime_builder = create_runtime_builder(
             logger=logger,
             controller_config=controller_config,
@@ -295,12 +325,23 @@ def cli_main(args: argparse.Namespace) -> int:
         presenter = CliPresenter()
         user_message = presenter.render_result(result)
         if user_message.level != "INFO":
-            print(user_message.text)
+            if user_message.level == "ERROR":
+                print(format_cli_error(user_message.text, code=user_message.code))
+            else:
+                print(user_message.text)
         return presenter.exit_code(result)
 
     except (ConfigurationError, ValueError) as ve:
+        error_code = ve.code if isinstance(ve, ConfigurationError) else None
+        error_message = ve.message if isinstance(ve, ConfigurationError) else str(ve)
         if "logger" in locals():
-            logger.user("ERROR", str(ve), component="CLI", event="configuration.invalid")
+            logger.user(
+                "ERROR",
+                error_message,
+                component="CLI",
+                event="configuration.invalid",
+                code=error_code,
+            )
             logger.technical(
                 "ERROR",
                 "Invalid CLI configuration",
@@ -308,7 +349,7 @@ def cli_main(args: argparse.Namespace) -> int:
                 event="configuration.invalid",
                 exc=ve,
             )
-        print(f"エラー: {ve}")
+        print(format_cli_error(error_message, code=error_code))
         return 1  # エラー時の終了コード
 
     except Exception as e:

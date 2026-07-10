@@ -5,6 +5,8 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from nyxpy.cli import run_cli
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 
@@ -47,6 +49,26 @@ class RecordingBuilder:
 
     def shutdown(self) -> None:
         self.shutdown_called = True
+
+
+class SwbtDiscovery:
+    def list_adapters(self) -> tuple[SwbtAdapterView, ...]:
+        return (
+            SwbtAdapterView(
+                name="usb:0",
+                aliases=("hci0",),
+                display_name="usb:0",
+                vendor_id=None,
+                product_id=None,
+                manufacturer=None,
+                product=None,
+                serial_number=None,
+                bus_number=None,
+                device_address=None,
+                port_numbers=(),
+                is_bluetooth_hci=True,
+            ),
+        )
 
 
 def patch_cli_workspace(monkeypatch, tmp_path):
@@ -147,6 +169,49 @@ def test_top_level_parser_accepts_swbt_pair_command() -> None:
     assert args.adapter == "usb:0"
     assert args.controller_type == "pro-controller"
     assert args.timeout == 5.0
+
+
+def test_run_cli_canonicalizes_swbt_adapter_alias(monkeypatch, tmp_path) -> None:
+    builder = RecordingBuilder()
+    captured = {}
+    patch_cli_workspace(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        run_cli,
+        "configure_logging",
+        lambda *, silence, verbose, base_dir: Logging(Logger()),
+    )
+
+    def create_builder(**kwargs):
+        captured.update(kwargs)
+        return builder
+
+    monkeypatch.setattr(run_cli, "create_runtime_builder", create_builder)
+    args = run_cli.build_parser().parse_args(
+        ["sample", "--controller", "swbt", "--swbt-adapter", "hci0"]
+    )
+
+    assert run_cli.cli_main(args, swbt_adapter_discovery=SwbtDiscovery()) == 0
+    assert captured["controller_config"].adapter == "usb:0"
+
+
+def test_run_cli_configuration_error_prints_code(monkeypatch, tmp_path, capsys) -> None:
+    patch_cli_workspace(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        run_cli,
+        "configure_logging",
+        lambda *, silence, verbose, base_dir: Logging(Logger()),
+    )
+    monkeypatch.setattr(
+        run_cli,
+        "controller_config_from_overrides",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ConfigurationError("adapter missing", code="NYX_SWBT_ADAPTER_NOT_FOUND")
+        ),
+    )
+    args = run_cli.build_parser().parse_args(["sample", "--controller", "swbt"])
+
+    assert run_cli.cli_main(args) == 1
+    assert "NYX_SWBT_ADAPTER_NOT_FOUND" in capsys.readouterr().out
 
 
 def test_cli_does_not_accept_notification_secret_args() -> None:

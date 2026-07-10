@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +29,7 @@ from tests.hardware.swbt_realdevice_support import (
     current_git_commit,
     installed_swbt_python_version,
     load_swbt_realdevice_options,
+    resolve_operator_result,
 )
 from tests.support.fake_execution_context import make_fake_execution_context
 
@@ -107,18 +108,17 @@ def test_swbt_pair_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
         result = session.pair(timeout_sec=swbt_run.options.timeout_sec)
         assert session.connected is True
 
-    swbt_run.record(
-        "test_swbt_pair_realdevice",
-        "pass",
-        key_store_exists=swbt_run.options.key_store_path.exists(),
-        result_type=type(result).__name__,
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_pair_realdevice",
-        result="pass",
-        details={"controller_type": swbt_run.options.controller_type},
-    )
     assert swbt_run.options.key_store_path.exists()
+    _record_operator_result(
+        swbt_run,
+        "test_swbt_pair_realdevice",
+        prompt="Switch 上で controller の接続が確認できたか (pass/fail/skip): ",
+        details={
+            "controller_type": swbt_run.options.controller_type,
+            "key_store_exists": True,
+            "result_type": type(result).__name__,
+        },
+    )
 
 
 def test_swbt_reconnect_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
@@ -149,15 +149,10 @@ def test_swbt_button_dpad_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None
         time.sleep(0.05)
         port.release((Hat.UPRIGHT,))
 
-    swbt_run.record(
+    _record_operator_result(
+        swbt_run,
         "test_swbt_button_dpad_manual_realdevice",
-        "pass",
-        button=button.name,
-        dpad="UPRIGHT",
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_button_dpad_manual_realdevice",
-        result="pass",
+        prompt=f"{button.name} と UPRIGHT が正しく入力されたか (pass/fail/skip): ",
         details={"button": button.name, "dpad": "UPRIGHT"},
     )
 
@@ -178,17 +173,13 @@ def test_swbt_stick_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
             port.release((RStick.UP,))
             exercised.append("right_stick_up")
 
-    swbt_run.record(
+    assert exercised
+    _record_operator_result(
+        swbt_run,
         "test_swbt_stick_manual_realdevice",
-        "pass",
-        exercised=exercised,
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_stick_manual_realdevice",
-        result="pass",
+        prompt="対象 stick が上方向へ入力されたか (pass/fail/skip): ",
         details={"exercised": exercised, "expected_direction": "up"},
     )
-    assert exercised
 
 
 def test_swbt_imu_realdevice(tmp_path: Path, swbt_run: SwbtRealDeviceRun) -> None:
@@ -200,14 +191,10 @@ def test_swbt_imu_realdevice(tmp_path: Path, swbt_run: SwbtRealDeviceRun) -> Non
         cmd.imu(IMUFrame.gyro(x=100))
         port.release()
 
-    swbt_run.record(
+    _record_operator_result(
+        swbt_run,
         "test_swbt_imu_realdevice",
-        "pass",
-        frames=("neutral", "gyro_x_100"),
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_imu_realdevice",
-        result="pass",
+        prompt="IMU frame 送信時に想定外の入力や切断がなかったか (pass/fail/skip): ",
         details={"frames": ["neutral", "gyro_x_100"]},
     )
 
@@ -221,14 +208,10 @@ def test_swbt_neutral_after_close_realdevice(swbt_run: SwbtRealDeviceRun) -> Non
         time.sleep(0.05)
         port.close()
 
-    swbt_run.record(
+    _record_operator_result(
+        swbt_run,
         "test_swbt_neutral_after_close_realdevice",
-        "pass",
-        button=button.name,
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_neutral_after_close_realdevice",
-        result="pass",
+        prompt=f"close 後に {button.name} が押下状態で残らなかったか (pass/fail/skip): ",
         details={"button": button.name},
     )
 
@@ -249,16 +232,14 @@ def test_swbt_short_press_duration_realdevice(
         for duration_ms in swbt_run.options.short_press_ms:
             cmd.press(button, dur=duration_ms / 1000, wait=0.05)
 
-    swbt_run.record(
+    _record_operator_result(
+        swbt_run,
         "test_swbt_short_press_duration_realdevice",
-        "pass",
-        button=button.name,
-        durations_ms=list(swbt_run.options.short_press_ms),
-    )
-    swbt_run.writer.record_operator_confirmation(
-        test_name="test_swbt_short_press_duration_realdevice",
-        result="pass",
-        details={"button": button.name, "durations_ms": list(swbt_run.options.short_press_ms)},
+        prompt=f"{button.name} の短押しが各 duration で認識されたか (pass/fail/skip): ",
+        details={
+            "button": button.name,
+            "durations_ms": list(swbt_run.options.short_press_ms),
+        },
     )
 
 
@@ -289,12 +270,35 @@ def _connected_port(
 def _require_operator_confirmation(run: SwbtRealDeviceRun, test_name: str) -> None:
     if run.options.operator_confirmation:
         return
+    details = {"reason": "NYX_SWBT_OPERATOR_CONFIRMATION=1 is required"}
     run.writer.record_operator_confirmation(
         test_name=test_name,
         result="skip",
-        details={"reason": "NYX_SWBT_OPERATOR_CONFIRMATION=1 is required"},
+        details=details,
     )
+    run.record(test_name, "skip", **details)
     pytest.skip("NYX_SWBT_OPERATOR_CONFIRMATION=1 is required for this realdevice test")
+
+
+def _record_operator_result(
+    run: SwbtRealDeviceRun,
+    test_name: str,
+    *,
+    prompt: str,
+    details: Mapping[str, object],
+) -> None:
+    result = resolve_operator_result(run.options, test_name, prompt=prompt)
+    recorded_details = {**details, "source": result.source}
+    run.writer.record_operator_confirmation(
+        test_name=test_name,
+        result=result.status,
+        details=recorded_details,
+    )
+    run.record(test_name, result.status, **recorded_details)
+    if result.status == "fail":
+        pytest.fail(f"operator reported failure for {test_name}")
+    if result.status == "skip":
+        pytest.skip(f"operator skipped {test_name}")
 
 
 def _require_key_store(run: SwbtRealDeviceRun, test_name: str) -> None:

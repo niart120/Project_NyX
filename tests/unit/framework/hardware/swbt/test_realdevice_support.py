@@ -12,6 +12,7 @@ from tests.hardware.swbt_realdevice_support import (
     SwbtRealDeviceEnvironmentMissing,
     SwbtRealDeviceOptions,
     load_swbt_realdevice_options,
+    resolve_operator_result,
 )
 
 
@@ -25,6 +26,8 @@ def test_swbt_realdevice_options_from_environment(tmp_path: Path) -> None:
         "NYX_SWBT_TIMEOUT": "7.5",
         "NYX_SWBT_EVIDENCE_DIR": str(tmp_path / "evidence"),
         "NYX_SWBT_OPERATOR_CONFIRMATION": "1",
+        "NYX_SWBT_OPERATOR_RESULT": "skip",
+        "NYX_SWBT_OPERATOR_RESULTS": '{"test_manual": "pass"}',
         "NYX_SWBT_SHORT_PRESS_MS": "16, 33,50",
     }
 
@@ -36,6 +39,8 @@ def test_swbt_realdevice_options_from_environment(tmp_path: Path) -> None:
     assert options.evidence_dir == tmp_path / "evidence"
     assert options.timeout_sec == 7.5
     assert options.operator_confirmation is True
+    assert options.operator_result == "skip"
+    assert options.operator_results == {"test_manual": "pass"}
     assert options.short_press_ms == (16, 33, 50)
 
 
@@ -65,6 +70,20 @@ def test_swbt_realdevice_options_require_gate_flags() -> None:
 
     with pytest.raises(SwbtRealDeviceEnvironmentMissing, match="NYX_SWBT_ADAPTER"):
         load_swbt_realdevice_options({"NYX_REALDEVICE": "1", "NYX_SWBT": "1"})
+
+
+def test_swbt_realdevice_options_reject_invalid_operator_results() -> None:
+    base = {
+        "NYX_REALDEVICE": "1",
+        "NYX_SWBT": "1",
+        "NYX_SWBT_ADAPTER": "usb:0",
+    }
+
+    with pytest.raises(ValueError, match="NYX_SWBT_OPERATOR_RESULTS must be a JSON object"):
+        load_swbt_realdevice_options({**base, "NYX_SWBT_OPERATOR_RESULTS": "not-json"})
+
+    with pytest.raises(ValueError, match="pass, fail, or skip"):
+        load_swbt_realdevice_options({**base, "NYX_SWBT_OPERATOR_RESULT": "yes"})
 
 
 def test_swbt_evidence_writer_redacts_absolute_paths(tmp_path: Path) -> None:
@@ -110,3 +129,60 @@ def test_swbt_operator_confirmation_records_result(tmp_path: Path) -> None:
         "result": "pass",
         "test_name": "test_swbt_button_dpad_manual_realdevice",
     }
+
+
+def test_resolve_operator_result_prefers_per_test_then_default_then_stdin(tmp_path: Path) -> None:
+    options = SwbtRealDeviceOptions(
+        adapter="usb:0",
+        controller_type="pro-controller",
+        key_store_path=tmp_path / "bond.json",
+        evidence_dir=tmp_path / "evidence",
+        operator_confirmation=True,
+        operator_result="fail",
+        operator_results={"test_specific": "pass"},
+    )
+
+    specific = resolve_operator_result(
+        options,
+        "test_specific",
+        input_func=lambda _prompt: pytest.fail("stdin must not be read"),
+    )
+    default = resolve_operator_result(
+        options,
+        "test_default",
+        input_func=lambda _prompt: pytest.fail("stdin must not be read"),
+    )
+    interactive_options = SwbtRealDeviceOptions(
+        adapter="usb:0",
+        controller_type="pro-controller",
+        key_store_path=tmp_path / "bond.json",
+        evidence_dir=tmp_path / "evidence",
+        operator_confirmation=True,
+    )
+    interactive = resolve_operator_result(
+        interactive_options,
+        "test_interactive",
+        input_func=lambda _prompt: "skip",
+    )
+
+    assert (specific.status, specific.source) == ("pass", "NYX_SWBT_OPERATOR_RESULTS")
+    assert (default.status, default.source) == ("fail", "NYX_SWBT_OPERATOR_RESULT")
+    assert (interactive.status, interactive.source) == ("skip", "stdin")
+
+
+def test_resolve_operator_result_does_not_treat_unavailable_stdin_as_pass(
+    tmp_path: Path,
+) -> None:
+    options = SwbtRealDeviceOptions(
+        adapter="usb:0",
+        controller_type="pro-controller",
+        key_store_path=tmp_path / "bond.json",
+        evidence_dir=tmp_path / "evidence",
+        operator_confirmation=True,
+    )
+
+    def eof(_prompt: str) -> str:
+        raise EOFError
+
+    with pytest.raises(SwbtRealDeviceEnvironmentMissing, match="pytest -s"):
+        resolve_operator_result(options, "test_manual", input_func=eof)

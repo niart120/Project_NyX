@@ -70,21 +70,38 @@ D-pad は button set として扱う。
 
 ## Stick
 
-NyX の `LStick` / `RStick` は、Project_NyX 側で既に raw `x/y` を持つ。mapper はその値を swbt `Stick.raw(x=..., y=...)` に渡す。
+NyX の `LStick` / `RStick` は `0..255`、中心 `128`、Y 軸下向き正の座標系を持つ。swbt の `Stick.normalized(...)` は `-1.0..1.0`、Y 軸上向き正である。mapper は座標系を変換し、Y 軸を反転してから渡す。NyX の値を `Stick.raw(...)` へ直接渡してはならない。
 
 ```python
 def to_stick(stick: LStick | RStick | None) -> SwbtStick:
     if stick is None:
         return Stick.center()
-    return Stick.raw(x=stick.x, y=stick.y)
+
+    def normalize(value: int) -> float:
+        if value < 128:
+            return (value - 128) / 128
+        return (value - 128) / 127
+
+    return Stick.normalized(
+        x=normalize(stick.x),
+        y=-normalize(stick.y),
+    )
 ```
 
 | NyX | swbt |
 |---|---|
 | `LStick.CENTER` | `Stick.center()` |
 | `RStick.CENTER` | `Stick.center()` |
-| `LStick.UP` など | left stick `Stick.raw(x=..., y=...)` |
-| `RStick.UP` など | right stick `Stick.raw(x=..., y=...)` |
+| `LStick.UP` など | left stick `Stick.normalized(x=..., y=-...)` |
+| `RStick.UP` など | right stick `Stick.normalized(x=..., y=-...)` |
+
+変換の基準点は次のとおりである。
+
+| NyX 値 | 正規化値 | Y 軸へ使う値 |
+|---:|---:|---:|
+| `0` | `-1.0` | `1.0` |
+| `128` | `0.0` | `0.0` |
+| `255` | `1.0` | `-1.0` |
 
 Joy-Con L は right stick を持たない。Joy-Con R は left stick を持たない。mapper は `SwbtControllerModel.capabilities` を見て拒否する。
 

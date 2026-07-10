@@ -621,3 +621,216 @@ def test_runtime_builder_does_not_cache_failed_preview_source(tmp_path: Path) ->
     assert first_preview_source.closed is True
     assert builder.frame_source_for_preview() is second_preview_source
     assert second_preview_source.initialized is True
+
+
+def test_swbt_gui_lifetime_controller_never_allows_dummy(tmp_path: Path) -> None:
+    swbt_factory = RecordingSwbtFactory()
+    config = SwbtControllerConfig(
+        model=resolve_controller_model("pro-controller"),
+        adapter="usb:0",
+        key_store_path=tmp_path / ".nyxpy" / "swbt" / "bond.json",
+    )
+    builder = create_device_runtime_builder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        device_discovery=Discovery(),
+        controller_config=config,
+        swbt_controller_factory=swbt_factory,
+        frame_source_factory=RecordingFrameFactory(),
+        notification_handler=None,
+        logger=FakeLoggerPort(),
+        lifetime_allow_dummy=True,
+    )
+
+    builder.controller_output_for_manual_input()
+
+    assert swbt_factory.creates == [(config, False, config.connect_timeout_sec)]
+
+
+def test_runtime_builder_closes_created_resources_in_reverse_order_on_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+
+    class Controller(FakeControllerOutputPort):
+        def close(self) -> None:
+            events.append("controller")
+
+    class FrameSource(FakeFrameSourcePort):
+        def close(self) -> None:
+            events.append("frame_source")
+
+    class Resources(FakeResourceStore):
+        def close(self) -> None:
+            events.append("resources")
+
+    class Artifacts(FakeRunArtifactStore):
+        def close(self) -> None:
+            events.append("artifacts")
+
+    class Notifications(FakeNotificationPort):
+        def close(self) -> None:
+            events.append("notifications")
+
+    class Logger(FakeLoggerPort):
+        def bind_context(self, context):
+            self.context = context
+            return self
+
+        def close(self) -> None:
+            events.append("logger")
+
+    monkeypatch.setattr(
+        "nyxpy.framework.core.runtime.builder.ExecutionContext",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("context failed")),
+    )
+    registry = Registry(definition(tmp_path))
+    builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=registry,
+        controller_factory=lambda _request, _definition: Controller(),
+        frame_source_factory=lambda _request, _definition: FrameSource(),
+        resource_store_factory=lambda _request, definition: Resources(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: Artifacts(
+            tmp_path / "artifacts",
+            macro_id=definition.id,
+            run_id=run_id,
+            artifact_dir_name=artifact_dir_name,
+        ),
+        notification_factory=lambda _request, _definition: Notifications(),
+        logger_factory=lambda _request, _definition: Logger(),
+    )
+
+    with pytest.raises(RuntimeError, match="context failed"):
+        builder.build(RuntimeBuildRequest(macro_id="sample"))
+
+    assert events == ["artifacts", "resources", "frame_source", "controller"]
+
+
+def test_runtime_builder_preserves_build_and_cleanup_errors(tmp_path: Path) -> None:
+    class Controller(FakeControllerOutputPort):
+        def close(self) -> None:
+            raise RuntimeError("controller close failed")
+
+    builder = MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        controller_factory=lambda _request, _definition: Controller(),
+        frame_source_factory=lambda _request, _definition: (_ for _ in ()).throw(
+            RuntimeError("frame build failed")
+        ),
+        resource_store_factory=lambda _request, definition: FakeResourceStore(
+            MacroResourceScope.from_definition(definition, tmp_path)
+        ),
+        artifact_store_factory=lambda _request, definition, run_id, artifact_dir_name: (
+            FakeRunArtifactStore(
+                tmp_path / "artifacts",
+                macro_id=definition.id,
+                run_id=run_id,
+                artifact_dir_name=artifact_dir_name,
+            )
+        ),
+        notification_factory=lambda _request, _definition: FakeNotificationPort(),
+        logger_factory=lambda _request, _definition: FakeLoggerPort(),
+    )
+
+    with pytest.raises(ExceptionGroup) as exc_info:
+        builder.build(RuntimeBuildRequest(macro_id="sample"))
+
+    assert [str(error) for error in exc_info.value.exceptions] == [
+        "frame build failed",
+        "controller close failed",
+    ]
+
+
+def test_runtime_builder_closes_context_resources_when_runtime_start_fails(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+    builder = _start_cleanup_builder(tmp_path, events=events)
+
+    def fail_start(_context) -> None:
+        raise RuntimeError("runtime start failed")
+
+    monkeypatch.setattr(builder.runtime, "start", fail_start)
+
+    with pytest.raises(RuntimeError, match="runtime start failed"):
+        builder.start(RuntimeBuildRequest(macro_id="sample"))
+
+    assert events == ["artifacts", "resources", "frame_source", "controller"]
+
+
+def test_runtime_builder_preserves_start_and_all_cleanup_errors(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+    builder = _start_cleanup_builder(
+        tmp_path,
+        events=events,
+        failing_resources=frozenset({"controller", "frame_source", "resources", "artifacts"}),
+    )
+
+    def fail_start(_context) -> None:
+        raise RuntimeError("runtime start failed")
+
+    monkeypatch.setattr(builder.runtime, "start", fail_start)
+
+    with pytest.raises(ExceptionGroup) as exc_info:
+        builder.start(RuntimeBuildRequest(macro_id="sample"))
+
+    assert events == ["artifacts", "resources", "frame_source", "controller"]
+    assert [str(error) for error in exc_info.value.exceptions] == [
+        "runtime start failed",
+        "artifacts close failed",
+        "resources close failed",
+        "frame_source close failed",
+        "controller close failed",
+    ]
+
+
+def _start_cleanup_builder(
+    tmp_path: Path,
+    *,
+    events: list[str],
+    failing_resources: frozenset[str] = frozenset(),
+) -> MacroRuntimeBuilder:
+    controller = FakeControllerOutputPort()
+    frame_source = FakeFrameSourcePort()
+    resources = FakeResourceStore(
+        MacroResourceScope.from_definition(definition(tmp_path), tmp_path)
+    )
+    artifacts = FakeRunArtifactStore(
+        tmp_path / "artifacts",
+        macro_id="sample",
+        run_id="run-id",
+    )
+    notifications = FakeNotificationPort()
+    logger = FakeLoggerPort()
+
+    def close_resource(name: str) -> None:
+        events.append(name)
+        if name in failing_resources:
+            raise RuntimeError(f"{name} close failed")
+
+    controller.close = lambda: close_resource("controller")
+    frame_source.close = lambda: close_resource("frame_source")
+    resources.close = lambda: close_resource("resources")
+    artifacts.close = lambda: close_resource("artifacts")
+    notifications.close = lambda: close_resource("notifications")
+    logger.close = lambda: close_resource("logger")
+
+    return MacroRuntimeBuilder(
+        project_root=tmp_path,
+        registry=Registry(definition(tmp_path)),
+        controller_factory=lambda _request, _definition: controller,
+        frame_source_factory=lambda _request, _definition: frame_source,
+        resource_store_factory=lambda _request, _definition: resources,
+        artifact_store_factory=lambda _request, _definition, _run_id, _artifact_dir: artifacts,
+        notification_factory=lambda _request, _definition: notifications,
+        logger_factory=lambda _request, _definition: logger,
+    )

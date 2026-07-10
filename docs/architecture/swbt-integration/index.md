@@ -61,7 +61,7 @@ GUI widget
   -> SerialComm
 ```
 
-`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の controller lifecycle、connection、`InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。
+`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の async controller lifecycle と `InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。`status()` は同期 API であり、pair / reconnect 後の `connection_state` を接続判定に使う。
 
 ## GUI の範囲
 
@@ -102,7 +102,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 | adapter refresh | Python API の `list_adapters()` を直接呼ぶ |
 | pairing | 明示操作として扱い、通常の macro run では勝手に pairing しない |
 | reconnect | key store に保存済み pairing 情報があることを前提にする |
-| disconnect | factory-managed cached session を明示的に閉じる。別 process や Switch 側状態は保証しない |
+| disconnect | factory lifetime を維持する GUI から cached session を明示的に閉じる。fresh factory を作る CLI command は提供しない |
 | input | NyX state から `InputState` を構成し、`apply(state)` を使う |
 | manual input | 既存 `VirtualControllerModel` と `ControllerOutputPort` 経路を使う |
 | unsupported input | silent no-op にせず明示的に失敗させる |
@@ -136,7 +136,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 - Pro Controller / Joy-Con L / Joy-Con R の選択
 - pairing と key store への保存
 - 保存済み pairing key に基づく reconnect
-- factory-managed cached session の disconnect
+- GUI が管理する cached session の disconnect
 - `ControllerOutputPort` からの button / D-pad / stick / IMU 入力
 - GUI 仮想コントローラーによる manual input
 

@@ -61,6 +61,7 @@ def controller_config_from_settings(
     key_store = _key_store_path(
         dotted_get(settings, "controller.swbt.key_store_path", None),
         default=model.default_key_store_path(_default_swbt_key_store_dir(workspace_root)),
+        workspace_root=workspace_root,
     )
     return SwbtControllerConfig(
         model=model,
@@ -143,10 +144,18 @@ def _default_swbt_key_store_dir(workspace_root: Path | None) -> Path:
     return Path(workspace_root) / ".nyxpy" / "swbt"
 
 
-def _key_store_path(value: object, *, default: Path) -> Path:
+def _key_store_path(
+    value: object,
+    *,
+    default: Path,
+    workspace_root: Path | None,
+) -> Path:
     if value in (None, ""):
         return default
-    return Path(str(value))
+    path = Path(str(value))
+    if path.is_absolute() or workspace_root is None:
+        return path
+    return Path(workspace_root) / path
 
 
 def _optional_name(value: object) -> str | None:

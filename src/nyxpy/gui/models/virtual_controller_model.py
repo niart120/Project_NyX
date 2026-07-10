@@ -12,6 +12,7 @@ class VirtualControllerModel(QObject):
 
     # 状態変更通知用シグナル
     stateChanged = Signal()
+    inputFailed = Signal(object, object)
 
     def __init__(
         self,
@@ -22,7 +23,7 @@ class VirtualControllerModel(QObject):
         super().__init__()
         self.logger = logger
         self.controller = controller
-        self.manual_input_enabled = True
+        self.manual_input_enabled = controller is not None
 
         # コントローラー状態
         self.pressed_buttons: set[Button] = set()
@@ -36,7 +37,7 @@ class VirtualControllerModel(QObject):
 
     def set_manual_input_enabled(self, enabled: bool) -> None:
         """Manual input の有効状態を切り替える。"""
-        self.manual_input_enabled = bool(enabled)
+        self.manual_input_enabled = bool(enabled and self.controller is not None)
         self.stateChanged.emit()
 
     def reset_state(self) -> None:
@@ -58,32 +59,27 @@ class VirtualControllerModel(QObject):
         """ボタンが押されたときの処理"""
         if not self._can_send_input():
             return
-        self.pressed_buttons.add(button)
-        # ボタン押下の専用コマンドを送信
-        self.send_press_command((button,))
+        if self.send_press_command((button,)):
+            self.pressed_buttons.add(button)
 
     def button_release(self, button: Button) -> None:
         """ボタンが離されたときの処理"""
         if not self._can_send_input():
             return
-        if button in self.pressed_buttons:
+        if button in self.pressed_buttons and self.send_release_command((button,)):
             self.pressed_buttons.remove(button)
-            # ボタン解放の専用コマンドを送信
-            self.send_release_command((button,))
 
     def set_hat_direction(self, direction: Hat) -> None:
         """方向パッドの方向を設定"""
         if not self._can_send_input():
             return
         previous_direction = self.current_hat
-        self.current_hat = direction
-
-        # CENTERに戻る場合は解放コマンドを送信
         if direction == Hat.CENTER and previous_direction != Hat.CENTER:
-            self.send_release_command((previous_direction,))
-        # それ以外の場合は押下コマンドを送信
+            sent = self.send_release_command((previous_direction,))
         else:
-            self.send_press_command((direction,))
+            sent = self.send_press_command((direction,))
+        if sent:
+            self.current_hat = direction
 
     def set_left_stick(self, angle: float, strength: float) -> None:
         """左スティックの状態を設定"""
@@ -94,13 +90,12 @@ class VirtualControllerModel(QObject):
         # スティックの強度が0.1以上の場合、スティックを押下状態にする
         # それ以外の場合はスティックを中央に戻す
         if strength > 0.1:
-            self.current_l_stick = LStick(angle, strength)
-            self.send_press_command((self.current_l_stick,))
+            next_stick = LStick(angle, strength)
+            if self.send_press_command((next_stick,)):
+                self.current_l_stick = next_stick
         else:
-            # スティックを戻す場合、以前の状態が中央でなければ解放コマンドを送信
-            if previous_stick != LStick.CENTER:
-                self.send_release_command((previous_stick,))
-            self.current_l_stick = LStick.CENTER
+            if previous_stick == LStick.CENTER or self.send_release_command((previous_stick,)):
+                self.current_l_stick = LStick.CENTER
 
     def set_right_stick(self, angle: float, strength: float) -> None:
         """右スティックの状態を設定"""
@@ -111,13 +106,12 @@ class VirtualControllerModel(QObject):
         # スティックの強度が0.1以上の場合、スティックを押下状態にする
         # それ以外の場合はスティックを中央に戻す
         if strength > 0.1:
-            self.current_r_stick = RStick(angle, strength)
-            self.send_press_command((self.current_r_stick,))
+            next_stick = RStick(angle, strength)
+            if self.send_press_command((next_stick,)):
+                self.current_r_stick = next_stick
         else:
-            # スティックを戻す場合、以前の状態が中央でなければ解放コマンドを送信
-            if previous_stick != RStick.CENTER:
-                self.send_release_command((previous_stick,))
-            self.current_r_stick = RStick.CENTER
+            if previous_stick == RStick.CENTER or self.send_release_command((previous_stick,)):
+                self.current_r_stick = RStick.CENTER
 
     def touch_down(self, x: int, y: int) -> None:
         controller = self.controller
@@ -126,14 +120,12 @@ class VirtualControllerModel(QObject):
         try:
             controller.touch_down(x, y)
         except Exception as e:
-            self.logger.technical(
-                "ERROR",
-                "タッチ押下コマンド送信エラー",
-                component="VirtualController",
+            self._handle_input_failure(
+                e,
+                controller,
+                message="タッチ押下コマンド送信エラー",
                 event="controller.touch_down_failed",
-                exc=e,
             )
-            raise
 
     def touch_move(self, x: int, y: int) -> None:
         self.touch_down(x, y)
@@ -145,46 +137,44 @@ class VirtualControllerModel(QObject):
         try:
             controller.touch_up()
         except Exception as e:
-            self.logger.technical(
-                "ERROR",
-                "タッチ解放コマンド送信エラー",
-                component="VirtualController",
+            self._handle_input_failure(
+                e,
+                controller,
+                message="タッチ解放コマンド送信エラー",
                 event="controller.touch_up_failed",
-                exc=e,
             )
-            raise
 
-    def send_release_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
+    def send_release_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> bool:
         controller = self.controller
         if not self.manual_input_enabled or controller is None:
-            return
+            return False
         try:
             controller.release(keys)
         except Exception as e:
-            self.logger.technical(
-                "ERROR",
-                "コントローラー解放コマンド送信エラー",
-                component="VirtualController",
+            self._handle_input_failure(
+                e,
+                controller,
+                message="コントローラー解放コマンド送信エラー",
                 event="controller.release_failed",
-                exc=e,
             )
-            raise
+            return False
+        return True
 
-    def send_press_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> None:
+    def send_press_command(self, keys: tuple[Button | Hat | LStick | RStick, ...]) -> bool:
         controller = self.controller
         if not self.manual_input_enabled or controller is None:
-            return
+            return False
         try:
             controller.press(keys)
         except Exception as e:
-            self.logger.technical(
-                "ERROR",
-                "コントローラー押下コマンド送信エラー",
-                component="VirtualController",
+            self._handle_input_failure(
+                e,
+                controller,
+                message="コントローラー押下コマンド送信エラー",
                 event="controller.press_failed",
-                exc=e,
             )
-            raise
+            return False
+        return True
 
     def release_all(self) -> None:
         """Manual input の保持状態を解除し、controller へ全解除を送る。"""
@@ -193,3 +183,24 @@ class VirtualControllerModel(QObject):
 
     def _can_send_input(self) -> bool:
         return self.manual_input_enabled and self.controller is not None
+
+    def _handle_input_failure(
+        self,
+        error: Exception,
+        controller: ControllerOutputPort,
+        *,
+        message: str,
+        event: str,
+    ) -> None:
+        self.logger.technical(
+            "ERROR",
+            message,
+            component="VirtualController",
+            event=event,
+            exc=error,
+        )
+        if self.controller is controller:
+            self.controller = None
+        self.manual_input_enabled = False
+        self.reset_state()
+        self.inputFailed.emit(error, controller)

@@ -128,8 +128,7 @@ class RaisingSwbtDiscovery:
 
 
 class FakeSwbtStatus:
-    connected = True
-    message = "connected"
+    connection_state = "connected"
 
 
 class FakeSwbtFactory:
@@ -138,11 +137,11 @@ class FakeSwbtFactory:
 
     def pair(self, config, *, timeout_sec):
         self.calls.append(("pair", config, timeout_sec))
-        return FakeSwbtStatus()
+        return None
 
     def reconnect(self, config, *, timeout_sec):
         self.calls.append(("reconnect", config, timeout_sec))
-        return FakeSwbtStatus()
+        return None
 
     def disconnect(self, config):
         self.calls.append(("disconnect", config, None))
@@ -171,6 +170,7 @@ def make_services(
     )
     services.ponkan_capture_available = ponkan_capture_available
     services.runtime_builder = FakeBuilder()
+    services.swbt_adapter_discovery = FakeSwbtDiscovery()
     services._last_settings = dict(settings)
     services._last_secrets = {}
     services._builder_settings = previous_builder_settings or dict(settings)
@@ -181,6 +181,7 @@ def make_services(
         None,
         False,
     )
+    services._active_swbt_config = None
     services._pending_settings_apply = False
 
     def replace_runtime_builder(self, **_kwargs):
@@ -431,12 +432,94 @@ def test_app_services_pair_swbt_returns_gui_status_view() -> None:
 
     status = services.pair_swbt()
 
-    assert factory.calls[0][0] == "pair"
+    assert [call[0] for call in factory.calls] == ["pair", "status"]
     assert factory.calls[0][1].adapter == "hci0"
     assert factory.calls[0][2] == 4.0
     assert status.connected is True
     assert status.controller_type == "joy-con-l"
     assert status.adapter == "hci0"
+
+
+def test_app_services_canonicalizes_adapter_alias_before_pair() -> None:
+    settings = {
+        "controller.backend": "swbt",
+        "controller.swbt.controller_type": "pro-controller",
+        "controller.swbt.adapter": "usb-1",
+    }
+    services = make_services(settings)
+    factory = FakeSwbtFactory()
+    services.swbt_controller_factory = factory
+
+    status = services.pair_swbt()
+
+    assert services.global_settings.get("controller.swbt.adapter") == "hci0"
+    assert factory.calls[0][1].adapter == "hci0"
+    assert status.adapter == "hci0"
+    assert services.swbt_adapter_discovery.calls == 1
+
+
+def test_app_services_keeps_active_config_when_disconnect_fails() -> None:
+    class RetryFactory(FakeSwbtFactory):
+        def __init__(self) -> None:
+            super().__init__()
+            self.disconnect_failures = 1
+
+        def disconnect(self, config):
+            self.calls.append(("disconnect", config, None))
+            if self.disconnect_failures:
+                self.disconnect_failures -= 1
+                raise RuntimeError("neutral failed")
+
+    settings = {
+        "controller.backend": "swbt",
+        "controller.swbt.controller_type": "pro-controller",
+        "controller.swbt.adapter": "hci0",
+    }
+    services = make_services(settings)
+    factory = RetryFactory()
+    services.swbt_controller_factory = factory
+    services.pair_swbt()
+    services.global_settings.set("controller.swbt.adapter", "draft-adapter")
+
+    try:
+        services.disconnect_swbt()
+    except RuntimeError:
+        pass
+    services.disconnect_swbt()
+
+    disconnect_configs = [call[1] for call in factory.calls if call[0] == "disconnect"]
+    assert [config.adapter for config in disconnect_configs] == ["hci0", "hci0"]
+    assert services._active_swbt_config is None
+
+
+def test_notification_change_reuses_gui_lifetime_ports() -> None:
+    services = make_services({"capture_source_type": "camera", "capture_device": "Camera1"})
+    services.secrets_settings.data = {"notification.discord.enabled": True}
+
+    outcome = services.apply_settings(is_run_active=False)
+
+    assert outcome.builder_replaced is True
+    assert outcome.preview_frame_source is None
+    assert outcome.manual_controller is None
+
+
+def test_gui_services_injects_logger_diagnostics_writer(monkeypatch, tmp_path) -> None:
+    captured = {}
+
+    class Factory:
+        def __init__(self, *, diagnostics_writer) -> None:
+            captured["writer"] = diagnostics_writer
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("nyxpy.gui.app_services.SwbtControllerOutputPortFactory", Factory)
+
+    services = GuiAppServices(project_root=tmp_path)
+    try:
+        assert type(captured["writer"]).__name__ == "LoggerDiagnosticsWriter"
+    finally:
+        services.close()
 
 
 def test_gui_does_not_import_swbt_python() -> None:

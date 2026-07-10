@@ -44,7 +44,7 @@ report_period_us = 8000
 
 `adapter` は swbt が開く USB Bluetooth adapter 名である。空文字または未指定のまま pair / reconnect / run を試みた場合は、候補数に関係なく `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。adapter 候補が 1 件だけでも自動採用しない。
 
-`key_store_path` は pairing key file である。明示されない場合は controller type ごとに `.nyxpy/swbt/<controller>-bond.json` を使う。
+`key_store_path` は pairing key file である。明示されない場合は controller type ごとに `.nyxpy/swbt/<controller>-bond.json` を使う。相対 path はコマンドを実行した子 directory ではなく workspace root を基準に解決する。
 
 ```text
 .nyxpy/swbt/pro-controller-bond.json
@@ -64,10 +64,9 @@ report_period_us = 8000
 nyxpy swbt adapters [--json]
 nyxpy swbt pair [--adapter usb:0] [--controller-type pro-controller] [--key-store .nyxpy/swbt/pro-controller-bond.json]
 nyxpy swbt reconnect [--adapter usb:0] [--controller-type pro-controller] [--key-store .nyxpy/swbt/pro-controller-bond.json]
-nyxpy swbt disconnect [--adapter usb:0] [--controller-type pro-controller] [--key-store .nyxpy/swbt/pro-controller-bond.json]
 ```
 
-`pair`、`reconnect`、`disconnect` は workspace settings を読み、CLI option が指定された場合だけ上書きする。解決後に adapter が空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。`key_store_path` が未指定なら controller type から既定値を補う。
+`pair` と `reconnect` は workspace settings を読み、CLI option が指定された場合だけ上書きする。解決後に adapter が空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。指定 adapter は discovery 結果の `name` / `aliases` から代表 `name` へ正規化する。不一致と曖昧 alias はそれぞれ `NYX_SWBT_ADAPTER_NOT_FOUND` / `NYX_SWBT_ADAPTER_AMBIGUOUS` とする。候補が 1 件でも未指定値を補わない。`key_store_path` が未指定なら controller type から既定値を補う。
 
 run option:
 
@@ -79,7 +78,9 @@ nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-
 
 `--serial` と `--capture` は parser 上の必須 option にしない。未指定時は settings に fallback し、解決後の設定を検証する。
 
-`nyxpy swbt status` は初期範囲外である。`disconnect` は同一 process の factory-managed cached session を閉じる操作であり、別 process や OS、Switch 側の接続状態までは保証しない。
+`swbt` の CLI に `status` と `disconnect` は提供しない。CLI は command ごとに fresh factory を作る別 process であり、前回 process の cached session を disconnect できない。接続を閉じる操作は同じ factory lifetime を持つ GUI の `Disconnect` で行う。
+
+失敗時は利用者向け本文と `NYX_SWBT_*` error code の両方をコンソールへ出す。
 
 CLI は GUI 連携用の command copy や clipboard 出力を持たない。
 
@@ -97,7 +98,7 @@ GUI swbt panel に置く項目:
 | pair button | yes | 明示 pairing |
 | reconnect button | yes | 保存済み key で reconnect |
 | disconnect button | yes | GUI lifetime port を release/close し、factory-managed session を disconnect |
-| connection status | yes | factory-managed cached session の状態表示 |
+| connection status | yes | `GamepadStatus.connection_state` に基づく状態表示 |
 
 capture backend / capture source の選択 UI は controller backend と独立させる。controller backend を変更しても preview frame source は再作成しない。capture backend を変更しても manual controller port は再作成しない。
 
@@ -123,6 +124,10 @@ GUI に置かない項目:
 | Disconnect | connected | `release()` 後に `close()`、factory session を閉じ、controller `None` | error log、controller `None` |
 | Macro run start | not pairing/reconnecting | `VirtualControllerModel.set_controller(None)` 後に旧 manual port を release/close して runtime start | close 失敗時は実行を止める |
 
+adapter refresh、pair、reconnect、disconnect、manual port 作成、macro start は worker thread で実行する。widget 更新は main thread に戻す。`pair()` / `reconnect()` の戻り値は `None` なので、成功表示には操作後の `status.connection_state == "connected"` を使う。
+
+adapter refresh の候補が 1 件でも combo で自動選択しない。保存済み adapter が discovery 結果の alias に一致する場合は代表 `name` へ正規化する。discovery が失敗した場合は保存値と現在の選択を消さず、error を表示する。
+
 ## GUI manual input
 
 GUI manual input は既存仮想コントローラー UI で行う。
@@ -134,6 +139,8 @@ VirtualControllerModel
 ```
 
 GUI view model は `SwbtControllerSession` や `InputState` を直接扱わない。
+
+manual input widget は controller port が存在し、macro 非実行、lifecycle worker 非実行の場合だけ有効にする。port 操作が失敗した場合は利用者向け error を表示し、失敗した port を model から外す。
 
 ## Settings validation
 
