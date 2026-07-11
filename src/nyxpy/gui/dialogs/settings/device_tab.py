@@ -177,16 +177,16 @@ class DeviceSettingsTab(QWidget):
         controller_form = QFormLayout()
 
         self.controller_backend = QComboBox()
-        self.controller_backend.addItem("Serial", "serial")
+        self.controller_backend.addItem("serial", "serial")
         self.controller_backend.addItem("swbt", "swbt")
         self._set_controller_backend(self.settings.get("controller.backend", "serial"))
         self.controller_backend.currentIndexChanged.connect(
             lambda _index: self._update_controller_field_state()
         )
-        controller_form.addRow(QLabel("Backend:"), self.controller_backend)
+        controller_form.addRow(QLabel("方式:"), self.controller_backend)
         controller_group_layout.addLayout(controller_form)
 
-        self.ser_group = QGroupBox("Serial")
+        self.ser_group = QGroupBox("serial")
         ser_group = self.ser_group
         ser_group_layout = QVBoxLayout(ser_group)
         ser_form = QFormLayout()
@@ -199,7 +199,7 @@ class DeviceSettingsTab(QWidget):
         refresh_ser_btn.clicked.connect(self.refresh_serial_devices)
         ser_row.addWidget(self.ser_device)
         ser_row.addWidget(refresh_ser_btn)
-        ser_form.addRow(QLabel("Device:"), ser_row)
+        ser_form.addRow(QLabel("デバイス:"), ser_row)
 
         self.ser_protocol = QComboBox()
         protocol_options = ProtocolFactory.get_protocol_names()
@@ -227,8 +227,8 @@ class DeviceSettingsTab(QWidget):
             self.ser_baud.setCurrentText(current_baud)
         else:
             self.ser_baud.setCurrentText("9600")
-        ser_form.addRow(QLabel("Protocol:"), self.ser_protocol)
-        ser_form.addRow(QLabel("Baud Rate:"), self.ser_baud)
+        ser_form.addRow(QLabel("プロトコル:"), self.ser_protocol)
+        ser_form.addRow(QLabel("ボーレート:"), self.ser_baud)
         ser_group_layout.addLayout(ser_form)
         controller_group_layout.addWidget(ser_group)
 
@@ -243,7 +243,6 @@ class DeviceSettingsTab(QWidget):
             self.swbt_controller_type,
             self.settings.get("controller.swbt.controller_type", "pro-controller"),
         )
-        swbt_form.addRow(QLabel("Controller:"), self.swbt_controller_type)
 
         adapter_row = QHBoxLayout()
         self.swbt_adapter = QComboBox()
@@ -259,7 +258,8 @@ class DeviceSettingsTab(QWidget):
         self.refresh_swbt_btn.clicked.connect(self.refresh_swbt_adapters)
         adapter_row.addWidget(self.swbt_adapter)
         adapter_row.addWidget(self.refresh_swbt_btn)
-        swbt_form.addRow(QLabel("Adapter:"), adapter_row)
+        swbt_form.addRow(QLabel("デバイス:"), adapter_row)
+        swbt_form.addRow(QLabel("タイプ:"), self.swbt_controller_type)
 
         self.swbt_key_store = QComboBox()
         self.swbt_key_store.setEditable(True)
@@ -270,7 +270,7 @@ class DeviceSettingsTab(QWidget):
         self.swbt_controller_type.currentIndexChanged.connect(
             self._update_swbt_key_store_for_controller
         )
-        swbt_form.addRow(QLabel("Key Store:"), self.swbt_key_store)
+        swbt_form.addRow(QLabel("キーストア:"), self.swbt_key_store)
 
         lifecycle_row = QHBoxLayout()
         self.swbt_pair_btn = QPushButton("Pair")
@@ -282,10 +282,10 @@ class DeviceSettingsTab(QWidget):
         lifecycle_row.addWidget(self.swbt_pair_btn)
         lifecycle_row.addWidget(self.swbt_reconnect_btn)
         lifecycle_row.addWidget(self.swbt_disconnect_btn)
-        swbt_form.addRow(QLabel("Connection:"), lifecycle_row)
+        swbt_form.addRow(QLabel("接続:"), lifecycle_row)
 
         self.swbt_status_label = QLabel("disconnected")
-        swbt_form.addRow(QLabel("Status:"), self.swbt_status_label)
+        swbt_form.addRow(QLabel("状態:"), self.swbt_status_label)
         swbt_group_layout.addLayout(swbt_form)
         controller_group_layout.addWidget(self.swbt_group)
         layout.addWidget(self.controller_group)

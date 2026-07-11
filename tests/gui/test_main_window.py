@@ -7,8 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QPoint
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent
 from PySide6.QtWidgets import QDialog
 
 from nyxpy.framework.core.constants import Button, Hat
@@ -18,6 +18,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
     DeviceInfo,
     WindowDiscoveryResult,
 )
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
 from nyxpy.framework.core.macro.exceptions import DeviceError, ErrorInfo, ErrorKind
@@ -241,7 +242,22 @@ class FakeServices:
 
     def refresh_swbt_adapters(self):
         self.swbt_calls.append("refresh")
-        return ()
+        return (
+            SwbtAdapterView(
+                name="usb:0",
+                aliases=("usb:0A12:0001",),
+                display_name="CSR8510 A10 (usb:0)",
+                vendor_id=0x0A12,
+                product_id=0x0001,
+                manufacturer=None,
+                product="CSR8510 A10",
+                serial_number=None,
+                bus_number=1,
+                device_address=2,
+                port_numbers=(1,),
+                is_bluetooth_hci=True,
+            ),
+        )
 
     def pair_swbt(self):
         self.swbt_calls.append("pair")
@@ -389,19 +405,191 @@ def test_connection_menu_has_required_children(window: MainWindow) -> None:
         if action.menu() is not None
     ]
 
-    assert child_menus[:4] == ["キャプチャ入力", "コントローラー", "シリアルデバイス", "プロトコル"]
+    assert child_menus == ["キャプチャ入力", "コントローラー"]
 
 
-def test_capture_input_menu_nests_candidates_under_input_source(window: MainWindow) -> None:
-    assert window.capture_source_type_menu is not None
+def test_controller_menu_shows_only_serial_settings_for_serial_backend(
+    window: MainWindow,
+) -> None:
+    assert window.controller_backend_menu is not None
+
+    actions = window.controller_backend_menu.actions()
+    child_menus = [action.menu().title() for action in actions if action.menu() is not None]
+
+    assert [action.text() for action in actions[:2]] == ["serial", "swbt"]
+    assert child_menus == ["デバイス", "プロトコル", "ボーレート"]
+    assert window.serial_device_menu is not None
+    assert window.protocol_menu is not None
+    assert window.serial_baud_menu is not None
+    assert window.swbt_device_menu is None
+    assert window.swbt_type_menu is None
+
+
+def test_controller_menu_shows_only_swbt_settings_for_swbt_backend(
+    window: MainWindow,
+) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:0")
+
+    window._swbt_adapter_views = services_adapters = window.services.refresh_swbt_adapters()
+    assert services_adapters
+    window._refresh_connection_menu()
+
+    assert window.controller_backend_menu is not None
+    actions = window.controller_backend_menu.actions()
+    child_menus = [action.menu().title() for action in actions if action.menu() is not None]
+    assert child_menus == ["デバイス", "タイプ"]
+    assert [action.text() for action in actions[-3:]] == ["Pair", "Reconnect", "Disconnect"]
+    assert window.serial_device_menu is None
+    assert window.protocol_menu is None
+    assert window.serial_baud_menu is None
+    assert window.swbt_device_menu is not None
+    assert window.swbt_type_menu is not None
+
+
+def test_swbt_device_menu_canonicalizes_alias_selection(window: MainWindow) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:0A12:0001")
+    window._swbt_adapter_views = window.services.refresh_swbt_adapters()
+    window._refresh_connection_menu()
+    assert window.swbt_device_menu is not None
+    action = next(
+        action for action in window.swbt_device_menu.actions() if action.data() == "usb:0"
+    )
+
+    assert action.isChecked()
+    action.trigger()
+
+    assert window.global_settings.get("controller.swbt.adapter") == "usb:0"
+
+
+def test_swbt_type_menu_updates_default_key_store(window: MainWindow) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set(
+        "controller.swbt.key_store_path", ".nyxpy/swbt/pro-controller-bond.json"
+    )
+    window._refresh_connection_menu()
+    assert window.swbt_type_menu is not None
+    joy_con_l = next(
+        action for action in window.swbt_type_menu.actions() if action.data() == "joy-con-l"
+    )
+
+    joy_con_l.trigger()
+
+    assert window.global_settings.get("controller.swbt.controller_type") == "joy-con-l"
+    assert (
+        window.global_settings.get("controller.swbt.key_store_path")
+        == ".nyxpy/swbt/joy-con-l-bond.json"
+    )
+
+
+def test_swbt_type_menu_preserves_custom_key_store(window: MainWindow) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.key_store_path", "keys/custom.json")
+    window._refresh_connection_menu()
+    assert window.swbt_type_menu is not None
+    joy_con_r = next(
+        action for action in window.swbt_type_menu.actions() if action.data() == "joy-con-r"
+    )
+
+    joy_con_r.trigger()
+
+    assert window.global_settings.get("controller.swbt.controller_type") == "joy-con-r"
+    assert window.global_settings.get("controller.swbt.key_store_path") == "keys/custom.json"
+
+
+def test_swbt_device_menu_keeps_missing_saved_adapter_visible_and_disables_connect(
+    window: MainWindow,
+) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:missing")
+    window._swbt_adapter_views = ()
+
+    window._refresh_connection_menu()
+
+    assert window.swbt_device_menu is not None
+    missing = next(
+        action
+        for action in window.swbt_device_menu.actions()
+        if action.text() == "usb:missing (未検出)"
+    )
+    assert missing.isCheckable()
+    assert missing.isChecked()
+    assert not missing.isEnabled()
+    assert window.controller_backend_menu is not None
+    lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
+    assert not lifecycle["Pair"].isEnabled()
+    assert not lifecycle["Reconnect"].isEnabled()
+
+
+def test_swbt_device_refresh_runs_in_background_and_updates_cached_menu(
+    qtbot,
+    services: FakeServices,
+) -> None:
+    started = Event()
+    release = Event()
+    adapters = services.refresh_swbt_adapters()
+
+    def slow_refresh():
+        started.set()
+        release.wait(2.0)
+        return adapters
+
+    services.refresh_swbt_adapters = slow_refresh
+    services.global_settings.set("controller.backend", "swbt")
+    services.global_settings.set("controller.swbt.adapter", "usb:0")
+    w = MainWindow(services=services)
+    qtbot.addWidget(w)
+    w._refresh_connection_menu()
+    assert w.swbt_device_menu is not None
+    refresh = next(action for action in w.swbt_device_menu.actions() if action.text() == "再検索")
+
+    refresh.trigger()
+
+    qtbot.waitUntil(started.is_set)
+    assert w._swbt_adapter_refreshing
+    assert w.swbt_device_menu is not None
+    assert any(
+        action.text() == "再検索中..." and not action.isEnabled()
+        for action in w.swbt_device_menu.actions()
+    )
+    release.set()
+    qtbot.waitUntil(lambda: not w._swbt_adapter_refreshing)
+    assert w.swbt_device_menu is not None
+    assert any(action.data() == "usb:0" for action in w.swbt_device_menu.actions())
+    w.preview_pane.timer.stop()
+
+
+def test_dynamic_menu_refresh_does_not_accumulate_qt_objects(
+    window: MainWindow,
+) -> None:
+    dynamic_children_before = (
+        len(window.findChildren(QAction)),
+        len(window.findChildren(QActionGroup)),
+    )
+
+    for _ in range(20):
+        window._refresh_connection_menu()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    dynamic_children_after = (
+        len(window.findChildren(QAction)),
+        len(window.findChildren(QActionGroup)),
+    )
+    assert dynamic_children_after == dynamic_children_before
+
+
+def test_capture_input_menu_lists_source_candidates_directly(window: MainWindow) -> None:
+    assert window.capture_input_menu is not None
 
     source_menus = [
         action.menu().title()
-        for action in window.capture_source_type_menu.actions()
+        for action in window.capture_input_menu.actions()
         if action.menu() is not None
     ]
 
-    assert source_menus == ["カメラ", "ウィンドウ", "キャプチャ"]
+    assert source_menus == ["カメラ", "ウィンドウ", "キャプチャ", "FPS"]
+    assert window.capture_source_type_menu is None
 
 
 def test_connection_menu_hides_capture_when_ponkan_unavailable(
@@ -412,14 +600,14 @@ def test_connection_menu_hides_capture_when_ponkan_unavailable(
     w = MainWindow(services=services)
     qtbot.addWidget(w)
 
-    assert w.capture_source_type_menu is not None
+    assert w.capture_input_menu is not None
     source_menus = [
         action.menu().title()
-        for action in w.capture_source_type_menu.actions()
+        for action in w.capture_input_menu.actions()
         if action.menu() is not None
     ]
 
-    assert source_menus == ["カメラ", "ウィンドウ"]
+    assert source_menus == ["カメラ", "ウィンドウ", "FPS"]
     assert w.capture_source_menu is None
     w.preview_pane.timer.stop()
 
@@ -462,7 +650,7 @@ def test_connection_menu_removes_ponkan_backend_submenu(
         if action.menu() is not None
     ]
 
-    assert child_menus == ["入力ソース", "FPS"]
+    assert child_menus == ["カメラ", "ウィンドウ", "キャプチャ", "FPS"]
     assert window.capture_settings_menu is None
     assert window.ponkan_backend_menu is None
 

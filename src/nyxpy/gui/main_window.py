@@ -28,6 +28,8 @@ from nyxpy.framework.core.hardware.device_discovery import (
     WindowDiscoveryResult,
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.config import supported_controller_models
+from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.swbt.errors import (
     is_swbt_connect_cancelled,
     swbt_connect_cancel_code,
@@ -191,6 +193,8 @@ class MainWindow(QMainWindow):
         self._manual_controller_restore_backend: str | None = None
         self._close_pending = False
         self._background_tasks: set[BackgroundTask] = set()
+        self._swbt_adapter_views: tuple[SwbtAdapterView, ...] = ()
+        self._swbt_adapter_refreshing = False
         self.window_size_actions: dict[str, QAction] = {}
         self.window_size_action_group: QActionGroup | None = None
         self.connection_menu: QMenu | None = None
@@ -198,6 +202,8 @@ class MainWindow(QMainWindow):
         self.capture_input_menu: QMenu | None = None
         self.serial_device_menu: QMenu | None = None
         self.protocol_menu: QMenu | None = None
+        self.swbt_device_menu: QMenu | None = None
+        self.swbt_type_menu: QMenu | None = None
         self.capture_source_type_menu: QMenu | None = None
         self.camera_source_menu: QMenu | None = None
         self.window_source_menu: QMenu | None = None
@@ -208,6 +214,7 @@ class MainWindow(QMainWindow):
         self.capture_fps_menu: QMenu | None = None
         self.serial_baud_menu: QMenu | None = None
         self.capture_device_action_group: QActionGroup | None = None
+        self.window_source_action_group: QActionGroup | None = None
         self.capture_profile_action_group: QActionGroup | None = None
         self.ponkan_backend_action_group: QActionGroup | None = None
         self.capture_fps_action_group: QActionGroup | None = None
@@ -215,6 +222,8 @@ class MainWindow(QMainWindow):
         self.serial_device_action_group: QActionGroup | None = None
         self.serial_baud_action_group: QActionGroup | None = None
         self.protocol_action_group: QActionGroup | None = None
+        self.swbt_device_action_group: QActionGroup | None = None
+        self.swbt_type_action_group: QActionGroup | None = None
         self.current_window_size_preset_key = normalize_window_size_preset_key(
             self.global_settings.get(
                 "gui.window_size_preset",
@@ -240,8 +249,6 @@ class MainWindow(QMainWindow):
         self.connection_menu = self.menuBar().addMenu("接続")
         self.capture_input_menu = self.connection_menu.addMenu("キャプチャ入力")
         self.controller_backend_menu = self.connection_menu.addMenu("コントローラー")
-        self.serial_device_menu = self.connection_menu.addMenu("シリアルデバイス")
-        self.protocol_menu = self.connection_menu.addMenu("プロトコル")
         self.connection_menu.aboutToShow.connect(
             lambda: self._refresh_connection_menu(refresh_discovery=True)
         )
@@ -277,16 +284,12 @@ class MainWindow(QMainWindow):
                 windows,
             )
         if self.controller_backend_menu is not None:
-            self._populate_controller_backend_menu(self.controller_backend_menu)
-        if self.serial_device_menu is not None:
-            self._populate_serial_device_menu(self.serial_device_menu, snapshot.serial_devices)
-        if self.protocol_menu is not None:
-            self._populate_protocol_menu(self.protocol_menu)
-        is_serial = self.global_settings.get("controller.backend", "serial") == "serial"
-        if self.serial_device_menu is not None:
-            self.serial_device_menu.setEnabled(is_serial)
-        if self.protocol_menu is not None:
-            self.protocol_menu.setEnabled(is_serial)
+            self._populate_controller_backend_menu(
+                self.controller_backend_menu,
+                snapshot.serial_devices,
+            )
+        if refresh_discovery and self.global_settings.get("controller.backend", "serial") == "swbt":
+            self._refresh_swbt_adapters_async()
 
     def _ponkan_capture_available(self) -> bool:
         value = getattr(self.services, "ponkan_capture_available", False)
@@ -294,13 +297,19 @@ class MainWindow(QMainWindow):
             return bool(value())
         return bool(value)
 
-    def _populate_controller_backend_menu(self, menu: QMenu) -> None:
+    def _populate_controller_backend_menu(
+        self,
+        menu: QMenu,
+        serial_devices: tuple[DeviceInfo, ...],
+    ) -> None:
+        self._dispose_controller_submenus()
         menu.clear()
-        self.controller_backend_action_group = QActionGroup(self)
+        if self.controller_backend_action_group is None:
+            self.controller_backend_action_group = QActionGroup(menu)
         self.controller_backend_action_group.setExclusive(True)
         current = str(self.global_settings.get("controller.backend", "serial") or "serial")
-        for label, backend in (("Serial", "serial"), ("swbt", "swbt")):
-            action = QAction(label, self)
+        for label, backend in (("serial", "serial"), ("swbt", "swbt")):
+            action = QAction(label, menu)
             action.setCheckable(True)
             action.setData(backend)
             action.setChecked(current == backend)
@@ -317,18 +326,37 @@ class MainWindow(QMainWindow):
             self.controller_backend_action_group.addAction(action)
             menu.addAction(action)
         menu.addSeparator()
-        adapter_selected = bool(self.global_settings.get("controller.swbt.adapter"))
+        self.serial_device_menu = None
+        self.protocol_menu = None
+        self.serial_baud_menu = None
+        self.swbt_device_menu = None
+        self.swbt_type_menu = None
+        if current == "serial":
+            self.serial_device_menu = menu.addMenu("デバイス")
+            self._populate_serial_device_menu(self.serial_device_menu, serial_devices)
+            self.protocol_menu = menu.addMenu("プロトコル")
+            self._populate_protocol_menu(self.protocol_menu)
+            self.serial_baud_menu = menu.addMenu("ボーレート")
+            self._populate_serial_baud_menu(self.serial_baud_menu)
+            return
+
+        adapters = self._swbt_adapter_views
+        self.swbt_device_menu = menu.addMenu("デバイス")
+        adapter_available = self._populate_swbt_device_menu(self.swbt_device_menu, adapters)
+        self.swbt_type_menu = menu.addMenu("タイプ")
+        self._populate_swbt_type_menu(self.swbt_type_menu)
+        menu.addSeparator()
         lifecycle_enabled = (
             current == "swbt"
             and not self._is_run_active()
             and not self._swbt_lifecycle_busy
             and not self._manual_controller_restoring
         )
-        pair_action = QAction("Pair", self)
-        reconnect_action = QAction("Reconnect", self)
-        disconnect_action = QAction("Disconnect", self)
-        pair_action.setEnabled(lifecycle_enabled and adapter_selected)
-        reconnect_action.setEnabled(lifecycle_enabled and adapter_selected)
+        pair_action = QAction("Pair", menu)
+        reconnect_action = QAction("Reconnect", menu)
+        disconnect_action = QAction("Disconnect", menu)
+        pair_action.setEnabled(lifecycle_enabled and adapter_available)
+        reconnect_action.setEnabled(lifecycle_enabled and adapter_available)
         disconnect_action.setEnabled(lifecycle_enabled and self._swbt_is_connected())
         pair_action.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
         reconnect_action.triggered.connect(
@@ -341,17 +369,154 @@ class MainWindow(QMainWindow):
         menu.addAction(reconnect_action)
         menu.addAction(disconnect_action)
 
+    def _dispose_controller_submenus(self) -> None:
+        for name in (
+            "serial_device_menu",
+            "protocol_menu",
+            "serial_baud_menu",
+            "swbt_device_menu",
+            "swbt_type_menu",
+        ):
+            submenu = getattr(self, name)
+            if submenu is not None:
+                submenu.deleteLater()
+                setattr(self, name, None)
+        self.serial_device_action_group = None
+        self.serial_baud_action_group = None
+        self.protocol_action_group = None
+        self.swbt_device_action_group = None
+        self.swbt_type_action_group = None
+
+    def _refresh_swbt_adapters_async(self) -> None:
+        if self._swbt_adapter_refreshing:
+            return
+        self._swbt_adapter_refreshing = True
+        self._refresh_connection_menu()
+        task = BackgroundTask(self.services.refresh_swbt_adapters, parent=self)
+        task.succeeded.connect(self._finish_swbt_adapter_refresh)
+        task.failed.connect(self._fail_swbt_adapter_refresh)
+        self._track_background_task(task)
+        task.start()
+
+    def _finish_swbt_adapter_refresh(
+        self,
+        adapters: tuple[SwbtAdapterView, ...],
+    ) -> None:
+        self._swbt_adapter_views = adapters
+        self._swbt_adapter_refreshing = False
+        self._refresh_connection_menu()
+
+    def _fail_swbt_adapter_refresh(self, error: BaseException) -> None:
+        self._swbt_adapter_refreshing = False
+        self.logger.technical(
+            "WARNING",
+            "swbt adapter refresh failed while building connection menu.",
+            component="MainWindow",
+            event="swbt.adapter_refresh_failed",
+            exc=error,
+        )
+        self._refresh_connection_menu()
+
+    def _populate_swbt_device_menu(
+        self,
+        menu: QMenu,
+        adapters: tuple[SwbtAdapterView, ...],
+    ) -> bool:
+        self.swbt_device_action_group = QActionGroup(menu)
+        self.swbt_device_action_group.setExclusive(True)
+        current = str(self.global_settings.get("controller.swbt.adapter", "") or "")
+        selected = next(
+            (
+                adapter.name
+                for adapter in adapters
+                if current == adapter.name or current in adapter.aliases
+            ),
+            current,
+        )
+        adapter_available = bool(selected) and any(adapter.name == selected for adapter in adapters)
+        if current and not adapter_available:
+            missing_action = QAction(f"{current} (未検出)", menu)
+            missing_action.setCheckable(True)
+            missing_action.setChecked(True)
+            missing_action.setData(current)
+            missing_action.setEnabled(False)
+            menu.addAction(missing_action)
+        elif not adapters:
+            empty_action = QAction("利用可能な swbt デバイスなし", menu)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+        for adapter in adapters:
+            action = QAction(adapter.display_name, menu)
+            action.setCheckable(True)
+            action.setData(adapter.name)
+            action.setChecked(adapter.name == selected)
+            action.triggered.connect(
+                lambda _checked=False, name=adapter.name: self._apply_connection_settings(
+                    {"controller.backend": "swbt", "controller.swbt.adapter": name}
+                )
+            )
+            self.swbt_device_action_group.addAction(action)
+            menu.addAction(action)
+        menu.addSeparator()
+        refresh_action = QAction(
+            "再検索中..." if self._swbt_adapter_refreshing else "再検索",
+            menu,
+        )
+        refresh_action.setEnabled(not self._swbt_adapter_refreshing)
+        refresh_action.triggered.connect(lambda _checked=False: self._refresh_swbt_adapters_async())
+        menu.addAction(refresh_action)
+        return adapter_available
+
+    def _populate_swbt_type_menu(self, menu: QMenu) -> None:
+        self.swbt_type_action_group = QActionGroup(menu)
+        self.swbt_type_action_group.setExclusive(True)
+        current = str(
+            self.global_settings.get("controller.swbt.controller_type", "pro-controller")
+            or "pro-controller"
+        )
+        for model in supported_controller_models():
+            action = QAction(model.display_name, menu)
+            action.setCheckable(True)
+            action.setData(model.settings_value)
+            action.setChecked(model.settings_value == current)
+            action.triggered.connect(
+                lambda _checked=False, selected=model.settings_value: (
+                    self._apply_connection_settings(self._swbt_type_updates(selected))
+                )
+            )
+            self.swbt_type_action_group.addAction(action)
+            menu.addAction(action)
+
+    def _swbt_type_updates(self, controller_type: str) -> dict[str, SettingValue]:
+        updates: dict[str, SettingValue] = {
+            "controller.backend": "swbt",
+            "controller.swbt.controller_type": controller_type,
+        }
+        current_key_store = str(
+            self.global_settings.get("controller.swbt.key_store_path", "") or ""
+        ).replace("\\", "/")
+        models = supported_controller_models()
+        defaults = {str(model.default_key_store_path()).replace("\\", "/") for model in models}
+        if not current_key_store or current_key_store in defaults:
+            selected_model = next(
+                model for model in models if model.settings_value == controller_type
+            )
+            updates["controller.swbt.key_store_path"] = str(
+                selected_model.default_key_store_path()
+            ).replace("\\", "/")
+        return updates
+
     def _populate_capture_input_menu(
         self,
         menu: QMenu,
         devices: tuple[DeviceInfo, ...],
         windows: tuple[WindowInfo, ...],
     ) -> None:
+        self._dispose_capture_submenus()
         menu.clear()
-        self.capture_source_type_menu = QMenu("入力ソース", menu)
-        menu.addMenu(self.capture_source_type_menu)
+        self.capture_source_type_menu = None
         self._populate_capture_source_type_menu(
-            self.capture_source_type_menu,
+            menu,
             devices,
             windows,
         )
@@ -364,11 +529,11 @@ class MainWindow(QMainWindow):
             self.global_settings.get("capture_source_type", "camera") != "capture"
         )
         menu.addMenu(self.capture_fps_menu)
-        self.capture_fps_action_group = QActionGroup(self)
+        self.capture_fps_action_group = QActionGroup(self.capture_fps_menu)
         self.capture_fps_action_group.setExclusive(True)
         current_fps = self.global_settings.get("capture_fps", None)
         for label, value in _CAPTURE_FPS_OPTIONS:
-            action = QAction(label, self)
+            action = QAction(label, self.capture_fps_menu)
             action.setCheckable(True)
             action.setData(value)
             action.setChecked(_same_number_or_none(current_fps, value))
@@ -379,6 +544,27 @@ class MainWindow(QMainWindow):
             )
             self.capture_fps_action_group.addAction(action)
             self.capture_fps_menu.addAction(action)
+
+    def _dispose_capture_submenus(self) -> None:
+        for name in (
+            "capture_source_type_menu",
+            "camera_source_menu",
+            "window_source_menu",
+            "capture_source_menu",
+            "capture_provider_menu",
+            "capture_settings_menu",
+            "ponkan_backend_menu",
+            "capture_fps_menu",
+        ):
+            submenu = getattr(self, name)
+            if submenu is not None:
+                submenu.deleteLater()
+                setattr(self, name, None)
+        self.capture_device_action_group = None
+        self.window_source_action_group = None
+        self.capture_profile_action_group = None
+        self.ponkan_backend_action_group = None
+        self.capture_fps_action_group = None
 
     def _populate_capture_source_type_menu(
         self,
@@ -403,9 +589,9 @@ class MainWindow(QMainWindow):
 
     def _populate_direct_capture_source_menu(self, menu: QMenu) -> None:
         menu.clear()
-        self.capture_profile_action_group = QActionGroup(self)
+        self.capture_profile_action_group = QActionGroup(menu)
         self.capture_profile_action_group.setExclusive(True)
-        action = QAction("N3DSXL (ponkan-python)", self)
+        action = QAction("N3DSXL (ponkan-python)", menu)
         action.setCheckable(True)
         action.setData("n3dsxl")
         action.setChecked(
@@ -431,14 +617,14 @@ class MainWindow(QMainWindow):
         devices: tuple[DeviceInfo, ...],
     ) -> None:
         menu.clear()
-        self.capture_device_action_group = QActionGroup(self)
+        self.capture_device_action_group = QActionGroup(menu)
         self.capture_device_action_group.setExclusive(True)
         current = str(self.global_settings.get("capture_device", "") or "")
         selection = select_capture_target(
             ConnectionRequest(kind="capture", requested=current, allow_dummy=True),
             DeviceDiscoveryResult(capture_devices=devices),
         )
-        dummy_action = QAction(DUMMY_DEVICE_NAME, self)
+        dummy_action = QAction(DUMMY_DEVICE_NAME, menu)
         dummy_action.setCheckable(True)
         dummy_action.setData(DUMMY_DEVICE_NAME)
         dummy_action.setChecked(
@@ -451,13 +637,13 @@ class MainWindow(QMainWindow):
         )
         self.capture_device_action_group.addAction(dummy_action)
         menu.addAction(dummy_action)
-        _add_auto_dummy_status_action(menu, selection, self)
+        _add_auto_dummy_status_action(menu, selection)
         if not devices:
-            empty_action = QAction("利用可能なキャプチャ入力なし", self)
+            empty_action = QAction("利用可能なキャプチャ入力なし", menu)
             empty_action.setEnabled(False)
             menu.addAction(empty_action)
         for device in devices:
-            action = QAction(device.display_name, self)
+            action = QAction(device.display_name, menu)
             action.setCheckable(True)
             action.setData(device.name)
             action.setChecked(selection.selected == device)
@@ -474,18 +660,18 @@ class MainWindow(QMainWindow):
         menu: QMenu,
         windows: tuple[WindowInfo, ...],
     ) -> None:
-        group = QActionGroup(self)
-        group.setExclusive(True)
+        self.window_source_action_group = QActionGroup(menu)
+        self.window_source_action_group.setExclusive(True)
         selection = _select_window_connection_status(self.global_settings, windows)
-        _add_auto_dummy_status_action(menu, selection, self)
+        _add_auto_dummy_status_action(menu, selection)
         if not windows:
-            empty_action = QAction("利用可能なウィンドウなし", self)
+            empty_action = QAction("利用可能なウィンドウなし", menu)
             empty_action.setEnabled(False)
             menu.addAction(empty_action)
             return
         for window in windows:
             identifier = str(window.identifier)
-            action = QAction(window.display_name, self)
+            action = QAction(window.display_name, menu)
             action.setCheckable(True)
             action.setData(identifier)
             action.setChecked(selection.selected == window)
@@ -498,7 +684,7 @@ class MainWindow(QMainWindow):
                     }
                 )
             )
-            group.addAction(action)
+            self.window_source_action_group.addAction(action)
             menu.addAction(action)
 
     def _populate_serial_device_menu(
@@ -507,14 +693,14 @@ class MainWindow(QMainWindow):
         devices: tuple[DeviceInfo, ...],
     ) -> None:
         menu.clear()
-        self.serial_device_action_group = QActionGroup(self)
+        self.serial_device_action_group = QActionGroup(menu)
         self.serial_device_action_group.setExclusive(True)
         current = str(self.global_settings.get("controller.serial.device", "") or "")
         selection = select_serial_target(
             ConnectionRequest(kind="serial", requested=current, allow_dummy=True),
             DeviceDiscoveryResult(serial_devices=devices),
         )
-        dummy_action = QAction(DUMMY_DEVICE_NAME, self)
+        dummy_action = QAction(DUMMY_DEVICE_NAME, menu)
         dummy_action.setCheckable(True)
         dummy_action.setData(DUMMY_DEVICE_NAME)
         dummy_action.setChecked(
@@ -530,14 +716,14 @@ class MainWindow(QMainWindow):
         )
         self.serial_device_action_group.addAction(dummy_action)
         menu.addAction(dummy_action)
-        _add_auto_dummy_status_action(menu, selection, self)
+        _add_auto_dummy_status_action(menu, selection)
         if not devices:
-            empty_action = QAction("利用可能なシリアルデバイスなし", self)
+            empty_action = QAction("利用可能なシリアルデバイスなし", menu)
             empty_action.setEnabled(False)
             menu.addAction(empty_action)
         for device in devices:
             identifier = str(device.identifier)
-            action = QAction(device.display_name, self)
+            action = QAction(device.display_name, menu)
             action.setCheckable(True)
             action.setData(identifier)
             action.setChecked(selection.selected == device)
@@ -551,10 +737,9 @@ class MainWindow(QMainWindow):
             )
             self.serial_device_action_group.addAction(action)
             menu.addAction(action)
-        menu.addSeparator()
-        self.serial_baud_menu = QMenu("ボーレート", menu)
-        menu.addMenu(self.serial_baud_menu)
-        self.serial_baud_action_group = QActionGroup(self)
+
+    def _populate_serial_baud_menu(self, menu: QMenu) -> None:
+        self.serial_baud_action_group = QActionGroup(menu)
         self.serial_baud_action_group.setExclusive(True)
         current_baud = str(self.global_settings.get("controller.serial.baudrate", 9600))
         protocol_name = str(
@@ -564,7 +749,7 @@ class MainWindow(QMainWindow):
         if current_baud not in baud_options:
             baud_options.append(current_baud)
         for baud in baud_options:
-            action = QAction(baud, self)
+            action = QAction(baud, menu)
             action.setCheckable(True)
             action.setData(int(baud))
             action.setChecked(baud == current_baud)
@@ -577,15 +762,15 @@ class MainWindow(QMainWindow):
                 )
             )
             self.serial_baud_action_group.addAction(action)
-            self.serial_baud_menu.addAction(action)
+            menu.addAction(action)
 
     def _populate_protocol_menu(self, menu: QMenu) -> None:
         menu.clear()
-        self.protocol_action_group = QActionGroup(self)
+        self.protocol_action_group = QActionGroup(menu)
         self.protocol_action_group.setExclusive(True)
         current = str(self.global_settings.get("controller.serial.protocol", "CH552") or "CH552")
         for protocol_name in ProtocolFactory.get_protocol_names():
-            action = QAction(protocol_name, self)
+            action = QAction(protocol_name, menu)
             action.setCheckable(True)
             action.setData(protocol_name)
             action.setChecked(protocol_name == current)
@@ -1756,14 +1941,13 @@ def _format_connection_status(label: str, selection: ResolvedConnection) -> str:
 def _add_auto_dummy_status_action(
     menu: QMenu,
     selection: ResolvedConnection,
-    parent: QMainWindow,
 ) -> None:
     if selection.uses_dummy and selection.fallback_reason not in {
         ConnectionFallbackReason.NOT_SELECTED,
         ConnectionFallbackReason.USER_SELECTED_DUMMY,
     }:
         requested = selection.requested or "未選択"
-        action = QAction(f"自動フォールバック中: {requested} 未検出", parent)
+        action = QAction(f"自動フォールバック中: {requested} 未検出", menu)
         action.setEnabled(False)
         menu.addAction(action)
 

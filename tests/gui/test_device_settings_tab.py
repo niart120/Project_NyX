@@ -1,7 +1,7 @@
 from threading import Event
 
 import pytest
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QFormLayout, QLabel
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
@@ -120,6 +120,55 @@ def test_device_tab_protocol_options_include_3ds(qtbot):
 
     options = [tab.ser_protocol.itemText(i) for i in range(tab.ser_protocol.count())]
     assert "3DS" in options
+
+
+def test_device_tab_uses_consistent_controller_terms(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    labels = set(_label_texts(tab.controller_group))
+
+    assert tab.ser_group.title() == "serial"
+    assert tab.swbt_group.title() == "swbt"
+    assert [
+        tab.controller_backend.itemText(index) for index in range(tab.controller_backend.count())
+    ] == ["serial", "swbt"]
+    assert labels >= {
+        "方式:",
+        "デバイス:",
+        "プロトコル:",
+        "ボーレート:",
+        "タイプ:",
+        "キーストア:",
+        "接続:",
+        "状態:",
+    }
+    assert labels.isdisjoint(
+        {
+            "Backend:",
+            "Device:",
+            "Protocol:",
+            "Baud Rate:",
+            "Controller:",
+            "Adapter:",
+            "Key Store:",
+            "Connection:",
+            "Status:",
+        }
+    )
+
+
+def test_device_tab_orders_swbt_fields_like_controller_menu(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    form = tab.swbt_group.layout().itemAt(0).layout()
+
+    assert isinstance(form, QFormLayout)
+    assert [
+        form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()
+        for row in range(form.rowCount())
+    ] == ["デバイス:", "タイプ:", "キーストア:", "接続:", "状態:"]
 
 
 def test_device_tab_selects_3ds_default_baudrate(qtbot):
