@@ -1,7 +1,7 @@
 from threading import Event
 
 import pytest
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QFormLayout, QLabel
 
 from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
@@ -120,6 +120,55 @@ def test_device_tab_protocol_options_include_3ds(qtbot):
 
     options = [tab.ser_protocol.itemText(i) for i in range(tab.ser_protocol.count())]
     assert "3DS" in options
+
+
+def test_device_tab_uses_consistent_controller_terms(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    labels = set(_label_texts(tab.controller_group))
+
+    assert tab.ser_group.title() == "serial"
+    assert tab.swbt_group.title() == "swbt"
+    assert [
+        tab.controller_backend.itemText(index) for index in range(tab.controller_backend.count())
+    ] == ["serial", "swbt"]
+    assert labels >= {
+        "方式:",
+        "デバイス:",
+        "プロトコル:",
+        "ボーレート:",
+        "タイプ:",
+        "キーストア:",
+        "接続:",
+        "状態:",
+    }
+    assert labels.isdisjoint(
+        {
+            "Backend:",
+            "Device:",
+            "Protocol:",
+            "Baud Rate:",
+            "Controller:",
+            "Adapter:",
+            "Key Store:",
+            "Connection:",
+            "Status:",
+        }
+    )
+
+
+def test_device_tab_orders_swbt_fields_like_controller_menu(qtbot):
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    form = tab.swbt_group.layout().itemAt(0).layout()
+
+    assert isinstance(form, QFormLayout)
+    assert [
+        form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()
+        for row in range(form.rowCount())
+    ] == ["デバイス:", "タイプ:", "キーストア:", "接続:", "状態:"]
 
 
 def test_device_tab_selects_3ds_default_baudrate(qtbot):
@@ -342,17 +391,19 @@ def test_device_settings_tab_saves_serial_identifier(qtbot):
     assert settings.data["controller.serial.device"] == "COM1"
 
 
-def test_device_tab_switches_serial_and_swbt_fields(qtbot):
+def test_device_tab_switches_serial_and_swbt_field_visibility(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
+    assert not tab.ser_group.isHidden()
     assert tab.ser_group.isEnabled()
-    assert not tab.swbt_group.isEnabled()
+    assert tab.swbt_group.isHidden()
 
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
 
-    assert not tab.ser_group.isEnabled()
+    assert tab.ser_group.isHidden()
+    assert not tab.swbt_group.isHidden()
     assert tab.swbt_group.isEnabled()
 
 
@@ -415,6 +466,47 @@ def test_device_settings_tab_applies_swbt_settings(qtbot):
     assert settings.data["controller.swbt.key_store_path"] == ".nyxpy/swbt/joy-con-l-bond.json"
 
 
+def test_key_store_lists_model_defaults_and_selects_current_model_default(qtbot) -> None:
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    assert tab.swbt_key_store.currentText() == ".nyxpy/swbt/pro-controller-bond.json"
+    assert {tab.swbt_key_store.itemText(index) for index in range(tab.swbt_key_store.count())} >= {
+        ".nyxpy/swbt/pro-controller-bond.json",
+        ".nyxpy/swbt/joy-con-l-bond.json",
+        ".nyxpy/swbt/joy-con-r-bond.json",
+    }
+
+
+def test_key_store_model_change_updates_default_but_preserves_custom_path(qtbot) -> None:
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
+    assert tab.swbt_key_store.currentText() == ".nyxpy/swbt/joy-con-l-bond.json"
+
+    tab.swbt_key_store.setEditText("keys/custom.json")
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-r"))
+    assert tab.swbt_key_store.currentText() == "keys/custom.json"
+
+
+def test_key_store_lists_existing_workspace_json_files(qtbot, tmp_path) -> None:
+    class SettingsWithConfigDir(FakeSettings):
+        config_dir = tmp_path / ".nyxpy"
+
+    key_store_dir = SettingsWithConfigDir.config_dir / "swbt"
+    key_store_dir.mkdir(parents=True)
+    (key_store_dir / "paired-switch.json").write_text("{}", encoding="utf-8")
+    (key_store_dir / "ignore.txt").write_text("", encoding="utf-8")
+
+    tab = DeviceSettingsTab(SettingsWithConfigDir(), None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+
+    choices = [tab.swbt_key_store.itemText(index) for index in range(tab.swbt_key_store.count())]
+    assert ".nyxpy/swbt/paired-switch.json" in choices
+    assert ".nyxpy/swbt/ignore.txt" not in choices
+
+
 def test_device_tab_preserves_edited_adapter_text(qtbot) -> None:
     settings = FakeSettings()
     provider = FakeSwbtAdapterProvider()
@@ -466,6 +558,95 @@ def test_pair_status_replaces_alias_with_canonical_adapter(qtbot) -> None:
 
     assert tab.swbt_adapter.currentText() == "hci0"
     assert settings.data["controller.swbt.adapter"] == "hci0"
+
+
+def test_pair_button_becomes_cancel_and_invokes_pair_cancellation(qtbot) -> None:
+    cancelled = Event()
+    callbacks = {}
+
+    def pair(_succeeded, failed):
+        callbacks["failed"] = failed
+        return cancelled.set
+
+    tab = DeviceSettingsTab(
+        FakeSettings(),
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_pair=pair,
+    )
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb-1")
+
+    tab.swbt_pair_btn.click()
+    assert tab.swbt_pair_btn.text() == "Cancel"
+    assert tab.swbt_pair_btn.isEnabled()
+
+    tab.swbt_pair_btn.click()
+    assert cancelled.is_set()
+    assert tab.swbt_pair_btn.text() == "Cancelling..."
+    assert not tab.swbt_pair_btn.isEnabled()
+
+    callbacks["failed"](
+        ExceptionGroup(
+            "pair cleanup",
+            [
+                type(
+                    "PairCancelled",
+                    (RuntimeError,),
+                    {"code": "NYX_SWBT_PAIR_CANCELLED"},
+                )()
+            ],
+        )
+    )
+
+    assert tab.swbt_status_label.text() == "ペアリングをキャンセルしました"
+    assert tab.swbt_pair_btn.text() == "Pair"
+
+
+def test_reconnect_button_becomes_cancel_and_restores_after_nested_cancellation(qtbot) -> None:
+    cancelled = Event()
+    callbacks = {}
+
+    def reconnect(_succeeded, failed):
+        callbacks["failed"] = failed
+        return cancelled.set
+
+    tab = DeviceSettingsTab(
+        FakeSettings(),
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_reconnect=reconnect,
+    )
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb-1")
+
+    tab.swbt_reconnect_btn.click()
+    assert tab.swbt_reconnect_btn.text() == "Cancel"
+    assert tab.swbt_reconnect_btn.isEnabled()
+    assert not tab.swbt_pair_btn.isEnabled()
+
+    tab.swbt_reconnect_btn.click()
+    assert cancelled.is_set()
+    assert tab.swbt_reconnect_btn.text() == "Cancelling..."
+    assert not tab.swbt_reconnect_btn.isEnabled()
+
+    callbacks["failed"](
+        ExceptionGroup(
+            "reconnect cleanup",
+            [
+                type(
+                    "ReconnectCancelled",
+                    (RuntimeError,),
+                    {"code": "NYX_SWBT_RECONNECT_CANCELLED"},
+                )()
+            ],
+        )
+    )
+
+    assert tab.swbt_status_label.text() == "再接続をキャンセルしました"
+    assert tab.swbt_reconnect_btn.text() == "Reconnect"
 
 
 def test_adapter_refresh_resolves_saved_alias_without_auto_selecting_other(qtbot) -> None:

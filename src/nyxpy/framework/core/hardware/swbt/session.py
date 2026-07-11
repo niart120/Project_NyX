@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import time
 from collections.abc import Awaitable, Callable
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
@@ -30,9 +31,9 @@ class SwbtControllerSessionProtocol(Protocol):
 
     def open(self) -> None: ...
 
-    def pair(self, *, timeout_sec: float) -> None: ...
+    def pair(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None: ...
 
-    def reconnect(self, *, timeout_sec: float) -> None: ...
+    def reconnect(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None: ...
 
     def apply(self, state: object) -> None: ...
 
@@ -126,7 +127,7 @@ class SwbtControllerSession:
             self._opened = True
             self._closed = False
 
-    def pair(self, *, timeout_sec: float) -> None:
+    def pair(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
         """明示 pairing を実行する。"""
         with self._lock:
             self.open()
@@ -137,6 +138,8 @@ class SwbtControllerSession:
                     "pair",
                     timeout=timeout_sec,
                     _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
+                    _cancellation_event=cancellation_event,
+                    _cancellation_code="NYX_SWBT_PAIR_CANCELLED",
                 )
                 status = self._call_controller(controller, "status")
             except (ConfigurationError, DeviceError):
@@ -147,7 +150,7 @@ class SwbtControllerSession:
             if not self._connected:
                 raise swbt_not_connected(type(self).__name__)
 
-    def reconnect(self, *, timeout_sec: float) -> None:
+    def reconnect(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
         """保存済み pairing key に基づく reconnect を実行する。"""
         with self._lock:
             self.open()
@@ -158,6 +161,8 @@ class SwbtControllerSession:
                     "reconnect",
                     timeout=timeout_sec,
                     _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
+                    _cancellation_event=cancellation_event,
+                    _cancellation_code="NYX_SWBT_RECONNECT_CANCELLED",
                 )
                 status = self._call_controller(controller, "status")
             except (ConfigurationError, DeviceError):
@@ -259,6 +264,8 @@ class SwbtControllerSession:
         method_name: str,
         *args,
         _wait_timeout_sec: float | None = None,
+        _cancellation_event: Event | None = None,
+        _cancellation_code: str = "NYX_SWBT_OPERATION_CANCELLED",
         **kwargs,
     ) -> object:
         if self._loop_stopping:
@@ -273,10 +280,19 @@ class SwbtControllerSession:
             return self._run_awaitable(
                 result,
                 timeout_sec=_wait_timeout_sec or self._operation_timeout_sec,
+                cancellation_event=_cancellation_event,
+                cancellation_code=_cancellation_code,
             )
         return result
 
-    def _run_awaitable(self, awaitable: Awaitable[object], *, timeout_sec: float) -> object:
+    def _run_awaitable(
+        self,
+        awaitable: Awaitable[object],
+        *,
+        timeout_sec: float,
+        cancellation_event: Event | None = None,
+        cancellation_code: str = "NYX_SWBT_OPERATION_CANCELLED",
+    ) -> object:
         loop = self._loop
         if loop is None or not loop.is_running():
             raise swbt_configuration_error(
@@ -287,7 +303,26 @@ class SwbtControllerSession:
         completed = Event()
         future = asyncio.run_coroutine_threadsafe(_await_result(awaitable, completed), loop)
         try:
-            return future.result(timeout=timeout_sec)
+            if cancellation_event is None:
+                return future.result(timeout=timeout_sec)
+            deadline = time.monotonic() + timeout_sec
+            while True:
+                if cancellation_event.is_set():
+                    future.cancel()
+                    completed.wait(timeout=self._cancellation_timeout_sec)
+                    raise DeviceError(
+                        "swbt connection operation was cancelled",
+                        code=cancellation_code,
+                        component=type(self).__name__,
+                        recoverable=True,
+                    )
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return future.result(timeout=0)
+                try:
+                    return future.result(timeout=min(0.05, remaining))
+                except FutureTimeoutError:
+                    continue
         except FutureTimeoutError:
             future.cancel()
             if not completed.wait(timeout=self._cancellation_timeout_sec):
@@ -413,13 +448,13 @@ class DummySwbtControllerSession:
         self.opened = True
         self.closed = False
 
-    def pair(self, *, timeout_sec: float) -> None:
+    def pair(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
         """Dummy pairing を記録する。"""
         self.open()
         self.pair_calls += 1
         self.connected = True
 
-    def reconnect(self, *, timeout_sec: float) -> None:
+    def reconnect(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
         """Dummy reconnect を記録する。"""
         self.open()
         self.reconnect_calls += 1

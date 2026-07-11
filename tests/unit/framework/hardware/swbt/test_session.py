@@ -92,6 +92,28 @@ class SlowAwaitableFakeSwbtController(AwaitableFakeSwbtController):
         self.connection_state = "connected"
 
 
+class HangingPairFakeSwbtController(AwaitableFakeSwbtController):
+    def __init__(self) -> None:
+        super().__init__()
+        self.pair_started = Event()
+
+    async def pair(self, *, timeout: float) -> None:
+        self.calls.append(("pair", timeout))
+        self.pair_started.set()
+        await asyncio.sleep(3600)
+
+
+class HangingReconnectFakeSwbtController(AwaitableFakeSwbtController):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reconnect_started = Event()
+
+    async def reconnect(self, *, timeout: float) -> None:
+        self.calls.append(("reconnect", timeout))
+        self.reconnect_started.set()
+        await asyncio.sleep(3600)
+
+
 class CancellationAwareFakeSwbtController(AwaitableFakeSwbtController):
     async def apply(self, state) -> None:
         self.calls.append(("apply-start", state))
@@ -122,6 +144,54 @@ def test_session_open_does_not_pair_or_reconnect() -> None:
 
     assert fake.calls == [("open", None)]
     assert not session.connected
+
+
+def test_session_pair_cancels_pending_awaitable_without_waiting_for_timeout() -> None:
+    fake = HangingPairFakeSwbtController()
+    session = SwbtControllerSession(config(), controller_factory=lambda _config, _writer: fake)
+    cancellation_event = Event()
+    errors: list[BaseException] = []
+
+    def pair() -> None:
+        try:
+            session.pair(timeout_sec=30.0, cancellation_event=cancellation_event)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = Thread(target=pair)
+    thread.start()
+    assert fake.pair_started.wait(1.0)
+
+    cancellation_event.set()
+    thread.join(1.0)
+
+    assert not thread.is_alive()
+    assert len(errors) == 1
+    assert getattr(errors[0], "code", None) == "NYX_SWBT_PAIR_CANCELLED"
+
+
+def test_session_reconnect_cancels_after_awaitable_started() -> None:
+    fake = HangingReconnectFakeSwbtController()
+    session = SwbtControllerSession(config(), controller_factory=lambda _config, _writer: fake)
+    cancellation_event = Event()
+    errors: list[BaseException] = []
+
+    def reconnect() -> None:
+        try:
+            session.reconnect(timeout_sec=30.0, cancellation_event=cancellation_event)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = Thread(target=reconnect)
+    thread.start()
+    assert fake.reconnect_started.wait(1.0)
+
+    cancellation_event.set()
+    thread.join(1.0)
+
+    assert not thread.is_alive()
+    assert len(errors) == 1
+    assert getattr(errors[0], "code", None) == "NYX_SWBT_RECONNECT_CANCELLED"
 
 
 def test_session_pair_reconnect_apply_status_and_close() -> None:

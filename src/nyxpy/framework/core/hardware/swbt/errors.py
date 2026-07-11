@@ -2,6 +2,38 @@
 
 from nyxpy.framework.core.macro.exceptions import ConfigurationError, DeviceError
 
+_CONNECT_CANCELLED_CODES = frozenset({"NYX_SWBT_PAIR_CANCELLED", "NYX_SWBT_RECONNECT_CANCELLED"})
+
+
+def is_swbt_connect_cancelled(error: BaseException) -> bool:
+    """Nested ExceptionGroup を含む接続操作の cancellation を識別する。"""
+    if getattr(error, "code", None) in _CONNECT_CANCELLED_CODES:
+        return True
+    if isinstance(error, BaseExceptionGroup):
+        return any(is_swbt_connect_cancelled(nested) for nested in error.exceptions)
+    return False
+
+
+def swbt_connect_cancel_code(error: BaseException) -> str | None:
+    """Nested ExceptionGroup から接続キャンセルcodeを返す。"""
+    code = getattr(error, "code", None)
+    if code in _CONNECT_CANCELLED_CODES:
+        return str(code)
+    if isinstance(error, BaseExceptionGroup):
+        for nested in error.exceptions:
+            nested_code = swbt_connect_cancel_code(nested)
+            if nested_code is not None:
+                return nested_code
+    return None
+
+
+def is_swbt_pair_cancelled(error: BaseException) -> bool:
+    """Pair cancellation の後方互換 helper。"""
+    return getattr(error, "code", None) == "NYX_SWBT_PAIR_CANCELLED" or (
+        isinstance(error, BaseExceptionGroup)
+        and any(is_swbt_pair_cancelled(nested) for nested in error.exceptions)
+    )
+
 
 def adapter_discovery_failed(exc: BaseException) -> ConfigurationError:
     """Adapter discovery 失敗を NyX の設定エラーへ変換する。"""

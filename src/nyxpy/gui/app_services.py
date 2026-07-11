@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from nyxpy.framework.core.hardware.capture_source import WindowCaptureSourceConfig
@@ -388,13 +389,22 @@ class GuiAppServices:
     def pair_swbt_prepared(
         self,
         config: SwbtControllerConfig,
+        *,
+        cancellation_event: Event | None = None,
     ) -> SwbtControllerStatusView:
         """列挙済みcanonical configでpairingを1回だけ実行する。"""
         try:
-            self.swbt_controller_factory.pair(
-                config,
-                timeout_sec=config.connect_timeout_sec,
-            )
+            if cancellation_event is None:
+                self.swbt_controller_factory.pair(
+                    config,
+                    timeout_sec=config.connect_timeout_sec,
+                )
+            else:
+                self.swbt_controller_factory.pair(
+                    config,
+                    timeout_sec=config.connect_timeout_sec,
+                    cancellation_event=cancellation_event,
+                )
             view = self._connected_swbt_status(config, operation="pair")
         except Exception:
             self._active_swbt_config = None
@@ -409,13 +419,22 @@ class GuiAppServices:
     def reconnect_swbt_prepared(
         self,
         config: SwbtControllerConfig,
+        *,
+        cancellation_event: Event | None = None,
     ) -> SwbtControllerStatusView:
         """列挙済みcanonical configでreconnectを1回だけ実行する。"""
         try:
-            self.swbt_controller_factory.reconnect(
-                config,
-                timeout_sec=config.connect_timeout_sec,
-            )
+            if cancellation_event is None:
+                self.swbt_controller_factory.reconnect(
+                    config,
+                    timeout_sec=config.connect_timeout_sec,
+                )
+            else:
+                self.swbt_controller_factory.reconnect(
+                    config,
+                    timeout_sec=config.connect_timeout_sec,
+                    cancellation_event=cancellation_event,
+                )
             view = self._connected_swbt_status(config, operation="reconnect")
         except Exception:
             self._active_swbt_config = None
