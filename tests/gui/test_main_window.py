@@ -20,7 +20,7 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
-from nyxpy.framework.core.macro.exceptions import ErrorInfo, ErrorKind
+from nyxpy.framework.core.macro.exceptions import DeviceError, ErrorInfo, ErrorKind
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.app_services import SettingsApplyOutcome
 from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
@@ -1274,6 +1274,104 @@ def test_pair_and_close_wait_for_background_operation(qtbot, services: FakeServi
 
     release.set()
     qtbot.waitUntil(lambda: services.closed)
+
+
+def test_pair_cancel_callable_sets_event_passed_to_prepared_service(
+    qtbot,
+    services: FakeServices,
+) -> None:
+    started = Event()
+    received_events: list[Event] = []
+    config = object()
+
+    services.canonicalize_swbt_adapter = lambda: config
+
+    def pair_prepared(received_config, *, cancellation_event: Event) -> None:
+        assert received_config is config
+        received_events.append(cancellation_event)
+        started.set()
+        cancellation_event.wait(2.0)
+        raise ExceptionGroup(
+            "pair cleanup",
+            [
+                DeviceError(
+                    "cancelled",
+                    code="NYX_SWBT_PAIR_CANCELLED",
+                    component="test",
+                )
+            ],
+        )
+
+    services.pair_swbt_prepared = pair_prepared
+    services.global_settings.set("controller.backend", "swbt")
+    services.global_settings.set("controller.swbt.adapter", "hci0")
+    window = MainWindow(services=services)
+    qtbot.addWidget(window)
+    window.deferred_init()
+
+    cancel = window._pair_swbt_controller_async()
+
+    assert callable(cancel)
+    qtbot.waitUntil(started.is_set)
+    assert len(received_events) == 1
+    assert not received_events[0].is_set()
+
+    cancel()
+
+    assert received_events[0].is_set()
+    qtbot.waitUntil(lambda: not window._swbt_lifecycle_busy)
+    assert window.manual_controller_error is None
+    assert window.status_label.text() == "swbt ペアリングをキャンセルしました"
+    assert not any(
+        event[3] == "swbt.lifecycle_failed" for event in services.logger.technical_events
+    )
+
+
+def test_reconnect_cancel_event_is_forwarded_and_not_reported_as_failure(
+    qtbot,
+    services: FakeServices,
+) -> None:
+    started = Event()
+    received_events: list[Event] = []
+    config = object()
+    services.canonicalize_swbt_adapter = lambda: config
+
+    def reconnect_prepared(received_config, *, cancellation_event: Event) -> None:
+        assert received_config is config
+        received_events.append(cancellation_event)
+        started.set()
+        cancellation_event.wait(2.0)
+        raise ExceptionGroup(
+            "reconnect cleanup",
+            [
+                DeviceError(
+                    "cancelled",
+                    code="NYX_SWBT_RECONNECT_CANCELLED",
+                    component="test",
+                )
+            ],
+        )
+
+    services.reconnect_swbt_prepared = reconnect_prepared
+    services.global_settings.set("controller.backend", "swbt")
+    services.global_settings.set("controller.swbt.adapter", "hci0")
+    window = MainWindow(services=services)
+    qtbot.addWidget(window)
+    window.deferred_init()
+
+    cancel = window._reconnect_swbt_controller_async()
+    assert callable(cancel)
+    qtbot.waitUntil(started.is_set)
+    assert not received_events[0].is_set()
+    cancel()
+
+    assert received_events[0].is_set()
+    qtbot.waitUntil(lambda: not window._swbt_lifecycle_busy)
+    assert window.manual_controller_error is None
+    assert window.status_label.text() == "swbt 再接続をキャンセルしました"
+    assert not any(
+        event[3] == "swbt.lifecycle_failed" for event in services.logger.technical_events
+    )
 
 
 def test_manual_send_failure_is_visible_and_closes_port_in_worker(

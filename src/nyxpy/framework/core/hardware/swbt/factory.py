@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from threading import RLock
+from threading import Event, RLock
 
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, SwbtControllerType
 from nyxpy.framework.core.hardware.swbt.controller import SwbtControllerOutputPort
@@ -95,7 +95,13 @@ class SwbtControllerOutputPortFactory:
                 self._dummy_session_keys.add(key)
             return self._activate_port(key, session, config)
 
-    def pair(self, config: SwbtControllerConfig, *, timeout_sec: float | None = None) -> None:
+    def pair(
+        self,
+        config: SwbtControllerConfig,
+        *,
+        timeout_sec: float | None = None,
+        cancellation_event: Event | None = None,
+    ) -> None:
         """明示 pairing を実行する。dummy fallback はしない。"""
         with self._lock:
             key = session_key(config)
@@ -104,7 +110,14 @@ class SwbtControllerOutputPortFactory:
             session = self._session_for(config)
             try:
                 session.open()
-                session.pair(timeout_sec=timeout_sec or config.connect_timeout_sec)
+                effective_timeout = timeout_sec or config.connect_timeout_sec
+                if cancellation_event is None:
+                    session.pair(timeout_sec=effective_timeout)
+                else:
+                    session.pair(
+                        timeout_sec=effective_timeout,
+                        cancellation_event=cancellation_event,
+                    )
             except (ConfigurationError, DeviceError) as primary_error:
                 self._discard_failed_session(
                     key,
@@ -114,7 +127,13 @@ class SwbtControllerOutputPortFactory:
                 )
                 raise
 
-    def reconnect(self, config: SwbtControllerConfig, *, timeout_sec: float | None = None) -> None:
+    def reconnect(
+        self,
+        config: SwbtControllerConfig,
+        *,
+        timeout_sec: float | None = None,
+        cancellation_event: Event | None = None,
+    ) -> None:
         """明示 reconnect を実行する。dummy fallback はしない。"""
         with self._lock:
             key = session_key(config)
@@ -123,7 +142,14 @@ class SwbtControllerOutputPortFactory:
             session = self._session_for(config)
             try:
                 session.open()
-                session.reconnect(timeout_sec=timeout_sec or config.connect_timeout_sec)
+                effective_timeout = timeout_sec or config.connect_timeout_sec
+                if cancellation_event is None:
+                    session.reconnect(timeout_sec=effective_timeout)
+                else:
+                    session.reconnect(
+                        timeout_sec=effective_timeout,
+                        cancellation_event=cancellation_event,
+                    )
             except (ConfigurationError, DeviceError) as primary_error:
                 self._discard_failed_session(
                     key,

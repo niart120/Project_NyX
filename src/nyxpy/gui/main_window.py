@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Event
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup
@@ -27,6 +28,10 @@ from nyxpy.framework.core.hardware.device_discovery import (
     WindowDiscoveryResult,
 )
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
+from nyxpy.framework.core.hardware.swbt.errors import (
+    is_swbt_connect_cancelled,
+    swbt_connect_cancel_code,
+)
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.ports import ControllerOutputPort
 from nyxpy.framework.core.macro.exceptions import ConfigurationError
@@ -687,11 +692,11 @@ class MainWindow(QMainWindow):
         self._update_connection_status()
         return status
 
-    def _pair_swbt_controller_async(self, succeeded=None, failed=None) -> None:
-        self._start_swbt_connect_task("pair", succeeded, failed)
+    def _pair_swbt_controller_async(self, succeeded=None, failed=None):
+        return self._start_swbt_connect_task("pair", succeeded, failed)
 
-    def _reconnect_swbt_controller_async(self, succeeded=None, failed=None) -> None:
-        self._start_swbt_connect_task("reconnect", succeeded, failed)
+    def _reconnect_swbt_controller_async(self, succeeded=None, failed=None):
+        return self._start_swbt_connect_task("reconnect", succeeded, failed)
 
     def _disconnect_swbt_controller_async(self, succeeded=None, failed=None) -> None:
         prepared, previous = self._prepare_swbt_lifecycle(failed, operation="disconnect")
@@ -714,12 +719,17 @@ class MainWindow(QMainWindow):
         self._track_background_task(task)
         task.start()
 
-    def _start_swbt_connect_task(self, operation: str, succeeded, failed) -> None:
+    def _start_swbt_connect_task(self, operation: str, succeeded, failed):
         prepared, previous = self._prepare_swbt_lifecycle(failed, operation="connect")
         if not prepared:
-            return
+            return None
+        cancellation_event = Event()
         task = BackgroundTask(
-            lambda: self._execute_swbt_connect(operation, previous),
+            lambda: self._execute_swbt_connect(
+                operation,
+                previous,
+                cancellation_event=cancellation_event,
+            ),
             parent=self,
         )
         task.succeeded.connect(lambda result: self._finish_swbt_connect(result, succeeded, failed))
@@ -728,6 +738,7 @@ class MainWindow(QMainWindow):
         )
         self._track_background_task(task)
         task.start()
+        return cancellation_event.set
 
     def _prepare_swbt_lifecycle(
         self,
@@ -763,13 +774,19 @@ class MainWindow(QMainWindow):
         self,
         operation: str,
         previous: ControllerOutputPort | None,
+        *,
+        cancellation_event: Event | None = None,
     ) -> _SwbtLifecycleResult:
         try:
             self._close_detached_manual_controller(previous)
             canonicalize = getattr(self.services, "canonicalize_swbt_adapter", None)
             config = canonicalize() if callable(canonicalize) else None
             outcome = self.services.apply_settings(is_run_active=False)
-            status = self._call_swbt_lifecycle(operation, config)
+            status = self._call_swbt_lifecycle(
+                operation,
+                config,
+                cancellation_event=cancellation_event,
+            )
             builder = self.services.create_runtime_builder()
             manual_controller = builder.controller_output_for_manual_input()
             if manual_controller is None:
@@ -785,9 +802,17 @@ class MainWindow(QMainWindow):
                 ) from exc
             raise
 
-    def _call_swbt_lifecycle(self, operation: str, config: object | None) -> object:
+    def _call_swbt_lifecycle(
+        self,
+        operation: str,
+        config: object | None,
+        *,
+        cancellation_event: Event | None = None,
+    ) -> object:
         prepared = getattr(self.services, f"{operation}_swbt_prepared", None)
         if callable(prepared) and config is not None:
+            if operation in {"pair", "reconnect"}:
+                return prepared(config, cancellation_event=cancellation_event)
             return prepared(config)
         return getattr(self.services, f"{operation}_swbt")()
 
@@ -854,6 +879,21 @@ class MainWindow(QMainWindow):
         self._notify_async_callback(succeeded, None)
 
     def _fail_swbt_lifecycle(self, error: BaseException, failed, *, operation: str) -> None:
+        if operation == "connect" and is_swbt_connect_cancelled(error):
+            self.manual_controller_error = None
+            self.virtual_controller.model.set_controller(None)
+            self._swbt_lifecycle_busy = False
+            error_code = swbt_connect_cancel_code(error)
+            self.status_label.setText(
+                "swbt 再接続をキャンセルしました"
+                if error_code == "NYX_SWBT_RECONNECT_CANCELLED"
+                else "swbt ペアリングをキャンセルしました"
+            )
+            self._sync_manual_input_state()
+            self._update_connection_status()
+            self._refresh_connection_menu()
+            self._notify_async_callback(failed, error)
+            return
         self.manual_controller_error = error
         self.virtual_controller.model.set_controller(None)
         self._swbt_lifecycle_busy = False
@@ -1520,9 +1560,7 @@ class MainWindow(QMainWindow):
         self._manual_controller_restoring = False
         self._manual_controller_restore_backend = None
         if not isinstance(controller, ControllerOutputPort):
-            self._fail_manual_controller_restore(
-                RuntimeError("manual controller was not created")
-            )
+            self._fail_manual_controller_restore(RuntimeError("manual controller was not created"))
             return
         stale = (
             restore_backend != self.global_settings.get("controller.backend", "serial")
