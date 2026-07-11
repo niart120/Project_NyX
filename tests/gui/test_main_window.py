@@ -1306,6 +1306,21 @@ def test_serial_manual_controller_is_restored_after_run(qtbot, window: MainWindo
     assert window.virtual_controller.model.manual_input_enabled is True
 
 
+def test_swbt_manual_controller_is_restored_after_cancelled_run(
+    qtbot, window: MainWindow, services: FakeServices
+) -> None:
+    manual = services.builder.manual_controller
+    services.global_settings.set("controller.backend", "swbt")
+    window.virtual_controller.model.set_controller(None)
+    window.run_handle = FakeRunHandle(run_result(RunStatus.CANCELLED), done=True)
+
+    window._poll_run_handle()
+
+    qtbot.waitUntil(lambda: window.virtual_controller.model.controller is manual)
+    assert window.virtual_controller.model.manual_input_enabled is True
+    assert window.status_label.text() == "中断"
+
+
 def test_deferred_settings_failure_still_restores_serial_manual_controller(
     qtbot, window: MainWindow, services: FakeServices
 ) -> None:
@@ -1344,7 +1359,7 @@ def test_stale_serial_manual_restore_is_discarded_and_closed_in_worker(
     services.builder = BlockingBuilder()
     window.virtual_controller.model.set_controller(None)
 
-    window._restore_serial_manual_controller()
+    window._restore_manual_controller()
     qtbot.waitUntil(started.is_set)
     assert window._manual_controller_restoring is True
 

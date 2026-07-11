@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         self._swbt_lifecycle_busy = False
         self._macro_starting = False
         self._manual_controller_restoring = False
+        self._manual_controller_restore_backend: str | None = None
         self._close_pending = False
         self._background_tasks: set[BackgroundTask] = set()
         self.window_size_actions: dict[str, QAction] = {}
@@ -1328,7 +1329,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("エラー: マクロを開始できません")
         self.control_pane.set_run_state(RunUiState.FINISHED)
         self._sync_manual_input_state()
-        self._restore_serial_manual_controller()
+        self._restore_manual_controller()
 
     def _is_run_active(self) -> bool:
         return self._macro_starting or (self.run_handle is not None and not self.run_handle.done())
@@ -1485,42 +1486,46 @@ class MainWindow(QMainWindow):
             self.status_label.setText(f"実行後の設定を反映できません: {exc}")
             self._sync_manual_input_state()
             self._update_connection_status()
-            self._restore_serial_manual_controller()
+            self._restore_manual_controller()
             return
         if outcome is not None:
             self._apply_runtime_ports(outcome)
             self._update_connection_status()
         self._sync_manual_input_state()
-        self._restore_serial_manual_controller()
+        self._restore_manual_controller()
 
-    def _restore_serial_manual_controller(self) -> None:
+    def _restore_manual_controller(self) -> None:
         if (
-            self.global_settings.get("controller.backend", "serial") != "serial"
-            or self.virtual_controller.model.controller is not None
+            self.virtual_controller.model.controller is not None
             or self._manual_controller_restoring
             or self._is_run_active()
             or self._close_pending
         ):
             return
         self._manual_controller_restoring = True
+        self._manual_controller_restore_backend = str(
+            self.global_settings.get("controller.backend", "serial")
+        )
         task = BackgroundTask(
             lambda: self.services.create_runtime_builder().controller_output_for_manual_input(),
             parent=self,
         )
-        task.succeeded.connect(self._finish_serial_manual_controller_restore)
-        task.failed.connect(self._fail_serial_manual_controller_restore)
+        task.succeeded.connect(self._finish_manual_controller_restore)
+        task.failed.connect(self._fail_manual_controller_restore)
         self._track_background_task(task)
         task.start()
 
-    def _finish_serial_manual_controller_restore(self, controller: object) -> None:
+    def _finish_manual_controller_restore(self, controller: object) -> None:
+        restore_backend = self._manual_controller_restore_backend
         self._manual_controller_restoring = False
+        self._manual_controller_restore_backend = None
         if not isinstance(controller, ControllerOutputPort):
-            self._fail_serial_manual_controller_restore(
-                RuntimeError("serial manual controller was not created")
+            self._fail_manual_controller_restore(
+                RuntimeError("manual controller was not created")
             )
             return
         stale = (
-            self.global_settings.get("controller.backend", "serial") != "serial"
+            restore_backend != self.global_settings.get("controller.backend", "serial")
             or self._is_run_active()
             or self._swbt_lifecycle_busy
             or self._close_pending
@@ -1541,12 +1546,13 @@ class MainWindow(QMainWindow):
         self._sync_manual_input_state()
         self._update_connection_status()
 
-    def _fail_serial_manual_controller_restore(self, error: BaseException) -> None:
+    def _fail_manual_controller_restore(self, error: BaseException) -> None:
         self._manual_controller_restoring = False
+        self._manual_controller_restore_backend = None
         self.manual_controller_error = error
         self.logger.technical(
             "ERROR",
-            "Serial manual controller restore failed.",
+            "Manual controller restore failed.",
             component="MainWindow",
             event="controller.restore_failed",
             exc=error,
