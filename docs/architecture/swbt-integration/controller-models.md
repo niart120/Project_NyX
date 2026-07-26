@@ -44,6 +44,7 @@ class SwbtControllerType(str, Enum):
 @dataclass(frozen=True)
 class SwbtInputCapabilities:
     buttons: frozenset[Button]
+    dpad: bool
     left_stick: bool
     right_stick: bool
     imu: bool
@@ -127,6 +128,7 @@ Joy-Con L/R では存在しない input がある。mapper は `SwbtControllerMo
 | A/B/X/Y | yes | subset | subset |
 | L/ZL | yes | yes | no |
 | R/ZR | yes | no | yes |
+| D-pad | yes | yes | no |
 | left stick | yes | yes | no |
 | right stick | yes | no | yes |
 | IMU | yes | yes | yes |

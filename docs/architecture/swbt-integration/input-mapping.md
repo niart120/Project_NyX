@@ -68,6 +68,8 @@ D-pad は button set として扱う。
 
 `VirtualControllerModel` は `CENTER` に戻ると previous direction を release する。swbt port 側は release に従って state を更新する。
 
+Pro ControllerとJoy-Con LはD-padを扱う。Joy-Con RはD-padを持たないため、mapperは `SwbtControllerModel.capabilities.dpad` を見て `NYX_SWBT_INPUT_UNSUPPORTED` とする。
+
 ## Stick
 
 NyX の `LStick` / `RStick` は `0..255`、中心 `128`、Y 軸下向き正の座標系を持つ。swbt の `Stick.normalized(...)` は `-1.0..1.0`、Y 軸上向き正である。mapper は座標系を変換し、Y 軸を反転してから渡す。NyX の値を `Stick.raw(...)` へ直接渡してはならない。
@@ -162,6 +164,7 @@ button、stick、IMUを同一reportに入れる必要がある場合は、port�
 |---|---|
 | Joy-Con L で right stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | Joy-Con R で left stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| Joy-Con R で D-pad | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | unsupported button | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | invalid input type / value | `NYX_SWBT_INPUT_INVALID` |
 | touch input | `NotImplementedError` |

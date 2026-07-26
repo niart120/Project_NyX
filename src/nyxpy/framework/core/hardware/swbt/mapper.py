@@ -106,6 +106,7 @@ class NyxSwbtInputMapper:
                 imu_frames=state.imu_frames,
             )
         if isinstance(key, Hat):
+            self._require_dpad()
             return NyxSwbtState(
                 buttons=state.buttons,
                 dpad_buttons=_swbt_dpad_buttons(key),
@@ -143,6 +144,7 @@ class NyxSwbtInputMapper:
                 imu_frames=state.imu_frames,
             )
         if isinstance(key, Hat):
+            self._require_dpad()
             return NyxSwbtState(
                 buttons=state.buttons,
                 dpad_buttons=frozenset(),
@@ -173,6 +175,10 @@ class NyxSwbtInputMapper:
             raise swbt_input_unsupported(
                 f"{self.model.display_name} does not support button {button.name}"
             )
+
+    def _require_dpad(self) -> None:
+        if not self.model.capabilities.dpad:
+            raise swbt_input_unsupported(f"{self.model.display_name} does not support D-pad")
 
     def _require_left_stick(self) -> None:
         if not self.model.capabilities.left_stick:

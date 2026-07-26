@@ -2,7 +2,7 @@
 
 > **対象モジュール**: `src/nyxpy/framework/core/hardware/swbt/`
 > **目的**: swbt backend を周期送信型から直接送信型へ統一する
-> **関連ドキュメント**: [swbt integration](../../../../docs/architecture/swbt-integration/index.md)、[実機検証仕様](../../local_026/SWBT_REALDEVICE_DOCS_CLOSEOUT.md)
+> **関連ドキュメント**: [swbt integration](../../../../docs/architecture/swbt-integration/index.md)、[実機検証仕様](../../wip/local_026/SWBT_REALDEVICE_DOCS_CLOSEOUT.md)
 > **既存ソース**: `src/nyxpy/framework/core/hardware/swbt/`
 > **破壊的変更**: あり
 
@@ -53,6 +53,7 @@ NyX側は `NyxSwbtState` を正本として操作ごとに完全な `InputState`
 |----------|----------|----------|
 | `pyproject.toml` / `uv.lock` | 変更 | swbt-python 0.5.4を固定 |
 | `src/nyxpy/framework/core/hardware/swbt/config.py` | 変更 | `report_period_us` をconfigから削除 |
+| `src/nyxpy/framework/core/hardware/swbt/mapper.py` | 変更 | Joy-Con Rの非対応D-padを送信前に拒否 |
 | `src/nyxpy/framework/core/hardware/swbt/session.py` | 変更 | Direct class解決、`send()`呼び出し、周期report待機の削除 |
 | `src/nyxpy/framework/core/hardware/swbt/factory.py` | 変更 | session keyから周期値を削除 |
 | `src/nyxpy/framework/core/io/controller_config.py` | 変更 | settingsから周期値を読み取らない |
@@ -197,6 +198,7 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 | ユニット | `test_settings_store_removes_legacy_report_period` | 既存設定の削除、保存、移行通知 |
 | ユニット | `test_port_commits_state_only_after_send` | send成功後だけ状態を確定し、失敗時はrollback |
 | ユニット | `test_session_key_ignores_removed_report_period` | cache keyがcontroller shape、adapter、profileだけで決まる |
+| ユニット | `test_mapper_rejects_joycon_r_dpad_before_swbt_send` | capabilityに基づき非対応D-padを送信前に拒否 |
 | 結合 | `test_swbt_runtime_uses_direct_send_path` | CLIマクロ経路が完全状態を操作順に送る |
 | GUI | `test_swbt_settings_apply_without_report_period` | GUI設定反映が削除済みkeyへ依存しない |
 | ハードウェア | `test_swbt_pair_realdevice` | Direct classでschema v2 profileを作成してPair |
@@ -214,11 +216,12 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 - [x] `report_period_us` のconfig、session key、settings schemaからの削除
 - [x] 既存 `global.toml` の移行とtechnical log
 - [x] portの完全状態送信とrollback契約の回帰
+- [x] controller capabilityに基づくD-pad事前検証
 - [x] unit / integration / GUIテスト
 - [x] architecture docsと利用者向け文書
 - [x] ruff / ty / pytest / MkDocs strict gate
-- [ ] Pro ControllerのPair、Reconnect、入力、neutral実機確認
-- [ ] Joy-Con L/Rのprofile再利用と確認範囲の記録
+- [x] Pro ControllerのPair、Reconnect、入力、neutral実機確認
+- [x] Joy-Con L/Rのprofile再利用と確認範囲の記録
 
 ## 7. 非実機検証結果
 
@@ -231,6 +234,24 @@ uv run mkdocs build --strict
 uv run pytest --basetemp=<repository外の一時directory>
 ```
 
-ruff、ty、MkDocs strictは成功した。pytestは897件を収集し、877件成功、実機要件の20件をskipした。Direct class解決、同期 `apply()` から非同期 `send()` への橋渡し、Pair / Reconnect後に周期reportを待たないこと、周期設定の移行、完全状態とrollback契約は非実機テストで確認済みである。
+ruff、ty、MkDocs strictは成功した。pytestは898件を収集し、878件成功、実機要件の20件をskipした。Direct class解決、同期 `apply()` から非同期 `send()` への橋渡し、Pair / Reconnect後に周期reportを待たないこと、周期設定の移行、完全状態とrollback契約、Joy-Con RのD-pad事前拒否は非実機テストで確認済みである。
 
-Pro ControllerとJoy-Con L/Rを使うPair、Reconnect、既存profile再利用、Switch画面上の入力、short pressは未検証である。周期送信型で取得した `local_027` の実機結果をDirect送信型の完了証拠には使わない。
+周期送信型で取得した `local_027` の実機結果をDirect送信型の完了証拠には使わない。Direct送信型の結果は次節に記録する。
+
+## 8. 実機検証結果
+
+2026-07-26にCSR8510 A10（`0A12:0001`、`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233を使って確認した。
+
+| controller | Pair / Reconnect | Switch画面上の入力 |
+|------------|------------------|--------------------|
+| Pro Controller | 新規schema v2 profileで成功 | A、UPRIGHT、左右stick上、IMU送信時の無入力、close neutral、macro経路、GUI lifecycle |
+| Joy-Con L | 新規schema v2 profileで成功 | CAP、UPRIGHT |
+| Joy-Con R | 新規schema v2 profileで成功 | A。D-padは非対応として送信前に拒否 |
+
+Pro ControllerのA短押しは16msと33msで認識した。50msは認識例と未認識例があり、trace上はいずれも `reason="direct"` の送信が完了していた。押下時間だけでは認識の揺れを説明できないため、最小推奨durationや常時認識は保証しない。
+
+旧 `local_027` profileのReconnectはPro ControllerとJoy-Con Lで `HCI AUTHENTICATION_FAILURE [0x05]` になった。新規Pair後は同一profileでReconnectできたため、Direct classやschema v2読込の失敗ではなく、Switch側と保存済みbond keyの不一致である。
+
+Joy-Con RへUPRIGHTを送った実機テストで、NyXのcapability modelにD-pad可否がないことを検出した。`SwbtInputCapabilities.dpad` を追加し、Pro ControllerとJoy-Con Lだけを対応、Joy-Con Rを非対応としてmapperで送信前に拒否するよう修正した。修正後はJoy-Con Rの対応入力Aだけを送る実機テストが成功した。
+
+実機証跡は `tmp/hardware/swbt/local028-v054-*` に保存した。

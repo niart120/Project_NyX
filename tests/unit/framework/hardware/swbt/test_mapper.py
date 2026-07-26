@@ -68,6 +68,13 @@ def test_mapper_rejects_joycon_missing_stick() -> None:
     assert getattr(right_error.value, "code", None) == "NYX_SWBT_INPUT_UNSUPPORTED"
 
 
+def test_mapper_rejects_joycon_r_dpad_before_swbt_send() -> None:
+    with pytest.raises(Exception) as exc_info:
+        mapper("joy-con-r").hold((Hat.UPRIGHT,))
+
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_INPUT_UNSUPPORTED"
+
+
 def test_mapper_translates_swbt_invalid_input_error() -> None:
     frame = IMUFrame.gyro(x=32768)
     state = mapper().set_imu(NyxSwbtState.neutral(), (frame,))

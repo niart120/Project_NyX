@@ -261,8 +261,8 @@ uv run mkdocs build --strict
 - [x] Button / D-pad / stick / IMU / neutral / short press の実機テストを追加する。
 - [x] Joy-Con L/R の unsupported input が明確に失敗することを単体テストで確認する。
 - [x] async controller method を session 内部で完了待ちする。
-- [ ] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
-- [ ] stick Y 軸既定値を実機結果で確定する。
+- [x] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
+- [x] stick Y 軸既定値を実機結果で確定する。
 - [ ] Direct送信型のshort press最小推奨durationを判定する。
 - [x] 利用者 docs に device setup、CLI、GUI、troubleshooting を反映する。
 - [x] macro development docs に `Command.imu(...)` と swbt 非対応入力を反映する。
@@ -286,7 +286,7 @@ uv run mkdocs build --strict
 - macro development docs: `Command.imu(...)` と swbt 非対応入力を追加した。
 - architecture docs: swbt 通常依存、adapter 自動採用なし、diagnostics path 非公開、現行 public API 前提へ更新した。
 
-現環境では `NYX_REALDEVICE`、`NYX_SWBT`、`NYX_SWBT_ADAPTER` が未設定のため、Pro Controller / Joy-Con L / Joy-Con R の実機検証は未実行である。従って `local_026` と rollout 全体を完了扱いにしない。
+2026-07-26にDirect送信型でPro Controller / Joy-Con L / Joy-Con RのPair、Reconnect、対応入力を確認した。実行ごとに環境変数を明示し、通常gateでは未設定のまま実機テストをskipする。
 
 ## 8. 2026-07-10 統合監査追補
 
@@ -306,3 +306,14 @@ uv run mkdocs build --strict
 `local_028/SWBT_DIRECT_REPORTING.md` でswbt backendを `DirectProController` / `DirectJoyConL` / `DirectJoyConR` へ変更した。非実機gateでは操作ごとに完全な入力状態を `send()` へ渡すこと、送信成功後だけNyX側状態を確定すること、Pair / Reconnect後に周期reportを待たないことを確認した。
 
 `local_027` で実施したPair、Reconnect、short press、GUI、macroの結果は周期送信型に対する証拠である。Direct送信型については、同じschema v2 profileの再利用、`reason="direct"` のreport trace、Switch画面上の認識を再確認するまで未検証として扱う。
+
+## 10. 2026-07-26 Direct送信型実機結果
+
+CSR8510 A10（`0A12:0001`、`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233で次を確認した。
+
+- Pro Controller: 新規Pair、同一profileでReconnect、A、UPRIGHT、左右stick上、IMU、close neutral、macro経路、GUI Pair / Disconnect / Reconnect / Disconnect
+- Joy-Con L: 新規Pair、同一profileでReconnect、CAP、UPRIGHT
+- Joy-Con R: 新規Pair、同一profileでReconnect、A
+- Joy-Con RのD-padは非対応である。実機テストで検出後、`SwbtInputCapabilities.dpad` とmapperの事前拒否を追加した。
+
+Pro ControllerのA短押しは16msと33msで認識した。50msは認識例と未認識例があり、いずれもtrace上はDirect reportを送信済みだった。従って最小推奨durationと認識安定性は未確定のまま残す。証跡は `tmp/hardware/swbt/local028-v054-*` に保存した。

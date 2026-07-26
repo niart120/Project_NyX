@@ -217,20 +217,23 @@ def test_swbt_gui_lifecycle_realdevice(
 def test_swbt_button_dpad_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
     _require_operator_confirmation(swbt_run, "test_swbt_button_dpad_manual_realdevice")
 
+    dpad: str | None = None
     with _connected_port(swbt_run) as port:
         button = _supported_button(swbt_run.model)
         port.press((button,))
         time.sleep(0.05)
         port.release((button,))
-        port.press((Hat.UPRIGHT,))
-        time.sleep(0.05)
-        port.release((Hat.UPRIGHT,))
+        if swbt_run.model.capabilities.dpad:
+            port.press((Hat.UPRIGHT,))
+            time.sleep(0.05)
+            port.release((Hat.UPRIGHT,))
+            dpad = "UPRIGHT"
 
     _record_operator_result(
         swbt_run,
         "test_swbt_button_dpad_manual_realdevice",
-        prompt=f"{button.name} と UPRIGHT が正しく入力されたか (pass/fail/skip): ",
-        details={"button": button.name, "dpad": "UPRIGHT"},
+        prompt=f"{button.name} と対応入力が正しく反映されたか (pass/fail/skip): ",
+        details={"button": button.name, "dpad": dpad},
     )
 
 

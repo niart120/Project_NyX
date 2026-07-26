@@ -85,4 +85,7 @@ def test_controller_models_hold_nyx_capabilities() -> None:
     assert left.capabilities.right_stick is False
     assert right.capabilities.left_stick is False
     assert right.capabilities.right_stick is True
+    assert pro.capabilities.dpad is True
+    assert left.capabilities.dpad is True
+    assert right.capabilities.dpad is False
     assert pro.capabilities.imu is True

@@ -21,6 +21,7 @@ class SwbtInputCapabilities:
     """NyX 入力単位で見た swbt controller の対応範囲。"""
 
     buttons: frozenset[Button]
+    dpad: bool
     left_stick: bool
     right_stick: bool
     imu: bool
@@ -86,6 +87,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="pro-controller-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_PRO_BUTTONS,
+            dpad=True,
             left_stick=True,
             right_stick=True,
             imu=True,
@@ -97,6 +99,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="joy-con-l-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_L_BUTTONS,
+            dpad=True,
             left_stick=True,
             right_stick=False,
             imu=True,
@@ -108,6 +111,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="joy-con-r-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_R_BUTTONS,
+            dpad=False,
             left_stick=False,
             right_stick=True,
             imu=True,
