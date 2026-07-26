@@ -281,7 +281,7 @@ uv run mkdocs build --strict
 - `tests/hardware/swbt_realdevice_support.py`: 環境変数から `SwbtRealDeviceOptions` を構築し、`run-metadata.json`、`swbt-trace.jsonl`、`operator-confirmation.jsonl`、`summary.md` を evidence directory に出力する。
 - `tests/hardware/test_swbt_controller_backend_realdevice.py`: adapter discovery、pair、reconnect、button / D-pad、stick、`Command.imu(...)`、close neutral、`Command.press(..., dur=...)` short press を分けて検証する。
 - `conftest.py`: swbt 実機テストだけは `NYX_REALDEVICE=1` と `NYX_SWBT=1` で `--realdevice` なしでも環境変数 gate へ進める。
-- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.5.3 の `create_profile()` と lifecycle / input API は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
+- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.5.4 の `create_profile()` と lifecycle / Direct `send()` は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
 - 利用者 docs: installation、device setup、CLI、GUI、troubleshooting に swbt backend を追加した。
 - macro development docs: `Command.imu(...)` と swbt 非対応入力を追加した。
 - architecture docs: swbt 通常依存、adapter 自動採用なし、diagnostics path 非公開、現行 public API 前提へ更新した。

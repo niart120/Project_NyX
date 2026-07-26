@@ -2,7 +2,7 @@
 
 この文書群は、Project_NyX から `swbt-python` を controller backend として利用するための設計方針を定義する。
 
-`swbt-python` 0.5.3 は NX 互換の仮想 Bluetooth HID controller を Python から扱うための library である。Project_NyX では、Bluetooth adapter の列挙、schema v2 pairing profile の作成、保存済み profile に基づく reconnect、入力 report の送信を controller backend の実装として扱う。マクロ作者から見える通常 API は `Command`、GUI の仮想コントローラーから見える境界は既存の `ControllerOutputPort` に止める。
+`swbt-python` 0.5.4 は NX 互換の仮想 Bluetooth HID controller を Python から扱うための library である。Project_NyX では、Bluetooth adapter の列挙、schema v2 pairing profile の作成、保存済み profile に基づく reconnect、Direct controller による入力 report の送信を controller backend の実装として扱う。マクロ作者から見える通常 API は `Command`、GUI の仮想コントローラーから見える境界は既存の `ControllerOutputPort` に止める。
 
 ## 最小構成
 

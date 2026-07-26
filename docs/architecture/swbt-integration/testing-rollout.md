@@ -4,7 +4,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 
 ## 導入順序
 
-1. `swbt-python==0.5.3` を通常依存として固定する。
+1. `swbt-python==0.5.4` を通常依存として固定する。
 2. `nyxpy.framework.core.hardware.swbt` package を追加する。
 3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
 4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。

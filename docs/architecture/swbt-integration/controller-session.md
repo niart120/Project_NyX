@@ -10,7 +10,7 @@
 
 serial backend は `SerialControllerOutputPort` から `SerialComm.send(...)` を呼ぶ。swbt backend は controller class の選択、adapter 未指定の拒否、pairing profile、diagnostics writer、swbt 例外の変換を同じ入力 port から扱う必要がある。
 
-`SwbtControllerSession` はこの lifecycle 差分を吸収する。swbt-python 0.5.3 では `create_profile()`、`open()`、`pair()`、`reconnect()`、`apply()`、`neutral()`、`close()` が async API、`status()` が同期 API である。session は専用 event loop thread で async API の完了を待ち、上位には同期 method として見せる。
+`SwbtControllerSession` はこの lifecycle 差分を吸収する。swbt-python 0.5.4 では `create_profile()`、`open()`、`pair()`、`reconnect()`、`send()`、`neutral()`、`close()` が async API、`status()` が同期 API である。session は専用 event loop thread で async API の完了を待ち、上位には同期 method として見せる。
 
 ```text
 SwbtControllerOutputPort  # sync ControllerOutputPort implementation
@@ -28,7 +28,7 @@ SwbtControllerOutputPort  # sync ControllerOutputPort implementation
 - `open()`、`pair()`、`reconnect()` の実行
 - macro 実行前の reconnect
 - async controller method の完了待ち
-- `InputState` の `apply()`
+- `InputState` を Direct controller の `send()` へ渡す同期 `apply()`
 - `neutral()`
 - `status()` の取得
 - diagnostics writer の lifetime

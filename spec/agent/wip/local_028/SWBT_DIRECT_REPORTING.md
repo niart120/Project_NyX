@@ -43,14 +43,15 @@ NyX側は `NyxSwbtState` を正本として操作ごとに完全な `InputState`
 
 - GitHub Issue #196 の実装項目と完了条件を正本とする。
 - Issue #195 のswbt-python 0.5.3およびschema v2 pairing profile移行が完了している。
+- swbt-python 0.5.4が公開済みであり、Direct controllerの公開APIを維持している。
 - Direct controllerは生成、Pair、Reconnectの完了後に入力可能であるものとする。
-- 周期送信型の上流修正およびswbt-python 0.5.4への更新は本仕様に含めない。
 - 実機操作は `@pytest.mark.realdevice` と `@pytest.mark.swbt` を付け、通常gateと分離する。
 
 ## 2. 対象ファイル
 
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
+| `pyproject.toml` / `uv.lock` | 変更 | swbt-python 0.5.4を固定 |
 | `src/nyxpy/framework/core/hardware/swbt/config.py` | 変更 | `report_period_us` をconfigから削除 |
 | `src/nyxpy/framework/core/hardware/swbt/session.py` | 変更 | Direct class解決、`send()`呼び出し、周期report待機の削除 |
 | `src/nyxpy/framework/core/hardware/swbt/factory.py` | 変更 | session keyから周期値を削除 |
@@ -112,7 +113,6 @@ Direct controllerの生成、Pair、Reconnect完了を利用可能状態とし�
 ### 対象外
 
 - 周期送信型と直接送信型を選択する設定
-- swbt-python 0.5.4への依存更新
 - 周期送信型のreport loopに対する回避策
 - HCI完了またはSwitch画面反映完了を待つ同期処理
 - pairing profileの独自変換
@@ -208,6 +208,7 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 ## 6. 実装チェックリスト
 
 - [x] Direct class解決とroot public API import
+- [x] swbt-python 0.5.4への依存更新
 - [x] session `apply()` からDirect `send()`への同期橋渡し
 - [x] 周期report開始待機の削除
 - [x] `report_period_us` のconfig、session key、settings schemaからの削除
@@ -221,7 +222,7 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 
 ## 7. 非実機検証結果
 
-2026-07-26に次を実行した。
+2026-07-26にDirect送信型への移行後、次を実行した。swbt-python 0.5.4への依存更新後にも同じgateを再実行した。
 
 ```console
 uv run ruff check .
