@@ -139,11 +139,11 @@ A    (dur=0.20)              # ゲーム起動（A の所要時間はタイマ�
 frame1 タイマー消化完了直後に frame2 タイマーを開始し、以降の操作はすべて frame2 タイマー内で実行される。
 
 ```python
-t2 = _start_timer()                    # ★ frame2 タイマー開始
+t2 = _start_timer()  # ★ frame2 タイマー開始
 
-cmd.press(Button.A, dur=2.50, wait=1.00)   # スプラッシュ画面をAで飛ばす
-cmd.press(Button.A, dur=0.20, wait=1.50)   # つづきからはじめる
-cmd.press(Button.B, dur=1.00, wait=0.50)   # 回想をBで飛ばす
+cmd.press(Button.A, dur=2.50, wait=1.00)  # スプラッシュ画面をAで飛ばす
+cmd.press(Button.A, dur=0.20, wait=1.50)  # つづきからはじめる
+cmd.press(Button.B, dur=1.00, wait=0.50)  # 回想をBで飛ばす
 
 _consume_timer(cmd, t2, frame2 + frame2_offset, fps)  # ★ frame2 タイマー消化
 ```
@@ -293,7 +293,11 @@ image = cmd.capture()
 x, y, w, h = roi
 cropped = image[y : y + h, x : x + w]
 padded = cv2.copyMakeBorder(
-    cropped, pad, pad, pad, pad,
+    cropped,
+    pad,
+    pad,
+    pad,
+    pad,
     borderType=cv2.BORDER_CONSTANT,
     value=(255, 255, 255),
 )
@@ -382,6 +386,7 @@ def calc_stat_valid_ranges(
     level: int,
 ) -> dict[str, tuple[int, int]]:
     """種族値・レベルから各ステータスの有効範囲を返す。"""
+
     def _hp_range(base: int) -> tuple[int, int]:
         lo = ((2 * base) * level) // 100 + level + 10
         hi = ((2 * base + 31) * level) // 100 + level + 10
@@ -391,6 +396,7 @@ def calc_stat_valid_ranges(
         lo = int(((2 * base) * level // 100 + 5) * 0.9)
         hi = int(((2 * base + 31) * level // 100 + 5) * 1.1)
         return lo, hi
+
     ...
 ```
 
@@ -526,9 +532,8 @@ def _start_timer() -> float:
     """高精度タイマーの開始時刻を返す。"""
     return time.perf_counter()
 
-def _consume_timer(
-    cmd: Command, start_time: float, total_frames: float, fps: float
-) -> None:
+
+def _consume_timer(cmd: Command, start_time: float, total_frames: float, fps: float) -> None:
     """開始時刻からの経過時間を差し引き、残りフレーム分だけ待機する。"""
     target_seconds = total_frames / fps
     elapsed = time.perf_counter() - start_time

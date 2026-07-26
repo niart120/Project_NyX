@@ -621,6 +621,7 @@ def _play_intro(self, cmd: Command, timing: RegionTiming) -> None:
         cmd.wait(timing.intro_pre_wait)
     self._press_a_sequence(cmd, timing.intro_sequence)
 
+
 def _press_a_sequence(self, cmd: Command, sequence: list[tuple[float, float]]) -> None:
     """A ボタンの (dur, wait) シーケンスを順に実行する。"""
     for dur, wait in sequence:
@@ -689,9 +690,7 @@ def _enter_name(self, cmd: Command, name: str, keyboard: RegionKeyboard) -> None
 
         # 濁点・半濁点処理
         if need_dakuten and keyboard.dakuten_pos:
-            cursor_x, cursor_y = self._move_cursor(
-                cmd, cursor_x, cursor_y, *keyboard.dakuten_pos
-            )
+            cursor_x, cursor_y = self._move_cursor(cmd, cursor_x, cursor_y, *keyboard.dakuten_pos)
             cmd.press(Button.A, dur=0.2, wait=0.2)
         # ...（半濁点も同様）
 ```
@@ -705,6 +704,7 @@ def _enter_name(self, cmd: Command, name: str, keyboard: RegionKeyboard) -> None
 ```python
 from typing import Iterator
 
+
 def frame_sweep(min_val: float, max_val: float, step: float = 1.0) -> Iterator[float]:
     """フレーム値を min_val から max_val まで step ずつ列挙する。"""
     v = min_val
@@ -712,9 +712,12 @@ def frame_sweep(min_val: float, max_val: float, step: float = 1.0) -> Iterator[f
         yield v
         v += step
 
+
 def dual_frame_sweep(
-    f1_min: float, f1_max: float,
-    f2_min: float, f2_max: float,
+    f1_min: float,
+    f1_max: float,
+    f2_min: float,
+    f2_max: float,
 ) -> Iterator[tuple[float, float]]:
     """Frame1 外側 × Frame2 内側の2軸スイープ。"""
     for f1 in frame_sweep(f1_min, f1_max):

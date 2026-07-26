@@ -92,42 +92,36 @@ Connection menu は GUI 層の表示・操作部品である。実デバイス�
 
 ```python
 class MainWindow(QMainWindow):
-    def _refresh_connection_menu(self, *, refresh_discovery: bool = False) -> None:
-        ...
+    def _refresh_connection_menu(self, *, refresh_discovery: bool = False) -> None: ...
 
     def _populate_capture_input_menu(
         self,
         menu: QMenu,
         devices: tuple[DeviceInfo, ...],
         windows: tuple[WindowInfo, ...],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def _populate_serial_device_menu(
         self,
         menu: QMenu,
         devices: tuple[DeviceInfo, ...],
-    ) -> None:
-        ...
+    ) -> None: ...
 
-    def _populate_protocol_menu(self, menu: QMenu) -> None:
-        ...
+    def _populate_protocol_menu(self, menu: QMenu) -> None: ...
 
 
 def _device_discovery_snapshot(
     discovery: object,
     *,
     refresh: bool = False,
-) -> DeviceDiscoveryResult:
-    ...
+) -> DeviceDiscoveryResult: ...
 
 
 def _window_discovery_snapshot(
     discovery: object,
     *,
     refresh: bool = False,
-) -> tuple[WindowInfo, ...]:
-    ...
+) -> tuple[WindowInfo, ...]: ...
 ```
 
 `refresh_discovery=False` は初期描画と設定反映後の lightweight refresh 用である。`refresh_discovery=True` は接続 menu を開く時に使い、現在接続可能な camera / serial / window 候補を再取得する。

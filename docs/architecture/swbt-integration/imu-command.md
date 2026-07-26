@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 Vector3 = tuple[int, int, int]
 
+
 @dataclass(frozen=True)
 class IMUFrame:
     accelerometer: Vector3 = (0, 0, 0)

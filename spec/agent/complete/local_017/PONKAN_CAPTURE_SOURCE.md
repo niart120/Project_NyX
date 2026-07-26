@@ -130,6 +130,7 @@
 ```python
 CaptureSourceType = Literal["camera", "window", "capture"]
 
+
 @dataclass(frozen=True)
 class PonkanCaptureSourceConfig:
     source_type: Literal["capture"] = "capture"

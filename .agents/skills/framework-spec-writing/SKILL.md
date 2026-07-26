@@ -190,6 +190,7 @@ class NewDeviceInterface(ABC):
     @abstractmethod
     def connect(self) -> None: ...
 
+
 # Bad: 具象クラスに直接依存
 class MacroBase:
     def __init__(self):

@@ -31,8 +31,7 @@ import pytest
 
 
 @pytest.mark.realdevice
-def test_macro_with_real_device() -> None:
-    ...
+def test_macro_with_real_device() -> None: ...
 ```
 
 実機なしで確認する場合:

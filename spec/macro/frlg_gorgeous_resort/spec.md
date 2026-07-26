@@ -137,9 +137,7 @@ ocr.get_text(np.full((64, 256, 3), 255, dtype=np.uint8), language="ja")
 # pokedex 初期化処理の概要
 if self._cfg.pokedex:
     pokedex_internal = {
-        NATIONAL_TO_INTERNAL[n]
-        for n in self._cfg.pokedex
-        if n in NATIONAL_TO_INTERNAL
+        NATIONAL_TO_INTERNAL[n] for n in self._cfg.pokedex if n in NATIONAL_TO_INTERNAL
     }
     for name in self._cfg.target_pokemon:
         nat = NAME_TO_NATIONAL.get(name)
@@ -147,7 +145,10 @@ if self._cfg.pokedex:
             cmd.log(f"target_pokemon '{name}' は不明なポケモン名です", level="WARNING")
         elif nat not in self._cfg.pokedex:
             cmd.log(f"target_pokemon '{name}' (No.{nat}) は図鑑未登録です", level="WARNING")
-    cmd.log(f"図鑑登録数: {len(self._cfg.pokedex)}種 → 内部コード {len(pokedex_internal)}種", level="INFO")
+    cmd.log(
+        f"図鑑登録数: {len(self._cfg.pokedex)}種 → 内部コード {len(pokedex_internal)}種",
+        level="INFO",
+    )
 ```
 
 #### ETA 見積りと開始通知
@@ -160,11 +161,13 @@ OCR ウォームアップは 1 回だけ発生する固定コストとして別�
 _OCR_WARMUP_SECONDS = 3.0  # 初回モデルロードとダミー推論の概算
 
 # --- 1ループあたりの見積り時間 (seconds) ---
-_OVERHEAD_RESTART = 4.35    # Step 1: HOME操作からタイマー開始まで
-_OVERHEAD_POST    = 30.0    # Step 5〜9: 会話終了・受渡し・OCR・レポート・退出・再入場
+_OVERHEAD_RESTART = 4.35  # Step 1: HOME操作からタイマー開始まで
+_OVERHEAD_POST = 30.0  # Step 5〜9: 会話終了・受渡し・OCR・レポート・退出・再入場
 
 t_frame1 = (self._cfg.frame1 + self._cfg.frame1_offset) / self._cfg.fps
-t_advance = (self._cfg.target_advance + self._cfg.advance_offset) / (self._cfg.fps * self._cfg.rng_multiplier)
+t_advance = (self._cfg.target_advance + self._cfg.advance_offset) / (
+    self._cfg.fps * self._cfg.rng_multiplier
+)
 t_loop = _OVERHEAD_RESTART + t_frame1 + t_advance + _OVERHEAD_POST
 
 total_seconds = _OCR_WARMUP_SECONDS + (t_loop * self._cfg.target_count)
@@ -176,7 +179,7 @@ cmd.log(
     f"OCRウォームアップ見積: {_OCR_WARMUP_SECONDS:.1f}s, "
     f"1ループ見積: {t_loop_str}s"
     f" × {self._cfg.target_count}回"
-    f" = {total_seconds/60:.0f}分"
+    f" = {total_seconds / 60:.0f}分"
     f" (ETA: {eta_str})",
     level="INFO",
 )
@@ -230,22 +233,24 @@ frame1 タイマー消化完了直後に advance タイマーを開始し、
 以降のゲーム内操作はすべて advance タイマー内で実行される。
 
 ```python
-t2 = _start_timer()                           # ★ advance タイマー開始
+t2 = _start_timer()  # ★ advance タイマー開始
 
-cmd.press(Button.A, dur=3.50, wait=1.00)       # OPをAで飛ばす
-cmd.press(Button.A, dur=0.20, wait=0.30)       # つづきからはじめる
-cmd.press(Button.B, dur=1.00, wait=1.80)       # 回想をBで飛ばす
+cmd.press(Button.A, dur=3.50, wait=1.00)  # OPをAで飛ばす
+cmd.press(Button.A, dur=0.20, wait=0.30)  # つづきからはじめる
+cmd.press(Button.B, dur=1.00, wait=1.80)  # 回想をBで飛ばす
 
 # アキホに話しかける（1回目：ポケモン決定処理をトリガー）
-cmd.press(Button.A, dur=0.10, wait=0.70)       # 話しかけ
-cmd.press(Button.B, dur=0.10, wait=0.70)       # テキスト送り
-cmd.press(Button.B, dur=0.10, wait=0.50)       # テキスト送り
+cmd.press(Button.A, dur=0.10, wait=0.70)  # 話しかけ
+cmd.press(Button.B, dur=0.10, wait=0.70)  # テキスト送り
+cmd.press(Button.B, dur=0.10, wait=0.50)  # テキスト送り
 ```
 
 ### Step 4: advance タイマー消化（ポケモン・アイテム決定）
 
 ```python
-_consume_timer(cmd, t2, target_advance + advance_offset, fps * rng_multiplier)  # ★ advance タイマー消化
+_consume_timer(
+    cmd, t2, target_advance + advance_offset, fps * rng_multiplier
+)  # ★ advance タイマー消化
 ```
 
 > 消化完了時点でアキホの要求ポケモンと報酬アイテムが乱数から決定される。
@@ -279,8 +284,7 @@ recognized = self._recognize_requested_pokemon(cmd)
 if self._cfg.target_pokemon:  # リストが空でなければ突合
     if recognized is None or not self._matches_any_target(recognized):
         cmd.log(
-            f"{i}回目：要求={recognized or '認識失敗'}"
-            f"（期待={self._cfg.target_pokemon}）リセット",
+            f"{i}回目：要求={recognized or '認識失敗'}（期待={self._cfg.target_pokemon}）リセット",
             level="INFO",
         )
         continue  # Step 1 へ戻る
@@ -335,12 +339,12 @@ for _ in range(7):
     cmd.press(Button.B, dur=0.10, wait=0.70)  # テキスト送り
 
 # セバスチャン登場・アイテム受取
-cmd.press(Button.B, dur=0.10, wait=0.70)   # セバスチャン会話
+cmd.press(Button.B, dur=0.10, wait=0.70)  # セバスチャン会話
 cmd.press(Button.B, dur=0.10, wait=0.80)
 cmd.press(Button.B, dur=0.10, wait=0.50)
-cmd.press(Button.B, dur=0.10, wait=2.50)   # アイテム渡しアニメーション
+cmd.press(Button.B, dur=0.10, wait=2.50)  # アイテム渡しアニメーション
 cmd.press(Button.B, dur=0.10, wait=0.40)
-cmd.press(Button.B, dur=0.10, wait=2.00)   # アイテム取得テキスト表示
+cmd.press(Button.B, dur=0.10, wait=2.00)  # アイテム取得テキスト表示
 ```
 
 ### Step 8: アイテム認識 → カウント更新
@@ -428,13 +432,13 @@ cmd.press(LStick.DOWN, dur=3.30, wait=0.10)
 
 # レポートを書く
 cmd.press(Button.PLUS, dur=0.10, wait=0.30)
-cmd.press(LStick.UP, dur=0.10, wait=0.10)     # ×3
+cmd.press(LStick.UP, dur=0.10, wait=0.10)  # ×3
 cmd.press(LStick.UP, dur=0.10, wait=0.10)
 cmd.press(LStick.UP, dur=0.10, wait=0.10)
-cmd.press(Button.A, dur=0.10, wait=1.00)       # 「レポートをかく」
-cmd.press(Button.A, dur=0.10, wait=1.00)       # 確認
-cmd.press(LStick.UP, dur=0.10, wait=0.10)      # 「はい」を選択
-cmd.press(Button.A, dur=0.10, wait=0.50)       # レポート書き込み実行
+cmd.press(Button.A, dur=0.10, wait=1.00)  # 「レポートをかく」
+cmd.press(Button.A, dur=0.10, wait=1.00)  # 確認
+cmd.press(LStick.UP, dur=0.10, wait=0.10)  # 「はい」を選択
+cmd.press(Button.A, dur=0.10, wait=0.50)  # レポート書き込み実行
 
 # レポート完了待ち（メッセージウィンドウ消失を監視）
 while self._is_message_window_visible(cmd):
@@ -454,7 +458,9 @@ if (
     and self._item_counters.get(self._cfg.target_item, 0) >= self._cfg.target_count
 ):
     cmd.log(f"目標数に到達: {self._cfg.target_item} {self._cfg.target_count}個", level="INFO")
-    cmd.notify(f"目標数に到達: {self._cfg.target_item} {self._cfg.target_count}個", img=cmd.capture())
+    cmd.notify(
+        f"目標数に到達: {self._cfg.target_item} {self._cfg.target_count}個", img=cmd.capture()
+    )
     break
 ```
 
@@ -476,7 +482,11 @@ def _ocr_roi(self, cmd: Command, roi: tuple[int, int, int, int], pad: int = 40) 
     x, y, w, h = roi
     cropped = image[y : y + h, x : x + w]
     padded = cv2.copyMakeBorder(
-        cropped, pad, pad, pad, pad,
+        cropped,
+        pad,
+        pad,
+        pad,
+        pad,
         borderType=cv2.BORDER_CONSTANT,
         value=(255, 255, 255),
     )
@@ -502,7 +512,7 @@ def _is_message_window_visible(self, cmd: Command) -> bool:
     """メッセージウィンドウの有無を ROI 内平均輝度で検出する。"""
     image = cmd.capture()
     roi = self._roi_message
-    cropped = image[roi.y:roi.y+roi.h, roi.x:roi.x+roi.w]
+    cropped = image[roi.y : roi.y + roi.h, roi.x : roi.x + roi.w]
     gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
     mean_brightness = float(np.mean(gray))
     return mean_brightness > self._MESSAGE_BRIGHTNESS_THRESHOLD
@@ -531,6 +541,7 @@ Switch / JPN / 720p:
 ```python
 def _start_timer() -> float:
     return time.perf_counter()
+
 
 def _consume_timer(cmd: Command, start_time: float, total_frames: float, fps: float) -> None:
     target_seconds = total_frames / fps

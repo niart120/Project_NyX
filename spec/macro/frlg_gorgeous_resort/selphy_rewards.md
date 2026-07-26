@@ -93,6 +93,7 @@ $$
 MAX_RETRY = 100
 NUM_SPECIES_CODES = 411  # 0x019B
 
+
 def determine_pokemon(lcg: LCG32, pokedex: set[int]) -> int:
     """アキホが要求するポケモンの内部コードを決定する。
 
@@ -207,12 +208,12 @@ def determine_item(lcg: LCG32) -> str:
 
 ```python
 ITEM_TABLE: list[str] = [
-    "おおきなしんじゅ",   # 0: 0-4   (5%)
-    "しんじゅ",           # 1: 5-9   (5%)
-    "ほしのすな",         # 2: 10-14 (5%)
-    "ほしのかけら",       # 3: 15-19 (5%)
-    "きんのたま",         # 4: 20-24 (5%)
-    "ふしぎなアメ",       # 5: 25-29 (5%)
+    "おおきなしんじゅ",  # 0: 0-4   (5%)
+    "しんじゅ",  # 1: 5-9   (5%)
+    "ほしのすな",  # 2: 10-14 (5%)
+    "ほしのかけら",  # 3: 15-19 (5%)
+    "きんのたま",  # 4: 20-24 (5%)
+    "ふしぎなアメ",  # 5: 25-29 (5%)
 ]
 
 LUXURY_BALL = "ゴージャスボール"  # 30-99 (70%)
@@ -254,10 +255,11 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class AkihoResult:
     """1フレーム分のアキホおねだり結果"""
+
     frame: int
-    species_code: int       # 内部コード
-    species_name: str       # ポケモン名
-    item: str               # アイテム名
+    species_code: int  # 内部コード
+    species_name: str  # ポケモン名
+    item: str  # アイテム名
     rng_pokemon_consumed: int  # ポケモン決定で消費した乱数回数
 
 
@@ -313,13 +315,15 @@ def search_akiho_frames(
         else:
             item = ITEM_TABLE[value // 5]
 
-        results.append(AkihoResult(
-            frame=frame,
-            species_code=species_code,
-            species_name=species_name_map.get(species_code, "???"),
-            item=item,
-            rng_pokemon_consumed=pokemon_consumed,
-        ))
+        results.append(
+            AkihoResult(
+                frame=frame,
+                species_code=species_code,
+                species_name=species_name_map.get(species_code, "???"),
+                item=item,
+                rng_pokemon_consumed=pokemon_consumed,
+            )
+        )
 
     return results
 ```

@@ -65,6 +65,7 @@ from swbt import Button as SwbtButton
 from swbt import IMUFrame as SwbtIMUFrame
 from swbt import Stick as SwbtStick
 
+
 @dataclass
 class NyxSwbtState:
     buttons: frozenset[Button] = field(default_factory=frozenset)
@@ -78,6 +79,7 @@ class NyxSwbtState:
 
 ```python
 from swbt import InputState
+
 
 class NyxSwbtInputMapper:
     def to_input_state(self, state: NyxSwbtState) -> InputState:

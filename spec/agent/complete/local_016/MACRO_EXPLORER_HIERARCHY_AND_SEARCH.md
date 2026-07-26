@@ -217,22 +217,21 @@ class MacroSearchResult:
     matched_tags: tuple[str, ...]
 
 
-def location_for_definition(definition: MacroDefinition, roots: tuple[Path, ...]) -> MacroLocation:
-    ...
+def location_for_definition(
+    definition: MacroDefinition, roots: tuple[Path, ...]
+) -> MacroLocation: ...
 
 
 def build_explorer_tree(
     definitions: tuple[MacroDefinition, ...],
     roots: tuple[Path, ...],
-) -> tuple[MacroExplorerNode, ...]:
-    ...
+) -> tuple[MacroExplorerNode, ...]: ...
 
 
 def search_macros(
     definitions: tuple[MacroDefinition, ...],
     query: str,
-) -> tuple[MacroSearchResult, ...]:
-    ...
+) -> tuple[MacroSearchResult, ...]: ...
 ```
 
 `MacroExplorerNode.macro_id is None` は folder node を表す。leaf node は `macro_id` を持ち、children を持たない。`display_name`、tooltip 用 metadata は `MacroCatalog.get(macro_id)` から取得する。
