@@ -6,14 +6,18 @@ Project_NyX は `swbt-python` の公開 API を `swbt` root module から import
 from swbt import (
     AdapterInfo,
     AdapterDiscoveryError,
+    AdapterIdentityRecoveryRequired,
     Button,
     DiagnosticsConfig,
     GamepadStatus,
     IMUFrame,
     InputState,
+    InvalidKeyStoreError,
+    InvalidProfileError,
     JoyConL,
     JoyConR,
     ProController,
+    ProfileControllerMismatchError,
     Stick,
     SwitchGamepad,
     list_adapters,
@@ -50,7 +54,7 @@ controller 実体は次の具象 class から生成する。
 ```python
 pad: SwitchGamepad = ProController(
     adapter="usb:0",
-    key_store_path=".nyxpy/swbt/pro-controller-bond.json",
+    profile_path=".nyxpy/swbt/pro-controller-profile.json",
     report_period_us=8000,
     diagnostics=None,
 )
@@ -60,8 +64,20 @@ pad: SwitchGamepad = ProController(
 
 `SwbtControllerSession` は `open()` と `close(neutral=True)` の scope を所有する。`open()` は transport と report loop の準備であり、pairing や reconnect を開始しない。
 
+新規 profile は constructor ではなく `create_profile()` で作成する。
+
 ```python
-pad = ProController(adapter="usb:0", key_store_path="switch-bond.json")
+pad = await ProController.create_profile(
+    adapter="usb:0",
+    profile_path="switch-profile.json",
+    local_address=None,
+    pair_timeout=30.0,
+    report_period_us=8000,
+)
+```
+
+```python
+pad = ProController(adapter="usb:0", profile_path="switch-profile.json")
 await pad.open()
 try:
     await pad.reconnect(timeout=30.0)
@@ -76,12 +92,13 @@ Project_NyX は connection operation を明示的に分ける。
 
 | operation | swbt API | 用途 |
 |---|---|---|
-| pair | `pair(timeout=...)` | 初回 pairing。key store に保存する |
+| profile作成と初回pair | `create_profile(..., pair_timeout=...)` | schema v2 profile を新規作成し、接続済み controller を返す |
+| pair再試行 | `pair(timeout=...)` | 作成済み profile から pairing を再試行する |
 | reconnect | `reconnect(timeout=...)` | 保存済み pairing key に基づく再接続 |
 | connect | `connect(timeout=..., allow_pairing=False)` | 原則使わない。pairing の暗黙実行を避ける |
 | connect result | `try_connect(timeout=..., allow_pairing=False)` | 原則使わない |
 
-macro 実行時は reconnect のみを行う。key store がないからといって暗黙に pairing しない。
+macro 実行時は reconnect のみを行う。pairing profile がないからといって暗黙に pairing しない。
 
 現行の Project_NyX 実装は `pair()` と `reconnect()` を使い、接続結果を返す別 API には依存しない。失敗理由は swbt 例外を NyX の framework error に変換して扱う。
 
@@ -129,7 +146,12 @@ swbt 例外は Project_NyX の framework error へ変換し、macro / GUI へ `S
 | `TransportOpenError` | `ConfigurationError(code="NYX_SWBT_TRANSPORT_OPEN_FAILED")` |
 | `ConnectionTimeoutError` | `ConfigurationError(code="NYX_SWBT_CONNECTION_TIMED_OUT")` |
 | `ConnectionFailedError` | `ConfigurationError(code="NYX_SWBT_CONNECTION_FAILED")` |
-| `InvalidKeyStoreError` | `ConfigurationError(code="NYX_SWBT_KEY_STORE_INVALID")` |
+| `FileNotFoundError` | `ConfigurationError(code="NYX_SWBT_PROFILE_NOT_FOUND")` |
+| `FileExistsError` | `ConfigurationError(code="NYX_SWBT_PROFILE_ALREADY_EXISTS")` |
+| `InvalidProfileError` | `ConfigurationError(code="NYX_SWBT_PROFILE_INVALID")` |
+| `ProfileControllerMismatchError` | `ConfigurationError(code="NYX_SWBT_PROFILE_CONTROLLER_MISMATCH")` |
+| `InvalidKeyStoreError` | `ConfigurationError(code="NYX_SWBT_PROFILE_KEY_DATA_INVALID")` |
+| `AdapterIdentityRecoveryRequired` | `ConfigurationError(code="NYX_SWBT_ADAPTER_IDENTITY_RECOVERY_REQUIRED")` |
 | `UnsupportedInputError` | `DeviceError(code="NYX_SWBT_INPUT_UNSUPPORTED")` |
 | `InvalidInputError` | `DeviceError(code="NYX_SWBT_INPUT_INVALID")` |
 | `ClosedError` | `DeviceError(code="NYX_SWBT_NOT_CONNECTED")` |

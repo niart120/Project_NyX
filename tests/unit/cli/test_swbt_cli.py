@@ -98,7 +98,7 @@ def test_swbt_pair_cli_calls_factory_pair(tmp_path: Path) -> None:
             "swbt_command": "pair",
             "adapter": "usb:0",
             "controller_type": "pro-controller",
-            "key_store": tmp_path / "bond.json",
+            "profile": tmp_path / "profile.json",
             "timeout": 5.0,
         },
     )()
@@ -115,7 +115,7 @@ def test_swbt_pair_cli_calls_factory_pair(tmp_path: Path) -> None:
     assert factory.closed is True
     assert factory.calls[0][0] == "pair"
     assert factory.calls[0][1].adapter == "usb:0"
-    assert factory.calls[0][1].key_store_path == tmp_path / "bond.json"
+    assert factory.calls[0][1].profile_path == tmp_path / "profile.json"
     assert factory.calls[0][2] == 5.0
     assert stdout.getvalue().strip() == "swbt pair completed."
 
@@ -130,7 +130,7 @@ def test_swbt_reconnect_cli_calls_factory_reconnect(tmp_path: Path) -> None:
             "swbt_command": "reconnect",
             "adapter": "usb:0",
             "controller_type": "pro-controller",
-            "key_store": None,
+            "profile": None,
             "timeout": 6.0,
         },
     )()
@@ -160,7 +160,7 @@ def test_swbt_lifecycle_cli_canonicalizes_adapter_alias(tmp_path: Path) -> None:
             "swbt_command": "pair",
             "adapter": "hci0",
             "controller_type": "pro-controller",
-            "key_store": None,
+            "profile": None,
             "timeout": None,
         },
     )()
@@ -214,7 +214,7 @@ def test_swbt_lifecycle_cli_injects_diagnostics_and_closes_logging(
             "swbt_command": "pair",
             "adapter": "usb:0",
             "controller_type": "pro-controller",
-            "key_store": None,
+            "profile": None,
             "timeout": None,
         },
     )()
@@ -247,7 +247,7 @@ def test_swbt_lifecycle_cli_rejects_unselected_missing_and_ambiguous_adapter(
             "swbt_command": "pair",
             "adapter": None,
             "controller_type": "pro-controller",
-            "key_store": None,
+            "profile": None,
             "timeout": None,
         },
     )()
@@ -289,6 +289,19 @@ def test_swbt_disconnect_command_is_not_exposed() -> None:
         parse_arguments(["swbt", "disconnect"])
 
 
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["swbt", "pair", "--key-store", "legacy.json"],
+        ["swbt", "reconnect", "--key-store", "legacy.json"],
+        ["run", "sample_macro", "--swbt-key-store", "legacy.json"],
+    ],
+)
+def test_legacy_swbt_profile_options_are_not_accepted(arguments: list[str]) -> None:
+    with pytest.raises(SystemExit):
+        parse_arguments(arguments)
+
+
 def test_swbt_cli_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
     settings = SettingsStore(config_dir=tmp_path / ".nyxpy", strict_load=False)
     settings.set("controller.swbt.adapter", "settings-adapter")
@@ -301,7 +314,7 @@ def test_swbt_cli_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
             "swbt_command": "pair",
             "adapter": "usb:0",
             "controller_type": "pro-controller",
-            "key_store": None,
+            "profile": None,
             "timeout": 2.0,
         },
     )()
@@ -321,3 +334,45 @@ def test_swbt_cli_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
     assert factory.calls[0][1].model.settings_value == "pro-controller"
     assert settings.get("controller.swbt.adapter") == "settings-adapter"
     assert settings.get("controller.swbt.controller_type") == "joy-con-r"
+
+
+def test_swbt_cli_reports_legacy_profile_setting_migration(tmp_path: Path) -> None:
+    config_dir = tmp_path / ".nyxpy"
+    config_dir.mkdir()
+    (config_dir / "global.toml").write_text(
+        "\n".join(
+            [
+                "[controller.swbt]",
+                'key_store_path = "legacy.json"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    settings = SettingsStore(config_dir=config_dir)
+    output = io.StringIO()
+    args = type(
+        "Args",
+        (),
+        {
+            "swbt_command": "pair",
+            "adapter": "usb:0",
+            "controller_type": "pro-controller",
+            "profile": None,
+            "timeout": 2.0,
+        },
+    )()
+
+    assert (
+        cli_main(
+            args,
+            discovery_service=Discovery((adapter_view(),)),
+            controller_factory=RecordingFactory(),
+            settings_store=settings,
+            project_root=tmp_path,
+            stdout=output,
+        )
+        == 0
+    )
+
+    assert "再ペアリングしてください" in output.getvalue()

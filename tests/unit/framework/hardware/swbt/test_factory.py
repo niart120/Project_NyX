@@ -95,7 +95,7 @@ def config(adapter: str = "usb:0") -> SwbtControllerConfig:
     return SwbtControllerConfig(
         model=model,
         adapter=adapter,
-        key_store_path=Path(".nyxpy/swbt/pro-controller-bond.json"),
+        profile_path=Path(".nyxpy/swbt/pro-controller-profile.json"),
     )
 
 
@@ -229,7 +229,7 @@ def test_factory_pair_discards_cached_dummy_session() -> None:
     assert failed_real.close_calls == 1
     assert dummy.close_calls == 1
     assert dummy.pair_calls == 0
-    assert next_real.open_calls == 1
+    assert next_real.open_calls == 0
     assert next_real.pair_calls == 1
 
 
@@ -275,7 +275,7 @@ def test_factory_discards_failed_pair_session() -> None:
     with pytest.raises(ConfigurationError):
         factory.pair(cfg, timeout_sec=1.0)
 
-    assert session.open_calls == 1
+    assert session.open_calls == 0
     assert session.pair_calls == 1
     assert session.close_calls == 1
     assert factory.status(cfg) is None
@@ -288,7 +288,7 @@ def test_factory_pair_reconnect_disconnect_and_status_are_explicit_operations() 
 
     factory.pair(cfg, timeout_sec=2.0)
     factory.reconnect(cfg, timeout_sec=3.0)
-    assert factory.status(cfg) == {"open_calls": 2}
+    assert factory.status(cfg) == {"open_calls": 1}
 
     factory.disconnect(cfg)
     factory.disconnect(cfg)
@@ -418,7 +418,7 @@ def test_factory_releases_previous_session_when_same_adapter_key_changes() -> No
     first_config = config()
     second_config = replace(
         first_config,
-        key_store_path=Path(".nyxpy/swbt/other-pro-controller-bond.json"),
+        profile_path=Path(".nyxpy/swbt/other-pro-controller-profile.json"),
     )
 
     first_port = factory.create(config=first_config, allow_dummy=False)

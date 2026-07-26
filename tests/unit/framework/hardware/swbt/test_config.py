@@ -17,11 +17,19 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 def test_swbt_dependency_declared_as_runtime_dependency() -> None:
     data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert "swbt-python>=0.2.0,<0.3.0" in data["project"]["dependencies"]
+    assert "swbt-python==0.5.3" in data["project"]["dependencies"]
     assert "swbt" not in data["project"].get("optional-dependencies", {})
     assert any(
         marker.startswith("swbt:") for marker in data["tool"]["pytest"]["ini_options"]["markers"]
     )
+
+
+def test_swbt_lock_resolves_expected_swbt_and_bumble_versions() -> None:
+    data = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
+    locked_versions = {package["name"]: package["version"] for package in data["package"]}
+
+    assert locked_versions["swbt-python"] == "0.5.3"
+    assert locked_versions["bumble"] == "0.0.233"
 
 
 def test_supported_controller_models_returns_three_models_without_swbt_runtime_import(
@@ -46,20 +54,20 @@ def test_parse_controller_type_rejects_unknown_value() -> None:
     assert exc_info.value.code == "NYX_SWBT_CONTROLLER_TYPE_UNSUPPORTED"
 
 
-def test_swbt_config_resolves_default_key_store_per_controller_type() -> None:
+def test_swbt_config_resolves_default_profile_per_controller_type() -> None:
     base_dir = Path(".nyxpy") / "swbt"
 
     assert (
-        resolve_controller_model("pro-controller").default_key_store_path(base_dir)
-        == base_dir / "pro-controller-bond.json"
+        resolve_controller_model("pro-controller").default_profile_path(base_dir)
+        == base_dir / "pro-controller-profile.json"
     )
     assert (
-        resolve_controller_model("joy-con-l").default_key_store_path(base_dir)
-        == base_dir / "joy-con-l-bond.json"
+        resolve_controller_model("joy-con-l").default_profile_path(base_dir)
+        == base_dir / "joy-con-l-profile.json"
     )
     assert (
-        resolve_controller_model("joy-con-r").default_key_store_path(base_dir)
-        == base_dir / "joy-con-r-bond.json"
+        resolve_controller_model("joy-con-r").default_profile_path(base_dir)
+        == base_dir / "joy-con-r-profile.json"
     )
 
 

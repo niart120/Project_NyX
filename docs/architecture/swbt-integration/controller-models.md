@@ -6,11 +6,11 @@ controller type は単なる文字列ではなく、domain object として扱�
 
 ## 永続化値
 
-| 値 | 表示名 | 既定 key store |
+| 値 | 表示名 | 既定 pairing profile |
 |---|---|---|
-| `pro-controller` | Pro Controller | `pro-controller-bond.json` |
-| `joy-con-l` | Joy-Con L | `joy-con-l-bond.json` |
-| `joy-con-r` | Joy-Con R | `joy-con-r-bond.json` |
+| `pro-controller` | Pro Controller | `pro-controller-profile.json` |
+| `joy-con-l` | Joy-Con L | `joy-con-l-profile.json` |
+| `joy-con-r` | Joy-Con R | `joy-con-r-profile.json` |
 
 TOML 例:
 
@@ -53,15 +53,15 @@ class SwbtInputCapabilities:
 class SwbtControllerModel:
     controller_type: SwbtControllerType
     display_name: str
-    default_key_store_name: str
+    default_profile_name: str
     capabilities: SwbtInputCapabilities
 
     @property
     def settings_value(self) -> str:
         return self.controller_type.value
 
-    def default_key_store_path(self, base_dir: Path = Path(".nyxpy/swbt")) -> Path:
-        return base_dir / self.default_key_store_name
+    def default_profile_path(self, base_dir: Path = Path(".nyxpy/swbt")) -> Path:
+        return base_dir / self.default_profile_name
 ```
 
 `SwbtControllerModel` は Project_NyX 側の controller 定義である。swbt の `ProController`、`JoyConL`、`JoyConR` などの runtime class は保持しない。session 作成時に `controller_type` から swbt controller class を解決する。
@@ -108,7 +108,7 @@ GUI choices と CLI choices は `supported_controller_models()` から作る。
 class SwbtControllerConfig:
     model: SwbtControllerModel
     adapter: str | None = None
-    key_store_path: Path | None = None
+    profile_path: Path
     connect_timeout_sec: float = 30.0
     report_period_us: int | None = 8000
 ```
@@ -117,7 +117,7 @@ class SwbtControllerConfig:
 
 `adapter` は settings 上では空を許容する。pair / reconnect / run の直前に空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` にする。
 
-`key_store_path` が `None` の場合は、`model.default_key_store_path()` で `.nyxpy/swbt/<controller>-bond.json` を補う。
+`profile_path` が `None` の場合は、`model.default_profile_path()` で `.nyxpy/swbt/<controller>-profile.json` を補う。
 
 ## capability validation
 

@@ -75,6 +75,49 @@ def test_settings_store_get_set_supports_dotted_keys(tmp_path) -> None:
     assert store.get("controller.serial.baudrate") == 115200
 
 
+def test_settings_store_migrates_legacy_swbt_key_without_touching_old_file(tmp_path) -> None:
+    legacy_profile = tmp_path / "legacy-key-store.json"
+    legacy_profile.write_text('{"legacy": true}', encoding="utf-8")
+    config_path = tmp_path / "global.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[controller.swbt]",
+                'controller_type = "joy-con-l"',
+                f'key_store_path = "{legacy_profile.as_posix()}"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    store = SettingsStore(config_dir=tmp_path)
+
+    assert store.get("controller.swbt.profile_path") == (".nyxpy/swbt/joy-con-l-profile.json")
+    assert "key_store_path" not in store.data["controller"]["swbt"]
+    assert legacy_profile.read_text(encoding="utf-8") == '{"legacy": true}'
+    assert "key_store_path" not in config_path.read_text(encoding="utf-8")
+    assert store.migration_notices
+
+
+def test_settings_store_keeps_explicit_profile_when_removing_legacy_key(tmp_path) -> None:
+    (tmp_path / "global.toml").write_text(
+        "\n".join(
+            [
+                "[controller.swbt]",
+                'key_store_path = "legacy.json"',
+                'profile_path = "current-profile.json"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    store = SettingsStore(config_dir=tmp_path)
+
+    assert store.get("controller.swbt.profile_path") == "current-profile.json"
+
+
 def test_settings_store_rejects_invalid_schema_type(tmp_path) -> None:
     (tmp_path / "global.toml").write_text(
         '[controller.serial]\nbaudrate = "fast"\n',

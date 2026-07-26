@@ -2,7 +2,7 @@
 
 この文書群は、Project_NyX から `swbt-python` を controller backend として利用するための設計方針を定義する。
 
-`swbt-python` は NX 互換の仮想 Bluetooth HID controller を Python から扱うための library である。Project_NyX では、Bluetooth adapter の列挙、pairing、保存済み pairing key に基づく reconnect、入力 report の送信を controller backend の実装として扱う。マクロ作者から見える通常 API は `Command`、GUI の仮想コントローラーから見える境界は既存の `ControllerOutputPort` に止める。
+`swbt-python` 0.5.3 は NX 互換の仮想 Bluetooth HID controller を Python から扱うための library である。Project_NyX では、Bluetooth adapter の列挙、schema v2 pairing profile の作成、保存済み profile に基づく reconnect、入力 report の送信を controller backend の実装として扱う。マクロ作者から見える通常 API は `Command`、GUI の仮想コントローラーから見える境界は既存の `ControllerOutputPort` に止める。
 
 ## 最小構成
 
@@ -13,7 +13,7 @@ backend = "swbt"
 [controller.swbt]
 controller_type = "pro-controller"
 adapter = "usb:0"
-key_store_path = ".nyxpy/swbt/pro-controller-bond.json"
+profile_path = ".nyxpy/swbt/pro-controller-profile.json"
 connect_timeout_sec = 30.0
 report_period_us = 8000
 ```
@@ -22,7 +22,7 @@ report_period_us = 8000
 
 `swbt-python` は通常依存である。利用者に swbt 用の extra 指定や追加同期手順を求めない。
 
-`adapter` が空文字または未指定のまま接続操作を行った場合は、候補が 1 件でも自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。`key_store_path` が未指定なら `.nyxpy/swbt/<controller>-bond.json` を使う。
+`adapter` が空文字または未指定のまま接続操作を行った場合は、候補が 1 件でも自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。`profile_path` が未指定なら `.nyxpy/swbt/<controller>-profile.json` を使う。
 
 ## 入力反映の基本方針
 
@@ -71,8 +71,8 @@ GUI の swbt 設定画面に置く機能は、実機運用に必要なものに�
 |---|---|
 | デバイス一覧取得 / 更新 | `list_adapters()` で利用可能な dedicated USB Bluetooth adapter 候補を表示する |
 | コントローラー種別指定 | Pro Controller / Joy-Con L / Joy-Con R を選ぶ |
-| ペアリング | 選択した adapter、controller type、key store path で pairing する |
-| pairing key に基づく reconnect | 保存済み key store を使って reconnect する |
+| ペアリング | 選択した adapter、controller type、pairing profile path で pairing する |
+| pairing key に基づく reconnect | 保存済み pairing profile を使って reconnect する |
 | 仮想コントローラー manual input | 既存 `VirtualControllerModel` から `ControllerOutputPort` へ button / D-pad / stick を送る |
 
 GUI と CLI の間で値を受け渡すための clipboard 機能、CLI command 生成、CLI 実行履歴との連携、diagnostics folder を開く導線、controller color editor は持たせない。
@@ -101,7 +101,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 | controller type | `SwbtControllerType` / `SwbtControllerModel` で扱い、文字列は設定境界で解決する |
 | adapter refresh | Python API の `list_adapters()` を直接呼ぶ |
 | pairing | 明示操作として扱い、通常の macro run では勝手に pairing しない |
-| reconnect | key store に保存済み pairing 情報があることを前提にする |
+| reconnect | pairing profile に保存済み pairing 情報があることを前提にする |
 | disconnect | factory lifetime を維持する GUI から cached session を明示的に閉じる。fresh factory を作る CLI command は提供しない |
 | input | NyX state から `InputState` を構成し、`apply(state)` を使う |
 | manual input | 既存 `VirtualControllerModel` と `ControllerOutputPort` 経路を使う |
@@ -134,7 +134,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 - swbt backend の controller 出力
 - dedicated USB Bluetooth adapter の列挙
 - Pro Controller / Joy-Con L / Joy-Con R の選択
-- pairing と key store への保存
+- pairing と pairing profile への保存
 - 保存済み pairing key に基づく reconnect
 - GUI が管理する cached session の disconnect
 - `ControllerOutputPort` からの button / D-pad / stick / IMU 入力

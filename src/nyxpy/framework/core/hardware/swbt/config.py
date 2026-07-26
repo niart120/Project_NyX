@@ -32,7 +32,7 @@ class SwbtControllerModel:
 
     controller_type: SwbtControllerType
     display_name: str
-    default_key_store_name: str
+    default_profile_name: str
     capabilities: SwbtInputCapabilities
 
     @property
@@ -40,9 +40,9 @@ class SwbtControllerModel:
         """Settings / CLI に保存する文字列表現。"""
         return self.controller_type.value
 
-    def default_key_store_path(self, base_dir: Path = Path(".nyxpy/swbt")) -> Path:
-        """Controller type ごとの既定 pairing key path を返す。"""
-        return base_dir / self.default_key_store_name
+    def default_profile_path(self, base_dir: Path = Path(".nyxpy/swbt")) -> Path:
+        """Controller type ごとの既定 pairing profile path を返す。"""
+        return base_dir / self.default_profile_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class SwbtControllerConfig:
 
     model: SwbtControllerModel
     adapter: str | None
-    key_store_path: Path
+    profile_path: Path
     connect_timeout_sec: float = 30.0
     report_period_us: int | None = 8000
 
@@ -84,7 +84,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
     SwbtControllerType.PRO_CONTROLLER: SwbtControllerModel(
         controller_type=SwbtControllerType.PRO_CONTROLLER,
         display_name="Pro Controller",
-        default_key_store_name="pro-controller-bond.json",
+        default_profile_name="pro-controller-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_PRO_BUTTONS,
             left_stick=True,
@@ -95,7 +95,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
     SwbtControllerType.JOY_CON_L: SwbtControllerModel(
         controller_type=SwbtControllerType.JOY_CON_L,
         display_name="Joy-Con L",
-        default_key_store_name="joy-con-l-bond.json",
+        default_profile_name="joy-con-l-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_L_BUTTONS,
             left_stick=True,
@@ -106,7 +106,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
     SwbtControllerType.JOY_CON_R: SwbtControllerModel(
         controller_type=SwbtControllerType.JOY_CON_R,
         display_name="Joy-Con R",
-        default_key_store_name="joy-con-r-bond.json",
+        default_profile_name="joy-con-r-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_R_BUTTONS,
             left_stick=False,

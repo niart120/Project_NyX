@@ -27,6 +27,27 @@ def swbt_connect_cancel_code(error: BaseException) -> str | None:
     return None
 
 
+def swbt_user_error_message(error: BaseException) -> str:
+    """利用者が原因を特定できる swbt error code と本文を返す。"""
+    coded_error = _first_swbt_coded_error(error)
+    if coded_error is None:
+        return str(error)
+    code, cause = coded_error
+    return f"{code}: {cause}"
+
+
+def _first_swbt_coded_error(error: BaseException) -> tuple[str, BaseException] | None:
+    code = getattr(error, "code", None)
+    if isinstance(code, str) and code.startswith("NYX_SWBT_"):
+        return code, error
+    if isinstance(error, BaseExceptionGroup):
+        for nested in error.exceptions:
+            coded_error = _first_swbt_coded_error(nested)
+            if coded_error is not None:
+                return coded_error
+    return None
+
+
 def is_swbt_pair_cancelled(error: BaseException) -> bool:
     """Pair cancellation の後方互換 helper。"""
     return getattr(error, "code", None) == "NYX_SWBT_PAIR_CANCELLED" or (
@@ -127,6 +148,49 @@ def swbt_input_invalid(message: str, *, component: str = "NyxSwbtInputMapper") -
 def map_swbt_exception(exc: BaseException, *, component: str) -> ConfigurationError | DeviceError:
     """swbt-python の公開例外を framework error に変換する。"""
     name = type(exc).__name__
+    if isinstance(exc, FileNotFoundError):
+        return ConfigurationError(
+            "swbt pairing profile was not found; run Pair to create it",
+            code="NYX_SWBT_PROFILE_NOT_FOUND",
+            component=component,
+            cause=exc,
+        )
+    if isinstance(exc, FileExistsError):
+        return ConfigurationError(
+            "swbt pairing profile already exists",
+            code="NYX_SWBT_PROFILE_ALREADY_EXISTS",
+            component=component,
+            cause=exc,
+        )
+    if name == "ProfileControllerMismatchError":
+        return ConfigurationError(
+            "swbt pairing profile belongs to a different controller type",
+            code="NYX_SWBT_PROFILE_CONTROLLER_MISMATCH",
+            component=component,
+            details={
+                "expected_controller_kind": str(getattr(exc, "expected_controller_kind", "")),
+                "actual_controller_kind": str(getattr(exc, "actual_controller_kind", "")),
+            },
+            cause=exc,
+        )
+    if name == "InvalidProfileError":
+        return ConfigurationError(
+            "swbt pairing profile is invalid or uses an unsupported schema",
+            code="NYX_SWBT_PROFILE_INVALID",
+            component=component,
+            cause=exc,
+        )
+    if name == "AdapterIdentityRecoveryRequired":
+        return ConfigurationError(
+            "swbt adapter identity recovery is required; unplug and reconnect the USB Bluetooth dongle before retrying",
+            code="NYX_SWBT_ADAPTER_IDENTITY_RECOVERY_REQUIRED",
+            component=component,
+            details={
+                "target_address": str(getattr(exc, "target_address", "")),
+                "stage": str(getattr(exc, "stage", "")),
+            },
+            cause=exc,
+        )
     if name == "TransportOpenError":
         return ConfigurationError(
             "swbt transport open failed",
@@ -150,8 +214,8 @@ def map_swbt_exception(exc: BaseException, *, component: str) -> ConfigurationEr
         )
     if name == "InvalidKeyStoreError":
         return ConfigurationError(
-            "swbt key store is invalid",
-            code="NYX_SWBT_KEY_STORE_INVALID",
+            "swbt pairing profile contains invalid key data",
+            code="NYX_SWBT_PROFILE_KEY_DATA_INVALID",
             component=component,
             cause=exc,
         )

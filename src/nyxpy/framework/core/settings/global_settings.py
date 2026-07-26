@@ -1,6 +1,6 @@
 """NyX workspace の global settings store。"""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -102,8 +102,8 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             (str, type(None)),
             None,
         ),
-        "controller.swbt.key_store_path": SettingField(
-            "controller.swbt.key_store_path",
+        "controller.swbt.profile_path": SettingField(
+            "controller.swbt.profile_path",
             (str, type(None)),
             None,
         ),
@@ -171,6 +171,7 @@ class SettingsStore:
         self.strict_load = strict_load
         self._lock = RLock()
         self.data: dict[str, SettingValue] = {}
+        self.migration_notices: tuple[str, ...] = ()
         self.load()
 
     def load(self) -> None:
@@ -178,9 +179,18 @@ class SettingsStore:
             try:
                 if self.config_path.exists():
                     loaded = tomlkit.loads(self.config_path.read_text(encoding="utf-8"))
+                    migrated = _migrate_swbt_profile_settings(loaded)
                     self.data = self.schema.validate(loaded)
+                    if migrated:
+                        self.migration_notices = (
+                            "旧 swbt キーストア設定を削除しました。新しいペアリングプロファイルで再ペアリングしてください。",
+                        )
+                        self.save()
+                    else:
+                        self.migration_notices = ()
                 else:
                     self.data = self.schema.defaults()
+                    self.migration_notices = ()
                     self.save()
             except TOMLKitError as exc:
                 if self.strict_load:
@@ -195,10 +205,12 @@ class SettingsStore:
                         cause=exc,
                     ) from exc
                 self.data = self.schema.defaults()
+                self.migration_notices = ()
             except ConfigurationError:
                 if self.strict_load:
                     raise
                 self.data = self.schema.defaults()
+                self.migration_notices = ()
 
     def save(self) -> None:
         with self._lock:
@@ -239,3 +251,25 @@ def _drop_none(value: Any) -> Any:
     if isinstance(value, list):
         return [_drop_none(item) for item in value]
     return value
+
+
+def _migrate_swbt_profile_settings(data: MutableMapping[str, Any]) -> bool:
+    """旧 key_store_path を除去し、新しい既定 profile path を設定する。"""
+    controller = data.get("controller")
+    if not isinstance(controller, MutableMapping):
+        return False
+    swbt = controller.get("swbt")
+    if not isinstance(swbt, MutableMapping) or "key_store_path" not in swbt:
+        return False
+
+    swbt.pop("key_store_path")
+    if swbt.get("profile_path") in (None, ""):
+        controller_type = str(swbt.get("controller_type", "pro-controller"))
+        profile_names = {
+            "pro-controller": "pro-controller-profile.json",
+            "joy-con-l": "joy-con-l-profile.json",
+            "joy-con-r": "joy-con-r-profile.json",
+        }
+        profile_name = profile_names.get(controller_type, "pro-controller-profile.json")
+        swbt["profile_path"] = f".nyxpy/swbt/{profile_name}"
+    return True

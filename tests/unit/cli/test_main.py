@@ -259,7 +259,7 @@ def make_args():
     args.baud = None
     args.swbt_adapter = None
     args.swbt_controller_type = None
-    args.swbt_key_store = None
+    args.swbt_profile = None
     args.swbt_timeout = None
     args.macro_name = "Sample"
     args.silence = False
@@ -319,6 +319,47 @@ def test_cli_main_success(monkeypatch, tmp_path):
         exec_args={},
         logger=mock_logging.logger,
     )
+
+
+def test_cli_main_logs_legacy_swbt_profile_migration(monkeypatch, tmp_path):
+    args = make_args()
+    paths = patch_cli_workspace(monkeypatch, tmp_path)
+    paths.config_dir.mkdir()
+    (paths.config_dir / "global.toml").write_text(
+        "\n".join(
+            [
+                "[controller.swbt]",
+                'key_store_path = "legacy.json"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    mock_logging = MockLoggingComponents()
+
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.configure_logging",
+        MagicMock(return_value=mock_logging),
+    )
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.create_runtime_builder",
+        MagicMock(return_value=MagicMock()),
+    )
+    monkeypatch.setattr("nyxpy.cli.run_cli.parse_define_args", lambda args: {})
+    monkeypatch.setattr(
+        "nyxpy.cli.run_cli.execute_macro",
+        MagicMock(return_value=result(RunStatus.SUCCESS)),
+    )
+
+    assert cli_main(args) == 0
+    assert (
+        "user",
+        "WARNING",
+        "旧 swbt キーストア設定を削除しました。"
+        "新しいペアリングプロファイルで再ペアリングしてください。",
+        "CLI",
+        "configuration.migrated",
+    ) in mock_logging.logger.logs
 
 
 def test_cli_main_uses_3ds_default_baudrate(monkeypatch, tmp_path):

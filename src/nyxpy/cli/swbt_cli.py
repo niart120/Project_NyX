@@ -73,6 +73,7 @@ def cli_main(
                 args,
                 settings_store=settings_store,
                 project_root=project_root,
+                output=output,
             )
             config = canonicalize_swbt_adapter(
                 config,
@@ -128,10 +129,10 @@ def _add_lifecycle_options(parser: argparse.ArgumentParser) -> None:
         help="swbt controller type override",
     )
     parser.add_argument(
-        "--key-store",
+        "--profile",
         type=Path,
         default=None,
-        help="swbt pairing key store path override",
+        help="swbt pairing profile path override",
     )
     parser.add_argument(
         "--timeout",
@@ -146,6 +147,7 @@ def _controller_config_from_args(
     *,
     settings_store: SettingsStore | None,
     project_root: Path | None,
+    output: TextIO,
 ) -> SwbtControllerConfig:
     resolved_root = resolve_project_root(
         explicit_root=project_root,
@@ -153,13 +155,15 @@ def _controller_config_from_args(
     )
     paths = ensure_workspace(resolved_root)
     settings = settings_store or SettingsStore(config_dir=paths.config_dir, strict_load=False)
+    for notice in settings.migration_notices:
+        print(f"WARNING: {notice}", file=output)
     config = controller_config_from_overrides(
         settings.snapshot(),
         workspace_root=paths.project_root,
         backend="swbt",
         swbt_adapter=getattr(args, "adapter", None),
         swbt_controller_type=getattr(args, "controller_type", None),
-        swbt_key_store_path=getattr(args, "key_store", None),
+        swbt_profile_path=getattr(args, "profile", None),
         swbt_connect_timeout_sec=getattr(args, "timeout", None),
     )
     if not isinstance(config, SwbtControllerConfig):

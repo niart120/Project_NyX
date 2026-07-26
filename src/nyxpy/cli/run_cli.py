@@ -293,6 +293,13 @@ def cli_main(
         logger = logging.logger
 
         settings = SettingsStore(config_dir=paths.config_dir, strict_load=False)
+        for notice in settings.migration_notices:
+            logger.user(
+                "WARNING",
+                notice,
+                component="CLI",
+                event="configuration.migrated",
+            )
         controller_config = _controller_config_from_args(
             args,
             settings_snapshot=settings.snapshot(),
@@ -405,10 +412,10 @@ def add_run_arguments(parser: argparse.ArgumentParser) -> None:
         help="swbt controller type override",
     )
     parser.add_argument(
-        "--swbt-key-store",
+        "--swbt-profile",
         type=pathlib.Path,
         default=None,
-        help="swbt pairing key store path override",
+        help="swbt pairing profile path override",
     )
     parser.add_argument(
         "--swbt-timeout",
@@ -441,7 +448,7 @@ def _controller_config_from_args(
         serial_baudrate=getattr(args, "baud", None),
         swbt_adapter=getattr(args, "swbt_adapter", None),
         swbt_controller_type=getattr(args, "swbt_controller_type", None),
-        swbt_key_store_path=getattr(args, "swbt_key_store", None),
+        swbt_profile_path=getattr(args, "swbt_profile", None),
         swbt_connect_timeout_sec=getattr(args, "swbt_timeout", None),
     )
     if isinstance(config, SerialControllerConfig):

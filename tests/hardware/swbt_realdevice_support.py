@@ -17,7 +17,7 @@ from typing import TextIO
 class SwbtRealDeviceOptions:
     adapter: str
     controller_type: str
-    key_store_path: Path
+    profile_path: Path
     evidence_dir: Path
     timeout_sec: float = 30.0
     operator_confirmation: bool = False
@@ -58,10 +58,10 @@ def load_swbt_realdevice_options(
         )
 
     controller_type = values.get("NYX_SWBT_CONTROLLER_TYPE", "pro-controller").strip()
-    key_store_path = Path(
+    profile_path = Path(
         values.get(
-            "NYX_SWBT_KEY_STORE",
-            f".nyxpy/swbt/{controller_type}-test-bond.json",
+            "NYX_SWBT_PROFILE",
+            f".nyxpy/swbt/{controller_type}-test-profile.json",
         )
     )
     timestamp = (now or datetime.now()).strftime("%Y%m%dT%H%M%S")
@@ -77,7 +77,7 @@ def load_swbt_realdevice_options(
     return SwbtRealDeviceOptions(
         adapter=adapter,
         controller_type=controller_type,
-        key_store_path=key_store_path,
+        profile_path=profile_path,
         evidence_dir=evidence_dir,
         timeout_sec=timeout_sec,
         operator_confirmation=values.get("NYX_SWBT_OPERATOR_CONFIRMATION") == "1",
@@ -163,7 +163,7 @@ class SwbtEvidenceWriter:
             "swbt_python_version": swbt_version,
             "controller_type": options.controller_type,
             "adapter": options.adapter,
-            "key_store_path": _display_path(options.key_store_path),
+            "profile_path": _display_path(options.profile_path),
             "timeout_sec": options.timeout_sec,
             "short_press_ms": list(options.short_press_ms),
             "operator_confirmation": options.operator_confirmation,
@@ -205,7 +205,7 @@ class SwbtEvidenceWriter:
             "",
             f"- controller_type: `{options.controller_type}`",
             f"- adapter: `{options.adapter}`",
-            f"- key_store_path: `{_display_path(options.key_store_path)}`",
+            f"- profile_path: `{_display_path(options.profile_path)}`",
             f"- trace: `{self.trace_path.name}`",
             f"- operator_confirmation: `{self.operator_confirmation_path.name}`",
             "",

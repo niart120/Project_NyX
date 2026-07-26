@@ -39,7 +39,7 @@ def test_swbt_runtime_runs_press_and_imu_with_dummy_session(
     config = SwbtControllerConfig(
         model=resolve_controller_model("pro-controller"),
         adapter="dummy-adapter",
-        key_store_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-bond.json",
+        profile_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-profile.json",
     )
     builder = create_device_runtime_builder(
         project_root=tmp_path,

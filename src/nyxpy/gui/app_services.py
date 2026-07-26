@@ -111,7 +111,7 @@ CONTROLLER_SETTING_KEYS = frozenset(
         "controller.serial.protocol",
         "controller.swbt.adapter",
         "controller.swbt.controller_type",
-        "controller.swbt.key_store_path",
+        "controller.swbt.profile_path",
         "controller.swbt.connect_timeout_sec",
         "controller.swbt.report_period_us",
     }
@@ -150,6 +150,13 @@ class GuiAppServices:
             run_retention_days=int(self.global_settings.get("logging.run_retention_days", 30)),
         )
         self.logger = self.logging.logger
+        for notice in self.global_settings.migration_notices:
+            self.logger.user(
+                "WARNING",
+                notice,
+                component="GuiAppServices",
+                event="configuration.migrated",
+            )
         self.device_discovery = DeviceDiscoveryService(logger=self.logger)
         self.swbt_adapter_discovery = SwbtAdapterDiscoveryService()
         self.swbt_controller_factory = SwbtControllerOutputPortFactory(

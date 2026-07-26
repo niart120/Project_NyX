@@ -12,7 +12,7 @@ def test_swbt_docs_examples_match_cli_parser() -> None:
         ("nyxpy swbt adapters", ["swbt", "adapters"]),
         ("nyxpy swbt adapters --json", ["swbt", "adapters", "--json"]),
         (
-            "nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json",
+            "nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json",
             [
                 "swbt",
                 "pair",
@@ -20,12 +20,12 @@ def test_swbt_docs_examples_match_cli_parser() -> None:
                 "usb:0",
                 "--controller-type",
                 "pro-controller",
-                "--key-store",
-                ".nyxpy/swbt/pro-controller-bond.json",
+                "--profile",
+                ".nyxpy/swbt/pro-controller-profile.json",
             ],
         ),
         (
-            "nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json",
+            "nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json",
             [
                 "swbt",
                 "reconnect",
@@ -33,12 +33,12 @@ def test_swbt_docs_examples_match_cli_parser() -> None:
                 "usb:0",
                 "--controller-type",
                 "pro-controller",
-                "--key-store",
-                ".nyxpy/swbt/pro-controller-bond.json",
+                "--profile",
+                ".nyxpy/swbt/pro-controller-profile.json",
             ],
         ),
         (
-            'nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-key-store .nyxpy/swbt/pro-controller-bond.json --capture "Capture Device"',
+            'nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-profile .nyxpy/swbt/pro-controller-profile.json --capture "Capture Device"',
             [
                 "run",
                 "sample_macro",
@@ -48,8 +48,8 @@ def test_swbt_docs_examples_match_cli_parser() -> None:
                 "usb:0",
                 "--swbt-controller-type",
                 "pro-controller",
-                "--swbt-key-store",
-                ".nyxpy/swbt/pro-controller-bond.json",
+                "--swbt-profile",
+                ".nyxpy/swbt/pro-controller-profile.json",
                 "--capture",
                 "Capture Device",
             ],

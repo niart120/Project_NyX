@@ -46,7 +46,7 @@ class SerialControllerConfig:
 class SwbtControllerConfig:
     model: SwbtControllerModel
     adapter: str | None = None
-    key_store_path: Path | None = None
+    profile_path: Path | None = None
     connect_timeout_sec: float = 30.0
     report_period_us: int | None = 8000
 
@@ -56,7 +56,7 @@ ControllerConfig = SerialControllerConfig | SwbtControllerConfig
 
 `SwbtControllerConfig` は `controller_type` 文字列を持たない。設定正規化の時点で `SwbtControllerModel` へ解決する。
 
-`key_store_path` が `None` の場合は、session 作成前に `.nyxpy/swbt/<controller>-bond.json` へ補完する。相対 path は現在の shell directory ではなく workspace root を基準に解決する。`adapter` が `None` または空文字の場合、接続操作は `NYX_SWBT_ADAPTER_NOT_SELECTED` で失敗させる。
+`profile_path` が `None` の場合は、session 作成前に `.nyxpy/swbt/<controller>-profile.json` へ補完する。相対 path は現在の shell directory ではなく workspace root を基準に解決する。`adapter` が `None` または空文字の場合、接続操作は `NYX_SWBT_ADAPTER_NOT_SELECTED` で失敗させる。
 
 `operation_timeout_sec` は settings / config に出さず、session / factory の内部既定値として扱う。diagnostics は config path ではなく writer を session へ渡す。
 
@@ -80,6 +80,7 @@ def make_controller_port_factory(
 ) -> PortFactory[ControllerOutputPort]:
     match config:
         case SerialControllerConfig():
+
             def create_serial(request: RuntimeBuildRequest, _definition) -> ControllerOutputPort:
                 return serial_factory.create(
                     name=config.device,
@@ -87,15 +88,18 @@ def make_controller_port_factory(
                     allow_dummy=allow_dummy(request),
                     timeout_sec=detection_timeout_sec,
                 )
+
             return create_serial
 
         case SwbtControllerConfig():
+
             def create_swbt(request: RuntimeBuildRequest, _definition) -> ControllerOutputPort:
                 return swbt_factory.create(
                     config=config,
                     allow_dummy=allow_dummy(request),
                     timeout_sec=config.connect_timeout_sec,
                 )
+
             return create_swbt
 ```
 
@@ -123,7 +127,7 @@ VirtualControllerModel
 
 ## SwbtControllerOutputPortFactory
 
-swbt factory は session と active port を cache する。同じ adapter / controller model / key store / report period の transport resource は `SwbtControllerSession` に集約する。同一物理 adapter は controller model や key store が違っても同時に開かず、有効な `SwbtControllerOutputPort` を 1 つだけにする。
+swbt factory は session と active port を cache する。同じ adapter / controller model / pairing profile / report period の transport resource は `SwbtControllerSession` に集約する。同一物理 adapter は controller model や pairing profile が違っても同時に開かず、有効な `SwbtControllerOutputPort` を 1 つだけにする。
 
 ```text
 SwbtControllerOutputPortFactory
@@ -146,7 +150,7 @@ session key に含める値:
 ```text
 model.controller_type
 adapter
-key_store_path
+profile_path
 report_period_us
 ```
 
@@ -195,7 +199,7 @@ class SwbtControllerOutputPortFactory:
 
 `SwbtControllerSession.start()` は作らない。`factory.create()` が `open()` と `reconnect()` を順に呼ぶ。
 
-key store がない場合に pairing へ fallback しない。key store がない場合や不正な場合は `ConfigurationError` に変換する。
+runtime と Reconnect は pairing profile がない場合に pairing へ fallback しない。明示 Pair だけが `create_profile()` を呼ぶ。pairing profile がない場合や不正な場合は個別の `ConfigurationError` に変換する。
 
 port 作成時は `SwbtControllerOutputPort` が neutral を常に試みる。`reset_on_port_create` という設定や引数は持たない。
 

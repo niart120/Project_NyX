@@ -6,7 +6,7 @@
 
 ## 依存関係
 
-`swbt-python>=0.2.0,<0.3.0` は通常依存として追加する。`[project.optional-dependencies].swbt` は作らない。
+`swbt-python==0.5.3` は通常依存として固定する。`[project.optional-dependencies].swbt` は作らない。lockfile 上の Bumble は `0.0.233` とする。
 
 NyX はすでに serial backend のために PySerial を通常依存として持つ。swbt backend も controller backend の正式な選択肢として扱い、利用者に swbt 用の extra 指定や追加同期手順を要求しない。
 
@@ -33,7 +33,7 @@ backend = "swbt"
 [controller.swbt]
 controller_type = "pro-controller"
 adapter = "usb:0"
-key_store_path = ".nyxpy/swbt/pro-controller-bond.json"
+profile_path = ".nyxpy/swbt/pro-controller-profile.json"
 connect_timeout_sec = 30.0
 report_period_us = 8000
 ```
@@ -44,12 +44,12 @@ report_period_us = 8000
 
 `adapter` は swbt が開く USB Bluetooth adapter 名である。空文字または未指定のまま pair / reconnect / run を試みた場合は、候補数に関係なく `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。adapter 候補が 1 件だけでも自動採用しない。
 
-`key_store_path` は pairing key file である。明示されない場合は controller type ごとに `.nyxpy/swbt/<controller>-bond.json` を使う。相対 path はコマンドを実行した子 directory ではなく workspace root を基準に解決する。
+`profile_path` は swbt-python schema v2 pairing profile である。明示されない場合は controller type ごとに `.nyxpy/swbt/<controller>-profile.json` を使う。相対 path はコマンドを実行した子 directory ではなく workspace root を基準に解決する。
 
 ```text
-.nyxpy/swbt/pro-controller-bond.json
-.nyxpy/swbt/joy-con-l-bond.json
-.nyxpy/swbt/joy-con-r-bond.json
+.nyxpy/swbt/pro-controller-profile.json
+.nyxpy/swbt/joy-con-l-profile.json
+.nyxpy/swbt/joy-con-r-profile.json
 ```
 
 `connect_timeout_sec` は接続操作ごとの timeout である。`report_period_us` は swbt report loop の周期で、既定値は `8000`、値は `None` または正の整数に限る。
@@ -62,11 +62,13 @@ report_period_us = 8000
 
 ```console
 nyxpy swbt adapters [--json]
-nyxpy swbt pair [--adapter usb:0] [--controller-type pro-controller] [--key-store .nyxpy/swbt/pro-controller-bond.json]
-nyxpy swbt reconnect [--adapter usb:0] [--controller-type pro-controller] [--key-store .nyxpy/swbt/pro-controller-bond.json]
+nyxpy swbt pair [--adapter usb:0] [--controller-type pro-controller] [--profile .nyxpy/swbt/pro-controller-profile.json]
+nyxpy swbt reconnect [--adapter usb:0] [--controller-type pro-controller] [--profile .nyxpy/swbt/pro-controller-profile.json]
 ```
 
-`pair` と `reconnect` は workspace settings を読み、CLI option が指定された場合だけ上書きする。解決後に adapter が空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。指定 adapter は discovery 結果の `name` / `aliases` から代表 `name` へ正規化する。不一致と曖昧 alias はそれぞれ `NYX_SWBT_ADAPTER_NOT_FOUND` / `NYX_SWBT_ADAPTER_AMBIGUOUS` とする。候補が 1 件でも未指定値を補わない。`key_store_path` が未指定なら controller type から既定値を補う。
+`pair` と `reconnect` は workspace settings を読み、CLI option が指定された場合だけ上書きする。解決後に adapter が空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` とする。指定 adapter は discovery 結果の `name` / `aliases` から代表 `name` へ正規化する。不一致と曖昧 alias はそれぞれ `NYX_SWBT_ADAPTER_NOT_FOUND` / `NYX_SWBT_ADAPTER_AMBIGUOUS` とする。候補が 1 件でも未指定値を補わない。`profile_path` が未指定なら controller type から既定値を補う。
+
+旧設定を読み込んだ場合は旧 path を新 profile の path として流用せず、controller type ごとの既定 profile path へ切り替える。旧 JSON は変換・削除・上書きしない。schema v1 も読み込まず、利用者へ再ペアリングを要求する。
 
 run option:
 
@@ -94,7 +96,7 @@ GUI swbt panel に置く項目:
 | controller type | yes | Pro Controller / Joy-Con L / Joy-Con R |
 | adapter combo | yes | `list_adapters()` の結果 |
 | refresh adapters | yes | adapter 列挙だけ行う |
-| key store path | yes | pairing key JSON path |
+| pairing profile path | yes | pairing key JSON path |
 | pair button | yes | 明示 pairing |
 | reconnect button | yes | 保存済み key で reconnect |
 | disconnect button | yes | GUI lifetime port を release/close し、factory-managed session を disconnect |
@@ -119,8 +121,8 @@ GUI に置かない項目:
 | operation | enabled when | success | failure |
 |---|---|---|---|
 | Refresh adapters | macro 未実行中 | combo を更新。settings は変更しない | error 表示 |
-| Pair | backend `swbt`、adapter、controller type、key store が有効 | status connected、manual controller を注入 | controller `None`、error 表示 |
-| Reconnect | backend `swbt`、key store が存在 | status connected、manual controller を注入 | controller `None`、error 表示 |
+| Pair | backend `swbt`、adapter、controller type、pairing profile が有効 | status connected、manual controller を注入 | controller `None`、error 表示 |
+| Reconnect | backend `swbt`、pairing profile が存在 | status connected、manual controller を注入 | controller `None`、error 表示 |
 | Disconnect | connected | `release()` 後に `close()`、factory session を閉じ、controller `None` | error log、controller `None` |
 | Macro run start | not pairing/reconnecting | `VirtualControllerModel.set_controller(None)` 後に旧 manual port を release/close して runtime start | close 失敗時は実行を止める |
 
@@ -149,7 +151,7 @@ manual input widget は controller port が存在し、macro 非実行、lifecyc
 | `controller.backend` | `serial` or `swbt` |
 | `controller.swbt.controller_type` | `resolve_controller_model(...)` で解決できる |
 | `controller.swbt.adapter` | 保存時は空を許容する。接続操作時に空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` |
-| `controller.swbt.key_store_path` | `Path | None`。`None` なら controller type から既定値を補う。親 directory は pair 前に作成 |
+| `controller.swbt.profile_path` | `Path | None`。`None` なら controller type から既定値を補う。親 directory は pair 前に作成 |
 | `connect_timeout_sec` | `> 0` |
 | `report_period_us` | `None` or `> 0` |
 
@@ -164,7 +166,12 @@ manual input widget は controller port が存在し、macro 非実行、lifecyc
 | `NYX_SWBT_ADAPTER_NOT_FOUND` | 選択 adapter が見つからない |
 | `NYX_SWBT_ADAPTER_AMBIGUOUS` | adapter alias が複数候補に一致している |
 | `NYX_SWBT_CONTROLLER_TYPE_UNSUPPORTED` | controller type を選択させる |
-| `NYX_SWBT_KEY_STORE_INVALID` | key store path を確認させる |
+| `NYX_SWBT_PROFILE_NOT_FOUND` | Pair で profile を新規作成させる |
+| `NYX_SWBT_PROFILE_ALREADY_EXISTS` | 既存 profile で Pair を再試行するか path を変更させる |
+| `NYX_SWBT_PROFILE_INVALID` | schema と profile path を確認させる |
+| `NYX_SWBT_PROFILE_CONTROLLER_MISMATCH` | controller type と profile の対応を確認させる |
+| `NYX_SWBT_PROFILE_KEY_DATA_INVALID` | 別 path で再ペアリングさせる |
+| `NYX_SWBT_ADAPTER_IDENTITY_RECOVERY_REQUIRED` | USB Bluetooth ドングルを抜き差しさせる |
 | `NYX_SWBT_CONNECTION_TIMED_OUT` | target device の pairing/reconnect 操作を確認させる |
 | `NYX_SWBT_CONNECTION_FAILED` | connection failed |
 | `NYX_SWBT_INPUT_UNSUPPORTED` | 選択 controller type ではその入力を扱えない |

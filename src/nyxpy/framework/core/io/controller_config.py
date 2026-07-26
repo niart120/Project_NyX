@@ -58,15 +58,15 @@ def controller_config_from_settings(
     model = resolve_controller_model(
         str(dotted_get(settings, "controller.swbt.controller_type", "pro-controller"))
     )
-    key_store = _key_store_path(
-        dotted_get(settings, "controller.swbt.key_store_path", None),
-        default=model.default_key_store_path(_default_swbt_key_store_dir(workspace_root)),
+    profile_path = _profile_path(
+        dotted_get(settings, "controller.swbt.profile_path", None),
+        default=model.default_profile_path(_default_swbt_profile_dir(workspace_root)),
         workspace_root=workspace_root,
     )
     return SwbtControllerConfig(
         model=model,
         adapter=_optional_name(dotted_get(settings, "controller.swbt.adapter", None)),
-        key_store_path=key_store,
+        profile_path=profile_path,
         connect_timeout_sec=_positive_float(
             dotted_get(settings, "controller.swbt.connect_timeout_sec", 30.0),
             key="controller.swbt.connect_timeout_sec",
@@ -88,7 +88,7 @@ def controller_config_from_overrides(
     serial_baudrate: int | None = None,
     swbt_adapter: str | None = None,
     swbt_controller_type: str | None = None,
-    swbt_key_store_path: Path | str | None = None,
+    swbt_profile_path: Path | str | None = None,
     swbt_connect_timeout_sec: float | None = None,
 ) -> ControllerConfig:
     """Settings の copy に CLI override を重ねて ControllerConfig を作る。"""
@@ -105,8 +105,8 @@ def controller_config_from_overrides(
         dotted_set(data, "controller.swbt.adapter", swbt_adapter)
     if swbt_controller_type is not None:
         dotted_set(data, "controller.swbt.controller_type", swbt_controller_type)
-    if swbt_key_store_path is not None:
-        dotted_set(data, "controller.swbt.key_store_path", str(swbt_key_store_path))
+    if swbt_profile_path is not None:
+        dotted_set(data, "controller.swbt.profile_path", str(swbt_profile_path))
     if swbt_connect_timeout_sec is not None:
         dotted_set(data, "controller.swbt.connect_timeout_sec", swbt_connect_timeout_sec)
     return controller_config_from_settings(data, workspace_root=workspace_root)
@@ -138,13 +138,13 @@ def _reject_legacy_serial_keys(settings: Mapping[str, Any]) -> None:
     )
 
 
-def _default_swbt_key_store_dir(workspace_root: Path | None) -> Path:
+def _default_swbt_profile_dir(workspace_root: Path | None) -> Path:
     if workspace_root is None:
         return Path(".nyxpy") / "swbt"
     return Path(workspace_root) / ".nyxpy" / "swbt"
 
 
-def _key_store_path(
+def _profile_path(
     value: object,
     *,
     default: Path,

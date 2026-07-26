@@ -33,6 +33,7 @@ from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.swbt.errors import (
     is_swbt_connect_cancelled,
     swbt_connect_cancel_code,
+    swbt_user_error_message,
 )
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.ports import ControllerOutputPort
@@ -356,7 +357,9 @@ class MainWindow(QMainWindow):
         reconnect_action = QAction("Reconnect", menu)
         disconnect_action = QAction("Disconnect", menu)
         pair_action.setEnabled(lifecycle_enabled and adapter_available)
-        reconnect_action.setEnabled(lifecycle_enabled and adapter_available)
+        reconnect_action.setEnabled(
+            lifecycle_enabled and adapter_available and self._swbt_profile_exists()
+        )
         disconnect_action.setEnabled(lifecycle_enabled and self._swbt_is_connected())
         pair_action.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
         reconnect_action.triggered.connect(
@@ -492,17 +495,17 @@ class MainWindow(QMainWindow):
             "controller.backend": "swbt",
             "controller.swbt.controller_type": controller_type,
         }
-        current_key_store = str(
-            self.global_settings.get("controller.swbt.key_store_path", "") or ""
+        current_profile = str(
+            self.global_settings.get("controller.swbt.profile_path", "") or ""
         ).replace("\\", "/")
         models = supported_controller_models()
-        defaults = {str(model.default_key_store_path()).replace("\\", "/") for model in models}
-        if not current_key_store or current_key_store in defaults:
+        defaults = {str(model.default_profile_path()).replace("\\", "/") for model in models}
+        if not current_profile or current_profile in defaults:
             selected_model = next(
                 model for model in models if model.settings_value == controller_type
             )
-            updates["controller.swbt.key_store_path"] = str(
-                selected_model.default_key_store_path()
+            updates["controller.swbt.profile_path"] = str(
+                selected_model.default_profile_path()
             ).replace("\\", "/")
         return updates
 
@@ -1092,7 +1095,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText(
             "エラー: swbt を切断できません"
             if operation == "disconnect"
-            else "エラー: swbt 接続操作に失敗しました"
+            else f"エラー: {swbt_user_error_message(error)}"
         )
         self._sync_manual_input_state()
         self._update_connection_status()
@@ -1124,6 +1127,31 @@ class MainWindow(QMainWindow):
         except Exception:
             return False
         return bool(status is not None and status.connected)
+
+    def _swbt_profile_exists(self) -> bool:
+        value = str(self.global_settings.get("controller.swbt.profile_path", "") or "").strip()
+        if not value:
+            controller_type = str(
+                self.global_settings.get(
+                    "controller.swbt.controller_type",
+                    "pro-controller",
+                )
+            )
+            model = next(
+                (
+                    candidate
+                    for candidate in supported_controller_models()
+                    if candidate.settings_value == controller_type
+                ),
+                None,
+            )
+            if model is None:
+                return False
+            value = str(model.default_profile_path())
+        path = Path(value)
+        if not path.is_absolute():
+            path = self.project_root / path
+        return path.is_file()
 
     def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
         preset_key = normalize_window_size_preset_key(key)

@@ -330,7 +330,7 @@ def test_make_controller_port_factory_selects_swbt(tmp_path: Path) -> None:
     swbt_config = SwbtControllerConfig(
         model=resolve_controller_model("pro-controller"),
         adapter="usb:0",
-        key_store_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-bond.json",
+        profile_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-profile.json",
         connect_timeout_sec=4.0,
     )
     builder = create_device_runtime_builder(
@@ -363,7 +363,7 @@ def test_run_swbt_does_not_resolve_serial_protocol(monkeypatch, tmp_path: Path) 
     swbt_config = SwbtControllerConfig(
         model=resolve_controller_model("pro-controller"),
         adapter="usb:0",
-        key_store_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-bond.json",
+        profile_path=tmp_path / ".nyxpy" / "swbt" / "pro-controller-profile.json",
     )
     builder = create_device_runtime_builder(
         project_root=tmp_path,
@@ -628,7 +628,7 @@ def test_swbt_gui_lifetime_controller_never_allows_dummy(tmp_path: Path) -> None
     config = SwbtControllerConfig(
         model=resolve_controller_model("pro-controller"),
         adapter="usb:0",
-        key_store_path=tmp_path / ".nyxpy" / "swbt" / "bond.json",
+        profile_path=tmp_path / ".nyxpy" / "swbt" / "profile.json",
     )
     builder = create_device_runtime_builder(
         project_root=tmp_path,
