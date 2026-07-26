@@ -112,11 +112,6 @@ GLOBAL_SETTINGS_SCHEMA = SettingsSchema(
             float,
             30.0,
         ),
-        "controller.swbt.report_period_us": SettingField(
-            "controller.swbt.report_period_us",
-            (int, type(None)),
-            8000,
-        ),
         "runtime.allow_dummy": SettingField("runtime.allow_dummy", bool, False),
         "runtime.frame_ready_timeout_sec": SettingField(
             "runtime.frame_ready_timeout_sec", float, 3.0
@@ -179,12 +174,10 @@ class SettingsStore:
             try:
                 if self.config_path.exists():
                     loaded = tomlkit.loads(self.config_path.read_text(encoding="utf-8"))
-                    migrated = _migrate_swbt_profile_settings(loaded)
+                    migration_notices = _migrate_swbt_settings(loaded)
                     self.data = self.schema.validate(loaded)
-                    if migrated:
-                        self.migration_notices = (
-                            "旧 swbt キーストア設定を削除しました。新しいペアリングプロファイルで再ペアリングしてください。",
-                        )
+                    if migration_notices:
+                        self.migration_notices = migration_notices
                         self.save()
                     else:
                         self.migration_notices = ()
@@ -253,23 +246,32 @@ def _drop_none(value: Any) -> Any:
     return value
 
 
-def _migrate_swbt_profile_settings(data: MutableMapping[str, Any]) -> bool:
-    """旧 key_store_path を除去し、新しい既定 profile path を設定する。"""
+def _migrate_swbt_settings(data: MutableMapping[str, Any]) -> tuple[str, ...]:
+    """廃止したswbt設定を除去し、利用者向け通知を返す。"""
     controller = data.get("controller")
     if not isinstance(controller, MutableMapping):
-        return False
+        return ()
     swbt = controller.get("swbt")
-    if not isinstance(swbt, MutableMapping) or "key_store_path" not in swbt:
-        return False
+    if not isinstance(swbt, MutableMapping):
+        return ()
 
-    swbt.pop("key_store_path")
-    if swbt.get("profile_path") in (None, ""):
-        controller_type = str(swbt.get("controller_type", "pro-controller"))
-        profile_names = {
-            "pro-controller": "pro-controller-profile.json",
-            "joy-con-l": "joy-con-l-profile.json",
-            "joy-con-r": "joy-con-r-profile.json",
-        }
-        profile_name = profile_names.get(controller_type, "pro-controller-profile.json")
-        swbt["profile_path"] = f".nyxpy/swbt/{profile_name}"
-    return True
+    notices: list[str] = []
+    if "key_store_path" in swbt:
+        swbt.pop("key_store_path")
+        if swbt.get("profile_path") in (None, ""):
+            controller_type = str(swbt.get("controller_type", "pro-controller"))
+            profile_names = {
+                "pro-controller": "pro-controller-profile.json",
+                "joy-con-l": "joy-con-l-profile.json",
+                "joy-con-r": "joy-con-r-profile.json",
+            }
+            profile_name = profile_names.get(controller_type, "pro-controller-profile.json")
+            swbt["profile_path"] = f".nyxpy/swbt/{profile_name}"
+        notices.append(
+            "旧 swbt キーストア設定を削除しました。"
+            "新しいペアリングプロファイルで再ペアリングしてください。"
+        )
+    if "report_period_us" in swbt:
+        swbt.pop("report_period_us")
+        notices.append("swbtを直接送信型へ切り替えたため、不要になった送信周期設定を削除しました。")
+    return tuple(notices)

@@ -1,6 +1,6 @@
 # デバイス列挙
 
-adapter 列挙は `swbt.list_adapters()` を使う。これは Bluetooth adapter の候補を返す API であり、controller の open、advertising、pairing、reconnect、HID report loop は開始しない。
+adapter列挙は `swbt.list_adapters()` を使う。これはBluetooth adapterの候補を返すAPIであり、controllerのopen、advertising、pairing、reconnectは開始しない。
 
 `SwbtAdapterDiscoveryService` の実装 module は `nyxpy.framework.core.hardware.swbt.discovery` である。
 

@@ -353,7 +353,7 @@ def test_cli_main_logs_legacy_swbt_profile_migration(monkeypatch, tmp_path):
 
     assert cli_main(args) == 0
     assert (
-        "user",
+        "technical",
         "WARNING",
         "旧 swbt キーストア設定を削除しました。"
         "新しいペアリングプロファイルで再ペアリングしてください。",

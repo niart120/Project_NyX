@@ -118,6 +118,29 @@ def test_settings_store_keeps_explicit_profile_when_removing_legacy_key(tmp_path
     assert store.get("controller.swbt.profile_path") == "current-profile.json"
 
 
+def test_settings_store_removes_legacy_swbt_report_period(tmp_path) -> None:
+    config_path = tmp_path / "global.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[controller.swbt]",
+                'controller_type = "pro-controller"',
+                "report_period_us = 8000",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    store = SettingsStore(config_dir=tmp_path)
+
+    assert "report_period_us" not in store.data["controller"]["swbt"]
+    assert "report_period_us" not in config_path.read_text(encoding="utf-8")
+    assert store.migration_notices == (
+        "swbtを直接送信型へ切り替えたため、不要になった送信周期設定を削除しました。",
+    )
+
+
 def test_settings_store_rejects_invalid_schema_type(tmp_path) -> None:
     (tmp_path / "global.toml").write_text(
         '[controller.serial]\nbaudrate = "fast"\n',

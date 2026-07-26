@@ -15,7 +15,6 @@ controller_type = "pro-controller"
 adapter = "usb:0"
 profile_path = ".nyxpy/swbt/pro-controller-profile.json"
 connect_timeout_sec = 30.0
-report_period_us = 8000
 ```
 
 `controller_type` は settings / CLI / GUI の境界でだけ文字列として扱う。runtime 内部では `SwbtControllerType` と `SwbtControllerModel` に正規化し、`Literal[...]` や raw string key による controller class dispatch を残さない。
@@ -61,7 +60,7 @@ GUI widget
   -> SerialComm
 ```
 
-`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` の async controller lifecycle と `InputState.apply()` を同期 port 実装から扱うための backend 内部部品である。`status()` は同期 API であり、pair / reconnect 後の `connection_state` を接続判定に使う。
+`SwbtControllerSession` は GUI manual input 用の上位機能ではない。`swbt-python` のasync controller lifecycleと `Direct*Controller.send()` を同期port実装から扱うbackend内部部品である。`status()` は同期APIであり、pair / reconnect後の `connection_state` を接続判定に使う。
 
 ## GUI の範囲
 
@@ -103,7 +102,7 @@ GUI manual input では IMU を直接操作しない。preset gesture、pose edi
 | pairing | 明示操作として扱い、通常の macro run では勝手に pairing しない |
 | reconnect | pairing profile に保存済み pairing 情報があることを前提にする |
 | disconnect | factory lifetime を維持する GUI から cached session を明示的に閉じる。fresh factory を作る CLI command は提供しない |
-| input | NyX state から `InputState` を構成し、`apply(state)` を使う |
+| input | NyX stateから完全な `InputState` を構成し、操作ごとに `send(state)` する |
 | manual input | 既存 `VirtualControllerModel` と `ControllerOutputPort` 経路を使う |
 | unsupported input | silent no-op にせず明示的に失敗させる |
 | diagnostics | swbt diagnostics writer を NyX の `LoggerPort.technical(...)` へ流す。GUI / CLI / settings に path は出さない |

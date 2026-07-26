@@ -53,7 +53,6 @@ class SwbtControllerConfig:
     adapter: str | None
     profile_path: Path
     connect_timeout_sec: float = 30.0
-    report_period_us: int | None = 8000
 
 
 _PRO_BUTTONS = frozenset(Button)

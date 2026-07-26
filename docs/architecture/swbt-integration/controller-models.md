@@ -110,7 +110,6 @@ class SwbtControllerConfig:
     adapter: str | None = None
     profile_path: Path
     connect_timeout_sec: float = 30.0
-    report_period_us: int | None = 8000
 ```
 
 `SwbtControllerConfig` は `controller_type: str` を持たない。設定 parser が `model` へ正規化する。

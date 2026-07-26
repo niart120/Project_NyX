@@ -154,7 +154,7 @@ def to_input_state(self, state: NyxSwbtState) -> InputState:
     )
 ```
 
-button、stick、IMU を同一 report に入れる必要がある場合は、port が完全 state を作って `apply(state)` する。
+button、stick、IMUを同一reportに入れる必要がある場合は、portが完全stateを作り、session adapterを通じて `send(state)` する。
 
 ## Unsupported input
 

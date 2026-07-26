@@ -43,7 +43,11 @@ nyxpy gui
 
 `Pair` は初回 pairing で pairing profile を作ります。2 回目以降は `Reconnect` を使います。接続状態は操作後の実際の status で判定されます。`Disconnect` は GUI と同じプロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
 
+swbt backendは直接送信型を使い、ボタン、D-pad、stick、IMUの完全な入力状態を操作ごとに送ります。送信周期の設定はありません。
+
 swbt-python 0.2 系の旧キーストアと schema v1 profile は読み込めません。NyX は旧ファイルを変換・削除・上書きせず、新しい既定 path へ切り替えます。更新後は `Pair` を実行して schema v2 profile を作成してください。
+
+旧 `controller.swbt.report_period_us` が `global.toml` に残っている場合、初回読み込み時に削除し、直接送信型への切り替えで不要になったことをtechnical logへ記録します。
 
 ## CLI で指定する
 

@@ -88,7 +88,6 @@ def create_swbt_controller(
     return controller_cls(
         adapter=config.adapter,
         profile_path=str(config.profile_path),
-        report_period_us=config.report_period_us,
         diagnostics=diagnostics,
     )
 ```
@@ -97,7 +96,7 @@ diagnostics writer は NyX 内部 adapter で `LoggerPort.technical(...)` に流
 
 初回 Pair で profile が存在しない場合は `controller_cls.create_profile(adapter=..., profile_path=..., local_address=None, pair_timeout=...)` を呼び、返却された接続済み controller の lifetime を session が所有する。profile が存在する場合は通常 constructor と `pair()` を使う。これにより、キャンセルや接続失敗後に残った profile から Pair を再試行できる。factory は Pair 前に `session.open()` を呼ばず、分岐判断を session に集約する。
 
-swbt の `pair()` / `reconnect()` 自体の戻り値は `None` である。session は操作完了後に同期 `status()` を取得し、`status.connection_state == "connected"` を確認する。その後、公開 status の `report_counters[0x30]` が接続直後の値から増えるまで待つ。`0x30` は周期 input report であり、増加は Switch へ入力を送れる状態になった根拠である。タイムアウト時は `NYX_SWBT_INPUT_REPORT_NOT_READY` とする。上位へ返す値も `None` であり、戻り値の truthiness や存在しない `status.connected` / `status.message` は使わない。
+swbt の `pair()` / `reconnect()` 自体の戻り値は `None` である。session は操作完了後に同期 `status()` を取得し、`status.connection_state == "connected"` を確認する。Direct controllerの生成または接続操作が完了した時点で利用可能とみなし、周期report counterは待たない。上位へ返す値も `None` であり、戻り値のtruthinessや存在しない `status.connected` / `status.message` は使わない。
 
 ## async bridge
 

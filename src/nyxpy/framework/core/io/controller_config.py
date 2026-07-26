@@ -71,10 +71,6 @@ def controller_config_from_settings(
             dotted_get(settings, "controller.swbt.connect_timeout_sec", 30.0),
             key="controller.swbt.connect_timeout_sec",
         ),
-        report_period_us=_optional_positive_int(
-            dotted_get(settings, "controller.swbt.report_period_us", 8000),
-            key="controller.swbt.report_period_us",
-        ),
     )
 
 
@@ -170,12 +166,6 @@ def _positive_int(value: object, *, key: str) -> int:
     if result <= 0:
         raise _invalid_positive(key)
     return result
-
-
-def _optional_positive_int(value: object, *, key: str) -> int | None:
-    if value in (None, ""):
-        return None
-    return _positive_int(value, key=key)
 
 
 def _positive_float(value: object, *, key: str) -> float:

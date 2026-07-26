@@ -14,9 +14,9 @@ from swbt import (
     InputState,
     InvalidKeyStoreError,
     InvalidProfileError,
-    JoyConL,
-    JoyConR,
-    ProController,
+    DirectJoyConL,
+    DirectJoyConR,
+    DirectProController,
     ProfileControllerMismatchError,
     Stick,
     SwitchGamepad,
@@ -37,7 +37,7 @@ except AdapterDiscoveryError as error:
 
 `list_adapters()` は adapter 候補を返す no-open discovery API として扱う。候補がない場合は空 tuple を返す。列挙失敗は `AdapterDiscoveryError` として扱い、Project_NyX 側では `NYX_SWBT_ADAPTER_DISCOVERY_FAILED` に変換する。
 
-adapter refresh は pairing、reconnect、report loop を開始しない。
+adapter refresh は controller の open、pairing、reconnect を開始しない。
 
 ## Controller class
 
@@ -45,43 +45,41 @@ controller 実体は次の具象 class から生成する。
 
 | controller type | swbt class |
 |---|---|
-| `pro-controller` | `ProController` |
-| `joy-con-l` | `JoyConL` |
-| `joy-con-r` | `JoyConR` |
+| `pro-controller` | `DirectProController` |
+| `joy-con-l` | `DirectJoyConL` |
+| `joy-con-r` | `DirectJoyConR` |
 
 `SwitchGamepad` は直接生成せず、共通 interface / type annotation として扱う。
 
 ```python
-pad: SwitchGamepad = ProController(
+pad: SwitchGamepad = DirectProController(
     adapter="usb:0",
     profile_path=".nyxpy/swbt/pro-controller-profile.json",
-    report_period_us=8000,
     diagnostics=None,
 )
 ```
 
 ## Resource lifecycle
 
-`SwbtControllerSession` は `open()` と `close(neutral=True)` の scope を所有する。`open()` は transport と report loop の準備であり、pairing や reconnect を開始しない。
+`SwbtControllerSession` は `open()` と `close(neutral=True)` の scope を所有する。`open()` は transport を準備し、pairing や reconnect は開始しない。
 
 新規 profile は constructor ではなく `create_profile()` で作成する。
 
 ```python
-pad = await ProController.create_profile(
+pad = await DirectProController.create_profile(
     adapter="usb:0",
     profile_path="switch-profile.json",
     local_address=None,
     pair_timeout=30.0,
-    report_period_us=8000,
 )
 ```
 
 ```python
-pad = ProController(adapter="usb:0", profile_path="switch-profile.json")
+pad = DirectProController(adapter="usb:0", profile_path="switch-profile.json")
 await pad.open()
 try:
     await pad.reconnect(timeout=30.0)
-    await pad.apply(InputState.neutral().with_buttons([Button.A]))
+    await pad.send(InputState.neutral().with_buttons([Button.A]))
 finally:
     await pad.close(neutral=True)
 ```
@@ -102,19 +100,21 @@ macro 実行時は reconnect のみを行う。pairing profile がないから�
 
 現行の Project_NyX 実装は `pair()` と `reconnect()` を使い、接続結果を返す別 API には依存しない。失敗理由は swbt 例外を NyX の framework error に変換して扱う。
 
-`open()`、`pair()`、`reconnect()`、`apply()`、`neutral()`、`close()` は async API であり、`status()` だけは同期 API である。`pair()` / `reconnect()` の戻り値は `None` なので、Project_NyX は操作後に `status()` を取得し、`GamepadStatus.connection_state == "connected"` を接続成功条件とする。
+`open()`、`pair()`、`reconnect()`、`send()`、`neutral()`、`close()` は async API であり、`status()` だけは同期 API である。`pair()` / `reconnect()` の戻り値は `None` なので、Project_NyX は操作後に `status()` を取得し、`GamepadStatus.connection_state == "connected"` を接続成功条件とする。
 
 ## Input APIs
 
-Project_NyX の `SwbtControllerOutputPort` は、button / stick / IMU を部分更新として `swbt-python` へ順番に投げるのではなく、内部に `NyxSwbtState` を持ち、完全な `InputState` を作って `apply(state)` する。
+Project_NyX の `SwbtControllerOutputPort` は、button / stick / IMU を部分更新として `swbt-python` へ順番に投げない。内部に `NyxSwbtState` を持ち、完全な `InputState` を作ってNyX内部の `session.apply(state)` へ渡す。session adapterがDirect controllerの `send(state)` を呼ぶ。
 
 | NyX 操作 | swbt API の扱い |
 |---|---|
-| `press(keys)` | state に key を追加し、`InputState` を再構築して `apply(state)` |
-| `hold(keys)` | state を破棄し、keys だけを保持する `InputState` を `apply(state)` |
-| `release(keys)` | state から key を除去し、`apply(state)` |
+| `press(keys)` | state に key を追加し、`InputState` を再構築して `send(state)` |
+| `hold(keys)` | state を破棄し、keys だけを保持する `InputState` を `send(state)` |
+| `release(keys)` | state から key を除去し、`send(state)` |
 | `release()` | neutral state に戻し、`neutral()` または neutral `InputState` を送る |
-| `imu(frames)` | state の IMU frames を置き換え、`apply(state)` |
+| `imu(frames)` | state の IMU frames を置き換え、`send(state)` |
+
+`send()` の完了はswbtの送信処理が入力レポートを受理したことを示す。HCI送信完了やSwitch画面への反映完了までは保証しない。
 
 `tap()` は Project_NyX の `press(dur=...)` と意味が重なる action API なので、`ControllerOutputPort.press()` の実装には使わない。
 

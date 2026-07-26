@@ -294,7 +294,7 @@ def cli_main(
 
         settings = SettingsStore(config_dir=paths.config_dir, strict_load=False)
         for notice in settings.migration_notices:
-            logger.user(
+            logger.technical(
                 "WARNING",
                 notice,
                 component="CLI",

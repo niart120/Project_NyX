@@ -123,30 +123,27 @@ class SwbtControllerOutputPort(ControllerOutputPort):
     def press(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.press(self._state, keys)
-            self._apply_locked()
+            self._apply_locked(self._mapper.press(self._state, keys))
 
     def hold(self, keys: tuple[KeyType, ...]) -> None:
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.hold(keys)
-            self._apply_locked()
+            self._apply_locked(self._mapper.hold(keys))
 
     def release(self, keys: tuple[KeyType, ...] = ()) -> None:
         with self._lock:
             self._ensure_open()
-            if not keys:
-                self._state = NyxSwbtState.neutral()
+            next_state = self._mapper.release(self._state, keys)
+            if keys:
+                self._apply_locked(next_state)
+            else:
                 self._session.neutral()
-                return
-            self._state = self._mapper.release(self._state, keys)
-            self._apply_locked()
+                self._state = next_state
 
     def imu(self, *frames: IMUFrame) -> None:
         with self._lock:
             self._ensure_open()
-            self._state = self._mapper.set_imu(self._state, frames)
-            self._apply_locked()
+            self._apply_locked(self._mapper.set_imu(self._state, frames))
 
     def close(self) -> None:
         with self._lock:
@@ -160,9 +157,9 @@ class SwbtControllerOutputPort(ControllerOutputPort):
                 if self._on_close is not None:
                     self._on_close(self)
 
-    def _apply_locked(self) -> None:
-        state = self._mapper.to_input_state(self._state)
-        self._session.apply(state)
+    def _apply_locked(self, next_state: NyxSwbtState) -> None:
+        self._session.apply(self._mapper.to_input_state(next_state))
+        self._state = next_state
 ```
 
 ## close と finalize
@@ -177,6 +174,6 @@ port 作成時の neutral は常に試みる。`reset_on_port_create` という�
 
 ## 短い押下の扱い
 
-swbt の state update API は即時送信を保証しない。NyXPy の `press(dur=...)` は、report loop による反映を前提にする。
+swbt backendは押下と解放をそれぞれ完全な `InputState` として `send()` する。周期report loopが押下状態を観測することには依存しない。
 
-`dur` が `report_period_us` より短い場合、対象機器が押下を観測できない可能性がある。実機で短い入力を多用するマクロは、backend ごとの最小押下時間を検証する。
+`send()` の完了はHCI送信完了やSwitch側の認識完了を意味しない。実機で短い入力を多用するマクロは16ms、33ms、50msを個別に確認し、確認済みの最小durationを利用者向け文書へ記録する。
