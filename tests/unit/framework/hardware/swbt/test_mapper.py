@@ -30,6 +30,22 @@ def test_mapper_maps_buttons_with_current_nyx_names() -> None:
     )
 
 
+@pytest.mark.parametrize("controller_type", ["joy-con-l", "joy-con-r"])
+def test_mapper_maps_joycon_side_buttons(controller_type: str) -> None:
+    m = mapper(controller_type)
+    state = m.hold((Button.SL, Button.SR))
+
+    assert m.to_input_state(state).buttons == frozenset({SwbtButton.SL, SwbtButton.SR})
+
+
+@pytest.mark.parametrize("button", [Button.SL, Button.SR])
+def test_mapper_rejects_joycon_side_buttons_for_pro_controller(button: Button) -> None:
+    with pytest.raises(Exception) as exc_info:
+        mapper().hold((button,))
+
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_INPUT_UNSUPPORTED"
+
+
 def test_mapper_replaces_dpad_direction() -> None:
     m = mapper()
     state = m.press(NyxSwbtState.neutral(), (Hat.UPRIGHT,))

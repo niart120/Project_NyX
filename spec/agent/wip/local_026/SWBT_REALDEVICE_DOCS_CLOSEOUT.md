@@ -84,7 +84,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 
 ### controller type 別確認
 
-Pro Controller、Joy-Con L、Joy-Con R は別 pairing profile を使う。Joy-Con L は right stick、Joy-Con R は left stick を unsupported として明確に失敗させる。unsupported input は実機確認の前に単体テストで固定し、実機では選択 controller type に存在する入力だけを確認する。
+Pro Controller、Joy-Con L、Joy-Con R は別 pairing profile を使う。Joy-Con L は right stick、Joy-Con R は left stickとD-pad、Pro Controllerは `SL` / `SR` をunsupportedとして明確に失敗させる。unsupported inputは実機確認の前に単体テストで固定し、実機では選択controller typeに存在する入力だけを確認する。Joy-Con L/Rでは `SL` と `SR` を個別に確認する。
 
 ### stick Y 軸と short press
 
@@ -142,6 +142,7 @@ class SwbtRealDeviceOptions:
 | `test_swbt_macro_reconnect_realdevice` | あり | 必須 | runtime factory と `DefaultCommand` を通した reconnect / input |
 | `test_swbt_gui_lifecycle_realdevice` | あり | 必須 | GUI service の Pair / Disconnect / Reconnect / Disconnect |
 | `test_swbt_button_dpad_manual_realdevice` | trace は自動 | 必須 | Button、D-pad の反映 |
+| `test_swbt_joycon_side_buttons_manual_realdevice` | trace は自動 | 必須 | Joy-Con L/RのSL、SR |
 | `test_swbt_stick_manual_realdevice` | trace は自動 | 必須 | left / right stick と Y 軸 |
 | `test_swbt_imu_realdevice` | trace は自動 | 必要に応じて必須 | `Command.imu(IMUFrame.neutral())` と gyro frame |
 | `test_swbt_neutral_after_close_realdevice` | trace は自動 | 必須 | close / cancel / failure 後に neutral |
@@ -237,6 +238,7 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | ハードウェア | `test_swbt_pair_realdevice` | pairing と pairing profile 作成 |
 | ハードウェア | `test_swbt_reconnect_realdevice` | reconnect |
 | ハードウェア | `test_swbt_button_dpad_manual_realdevice` | Button / D-pad |
+| ハードウェア | `test_swbt_joycon_side_buttons_manual_realdevice` | Joy-Con L/RのSL / SR |
 | ハードウェア | `test_swbt_stick_manual_realdevice` | stick と Y 軸 |
 | ハードウェア | `test_swbt_imu_realdevice` | IMU neutral / gyro |
 | ハードウェア | `test_swbt_neutral_after_close_realdevice` | close 後 neutral |
@@ -260,8 +262,10 @@ uv run mkdocs build --strict
 - [x] controller type ごとの pair / reconnect 実機テストを追加する。
 - [x] Button / D-pad / stick / IMU / neutral / short press の実機テストを追加する。
 - [x] Joy-Con L/R の unsupported input が明確に失敗することを単体テストで確認する。
+- [x] Joy-Con L/Rの `SL` / `SR` とPro Controllerの非対応境界を単体テストで確認する。
 - [x] async controller method を session 内部で完了待ちする。
 - [x] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
+- [ ] Joy-Con L/Rの `SL` / `SR` を実機で確認する。
 - [x] stick Y 軸既定値を実機結果で確定する。
 - [ ] Direct送信型のshort press最小推奨durationを判定する。
 - [x] 利用者 docs に device setup、CLI、GUI、troubleshooting を反映する。

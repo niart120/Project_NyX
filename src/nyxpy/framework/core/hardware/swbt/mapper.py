@@ -216,6 +216,8 @@ def _swbt_button(button: Button):
         Button.CAP: SwbtButton.CAPTURE,
         Button.LS: SwbtButton.LEFT_STICK,
         Button.RS: SwbtButton.RIGHT_STICK,
+        Button.SL: SwbtButton.SL,
+        Button.SR: SwbtButton.SR,
     }
     try:
         return mapping[button]

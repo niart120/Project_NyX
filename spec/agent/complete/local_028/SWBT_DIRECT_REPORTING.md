@@ -22,6 +22,7 @@ Project_NyX の swbt backend を `DirectProController` / `DirectJoyConL` / `Dire
 | session adapter | NyX内部の同期 `apply(state)` をswbtの非同期 `send(state)`へ変換する `SwbtControllerSession` |
 | pairing profile | controller shape、adapter identity、bond keyを保持するswbt-python schema v2 JSON |
 | 送信完了 | Bumbleの送信処理が入力レポートを受理した状態。HCI完了やSwitch画面への反映完了は含まない |
+| Joy-Con side button | Joy-Con L/Rの側面にある `SL` / `SR`。Pro Controller、CH552、PokeCon、3DSでは非対応 |
 
 ### 1.3 背景・問題
 
@@ -52,8 +53,10 @@ NyX側は `NyxSwbtState` を正本として操作ごとに完全な `InputState`
 | ファイル | 変更種別 | 変更内容 |
 |----------|----------|----------|
 | `pyproject.toml` / `uv.lock` | 変更 | swbt-python 0.5.4を固定 |
-| `src/nyxpy/framework/core/hardware/swbt/config.py` | 変更 | `report_period_us` をconfigから削除 |
-| `src/nyxpy/framework/core/hardware/swbt/mapper.py` | 変更 | Joy-Con Rの非対応D-padを送信前に拒否 |
+| `src/nyxpy/framework/core/constants/controller.py` | 変更 | `Button.SL` / `Button.SR` を公開入力へ追加 |
+| `src/nyxpy/framework/core/hardware/protocol.py` | 変更 | 非対応serial protocolで `SL` / `SR` を明示的に拒否 |
+| `src/nyxpy/framework/core/hardware/swbt/config.py` | 変更 | `report_period_us` を削除し、controller shape別capabilityを定義 |
+| `src/nyxpy/framework/core/hardware/swbt/mapper.py` | 変更 | 非対応D-padを送信前に拒否し、`SL` / `SR` をswbt入力へ変換 |
 | `src/nyxpy/framework/core/hardware/swbt/session.py` | 変更 | Direct class解決、`send()`呼び出し、周期report待機の削除 |
 | `src/nyxpy/framework/core/hardware/swbt/factory.py` | 変更 | session keyから周期値を削除 |
 | `src/nyxpy/framework/core/io/controller_config.py` | 変更 | settingsから周期値を読み取らない |
@@ -84,6 +87,8 @@ ControllerOutputPort
 マクロ、GUI、CLIへ `Direct*Controller` とswbtの `send()` を公開しない。NyX内部の `SwbtControllerSession.apply()` は、周期型との互換目的ではなく、`ControllerOutputPort` と下位backendの送信方式を分離するadapterとして維持する。
 
 `press()` / `hold()` / `release()` / `imu()` は現行シグネチャを維持する。上流の部分更新APIへ委譲せず、毎回完全な入力状態を送る。
+
+`Button.SL` / `Button.SR` を公開入力へ追加する。swbt backendではJoy-Con L/Rだけが対応し、Pro Controllerでは `NYX_SWBT_INPUT_UNSUPPORTED` にする。CH552 / PokeCon / 3DS serial protocolでは `UnsupportedKeyError` にする。
 
 ### 後方互換性
 
@@ -179,6 +184,8 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 | Direct `neutral()` 失敗 | 既存の `map_swbt_exception()` で変換し、NyX側状態を更新しない |
 | `connection_state != "connected"` | `NYX_SWBT_NOT_CONNECTED` |
 | controller type不一致profile | `NYX_SWBT_PROFILE_CONTROLLER_MISMATCH` |
+| controller shapeにないbutton、D-pad、stick | `NYX_SWBT_INPUT_UNSUPPORTED` とし、swbtへ送らない |
+| `SL` / `SR` をCH552 / PokeCon / 3DSへ指定 | `UnsupportedKeyError` |
 | 旧 `report_period_us` 設定 | 値を削除して移行通知を出す |
 
 ### シングルトン管理
@@ -199,11 +206,16 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 | ユニット | `test_port_commits_state_only_after_send` | send成功後だけ状態を確定し、失敗時はrollback |
 | ユニット | `test_session_key_ignores_removed_report_period` | cache keyがcontroller shape、adapter、profileだけで決まる |
 | ユニット | `test_mapper_rejects_joycon_r_dpad_before_swbt_send` | capabilityに基づき非対応D-padを送信前に拒否 |
+| ユニット | `test_controller_models_hold_nyx_capabilities` | swbt-python 0.5.4と一致するcontroller shape別button、D-pad、stick、IMU capability |
+| ユニット | `test_mapper_maps_joycon_side_buttons` | Joy-Con L/Rの `SL` / `SR` をswbt入力へ変換 |
+| ユニット | `test_mapper_rejects_joycon_side_buttons_for_pro_controller` | Pro Controllerでは `SL` / `SR` を送信前に拒否 |
+| ユニット | `test_serial_switch_protocols_reject_joycon_side_buttons` | CH552 / PokeConのpress、hold、releaseで `SL` / `SR` を拒否 |
 | 結合 | `test_swbt_runtime_uses_direct_send_path` | CLIマクロ経路が完全状態を操作順に送る |
 | GUI | `test_swbt_settings_apply_without_report_period` | GUI設定反映が削除済みkeyへ依存しない |
 | ハードウェア | `test_swbt_pair_realdevice` | Direct classでschema v2 profileを作成してPair |
 | ハードウェア | `test_swbt_reconnect_realdevice` | 既存profileをDirect classで再利用 |
 | ハードウェア | `test_swbt_*_manual_realdevice` | button、D-pad、stick、IMU、partial release、neutral |
+| ハードウェア | `test_swbt_joycon_side_buttons_manual_realdevice` | Joy-Con L/Rで `SL` と `SR` を個別に確認 |
 | ハードウェア | `test_swbt_macro_reconnect_realdevice` | macro経路の直接送信 |
 | ハードウェア | `test_swbt_gui_lifecycle_realdevice` | GUI Pair、Reconnect、手動入力、Disconnect |
 
@@ -217,11 +229,14 @@ constructorと `create_profile()` には `adapter`、`profile_path`、`diagnosti
 - [x] 既存 `global.toml` の移行とtechnical log
 - [x] portの完全状態送信とrollback契約の回帰
 - [x] controller capabilityに基づくD-pad事前検証
+- [x] swbt-python 0.5.4に基づくJoy-Con L/R capability監査
+- [x] Joy-Con L/Rの `SL` / `SR` 公開入力、mapper、serial非対応境界
 - [x] unit / integration / GUIテスト
 - [x] architecture docsと利用者向け文書
 - [x] ruff / ty / pytest / MkDocs strict gate
 - [x] Pro ControllerのPair、Reconnect、入力、neutral実機確認
 - [x] Joy-Con L/Rのprofile再利用と確認範囲の記録
+- [ ] Joy-Con L/Rの `SL` / `SR` 実機確認
 
 ## 7. 非実機検証結果
 
@@ -234,7 +249,7 @@ uv run mkdocs build --strict
 uv run pytest --basetemp=<repository外の一時directory>
 ```
 
-ruff、ty、MkDocs strictは成功した。pytestは898件を収集し、878件成功、実機要件の20件をskipした。Direct class解決、同期 `apply()` から非同期 `send()` への橋渡し、Pair / Reconnect後に周期reportを待たないこと、周期設定の移行、完全状態とrollback契約、Joy-Con RのD-pad事前拒否は非実機テストで確認済みである。
+ruff、ty、MkDocs strictは成功した。pytestは915件を収集し、894件成功、実機要件の21件をskipした。Direct class解決、同期 `apply()` から非同期 `send()` への橋渡し、Pair / Reconnect後に周期reportを待たないこと、周期設定の移行、完全状態とrollback契約、Joy-Con RのD-pad事前拒否、Joy-Con L/Rの `SL` / `SR` mapping、Pro Controllerとserial protocolの非対応境界は非実機テストで確認済みである。
 
 周期送信型で取得した `local_027` の実機結果をDirect送信型の完了証拠には使わない。Direct送信型の結果は次節に記録する。
 

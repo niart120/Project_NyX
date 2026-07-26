@@ -7,6 +7,7 @@ import pytest
 from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.hardware.swbt.config import (
     SwbtControllerType,
+    SwbtInputCapabilities,
     parse_controller_type,
     resolve_controller_model,
     supported_controller_models,
@@ -76,16 +77,65 @@ def test_controller_models_hold_nyx_capabilities() -> None:
     left = resolve_controller_model("joy-con-l")
     right = resolve_controller_model("joy-con-r")
 
-    assert Button.A in pro.capabilities.buttons
-    assert Button.ZL in left.capabilities.buttons
-    assert Button.A not in left.capabilities.buttons
-    assert Button.R in right.capabilities.buttons
-    assert Button.L not in right.capabilities.buttons
-    assert left.capabilities.left_stick is True
-    assert left.capabilities.right_stick is False
-    assert right.capabilities.left_stick is False
-    assert right.capabilities.right_stick is True
-    assert pro.capabilities.dpad is True
-    assert left.capabilities.dpad is True
-    assert right.capabilities.dpad is False
-    assert pro.capabilities.imu is True
+    assert pro.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.A,
+                Button.B,
+                Button.X,
+                Button.Y,
+                Button.L,
+                Button.R,
+                Button.ZL,
+                Button.ZR,
+                Button.MINUS,
+                Button.PLUS,
+                Button.LS,
+                Button.RS,
+                Button.HOME,
+                Button.CAP,
+            }
+        ),
+        dpad=True,
+        left_stick=True,
+        right_stick=True,
+        imu=True,
+    )
+    assert left.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.L,
+                Button.ZL,
+                Button.MINUS,
+                Button.LS,
+                Button.CAP,
+                Button.SL,
+                Button.SR,
+            }
+        ),
+        dpad=True,
+        left_stick=True,
+        right_stick=False,
+        imu=True,
+    )
+    assert right.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.A,
+                Button.B,
+                Button.X,
+                Button.Y,
+                Button.R,
+                Button.ZR,
+                Button.PLUS,
+                Button.RS,
+                Button.HOME,
+                Button.SL,
+                Button.SR,
+            }
+        ),
+        dpad=False,
+        left_stick=False,
+        right_stick=True,
+        imu=True,
+    )

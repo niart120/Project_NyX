@@ -56,7 +56,24 @@ class SwbtControllerConfig:
     connect_timeout_sec: float = 30.0
 
 
-_PRO_BUTTONS = frozenset(Button)
+_PRO_BUTTONS = frozenset(
+    {
+        Button.A,
+        Button.B,
+        Button.X,
+        Button.Y,
+        Button.L,
+        Button.R,
+        Button.ZL,
+        Button.ZR,
+        Button.MINUS,
+        Button.PLUS,
+        Button.LS,
+        Button.RS,
+        Button.HOME,
+        Button.CAP,
+    }
+)
 _JOY_CON_L_BUTTONS = frozenset(
     {
         Button.L,
@@ -64,6 +81,8 @@ _JOY_CON_L_BUTTONS = frozenset(
         Button.MINUS,
         Button.LS,
         Button.CAP,
+        Button.SL,
+        Button.SR,
     }
 )
 _JOY_CON_R_BUTTONS = frozenset(
@@ -77,6 +96,8 @@ _JOY_CON_R_BUTTONS = frozenset(
         Button.PLUS,
         Button.RS,
         Button.HOME,
+        Button.SL,
+        Button.SR,
     }
 )
 

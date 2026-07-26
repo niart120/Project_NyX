@@ -237,6 +237,33 @@ def test_swbt_button_dpad_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None
     )
 
 
+def test_swbt_joycon_side_buttons_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
+    side_buttons = (Button.SL, Button.SR)
+    if not all(button in swbt_run.model.capabilities.buttons for button in side_buttons):
+        swbt_run.record(
+            "test_swbt_joycon_side_buttons_manual_realdevice",
+            "skip",
+            reason="selected controller does not support Joy-Con side buttons",
+        )
+        pytest.skip("selected controller does not support Joy-Con side buttons")
+
+    _require_operator_confirmation(swbt_run, "test_swbt_joycon_side_buttons_manual_realdevice")
+
+    with _connected_port(swbt_run) as port:
+        for button in side_buttons:
+            port.press((button,))
+            time.sleep(0.2)
+            port.release((button,))
+            time.sleep(0.2)
+
+    _record_operator_result(
+        swbt_run,
+        "test_swbt_joycon_side_buttons_manual_realdevice",
+        prompt="SL と SR がそれぞれ正しく反映されたか (pass/fail/skip): ",
+        details={"buttons": [button.name for button in side_buttons]},
+    )
+
+
 def test_swbt_stick_manual_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
     _require_operator_confirmation(swbt_run, "test_swbt_stick_manual_realdevice")
 

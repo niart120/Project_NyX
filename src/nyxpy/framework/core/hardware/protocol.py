@@ -110,6 +110,15 @@ class UnsupportedKeyError(ValueError):
     """指定されたキーが対象プロトコルで表現できない場合の例外。"""
 
 
+_JOY_CON_SIDE_BUTTONS = frozenset({Button.SL, Button.SR})
+
+
+def _serial_switch_button_value(protocol_name: str, key: Button) -> int:
+    if key in _JOY_CON_SIDE_BUTTONS:
+        raise UnsupportedKeyError(f"{protocol_name} protocol does not support {key!r}.")
+    return int(key)
+
+
 class CH552SerialProtocol(SerialProtocolInterface):
     """CH552SerialProtocol は、CH552 デバイス向けの通信プロトコルを実装します。
 
@@ -149,9 +158,10 @@ class CH552SerialProtocol(SerialProtocolInterface):
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
+                button = _serial_switch_button_value("CH552", key)
                 # ボタンは2バイト（btn1, btn2）にわたってマスクする
-                self.key_state[1] |= key & 0xFF
-                self.key_state[2] |= (key >> 8) & 0xFF
+                self.key_state[1] |= button & 0xFF
+                self.key_state[2] |= (button >> 8) & 0xFF
             elif isinstance(key, Hat):
                 self.key_state[3] = key
             elif isinstance(key, LStick):
@@ -172,9 +182,10 @@ class CH552SerialProtocol(SerialProtocolInterface):
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
+                button = _serial_switch_button_value("CH552", key)
                 # ボタンは2バイト（btn1, btn2）にわたってマスクする
-                self.key_state[1] |= key & 0xFF
-                self.key_state[2] |= (key >> 8) & 0xFF
+                self.key_state[1] |= button & 0xFF
+                self.key_state[2] |= (button >> 8) & 0xFF
             elif isinstance(key, Hat):
                 self.key_state[3] = key
             elif isinstance(key, LStick):
@@ -196,8 +207,9 @@ class CH552SerialProtocol(SerialProtocolInterface):
         else:
             for key in keys:
                 if isinstance(key, Button):
-                    self.key_state[1] &= (~(key & 0xFF)) & 0xFF
-                    self.key_state[2] &= (~((key >> 8) & 0xFF)) & 0xFF
+                    button = _serial_switch_button_value("CH552", key)
+                    self.key_state[1] &= (~(button & 0xFF)) & 0xFF
+                    self.key_state[2] &= (~((button >> 8) & 0xFF)) & 0xFF
                 elif isinstance(key, Hat):
                     self.key_state[3] = Hat.CENTER
                 elif isinstance(key, LStick):
@@ -263,8 +275,9 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
+                button = _serial_switch_button_value("PokeCon", key)
                 # ボタンは16ビット（hex_btns）にわたってマスクする
-                self.key_state[0] |= (key << 2) & 0xFFFF  # Update to use hex_btns
+                self.key_state[0] |= (button << 2) & 0xFFFF  # Update to use hex_btns
             elif isinstance(key, Hat):
                 self.key_state[1] = key
             elif isinstance(key, LStick):
@@ -287,8 +300,9 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         # 各キーに対して、内部状態を更新する
         for key in keys:
             if isinstance(key, Button):
+                button = _serial_switch_button_value("PokeCon", key)
                 # ボタンは16ビット（hex_btns）にわたってマスクする
-                self.key_state[0] |= (key << 2) & 0xFFFF  # Update to use hex_btns
+                self.key_state[0] |= (button << 2) & 0xFFFF  # Update to use hex_btns
             elif isinstance(key, Hat):
                 self.key_state[1] = key
             elif isinstance(key, LStick):
@@ -312,7 +326,8 @@ class PokeConSerialProtocol(SerialProtocolInterface):
         else:
             for key in keys:
                 if isinstance(key, Button):
-                    self.key_state[0] &= (~((key << 2) & 0xFFFF)) & 0xFFFF
+                    button = _serial_switch_button_value("PokeCon", key)
+                    self.key_state[0] &= (~((button << 2) & 0xFFFF)) & 0xFFFF
                 elif isinstance(key, Hat):
                     self.key_state[1] = Hat.CENTER
                 elif isinstance(key, LStick):

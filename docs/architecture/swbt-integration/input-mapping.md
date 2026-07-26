@@ -45,10 +45,14 @@ Project_NyX `Button` を swbt `Button` へ変換する。
 | `Button.CAP` | `swbt.Button.CAPTURE` |
 | `Button.LS` | `swbt.Button.LEFT_STICK` |
 | `Button.RS` | `swbt.Button.RIGHT_STICK` |
+| `Button.SL` | `swbt.Button.SL` |
+| `Button.SR` | `swbt.Button.SR` |
 
 Project_NyX 側に backend 固有ではないが swbt が扱えない button がある場合は `NYX_SWBT_INPUT_UNSUPPORTED` にする。
 
 `Button.CAPTURE`、`Button.LCLICK`、`Button.RCLICK` の alias は追加しない。Project_NyX 既存定数を直接 swbt 定数へ対応付ける。
+
+`Button.SL` と `Button.SR` はJoy-Con L/Rだけが扱う。Pro Controllerのswbt backendでは `NYX_SWBT_INPUT_UNSUPPORTED`、CH552 / PokeCon / 3DS serial protocolでは `UnsupportedKeyError` にする。
 
 ## Hat
 
