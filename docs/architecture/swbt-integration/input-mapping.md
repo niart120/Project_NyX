@@ -124,7 +124,9 @@ def to_imu_frame(frame: NyxIMUFrame) -> SwbtIMUFrame:
 1 frame が渡された場合は 3 frame に複製する。3 frame が渡された場合は順に使う。それ以外は `NYX_IMU_FRAME_COUNT_INVALID` にする。
 
 ```python
-def normalize_imu_frames(frames: tuple[NyxIMUFrame, ...]) -> tuple[NyxIMUFrame, NyxIMUFrame, NyxIMUFrame]:
+def normalize_imu_frames(
+    frames: tuple[NyxIMUFrame, ...],
+) -> tuple[NyxIMUFrame, NyxIMUFrame, NyxIMUFrame]:
     if len(frames) == 1:
         return (frames[0], frames[0], frames[0])
     if len(frames) == 3:

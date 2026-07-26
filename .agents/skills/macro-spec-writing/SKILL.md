@@ -151,6 +151,7 @@ spec/macro/{macro_name}/補助ドキュメント.md  # 補足（任意）
 def calc_target_frame(base_frame: int, offset: int, fps: float) -> float:
     return (base_frame + offset) / fps
 
+
 # Bad: Command に依存 — テスト困難
 def calc_and_wait(cmd: Command, base_frame: int, offset: int) -> None:
     cmd.wait((base_frame + offset) / 59.7275)

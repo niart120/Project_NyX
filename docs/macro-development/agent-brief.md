@@ -56,7 +56,12 @@ from nyxpy.framework.core.constants import (
 画像処理:
 
 ```python
-from nyxpy.framework.core.imgproc import ImageProcessor, OCRProcessor, contains_template, find_template
+from nyxpy.framework.core.imgproc import (
+    ImageProcessor,
+    OCRProcessor,
+    contains_template,
+    find_template,
+)
 ```
 
 ## 最小構成の例

@@ -159,7 +159,9 @@ from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.macro.command import Command
 
 
-type FrameworkValue = str | int | float | bool | list[FrameworkValue] | dict[str, FrameworkValue] | None
+type FrameworkValue = (
+    str | int | float | bool | list[FrameworkValue] | dict[str, FrameworkValue] | None
+)
 type ErrorDetailValue = FrameworkValue
 type MacroArgValue = FrameworkValue
 type LogExtraValue = FrameworkValue
@@ -200,8 +202,14 @@ class MacroCancelled(MacroStopException):
 
 
 class DeviceError(FrameworkError): ...
+
+
 class ResourceError(FrameworkError): ...
+
+
 class ConfigurationError(FrameworkError): ...
+
+
 class MacroRuntimeError(FrameworkError): ...
 
 
@@ -215,6 +223,7 @@ class ErrorInfo:
     recoverable: bool
     details: dict[str, ErrorDetailValue] = field(default_factory=dict)
     traceback: str | None = None
+
 
 # RunStatus / RunResult の型定義は RUNTIME_AND_IO_PORTS.md を正とする。
 ```
@@ -260,6 +269,8 @@ class CancellableCommand(Command):
 
 ```python
 class RunContext: ...
+
+
 class ExecutionContext: ...
 
 
@@ -276,6 +287,7 @@ class MacroRunner:
         exec_args: Mapping[str, MacroArgValue],
         run_context: RunContext,
     ) -> RunResult: ...
+
 
 class MacroRuntime:
     def run(self, context: ExecutionContext) -> RunResult: ...

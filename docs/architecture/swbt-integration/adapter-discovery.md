@@ -37,6 +37,7 @@ CLI と GUI は `swbt.AdapterInfo` をそのまま外へ出さず、Project_NyX 
 ```python
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class SwbtAdapterView:
     name: str

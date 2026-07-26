@@ -204,7 +204,9 @@ import cv2
 from nyxpy.framework.core.constants import KeyCode, KeyType, SpecialKeyCode
 
 
-type LogExtraValue = str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
+type LogExtraValue = (
+    str | int | float | bool | list[LogExtraValue] | dict[str, LogExtraValue] | None
+)
 type KeyboardKey = KeyCode | SpecialKeyCode
 
 
@@ -252,8 +254,18 @@ class FakeLoggerPort:
     records: list[Mapping[str, LogExtraValue]] = field(default_factory=list)
 
     def bind_context(self, context: object) -> "FakeLoggerPort": ...
-    def technical(self, level: str, message: str, *, component: str, event: str = "log.message", **extra: LogExtraValue) -> None: ...
-    def user(self, level: str, message: str, *, component: str, event: str, **extra: LogExtraValue) -> None: ...
+    def technical(
+        self,
+        level: str,
+        message: str,
+        *,
+        component: str,
+        event: str = "log.message",
+        **extra: LogExtraValue,
+    ) -> None: ...
+    def user(
+        self, level: str, message: str, *, component: str, event: str, **extra: LogExtraValue
+    ) -> None: ...
 ```
 
 ### 設定パラメータ

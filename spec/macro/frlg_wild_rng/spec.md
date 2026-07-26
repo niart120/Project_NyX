@@ -176,6 +176,7 @@ OP スキップ → frame2 待機 → つづきから → 回想スキップの�
 _FRAME2: float = 300.0  # 初期Seed決定〜つづきからはじめる (5.000s × 60fps)
 _FPS: float = 60.0
 
+
 def skip_opening_and_continue(cmd: Command) -> float:
     """OP スキップ → frame2 待機 → つづきからはじめる → 回想スキップ。
 
@@ -186,10 +187,10 @@ def skip_opening_and_continue(cmd: Command) -> float:
         start_timer() による timer1 開始時刻
     """
     t1 = start_timer()
-    cmd.press(Button.A, dur=3.50, wait=1.00)   # OP スキップ
-    consume_timer(cmd, t1, _FRAME2, _FPS)      # frame2 タイマー消化
-    cmd.press(Button.A, dur=0.20, wait=0.30)   # つづきからはじめる
-    cmd.press(Button.B, dur=1.00, wait=1.80)   # 回想スキップ
+    cmd.press(Button.A, dur=3.50, wait=1.00)  # OP スキップ
+    consume_timer(cmd, t1, _FRAME2, _FPS)  # frame2 タイマー消化
+    cmd.press(Button.A, dur=0.20, wait=0.30)  # つづきからはじめる
+    cmd.press(Button.B, dur=1.00, wait=1.80)  # 回想スキップ
     return t1
 ```
 
@@ -334,13 +335,9 @@ def initialize(self, cmd: Command, args: dict) -> None:
     # おしえテレビによる消費分を差し引き、フレーム数を逆算
     if cfg.use_teachy_tv:
         self._teachy_tv_frames = (
-            cfg.teachy_tv_consumption
-            - cfg.teachy_tv_transition_correction
+            cfg.teachy_tv_consumption - cfg.teachy_tv_transition_correction
         ) / cfg.teachy_tv_adv_per_frame
-        teachy_excess = (
-            cfg.teachy_tv_consumption
-            - cfg.rng_multiplier * self._teachy_tv_frames
-        )
+        teachy_excess = cfg.teachy_tv_consumption - cfg.rng_multiplier * self._teachy_tv_frames
         self._effective_advance -= teachy_excess
 
     # バリデーション: effective_advance が負の場合は設定ミス
@@ -435,12 +432,12 @@ B    (dur=1.00, wait=1.80)   # 回想を B で飛ばす
 
 ```python
 if cfg.use_odd_correction:
-    cmd.press(Button.X, dur=0.10, wait=0.50)   # メニュー開く
-    cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
-    cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
-    cmd.press(Button.A, dur=0.10, wait=1.40)   # 図鑑開く
-    cmd.press(Button.B, dur=0.10, wait=1.40)   # 図鑑閉じる
-    cmd.press(Button.B, dur=0.10, wait=0.50)   # メニュー閉じる
+    cmd.press(Button.X, dur=0.10, wait=0.50)  # メニュー開く
+    cmd.press(Button.A, dur=0.10, wait=1.40)  # 図鑑開く
+    cmd.press(Button.B, dur=0.10, wait=1.40)  # 図鑑閉じる
+    cmd.press(Button.A, dur=0.10, wait=1.40)  # 図鑑開く
+    cmd.press(Button.B, dur=0.10, wait=1.40)  # 図鑑閉じる
+    cmd.press(Button.B, dur=0.10, wait=0.50)  # メニュー閉じる
 ```
 
 > **奇数ズレ補正の目的**: フィールド上の乱数消費は `rng_multiplier` 単位（Switch = 2 adv/F）で
@@ -456,10 +453,10 @@ if cfg.use_odd_correction:
 
 ```python
 if cfg.use_teachy_tv:
-    timer_teachy = start_timer()               # ★ timer_teachy 開始
-    cmd.press(Button.Y, dur=0.10, wait=0.50)   # おしえテレビ起動
+    timer_teachy = start_timer()  # ★ timer_teachy 開始
+    cmd.press(Button.Y, dur=0.10, wait=0.50)  # おしえテレビ起動
     consume_timer(cmd, timer_teachy, self._teachy_tv_frames, cfg.fps)  # 待機時間消化
-    cmd.press(Button.B, dur=0.10, wait=1.00)   # おしえテレビ終了
+    cmd.press(Button.B, dur=0.10, wait=1.00)  # おしえテレビ終了
 ```
 
 | タイミング | 説明 |
@@ -485,13 +482,13 @@ if cfg.use_teachy_tv:
 メニューを開いてあまいかおりを選択する。
 
 ```python
-cmd.press(Button.X, dur=0.10, wait=0.50)       # 1. メニューを開く
-cmd.press(LStick.DOWN, dur=0.10, wait=0.30)    # 2. "ポケモン" にカーソル
-cmd.press(Button.A, dur=0.10, wait=1.00)       # 3. ポケモンメニューを開く
-cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 4. カーソルを上に移動（ラップアラウンド開始）
-cmd.press(LStick.UP, dur=0.10, wait=0.20)      # 5. 最下段（あまいかおり持ち）にカーソル
-cmd.press(Button.A, dur=0.10, wait=0.30)       # 6. コンテキストメニューを開く
-cmd.press(LStick.DOWN, dur=0.10, wait=0.20)    # 7. "あまいかおり" にカーソル
+cmd.press(Button.X, dur=0.10, wait=0.50)  # 1. メニューを開く
+cmd.press(LStick.DOWN, dur=0.10, wait=0.30)  # 2. "ポケモン" にカーソル
+cmd.press(Button.A, dur=0.10, wait=1.00)  # 3. ポケモンメニューを開く
+cmd.press(LStick.UP, dur=0.10, wait=0.20)  # 4. カーソルを上に移動（ラップアラウンド開始）
+cmd.press(LStick.UP, dur=0.10, wait=0.20)  # 5. 最下段（あまいかおり持ち）にカーソル
+cmd.press(Button.A, dur=0.10, wait=0.30)  # 6. コンテキストメニューを開く
+cmd.press(LStick.DOWN, dur=0.10, wait=0.20)  # 7. "あまいかおり" にカーソル
 ```
 
 > **前提**: あまいかおりを覚えたポケモンは常に手持ちの最下段に配置する。

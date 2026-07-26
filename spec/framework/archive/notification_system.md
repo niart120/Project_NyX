@@ -86,7 +86,9 @@ password = "your-app-password"
 ### 5.1 プログラムからの呼び出し
 
 ```python
-from nyxpy.framework.core.notifications.notification_handler import create_notification_handler_from_settings
+from nyxpy.framework.core.notifications.notification_handler import (
+    create_notification_handler_from_settings,
+)
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 
 # 設定から通知ハンドラーを作成
@@ -98,6 +100,7 @@ handler.publish("マクロが完了しました")
 
 # スクリーンショット付き通知
 import cv2
+
 image = cv2.imread("screenshot.png")
 handler.publish("マクロが完了しました", image)
 ```
@@ -111,29 +114,30 @@ handler.publish("マクロが完了しました", image)
 from nyxpy.framework.core.macro.base import MacroBase
 from nyxpy.framework.core.constants.controller import Button
 
+
 class NotificationSampleMacro(MacroBase):
     description = "通知システムの使用例"
     tags = ["sample", "notification"]
 
     def initialize(self, cmd, args):
         pass
-    
+
     def run(self, cmd):
         # 重要な処理の開始時に通知
         cmd.notify("マクロ処理を開始しました")
-        
+
         # 何かしらの処理
         cmd.press(Button.A, dur=0.1)
         cmd.wait(5.0)
-        
+
         # スクリーンショット付き通知
         screenshot = cmd.capture()
         cmd.notify("中間処理が完了しました", screenshot)
-        
+
         # さらなる処理...
         for i in range(10):
             cmd.press(Button.B, dur=0.1, wait=1.0)
-        
+
         # 最終完了通知
         final_image = cmd.capture()
         cmd.notify("マクロが正常に完了しました", final_image)
@@ -192,10 +196,12 @@ CLI でマクロを実行する際、設定が有効であれば自動的に通�
 ```python
 from .notifier import Notifier
 import cv2
+
+
 class NewPlatformNotification(Notifier):
     def __init__(self, api_key: str):
         self.api_key = api_key
-    
+
     def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
         # プラットフォーム固有の通知実装
         pass

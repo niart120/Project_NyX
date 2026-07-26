@@ -170,6 +170,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Pokemon:
     """LCG から生成された個体のデータ"""
+
     pid: int
     nature_id: int
     iv_hp: int
@@ -397,8 +398,7 @@ def solve_initial_seed(
         for f in range(min_advance, max_advance + 1):
             pokemon = generate_pokemon(lcg)
 
-            if _matches(pokemon, nature_id, nature_mult,
-                        observed_stats, base_stats, level):
+            if _matches(pokemon, nature_id, nature_mult, observed_stats, base_stats, level):
                 result_count += 1
                 result_seed = f"{initial_seed:04X}"
 
@@ -495,7 +495,7 @@ NyX では `min_advance` 〜 `max_advance` の**全フレームを無条件に�
 
 ```python
 lcg = LCG32(initial_seed)
-lcg.advance(start_frame)      # start_frame = min_advance
+lcg.advance(start_frame)  # start_frame = min_advance
 ```
 
 この時点で LCG の内部状態は `seed[start_frame]` に位置する。

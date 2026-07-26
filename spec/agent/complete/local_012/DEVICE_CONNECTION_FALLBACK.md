@@ -181,29 +181,25 @@ class ResolvedConnection:
     fallback_reason: ConnectionFallbackReason | None = None
 
     @property
-    def uses_dummy(self) -> bool:
-        ...
+    def uses_dummy(self) -> bool: ...
 
 
 def select_serial_target(
     request: ConnectionRequest,
     result: DeviceDiscoveryResult,
-) -> ResolvedConnection:
-    ...
+) -> ResolvedConnection: ...
 
 
 def select_capture_target(
     request: ConnectionRequest,
     result: DeviceDiscoveryResult,
-) -> ResolvedConnection:
-    ...
+) -> ResolvedConnection: ...
 
 
 def select_window_target(
     request: ConnectionRequest,
     windows: tuple[WindowInfo, ...],
-) -> ResolvedConnection:
-    ...
+) -> ResolvedConnection: ...
 ```
 
 `ControllerOutputPortFactory.create()` と `FrameSourcePortFactory.create()` は、selection policy が `FALLBACK_DUMMY` を返した場合に Dummy port を返す。selection policy が `ERROR` を返した場合は `ConfigurationError` を送出し、`details` に `device_type`, `requested`, `available_devices`, `fallback_reason` を含める。実デバイスが見つかった後に serial `open()` で失敗した場合、`allow_dummy=True` では Dummy に切り替え、`allow_dummy=False` では原因例外を持つ `ConfigurationError` を送出する。capture/window の `initialize()` 失敗は fallback wrapper が `allow_dummy=True` で Dummy へ切り替え、warning log を残す。

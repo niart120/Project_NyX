@@ -332,50 +332,42 @@ class MacroBase(ABC):
     tags: list[str] = []
 
     @abstractmethod
-    def initialize(self, cmd: "Command", args: dict) -> None:
-        ...
+    def initialize(self, cmd: "Command", args: dict) -> None: ...
 
     @abstractmethod
-    def run(self, cmd: "Command") -> None:
-        ...
+    def run(self, cmd: "Command") -> None: ...
 
     @abstractmethod
-    def finalize(self, cmd: "Command") -> None:
-        ...
+    def finalize(self, cmd: "Command") -> None: ...
 
 
 class Command(ABC):
     @abstractmethod
-    def press(self, *keys: ControllerKey, dur: float = 0.1, wait: float = 0.1) -> None:
-        ...
+    def press(self, *keys: ControllerKey, dur: float = 0.1, wait: float = 0.1) -> None: ...
 
     @abstractmethod
-    def hold(self, *keys: ControllerKey) -> None:
-        ...
+    def hold(self, *keys: ControllerKey) -> None: ...
 
     @abstractmethod
-    def release(self, *keys: ControllerKey) -> None:
-        ...
+    def release(self, *keys: ControllerKey) -> None: ...
 
     @abstractmethod
-    def wait(self, wait: float) -> None:
-        ...
+    def wait(self, wait: float) -> None: ...
 
     @abstractmethod
-    def stop(self) -> None:
-        ...
+    def stop(self) -> None: ...
 
     @abstractmethod
-    def log(self, *values: object, sep: str = " ", end: str = "\n", level: str = "DEBUG") -> None:
-        ...
+    def log(
+        self, *values: object, sep: str = " ", end: str = "\n", level: str = "DEBUG"
+    ) -> None: ...
 
     @abstractmethod
     def capture(
         self,
         crop_region: tuple[int, int, int, int] | None = None,
         grayscale: bool = False,
-    ) -> cv2.typing.MatLike:
-        ...
+    ) -> cv2.typing.MatLike: ...
 
     @abstractmethod
     def save_artifact_img(
@@ -384,24 +376,19 @@ class Command(ABC):
         image: cv2.typing.MatLike,
         *,
         scope: ArtifactScope = ArtifactScope.RUN,
-    ) -> ResourceRef:
-        ...
+    ) -> ResourceRef: ...
 
     @abstractmethod
-    def load_img(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike:
-        ...
+    def load_img(self, filename: str | Path, grayscale: bool = False) -> cv2.typing.MatLike: ...
 
     @abstractmethod
-    def keyboard(self, text: str) -> None:
-        ...
+    def keyboard(self, text: str) -> None: ...
 
     @abstractmethod
-    def type(self, key: KeyCode | SpecialKeyCode) -> None:
-        ...
+    def type(self, key: KeyCode | SpecialKeyCode) -> None: ...
 
     @abstractmethod
-    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None:
-        ...
+    def notify(self, text: str, img: cv2.typing.MatLike | None = None) -> None: ...
 
     def touch(self, x: int, y: int, dur: float = 0.1, wait: float = 0.1) -> None:
         raise NotImplementedError("Current serial protocol does not support touch input.")
@@ -414,7 +401,6 @@ class Command(ABC):
 
     def disable_sleep(self, enabled: bool = True) -> None:
         raise NotImplementedError("Current serial protocol does not support sleep control.")
-
 ```
 
 `MacroExecutor` は上記の既存マクロ互換 API に含めない。`MacroExecutor.execute()` の成功時 `None`、失敗時例外再送出、`macros` / `macro` 属性は再設計後の保証対象外である。
@@ -435,9 +421,17 @@ type RuntimeValue = str | int | float | bool | list[RuntimeValue] | dict[str, Ru
 
 
 class MacroDefinition: ...
+
+
 class ExecutionContext: ...
+
+
 class RunContext: ...
+
+
 class RunResult: ...
+
+
 class RunHandle: ...
 
 

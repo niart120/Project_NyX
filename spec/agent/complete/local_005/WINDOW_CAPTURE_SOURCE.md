@@ -311,9 +311,7 @@ class ScreenRegionCaptureSourceConfig:
 
 
 CaptureSourceConfig = (
-    CameraCaptureSourceConfig
-    | WindowCaptureSourceConfig
-    | ScreenRegionCaptureSourceConfig
+    CameraCaptureSourceConfig | WindowCaptureSourceConfig | ScreenRegionCaptureSourceConfig
 )
 
 
