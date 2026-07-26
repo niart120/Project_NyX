@@ -7,6 +7,7 @@ from nyxpy.framework.core.hardware.capture_source import CaptureRect
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
+from nyxpy.framework.core.macro.exceptions import ConfigurationError
 from nyxpy.gui.dialogs.settings.device_tab import DeviceSettingsTab
 
 
@@ -38,7 +39,7 @@ class FakeSettings:
             "controller.serial.baudrate": 9600,
             "controller.swbt.controller_type": "pro-controller",
             "controller.swbt.adapter": None,
-            "controller.swbt.key_store_path": None,
+            "controller.swbt.profile_path": None,
             "gui.window_size_preset": "full_hd",
         }
 
@@ -139,7 +140,7 @@ def test_device_tab_uses_consistent_controller_terms(qtbot):
         "プロトコル:",
         "ボーレート:",
         "タイプ:",
-        "キーストア:",
+        "ペアリングプロファイル:",
         "接続:",
         "状態:",
     }
@@ -151,7 +152,7 @@ def test_device_tab_uses_consistent_controller_terms(qtbot):
             "Baud Rate:",
             "Controller:",
             "Adapter:",
-            "Key Store:",
+            "Pairing Profile:",
             "Connection:",
             "Status:",
         }
@@ -168,7 +169,7 @@ def test_device_tab_orders_swbt_fields_like_controller_menu(qtbot):
     assert [
         form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()
         for row in range(form.rowCount())
-    ] == ["デバイス:", "タイプ:", "キーストア:", "接続:", "状態:"]
+    ] == ["デバイス:", "タイプ:", "ペアリングプロファイル:", "接続:", "状態:"]
 
 
 def test_device_tab_selects_3ds_default_baudrate(qtbot):
@@ -457,52 +458,52 @@ def test_device_settings_tab_applies_swbt_settings(qtbot):
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
     tab.swbt_adapter.setCurrentIndex(tab.swbt_adapter.findData("hci0"))
-    tab.swbt_key_store.setEditText(".nyxpy/swbt/joy-con-l-bond.json")
+    tab.swbt_profile.setEditText(".nyxpy/swbt/joy-con-l-profile.json")
     tab.apply()
 
     assert settings.data["controller.backend"] == "swbt"
     assert settings.data["controller.swbt.controller_type"] == "joy-con-l"
     assert settings.data["controller.swbt.adapter"] == "hci0"
-    assert settings.data["controller.swbt.key_store_path"] == ".nyxpy/swbt/joy-con-l-bond.json"
+    assert settings.data["controller.swbt.profile_path"] == ".nyxpy/swbt/joy-con-l-profile.json"
 
 
-def test_key_store_lists_model_defaults_and_selects_current_model_default(qtbot) -> None:
+def test_profile_lists_model_defaults_and_selects_current_model_default(qtbot) -> None:
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    assert tab.swbt_key_store.currentText() == ".nyxpy/swbt/pro-controller-bond.json"
-    assert {tab.swbt_key_store.itemText(index) for index in range(tab.swbt_key_store.count())} >= {
-        ".nyxpy/swbt/pro-controller-bond.json",
-        ".nyxpy/swbt/joy-con-l-bond.json",
-        ".nyxpy/swbt/joy-con-r-bond.json",
+    assert tab.swbt_profile.currentText() == ".nyxpy/swbt/pro-controller-profile.json"
+    assert {tab.swbt_profile.itemText(index) for index in range(tab.swbt_profile.count())} >= {
+        ".nyxpy/swbt/pro-controller-profile.json",
+        ".nyxpy/swbt/joy-con-l-profile.json",
+        ".nyxpy/swbt/joy-con-r-profile.json",
     }
 
 
-def test_key_store_model_change_updates_default_but_preserves_custom_path(qtbot) -> None:
+def test_profile_model_change_updates_default_but_preserves_custom_path(qtbot) -> None:
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
-    assert tab.swbt_key_store.currentText() == ".nyxpy/swbt/joy-con-l-bond.json"
+    assert tab.swbt_profile.currentText() == ".nyxpy/swbt/joy-con-l-profile.json"
 
-    tab.swbt_key_store.setEditText("keys/custom.json")
+    tab.swbt_profile.setEditText("keys/custom.json")
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-r"))
-    assert tab.swbt_key_store.currentText() == "keys/custom.json"
+    assert tab.swbt_profile.currentText() == "keys/custom.json"
 
 
-def test_key_store_lists_existing_workspace_json_files(qtbot, tmp_path) -> None:
+def test_profile_lists_existing_workspace_json_files(qtbot, tmp_path) -> None:
     class SettingsWithConfigDir(FakeSettings):
         config_dir = tmp_path / ".nyxpy"
 
-    key_store_dir = SettingsWithConfigDir.config_dir / "swbt"
-    key_store_dir.mkdir(parents=True)
-    (key_store_dir / "paired-switch.json").write_text("{}", encoding="utf-8")
-    (key_store_dir / "ignore.txt").write_text("", encoding="utf-8")
+    profile_dir = SettingsWithConfigDir.config_dir / "swbt"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "paired-switch.json").write_text("{}", encoding="utf-8")
+    (profile_dir / "ignore.txt").write_text("", encoding="utf-8")
 
     tab = DeviceSettingsTab(SettingsWithConfigDir(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
-    choices = [tab.swbt_key_store.itemText(index) for index in range(tab.swbt_key_store.count())]
+    choices = [tab.swbt_profile.itemText(index) for index in range(tab.swbt_profile.count())]
     assert ".nyxpy/swbt/paired-switch.json" in choices
     assert ".nyxpy/swbt/ignore.txt" not in choices
 
@@ -604,7 +605,37 @@ def test_pair_button_becomes_cancel_and_invokes_pair_cancellation(qtbot) -> None
     assert tab.swbt_pair_btn.text() == "Pair"
 
 
-def test_reconnect_button_becomes_cancel_and_restores_after_nested_cancellation(qtbot) -> None:
+def test_profile_error_displays_individual_code(qtbot) -> None:
+    def pair(_succeeded, failed) -> None:
+        failed(
+            ConfigurationError(
+                "pairing profile uses an unsupported schema",
+                code="NYX_SWBT_PROFILE_INVALID",
+                component="test",
+            )
+        )
+
+    tab = DeviceSettingsTab(
+        FakeSettings(),
+        None,
+        device_discovery=FakeDiscovery(),
+        swbt_pair=pair,
+    )
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb-1")
+
+    tab.swbt_pair_btn.click()
+
+    assert tab.swbt_status_label.text() == (
+        "connection failed: NYX_SWBT_PROFILE_INVALID: pairing profile uses an unsupported schema"
+    )
+
+
+def test_reconnect_button_becomes_cancel_and_restores_after_nested_cancellation(
+    qtbot,
+    tmp_path,
+) -> None:
     cancelled = Event()
     callbacks = {}
 
@@ -612,8 +643,12 @@ def test_reconnect_button_becomes_cancel_and_restores_after_nested_cancellation(
         callbacks["failed"] = failed
         return cancelled.set
 
+    settings = FakeSettings()
+    profile_path = tmp_path / "pro-controller-profile.json"
+    profile_path.touch()
+    settings.data["controller.swbt.profile_path"] = str(profile_path)
     tab = DeviceSettingsTab(
-        FakeSettings(),
+        settings,
         None,
         device_discovery=FakeDiscovery(),
         swbt_reconnect=reconnect,
@@ -644,9 +679,26 @@ def test_reconnect_button_becomes_cancel_and_restores_after_nested_cancellation(
             ],
         )
     )
-
     assert tab.swbt_status_label.text() == "再接続をキャンセルしました"
     assert tab.swbt_reconnect_btn.text() == "Reconnect"
+
+
+def test_reconnect_requires_existing_profile_file(qtbot, tmp_path) -> None:
+    settings = FakeSettings()
+    profile_path = tmp_path / "pro-controller-profile.json"
+    settings.data["controller.swbt.profile_path"] = str(profile_path)
+    tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb-1")
+
+    assert tab.swbt_pair_btn.isEnabled()
+    assert not tab.swbt_reconnect_btn.isEnabled()
+
+    profile_path.touch()
+    tab._update_controller_field_state()
+
+    assert tab.swbt_reconnect_btn.isEnabled()
 
 
 def test_adapter_refresh_resolves_saved_alias_without_auto_selecting_other(qtbot) -> None:

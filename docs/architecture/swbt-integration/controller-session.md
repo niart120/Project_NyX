@@ -8,9 +8,9 @@
 
 ## なぜ session が必要か
 
-serial backend は `SerialControllerOutputPort` から `SerialComm.send(...)` を呼ぶ。swbt backend は controller class の選択、adapter 未指定の拒否、key store、diagnostics writer、swbt 例外の変換を同じ入力 port から扱う必要がある。
+serial backend は `SerialControllerOutputPort` から `SerialComm.send(...)` を呼ぶ。swbt backend は controller class の選択、adapter 未指定の拒否、pairing profile、diagnostics writer、swbt 例外の変換を同じ入力 port から扱う必要がある。
 
-`SwbtControllerSession` はこの lifecycle 差分を吸収する。swbt-python 0.2 系では `open()`、`pair()`、`reconnect()`、`apply()`、`neutral()`、`close()` が async API、`status()` が同期 API である。session は専用 event loop thread で async API の完了を待ち、上位には同期 method として見せる。
+`SwbtControllerSession` はこの lifecycle 差分を吸収する。swbt-python 0.5.3 では `create_profile()`、`open()`、`pair()`、`reconnect()`、`apply()`、`neutral()`、`close()` が async API、`status()` が同期 API である。session は専用 event loop thread で async API の完了を待ち、上位には同期 method として見せる。
 
 ```text
 SwbtControllerOutputPort  # sync ControllerOutputPort implementation
@@ -49,10 +49,10 @@ class SwbtControllerSession:
         """controller resource を開く。接続は開始しない。"""
 
     def pair(self, *, timeout_sec: float) -> None:
-        """pairing を実行し、status が connected であることを確認する。"""
+        """profile を作成または再利用してpairingし、connectedを確認する。"""
 
     def reconnect(self, *, timeout_sec: float) -> None:
-        """保存済み pairing key で reconnect し、status が connected であることを確認する。"""
+        """保存済み pairing profile で reconnect し、connectedを確認する。"""
 
     def apply(self, state: InputState) -> None:
         """現在入力全体を置き換える。"""
@@ -87,7 +87,7 @@ def create_swbt_controller(
         diagnostics = DiagnosticsConfig(trace_writer=diagnostics_writer)
     return controller_cls(
         adapter=config.adapter,
-        key_store_path=str(config.key_store_path),
+        profile_path=str(config.profile_path),
         report_period_us=config.report_period_us,
         diagnostics=diagnostics,
     )
@@ -95,7 +95,9 @@ def create_swbt_controller(
 
 diagnostics writer は NyX 内部 adapter で `LoggerPort.technical(...)` に流す。settings、GUI、CLI に diagnostics path は出さない。
 
-swbt の `pair()` / `reconnect()` 自体の戻り値は `None` である。session は操作完了後に同期 `status()` を取得し、`status.connection_state == "connected"` を接続成功条件として内部で確認する。上位へ返す値も `None` であり、戻り値の truthiness や存在しない `status.connected` / `status.message` は使わない。
+初回 Pair で profile が存在しない場合は `controller_cls.create_profile(adapter=..., profile_path=..., local_address=None, pair_timeout=...)` を呼び、返却された接続済み controller の lifetime を session が所有する。profile が存在する場合は通常 constructor と `pair()` を使う。これにより、キャンセルや接続失敗後に残った profile から Pair を再試行できる。factory は Pair 前に `session.open()` を呼ばず、分岐判断を session に集約する。
+
+swbt の `pair()` / `reconnect()` 自体の戻り値は `None` である。session は操作完了後に同期 `status()` を取得し、`status.connection_state == "connected"` を確認する。その後、公開 status の `report_counters[0x30]` が接続直後の値から増えるまで待つ。`0x30` は周期 input report であり、増加は Switch へ入力を送れる状態になった根拠である。タイムアウト時は `NYX_SWBT_INPUT_REPORT_NOT_READY` とする。上位へ返す値も `None` であり、戻り値の truthiness や存在しない `status.connected` / `status.message` は使わない。
 
 ## async bridge
 
@@ -136,7 +138,7 @@ session 内部には `RLock` を置き、connection operation と input apply �
 
 GUI lifetime port と macro runtime port が同一 session を同時に使わないよう、GUI 側は macro start 前に `VirtualControllerModel.set_controller(None)` を呼び、旧 manual port を release/close する。
 
-`SwbtControllerOutputPortFactory` は session key ごとに active port を 1 つだけ持つ。同一物理 adapter を別の controller model / key store で指定した場合も既存 port / session を先に閉じる。`create()` / `pair()` / `reconnect()` で旧 active port の neutral が失敗した場合は session close へ進み、終端 close に成功した場合だけ新しい session / port へ置き換える。`disconnect()` / `close()` / 接続失敗時の session 破棄も同じ cleanup 規則を使う。
+`SwbtControllerOutputPortFactory` は session key ごとに active port を 1 つだけ持つ。同一物理 adapter を別の controller model / pairing profile で指定した場合も既存 port / session を先に閉じる。`create()` / `pair()` / `reconnect()` で旧 active port の neutral が失敗した場合は session close へ進み、終端 close に成功した場合だけ新しい session / port へ置き換える。`disconnect()` / `close()` / 接続失敗時の session 破棄も同じ cleanup 規則を使う。
 
 session 自体は connection lifecycle と transport lock を持つ。manual / runtime の所有権は factory の active port 管理で扱い、`NYX_SWBT_ADAPTER_BUSY` のような busy error は追加しない。
 

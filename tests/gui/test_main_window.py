@@ -21,7 +21,12 @@ from nyxpy.framework.core.hardware.device_discovery import (
 from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
 from nyxpy.framework.core.logger import LogSanitizer, LogSinkDispatcher
-from nyxpy.framework.core.macro.exceptions import DeviceError, ErrorInfo, ErrorKind
+from nyxpy.framework.core.macro.exceptions import (
+    ConfigurationError,
+    DeviceError,
+    ErrorInfo,
+    ErrorKind,
+)
 from nyxpy.framework.core.runtime.result import RunResult, RunStatus
 from nyxpy.gui.app_services import SettingsApplyOutcome
 from nyxpy.gui.layout import LEFT_PANE_CONTENT_MARGIN
@@ -81,7 +86,7 @@ class FakeSettings:
                 "swbt": {
                     "controller_type": "pro-controller",
                     "adapter": None,
-                    "key_store_path": None,
+                    "profile_path": None,
                 },
             },
             "capture_fps": None,
@@ -447,6 +452,31 @@ def test_controller_menu_shows_only_swbt_settings_for_swbt_backend(
     assert window.swbt_type_menu is not None
 
 
+def test_swbt_reconnect_menu_requires_existing_profile(
+    window: MainWindow,
+    services: FakeServices,
+) -> None:
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:0")
+    window._swbt_adapter_views = services.refresh_swbt_adapters()
+
+    window._refresh_connection_menu()
+
+    assert window.controller_backend_menu is not None
+    lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
+    assert lifecycle["Pair"].isEnabled()
+    assert not lifecycle["Reconnect"].isEnabled()
+
+    profile_path = services.project_root / ".nyxpy" / "swbt" / "pro-controller-profile.json"
+    profile_path.parent.mkdir(parents=True)
+    profile_path.touch()
+    window._refresh_connection_menu()
+
+    assert window.controller_backend_menu is not None
+    lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
+    assert lifecycle["Reconnect"].isEnabled()
+
+
 def test_swbt_device_menu_canonicalizes_alias_selection(window: MainWindow) -> None:
     window.global_settings.set("controller.backend", "swbt")
     window.global_settings.set("controller.swbt.adapter", "usb:0A12:0001")
@@ -463,10 +493,10 @@ def test_swbt_device_menu_canonicalizes_alias_selection(window: MainWindow) -> N
     assert window.global_settings.get("controller.swbt.adapter") == "usb:0"
 
 
-def test_swbt_type_menu_updates_default_key_store(window: MainWindow) -> None:
+def test_swbt_type_menu_updates_default_profile(window: MainWindow) -> None:
     window.global_settings.set("controller.backend", "swbt")
     window.global_settings.set(
-        "controller.swbt.key_store_path", ".nyxpy/swbt/pro-controller-bond.json"
+        "controller.swbt.profile_path", ".nyxpy/swbt/pro-controller-profile.json"
     )
     window._refresh_connection_menu()
     assert window.swbt_type_menu is not None
@@ -478,14 +508,14 @@ def test_swbt_type_menu_updates_default_key_store(window: MainWindow) -> None:
 
     assert window.global_settings.get("controller.swbt.controller_type") == "joy-con-l"
     assert (
-        window.global_settings.get("controller.swbt.key_store_path")
-        == ".nyxpy/swbt/joy-con-l-bond.json"
+        window.global_settings.get("controller.swbt.profile_path")
+        == ".nyxpy/swbt/joy-con-l-profile.json"
     )
 
 
-def test_swbt_type_menu_preserves_custom_key_store(window: MainWindow) -> None:
+def test_swbt_type_menu_preserves_custom_profile(window: MainWindow) -> None:
     window.global_settings.set("controller.backend", "swbt")
-    window.global_settings.set("controller.swbt.key_store_path", "keys/custom.json")
+    window.global_settings.set("controller.swbt.profile_path", "keys/custom.json")
     window._refresh_connection_menu()
     assert window.swbt_type_menu is not None
     joy_con_r = next(
@@ -495,7 +525,7 @@ def test_swbt_type_menu_preserves_custom_key_store(window: MainWindow) -> None:
     joy_con_r.trigger()
 
     assert window.global_settings.get("controller.swbt.controller_type") == "joy-con-r"
-    assert window.global_settings.get("controller.swbt.key_store_path") == "keys/custom.json"
+    assert window.global_settings.get("controller.swbt.profile_path") == "keys/custom.json"
 
 
 def test_swbt_device_menu_keeps_missing_saved_adapter_visible_and_disables_connect(
@@ -1345,6 +1375,27 @@ def test_reconnect_success_sets_manual_controller(window: MainWindow, services: 
 
     assert services.swbt_calls == ["reconnect"]
     assert window.virtual_controller.model.controller is services.builder.manual_controller
+
+
+def test_connect_failure_displays_profile_error_code(
+    window: MainWindow,
+    services: FakeServices,
+) -> None:
+    error = ConfigurationError(
+        "pairing profile belongs to a different controller type",
+        code="NYX_SWBT_PROFILE_CONTROLLER_MISMATCH",
+        component="test",
+    )
+    failed: list[BaseException] = []
+
+    window._fail_swbt_lifecycle(error, failed.append, operation="connect")
+
+    assert window.status_label.text() == (
+        "エラー: NYX_SWBT_PROFILE_CONTROLLER_MISMATCH: "
+        "pairing profile belongs to a different controller type"
+    )
+    assert failed == [error]
+    assert services.logger.technical_events[-1][3] == "swbt.lifecycle_failed"
 
 
 def test_disconnect_releases_and_clears_manual_controller(

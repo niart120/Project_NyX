@@ -39,7 +39,7 @@ uv run nyxpy run sample_macro --serial <serial-device> --capture "Capture Device
 | `--controller` | controller backend。`serial` または `swbt` |
 | `--swbt-adapter` | swbt 用 USB Bluetooth adapter 名。候補が 1 件でも自動採用しない |
 | `--swbt-controller-type` | `pro-controller`、`joy-con-l`、`joy-con-r` |
-| `--swbt-key-store` | pairing key store の path |
+| `--swbt-profile` | pairing profile の path |
 | `--swbt-timeout` | pair / reconnect の timeout 秒 |
 | `--define` | マクロへ渡す `key=value` 形式の引数 |
 | `--verbose` | 詳細ログを出す |
@@ -54,29 +54,33 @@ nyxpy swbt adapters
 nyxpy swbt adapters --json
 ```
 
-初回は pairing を行い、controller type ごとに key store を分けます。
+初回は pairing を行い、controller type ごとに pairing profile を分けます。
 
 ```console
-nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
 ```
 
-保存済み key store で reconnect します。
+`pair` は profile がなければ `create_profile()` で schema v2 profile を作成します。キャンセルや接続失敗後に profile が残った場合、同じコマンドを再実行すると既存 profile から pairing を再試行します。
+
+保存済み pairing profile で reconnect します。
 
 ```console
-nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
 ```
 
 `--adapter` には一覧の代表名または alias を指定できます。alias は接続前に代表名へ正規化されます。候補が 1 件でも未指定値を自動補完しません。不一致または曖昧な alias は `NYX_SWBT_ADAPTER_NOT_FOUND` / `NYX_SWBT_ADAPTER_AMBIGUOUS` で失敗します。
 
-相対 key store path は、コマンドを実行した子ディレクトリではなく workspace root を基準に解決されます。
+相対 pairing profile path は、コマンドを実行した子ディレクトリではなく workspace root を基準に解決されます。
 
 CLI の各操作は別プロセスで新しい factory を作るため、以前のプロセスが持っていた session を閉じる subcommand はありません。継続中の GUI session は GUI の `Disconnect` で閉じてください。
 
-マクロ実行では `--controller swbt` を指定します。key store がない場合でも暗黙の pairing は行いません。
+マクロ実行では `--controller swbt` を指定します。pairing profile がない場合でも暗黙の pairing は行いません。
 
 ```console
-nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-key-store .nyxpy/swbt/pro-controller-bond.json --capture "Capture Device"
+nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-profile .nyxpy/swbt/pro-controller-profile.json --capture "Capture Device"
 ```
+
+旧オプションは受け付けません。swbt-python 0.2 系の旧キーストアや schema v1 profile を指定しても変換せず、profile error で終了します。
 
 ## 終了時の見方
 

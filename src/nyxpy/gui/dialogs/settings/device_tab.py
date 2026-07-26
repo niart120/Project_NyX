@@ -23,6 +23,7 @@ from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.swbt.errors import (
     is_swbt_connect_cancelled,
     swbt_connect_cancel_code,
+    swbt_user_error_message,
 )
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
@@ -261,16 +262,16 @@ class DeviceSettingsTab(QWidget):
         swbt_form.addRow(QLabel("デバイス:"), adapter_row)
         swbt_form.addRow(QLabel("タイプ:"), self.swbt_controller_type)
 
-        self.swbt_key_store = QComboBox()
-        self.swbt_key_store.setEditable(True)
-        current_key_store = str(self.settings.get("controller.swbt.key_store_path", "") or "")
-        for key_store_path in self._swbt_key_store_candidates(current_key_store):
-            self.swbt_key_store.addItem(key_store_path, key_store_path)
-        self.swbt_key_store.setCurrentText(current_key_store or self._default_swbt_key_store_path())
+        self.swbt_profile = QComboBox()
+        self.swbt_profile.setEditable(True)
+        current_profile = str(self.settings.get("controller.swbt.profile_path", "") or "")
+        for profile_path in self._swbt_profile_candidates(current_profile):
+            self.swbt_profile.addItem(profile_path, profile_path)
+        self.swbt_profile.setCurrentText(current_profile or self._default_swbt_profile_path())
         self.swbt_controller_type.currentIndexChanged.connect(
-            self._update_swbt_key_store_for_controller
+            self._update_swbt_profile_for_controller
         )
-        swbt_form.addRow(QLabel("キーストア:"), self.swbt_key_store)
+        swbt_form.addRow(QLabel("ペアリングプロファイル:"), self.swbt_profile)
 
         lifecycle_row = QHBoxLayout()
         self.swbt_pair_btn = QPushButton("Pair")
@@ -466,12 +467,12 @@ class DeviceSettingsTab(QWidget):
         )
         swbt_adapter = _editable_combo_value(self.swbt_adapter)
         self.settings.set("controller.swbt.adapter", swbt_adapter or None)
-        swbt_key_store = self.swbt_key_store.currentText().strip()
-        self.settings.set("controller.swbt.key_store_path", swbt_key_store or None)
+        swbt_profile = self.swbt_profile.currentText().strip()
+        self.settings.set("controller.swbt.profile_path", swbt_profile or None)
 
-    def _swbt_key_store_candidates(self, current: str) -> tuple[str, ...]:
+    def _swbt_profile_candidates(self, current: str) -> tuple[str, ...]:
         candidates = [
-            str(model.default_key_store_path()).replace("\\", "/")
+            str(model.default_profile_path()).replace("\\", "/")
             for model in supported_controller_models()
         ]
         config_dir = getattr(self.settings, "config_dir", None)
@@ -482,21 +483,21 @@ class DeviceSettingsTab(QWidget):
             candidates.append(current)
         return tuple(dict.fromkeys(candidates))
 
-    def _default_swbt_key_store_path(self) -> str:
+    def _default_swbt_profile_path(self) -> str:
         controller_type = self.swbt_controller_type.currentData()
         for model in supported_controller_models():
             if model.settings_value == controller_type:
-                return str(model.default_key_store_path()).replace("\\", "/")
+                return str(model.default_profile_path()).replace("\\", "/")
         return ""
 
-    def _update_swbt_key_store_for_controller(self) -> None:
-        current = self.swbt_key_store.currentText().strip()
+    def _update_swbt_profile_for_controller(self) -> None:
+        current = self.swbt_profile.currentText().strip()
         defaults = {
-            str(model.default_key_store_path()).replace("\\", "/")
+            str(model.default_profile_path()).replace("\\", "/")
             for model in supported_controller_models()
         }
         if not current or current in defaults:
-            self.swbt_key_store.setCurrentText(self._default_swbt_key_store_path())
+            self.swbt_profile.setCurrentText(self._default_swbt_profile_path())
 
     def _capture_source_type(self) -> str:
         value = self.capture_source_type.currentData()
@@ -548,7 +549,7 @@ class DeviceSettingsTab(QWidget):
         self.swbt_group.setEnabled(self.swbt_actions_enabled)
         self.swbt_controller_type.setEnabled(settings_enabled)
         self.swbt_adapter.setEnabled(settings_enabled)
-        self.swbt_key_store.setEnabled(settings_enabled)
+        self.swbt_profile.setEnabled(settings_enabled)
         adapter_selected = bool(_editable_combo_value(self.swbt_adapter))
         connect_enabled = is_swbt and settings_enabled and adapter_selected
         cancelling_pair = (
@@ -558,13 +559,26 @@ class DeviceSettingsTab(QWidget):
             self._cancel_swbt_connect is not None and self._swbt_connect_operation == "reconnect"
         )
         self.swbt_pair_btn.setEnabled(cancelling_pair or connect_enabled)
-        self.swbt_reconnect_btn.setEnabled(cancelling_reconnect or connect_enabled)
+        self.swbt_reconnect_btn.setEnabled(
+            cancelling_reconnect or (connect_enabled and self._swbt_profile_exists())
+        )
         self.swbt_disconnect_btn.setEnabled(is_swbt and settings_enabled and self._swbt_connected)
         self.refresh_swbt_btn.setEnabled(is_swbt and settings_enabled)
 
     def _set_swbt_busy(self, busy: bool) -> None:
         self._swbt_busy = bool(busy)
         self._update_controller_field_state()
+
+    def _swbt_profile_exists(self) -> bool:
+        value = self.swbt_profile.currentText().strip()
+        if not value:
+            return False
+        path = Path(value)
+        if not path.is_absolute():
+            config_dir = getattr(self.settings, "config_dir", None)
+            if config_dir is not None:
+                path = Path(config_dir).parent / path
+        return path.is_file()
 
     @property
     def swbt_lifecycle_busy(self) -> bool:
@@ -639,7 +653,9 @@ class DeviceSettingsTab(QWidget):
                 )
             else:
                 operation = "disconnect" if disconnect else "connection"
-                self.swbt_status_label.setText(f"{operation} failed: {error}")
+                self.swbt_status_label.setText(
+                    f"{operation} failed: {swbt_user_error_message(error)}"
+                )
             self._swbt_lifecycle_running = False
             self._reset_swbt_connect_action()
             self._set_swbt_busy(False)

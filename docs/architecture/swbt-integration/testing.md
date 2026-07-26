@@ -10,7 +10,7 @@ swbt 連携は unit test、session test、CLI test、GUI model test、port contr
 |---|---|
 | `parse_controller_type("pro-controller")` | `SwbtControllerType.PRO_CONTROLLER` |
 | unsupported value | `NYX_SWBT_CONTROLLER_TYPE_UNSUPPORTED` |
-| resolve model | `controller_cls`、表示名、default key store が得られる |
+| resolve model | `controller_cls`、表示名、default pairing profile が得られる |
 | capabilities | Pro Controller と Joy-Con L/R が IMU を supported として持つ |
 | config normalization | `controller_type` 文字列が `SwbtControllerModel` に変換される |
 
@@ -70,7 +70,9 @@ class FakeGamepad:
 - `close()` が `close(neutral=True)` を呼び、複数回呼んでも安全。
 - transport error が `NYX_SWBT_TRANSPORT_OPEN_FAILED` になる。
 - connection timeout が `NYX_SWBT_CONNECTION_TIMED_OUT` になる。
-- invalid key store が `NYX_SWBT_KEY_STORE_INVALID` になる。
+- profile未作成、既存、schema不正、controller type不一致、内部key不正がそれぞれ固有の `NYX_SWBT_PROFILE_*` code になる。
+- profile未作成時のPairだけが `create_profile()` を呼び、返却controllerをsessionが所有する。
+- Pairキャンセル後に残ったprofileからPairを再試行できる。
 - close 後の apply が `DeviceError` になる。
 
 ## port contract test
@@ -142,7 +144,7 @@ $env:NYX_REALDEVICE = "1"
 $env:NYX_SWBT = "1"
 $env:NYX_SWBT_ADAPTER = "usb:0"
 $env:NYX_SWBT_CONTROLLER_TYPE = "pro-controller"
-$env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/pro-controller-bond.json"
+$env:NYX_SWBT_PROFILE = ".nyxpy/swbt/pro-controller-profile.json"
 $env:NYX_SWBT_OPERATOR_CONFIRMATION = "1"
 $env:NYX_SWBT_OPERATOR_RESULT = "pass"
 uv run pytest tests/hardware/ -m realdevice

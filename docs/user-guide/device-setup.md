@@ -35,13 +35,15 @@ nyxpy gui
 | Baud Rate | protocol の既定値を使う。CH552 の既定値は `9600` |
 | swbt Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` から選ぶ |
 | swbt Adapter | `リロード` で候補を取得し、使う adapter を明示的に選ぶ。候補が 1 件でも自動選択しない |
-| swbt Key Store | pairing key の保存先。未指定時は `.nyxpy/swbt/<controller>-bond.json`。相対 path は workspace root 基準 |
+| swbt Pairing Profile | swbt-python 0.5.3 の pairing profile 保存先。未指定時は `.nyxpy/swbt/<controller>-profile.json`。相対 path は workspace root 基準 |
 | swbt Connection | `Pair`、`Reconnect`、`Disconnect` を実行する |
 | Preview FPS | GUI プレビューの更新頻度 |
 
 設定は workspace の `.nyxpy/global.toml` に保存されます。
 
-`Pair` は初回 pairing で key store を作ります。2 回目以降は `Reconnect` を使います。接続状態は操作後の実際の status で判定されます。`Disconnect` は GUI と同じプロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
+`Pair` は初回 pairing で pairing profile を作ります。2 回目以降は `Reconnect` を使います。接続状態は操作後の実際の status で判定されます。`Disconnect` は GUI と同じプロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
+
+swbt-python 0.2 系の旧キーストアと schema v1 profile は読み込めません。NyX は旧ファイルを変換・削除・上書きせず、新しい既定 path へ切り替えます。更新後は `Pair` を実行して schema v2 profile を作成してください。
 
 ## CLI で指定する
 
@@ -69,16 +71,16 @@ nyxpy run sample_macro --serial <serial-device> --capture "Capture Device" --pro
 
 ```console
 nyxpy swbt adapters
-nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
-nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
+nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
 ```
 
 一覧に表示された alias も指定できますが、接続時には代表名へ正規化されます。候補が 1 件でも adapter を省略できません。CLI は操作ごとに別プロセスを起動するため、前回の cached session を閉じる subcommand はありません。
 
-マクロ実行時は controller backend を明示します。`swbt` は保存済み key store に基づいて reconnect し、暗黙の pairing は行いません。
+マクロ実行時は controller backend を明示します。`swbt` は保存済み pairing profile に基づいて reconnect し、暗黙の pairing は行いません。
 
 ```console
-nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-key-store .nyxpy/swbt/pro-controller-bond.json --capture "Capture Device"
+nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-type pro-controller --swbt-profile .nyxpy/swbt/pro-controller-profile.json --capture "Capture Device"
 ```
 
 ## 主な設定ファイル

@@ -18,7 +18,7 @@ class FakeSettings:
             "controller.serial.baudrate": 9600,
             "controller.swbt.controller_type": "pro-controller",
             "controller.swbt.adapter": None,
-            "controller.swbt.key_store_path": None,
+            "controller.swbt.profile_path": None,
             "preview_fps": 60,
         }
 

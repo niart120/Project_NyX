@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -19,8 +20,10 @@ from nyxpy.framework.core.hardware.swbt.discovery import (
     SwbtAdapterDiscoveryService,
     resolve_adapter,
 )
+from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.hardware.swbt.session import SwbtControllerSession
 from nyxpy.framework.core.macro.command import DefaultCommand
+from nyxpy.gui.app_services import GuiAppServices
 from tests.hardware.swbt_realdevice_support import (
     SwbtEvidenceResult,
     SwbtEvidenceWriter,
@@ -50,7 +53,7 @@ class SwbtRealDeviceRun:
         return SwbtControllerConfig(
             model=self.model,
             adapter=self.options.adapter,
-            key_store_path=self.options.key_store_path,
+            profile_path=self.options.profile_path,
         )
 
     def record(self, test_name: str, status: str, **details: object) -> None:
@@ -102,27 +105,31 @@ def test_swbt_adapter_discovery_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
 
 def test_swbt_pair_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
     _require_operator_confirmation(swbt_run, "test_swbt_pair_realdevice")
-    swbt_run.options.key_store_path.parent.mkdir(parents=True, exist_ok=True)
+    swbt_run.options.profile_path.parent.mkdir(parents=True, exist_ok=True)
 
     with _session(swbt_run) as session:
         result = session.pair(timeout_sec=swbt_run.options.timeout_sec)
         assert session.connected is True
 
-    assert swbt_run.options.key_store_path.exists()
+    assert swbt_run.options.profile_path.exists()
+    profile_payload = json.loads(swbt_run.options.profile_path.read_text(encoding="utf-8"))
+    assert profile_payload["schema_version"] == 2
     _record_operator_result(
         swbt_run,
         "test_swbt_pair_realdevice",
         prompt="Switch 上で controller の接続が確認できたか (pass/fail/skip): ",
         details={
             "controller_type": swbt_run.options.controller_type,
-            "key_store_exists": True,
+            "profile_path": swbt_run.options.profile_path.name,
+            "profile_schema_version": profile_payload["schema_version"],
+            "initialization_result": "connected",
             "result_type": type(result).__name__,
         },
     )
 
 
 def test_swbt_reconnect_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
-    _require_key_store(swbt_run, "test_swbt_reconnect_realdevice")
+    _require_profile(swbt_run, "test_swbt_reconnect_realdevice")
 
     with _session(swbt_run) as session:
         result = session.reconnect(timeout_sec=swbt_run.options.timeout_sec)
@@ -134,6 +141,76 @@ def test_swbt_reconnect_realdevice(swbt_run: SwbtRealDeviceRun) -> None:
         "pass",
         result_type=type(result).__name__,
         status_type=type(status).__name__,
+        profile_path=swbt_run.options.profile_path.name,
+        initialization_result="connected",
+    )
+
+
+def test_swbt_macro_reconnect_realdevice(
+    tmp_path: Path,
+    swbt_run: SwbtRealDeviceRun,
+) -> None:
+    _require_operator_confirmation(swbt_run, "test_swbt_macro_reconnect_realdevice")
+    _require_profile(swbt_run, "test_swbt_macro_reconnect_realdevice")
+    button = _supported_button(swbt_run.model)
+
+    with swbt_run.writer.open_trace() as trace:
+        factory = SwbtControllerOutputPortFactory(diagnostics_writer=trace)
+        try:
+            port = factory.create(
+                config=swbt_run.config(),
+                allow_dummy=False,
+                timeout_sec=swbt_run.options.timeout_sec,
+            )
+            command = DefaultCommand(context=make_fake_execution_context(tmp_path, controller=port))
+            command.press(button, dur=0.05)
+            status = factory.status(swbt_run.config())
+            assert status is not None
+            assert getattr(status, "connection_state", None) == "connected"
+        finally:
+            factory.close()
+
+    _record_operator_result(
+        swbt_run,
+        "test_swbt_macro_reconnect_realdevice",
+        prompt=f"macro経路のReconnect後に{button.name}が入力されたか (pass/fail/skip): ",
+        details={
+            "button": button.name,
+            "profile_path": swbt_run.options.profile_path.name,
+            "initialization_result": "connected",
+        },
+    )
+
+
+def test_swbt_gui_lifecycle_realdevice(
+    tmp_path: Path,
+    swbt_run: SwbtRealDeviceRun,
+) -> None:
+    _require_operator_confirmation(swbt_run, "test_swbt_gui_lifecycle_realdevice")
+    _require_profile(swbt_run, "test_swbt_gui_lifecycle_realdevice")
+
+    services = GuiAppServices(project_root=tmp_path)
+    with swbt_run.writer.open_trace() as trace:
+        services.swbt_controller_factory = SwbtControllerOutputPortFactory(diagnostics_writer=trace)
+        try:
+            paired = services.pair_swbt_prepared(swbt_run.config())
+            assert paired.connected
+            services.disconnect_swbt()
+            reconnected = services.reconnect_swbt_prepared(swbt_run.config())
+            assert reconnected.connected
+            services.disconnect_swbt()
+        finally:
+            services.close()
+
+    _record_operator_result(
+        swbt_run,
+        "test_swbt_gui_lifecycle_realdevice",
+        prompt="GUI Pair / Disconnect / Reconnect / DisconnectがSwitch上で完了したか (pass/fail/skip): ",
+        details={
+            "profile_path": swbt_run.options.profile_path.name,
+            "pair_result": paired.message,
+            "reconnect_result": reconnected.message,
+        },
     )
 
 
@@ -257,7 +334,7 @@ def _session(run: SwbtRealDeviceRun) -> Iterator[SwbtControllerSession]:
 def _connected_port(
     run: SwbtRealDeviceRun,
 ) -> Iterator[SwbtControllerOutputPort]:
-    _require_key_store(run, "connected_swbt_port")
+    _require_profile(run, "connected_swbt_port")
     with _session(run) as session:
         session.reconnect(timeout_sec=run.options.timeout_sec)
         port = SwbtControllerOutputPort(session=session, model=run.model)
@@ -301,16 +378,16 @@ def _record_operator_result(
         pytest.skip(f"operator skipped {test_name}")
 
 
-def _require_key_store(run: SwbtRealDeviceRun, test_name: str) -> None:
-    if run.options.key_store_path.exists():
+def _require_profile(run: SwbtRealDeviceRun, test_name: str) -> None:
+    if run.options.profile_path.exists():
         return
     run.record(
         test_name,
         "skip",
-        reason="pairing key store is missing; run test_swbt_pair_realdevice first",
-        key_store=str(run.options.key_store_path),
+        reason="pairing profile is missing; run test_swbt_pair_realdevice first",
+        profile_path=str(run.options.profile_path),
     )
-    pytest.skip("swbt key store is missing; run pair test first")
+    pytest.skip("swbt pairing profile is missing; run pair test first")
 
 
 def _supported_button(model: SwbtControllerModel) -> Button:

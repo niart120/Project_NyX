@@ -1,4 +1,6 @@
 import asyncio
+import json
+from dataclasses import replace
 from pathlib import Path
 from threading import Event, Thread
 
@@ -126,13 +128,44 @@ class CancellationAwareFakeSwbtController(AwaitableFakeSwbtController):
             raise
 
 
+class ReportingReadyFakeSwbtController(FakeSwbtController):
+    def __init__(self) -> None:
+        super().__init__()
+        self.status_calls = 0
+
+    def status(self) -> GamepadStatus:
+        self.calls.append(("status", None))
+        self.status_calls += 1
+        report_count = 15 if self.status_calls == 1 else 16
+        return GamepadStatus(
+            connection_state=self.connection_state,
+            report_counters={0x30: report_count},
+            last_subcommand_id=None,
+            raw_rumble=None,
+            last_error=None,
+        )
+
+
 def config() -> SwbtControllerConfig:
     model = resolve_controller_model("pro-controller")
     return SwbtControllerConfig(
         model=model,
         adapter="usb:0",
-        key_store_path=Path(".nyxpy/swbt/pro-controller-bond.json"),
+        profile_path=Path(".nyxpy/swbt/pro-controller-profile.json"),
     )
+
+
+def _capture_error(errors: list[BaseException], operation) -> None:
+    try:
+        operation()
+    except BaseException as exc:
+        errors.append(exc)
+
+
+@pytest.fixture(autouse=True)
+def existing_profile(monkeypatch) -> None:
+    """既存テストは作成済みprofileからのPair経路を検証する。"""
+    monkeypatch.setattr(SwbtControllerSession, "_profile_exists", lambda _self: True)
 
 
 def test_session_open_does_not_pair_or_reconnect() -> None:
@@ -144,6 +177,37 @@ def test_session_open_does_not_pair_or_reconnect() -> None:
 
     assert fake.calls == [("open", None)]
     assert not session.connected
+
+
+def test_session_pair_creates_profile_and_owns_returned_controller(monkeypatch) -> None:
+    fake = FakeSwbtController()
+    fake.connection_state = "connected"
+    calls: list[tuple[SwbtControllerConfig, float]] = []
+
+    async def create_profile(
+        profile_config: SwbtControllerConfig,
+        _writer,
+        timeout_sec: float,
+    ) -> FakeSwbtController:
+        calls.append((profile_config, timeout_sec))
+        return fake
+
+    session = SwbtControllerSession(
+        config(),
+        controller_factory=lambda _config, _writer: pytest.fail(
+            "normal controller construction must not run"
+        ),
+        profile_creator=create_profile,
+    )
+    monkeypatch.setattr(session, "_profile_exists", lambda: False)
+
+    session.pair(timeout_sec=12.0)
+
+    assert calls == [(session.config, 12.0)]
+    assert fake.calls == [("status", None)]
+    assert session.connected
+    session.close()
+    assert fake.closed
 
 
 def test_session_pair_cancels_pending_awaitable_without_waiting_for_timeout() -> None:
@@ -168,6 +232,58 @@ def test_session_pair_cancels_pending_awaitable_without_waiting_for_timeout() ->
     assert not thread.is_alive()
     assert len(errors) == 1
     assert getattr(errors[0], "code", None) == "NYX_SWBT_PAIR_CANCELLED"
+
+
+def test_session_retries_pair_with_profile_left_after_create_cancellation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    profile_path = tmp_path / "pro-controller-profile.json"
+    profile_started = Event()
+
+    async def create_profile(
+        _config: SwbtControllerConfig,
+        _writer,
+        _timeout_sec: float,
+    ) -> object:
+        profile_path.write_text('{"schema_version": 2}', encoding="utf-8")
+        profile_started.set()
+        await asyncio.sleep(3600)
+        raise AssertionError("profile creation should be cancelled")
+
+    first = SwbtControllerSession(
+        replace(config(), profile_path=profile_path),
+        profile_creator=create_profile,
+    )
+    monkeypatch.setattr(first, "_profile_exists", profile_path.is_file)
+    cancellation_event = Event()
+    errors: list[BaseException] = []
+    thread = Thread(
+        target=lambda: _capture_error(
+            errors,
+            lambda: first.pair(
+                timeout_sec=30.0,
+                cancellation_event=cancellation_event,
+            ),
+        )
+    )
+    thread.start()
+    assert profile_started.wait(1.0)
+    cancellation_event.set()
+    thread.join(1.0)
+
+    assert getattr(errors[0], "code", None) == "NYX_SWBT_PAIR_CANCELLED"
+    assert profile_path.is_file()
+
+    fake = FakeSwbtController()
+    second = SwbtControllerSession(
+        replace(config(), profile_path=profile_path),
+        controller_factory=lambda _config, _writer: fake,
+    )
+    monkeypatch.setattr(second, "_profile_exists", profile_path.is_file)
+    second.pair(timeout_sec=5.0)
+
+    assert fake.calls[:3] == [("open", None), ("pair", 5.0), ("status", None)]
 
 
 def test_session_reconnect_cancels_after_awaitable_started() -> None:
@@ -212,6 +328,21 @@ def test_session_pair_reconnect_apply_status_and_close() -> None:
     assert ("reconnect", 20.0) in fake.calls
     assert fake.calls[-1] == ("close", True)
     assert fake.closed is True
+
+
+def test_session_waits_for_periodic_input_report_after_reconnect() -> None:
+    fake = ReportingReadyFakeSwbtController()
+    session = SwbtControllerSession(config(), controller_factory=lambda _config, _writer: fake)
+
+    session.reconnect(timeout_sec=1.0)
+
+    assert fake.status_calls == 2
+    assert fake.calls[:4] == [
+        ("open", None),
+        ("reconnect", 1.0),
+        ("status", None),
+        ("status", None),
+    ]
 
 
 def test_session_waits_for_awaitable_controller_methods() -> None:
@@ -381,7 +512,7 @@ def test_session_requires_adapter_before_open() -> None:
         SwbtControllerConfig(
             model=model,
             adapter=None,
-            key_store_path=Path(".nyxpy/swbt/pro-controller-bond.json"),
+            profile_path=Path(".nyxpy/swbt/pro-controller-profile.json"),
         )
     )
 
@@ -389,6 +520,65 @@ def test_session_requires_adapter_before_open() -> None:
         session.open()
 
     assert getattr(exc_info.value, "code", None) == "NYX_SWBT_ADAPTER_NOT_SELECTED"
+
+
+def test_session_reconnect_without_profile_reports_profile_not_found(tmp_path: Path) -> None:
+    profile_path = tmp_path / "missing-profile.json"
+    session = SwbtControllerSession(replace(config(), profile_path=profile_path))
+
+    with pytest.raises(Exception) as exc_info:
+        session.reconnect(timeout_sec=1.0)
+
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PROFILE_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"legacy": "key-store"},
+        {
+            "format": "swbt.profile",
+            "schema_version": 1,
+            "controller_kind": "pro",
+            "identity": {"kind": "adapter-default"},
+            "key_store": {"namespaces": {}},
+        },
+    ],
+)
+def test_session_rejects_legacy_and_schema_v1_profiles(
+    tmp_path: Path,
+    payload: dict[str, object],
+) -> None:
+    profile_path = tmp_path / "legacy.json"
+    profile_path.write_text(json.dumps(payload), encoding="utf-8")
+    session = SwbtControllerSession(replace(config(), profile_path=profile_path))
+
+    with pytest.raises(Exception) as exc_info:
+        session.open()
+
+    assert getattr(exc_info.value, "code", None) == "NYX_SWBT_PROFILE_INVALID"
+
+
+def test_session_rejects_profile_for_different_controller_type(tmp_path: Path) -> None:
+    profile_path = tmp_path / "joy-con-l-profile.json"
+    profile_path.write_text(
+        json.dumps(
+            {
+                "format": "swbt.profile",
+                "schema_version": 2,
+                "controller_kind": "joycon_l",
+                "identity": {"kind": "adapter-default"},
+                "key_store": {"namespaces": {}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    session = SwbtControllerSession(replace(config(), profile_path=profile_path))
+
+    with pytest.raises(Exception) as exc_info:
+        session.open()
+
+    assert getattr(exc_info.value, "code", None) == ("NYX_SWBT_PROFILE_CONTROLLER_MISMATCH")
 
 
 def test_dummy_session_records_state_without_bluetooth_transport() -> None:

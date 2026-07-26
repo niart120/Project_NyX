@@ -58,22 +58,33 @@ nyxpy swbt adapters --json
 
 - pair が timeout する。
 - reconnect が失敗する。
-- `NYX_SWBT_KEY_STORE_INVALID` または key store 関連のエラーが出る。
+- `NYX_SWBT_PROFILE_INVALID` または pairing profile 関連のエラーが出る。
 
 確認するもの:
 
 - Switch 側が controller の pairing を受け付ける画面になっている。
 - `--swbt-controller-type` と実機が一致している。
-- controller type ごとに別の key store を使っている。
-- key store を手で編集していない。
+- controller type ごとに別の pairing profile を使っている。
+- pairing profile を手で編集していない。
 - 初回は `nyxpy swbt pair`、2 回目以降は `nyxpy swbt reconnect` を使っている。
 
 ```console
-nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
-nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --key-store .nyxpy/swbt/pro-controller-bond.json
+nyxpy swbt pair --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
+nyxpy swbt reconnect --adapter usb:0 --controller-type pro-controller --profile .nyxpy/swbt/pro-controller-profile.json
 ```
 
-`nyxpy run --controller swbt` は暗黙に pairing しません。key store がない場合は、先に pair を実行してください。
+`nyxpy run --controller swbt` は暗黙に pairing しません。pairing profile がない場合は、先に pair を実行してください。
+
+| error code | 対応 |
+|------------|------|
+| `NYX_SWBT_PROFILE_NOT_FOUND` | `Pair` で新しい schema v2 profile を作成する |
+| `NYX_SWBT_PROFILE_ALREADY_EXISTS` | 指定 path を確認する。失敗後に残った profile なら同じ `Pair` を再試行する |
+| `NYX_SWBT_PROFILE_INVALID` | schema v1、旧キーストア、破損 file を使わず、別 path で再ペアリングする |
+| `NYX_SWBT_PROFILE_CONTROLLER_MISMATCH` | profile を作成した controller type を選ぶか、controller type ごとに別 profile を作る |
+| `NYX_SWBT_PROFILE_KEY_DATA_INVALID` | profile 内の key 情報が不正である。file を手で直さず、別 path で再ペアリングする |
+| `NYX_SWBT_ADAPTER_IDENTITY_RECOVERY_REQUIRED` | USB Bluetooth ドングルを抜き差ししてから再試行する |
+
+NyX は旧キーストア、schema v1 profile、破損 profile を自動変換・削除・上書きしません。必要なら別の場所へ保管したまま、新しい `*-profile.json` を指定してください。
 
 ## swbt 入力が反映されない
 

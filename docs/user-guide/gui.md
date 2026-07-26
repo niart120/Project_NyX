@@ -60,13 +60,15 @@ uv run nyxpy gui
 |------|------|
 | Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` |
 | Adapter | `リロード` で候補を取得し、使う adapter を選ぶ |
-| Key Store | pairing key の保存先 |
+| Pairing Profile | swbt-python 0.5.3 schema v2 profile の保存先 |
 | Pair | 初回 pairing を実行する |
-| Reconnect | 保存済み key store で再接続する |
+| Reconnect | 保存済み pairing profile で再接続する |
 | Disconnect | GUI が管理する swbt session を閉じる |
 | Status | `GamepadStatus.connection_state` に基づく GUI session の状態 |
 
 adapter は候補が 1 件でも自動採用されません。`Pair` と `Reconnect` の前に明示的に選んでください。保存済み alias が候補に一致した場合は代表名へ正規化されます。候補の更新に失敗した場合、保存済み値と更新前の選択は消去されません。
+
+`Reconnect` は指定した profile file が存在するときだけ有効です。旧キーストア設定を検出した場合は旧ファイルを残したまま新しい profile path へ切り替え、再ペアリングが必要であることをツールログへ表示します。schema 不正や controller type 不一致は個別の `NYX_SWBT_PROFILE_*` error として表示します。
 
 adapter 更新、`Pair`、`Reconnect`、`Disconnect`、マクロ開始は background worker で処理されます。処理中は対象操作が無効になり、GUI の表示更新は処理完了後に行われます。
 

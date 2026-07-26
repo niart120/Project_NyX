@@ -19,7 +19,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 
 ### 1.3 背景・問題
 
-単体テストと dummy session では、Bluetooth adapter、pairing key、Switch 側接続状態、Joy-Con capability、stick の画面上の方向、short press の取りこぼし、close 後の入力残留を確認できない。利用者 docs では、専用 adapter、key store、CLI pair/reconnect、GUI disconnect、GUI 操作、トラブル対応を説明する必要がある。
+単体テストと dummy session では、Bluetooth adapter、pairing key、Switch 側接続状態、Joy-Con capability、stick の画面上の方向、short press の取りこぼし、close 後の入力残留を確認できない。利用者 docs では、専用 adapter、pairing profile、CLI pair/reconnect、GUI disconnect、GUI 操作、トラブル対応を説明する必要がある。
 
 ### 1.4 期待効果
 
@@ -52,7 +52,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 | `tests/unit/framework/hardware/swbt/test_realdevice_support.py` | 新規 | 実機テスト設定と evidence writer を単体テストする |
 | `tests/integration/test_swbt_docs_examples.py` | 新規 | docs に記載した swbt CLI 例が parser と一致することを確認する |
 | `docs/user-guide/installation.md` | 変更 | swbt が通常依存である前提へ整える。extra 導入手順は追加しない |
-| `docs/user-guide/device-setup.md` | 変更 | swbt adapter、key store、CLI pair/reconnect、GUI disconnect 手順を追加する |
+| `docs/user-guide/device-setup.md` | 変更 | swbt adapter、pairing profile、CLI pair/reconnect、GUI disconnect 手順を追加する |
 | `docs/user-guide/cli.md` | 変更 | `nyxpy swbt adapters/pair/reconnect` と `nyxpy run --controller swbt` を追加する |
 | `docs/user-guide/gui.md` | 変更 | backend selector、adapter refresh、pair、reconnect、disconnect を追加する |
 | `docs/user-guide/troubleshooting.md` | 変更 | adapter 未選択、不検出、pair timeout、reconnect 失敗、unsupported input、disconnect の限界、short press を追加する |
@@ -75,7 +75,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 
 | ファイル | 内容 | commit 対象 |
 |----------|------|-------------|
-| `run-metadata.json` | OS、NyX commit、swbt-python version、controller type、adapter、key store、test command | 原則 commit しない |
+| `run-metadata.json` | OS、NyX commit、swbt-python version、controller type、adapter、pairing profile、test command | 原則 commit しない |
 | `swbt-trace.jsonl` | diagnostics writer 由来の pair/reconnect/report/neutral/disconnect trace | 原則 commit しない |
 | `operator-confirmation.jsonl` | 画面観察の `pass` / `fail` / `skip` | 原則 commit しない |
 | `summary.md` | 検証結果、失敗条件、docs 反映先 | 必要な要約だけ complete 仕様へ転記 |
@@ -84,7 +84,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 
 ### controller type 別確認
 
-Pro Controller、Joy-Con L、Joy-Con R は別 key store を使う。Joy-Con L は right stick、Joy-Con R は left stick を unsupported として明確に失敗させる。unsupported input は実機確認の前に単体テストで固定し、実機では選択 controller type に存在する入力だけを確認する。
+Pro Controller、Joy-Con L、Joy-Con R は別 pairing profile を使う。Joy-Con L は right stick、Joy-Con R は left stick を unsupported として明確に失敗させる。unsupported input は実機確認の前に単体テストで固定し、実機では選択 controller type に存在する入力だけを確認する。
 
 ### stick Y 軸と short press
 
@@ -109,7 +109,7 @@ serial backend を置き換えず、serial と swbt を並列に説明する。s
 class SwbtRealDeviceOptions:
     adapter: str
     controller_type: str
-    key_store_path: Path
+    profile_path: Path
     evidence_dir: Path
     timeout_sec: float = 30.0
     operator_confirmation: bool = False
@@ -124,7 +124,7 @@ class SwbtRealDeviceOptions:
 | `NYX_SWBT` | `str` | なし | `1` のとき swbt 実機テストを実行可能 |
 | `NYX_SWBT_ADAPTER` | `str` | なし | adapter 名 |
 | `NYX_SWBT_CONTROLLER_TYPE` | `str` | `"pro-controller"` | controller type |
-| `NYX_SWBT_KEY_STORE` | `Path` | `.nyxpy/swbt/<controller>-test-bond.json` | 実機テスト用 key store |
+| `NYX_SWBT_PROFILE` | `Path` | `.nyxpy/swbt/<controller>-test-profile.json` | 実機テスト用 pairing profile |
 | `NYX_SWBT_TIMEOUT` | `float` | `30.0` | pair/reconnect timeout |
 | `NYX_SWBT_EVIDENCE_DIR` | `Path | None` | `tmp/hardware/swbt/<日時>/` | 証跡保存先 |
 | `NYX_SWBT_OPERATOR_CONFIRMATION` | `str` | なし | `1` のとき画面観察を要するテストを実行 |
@@ -137,8 +137,10 @@ class SwbtRealDeviceOptions:
 | テスト | 自動判定 | operator confirmation | 検証内容 |
 |--------|----------|-----------------------|----------|
 | `test_swbt_adapter_discovery_realdevice` | あり | 不要 | adapter が `list_adapters()` で見える |
-| `test_swbt_pair_realdevice` | あり | 必須 | pairing 成功と key store 作成 |
-| `test_swbt_reconnect_realdevice` | あり | 不要 | 保存済み key store で reconnect |
+| `test_swbt_pair_realdevice` | あり | 必須 | pairing 成功、pairing profile 作成、`schema_version == 2` |
+| `test_swbt_reconnect_realdevice` | あり | 不要 | 保存済み pairing profile で reconnect |
+| `test_swbt_macro_reconnect_realdevice` | あり | 必須 | runtime factory と `DefaultCommand` を通した reconnect / input |
+| `test_swbt_gui_lifecycle_realdevice` | あり | 必須 | GUI service の Pair / Disconnect / Reconnect / Disconnect |
 | `test_swbt_button_dpad_manual_realdevice` | trace は自動 | 必須 | Button、D-pad の反映 |
 | `test_swbt_stick_manual_realdevice` | trace は自動 | 必須 | left / right stick と Y 軸 |
 | `test_swbt_imu_realdevice` | trace は自動 | 必要に応じて必須 | `Command.imu(IMUFrame.neutral())` と gyro frame |
@@ -162,7 +164,7 @@ $env:NYX_REALDEVICE = "1"
 $env:NYX_SWBT = "1"
 $env:NYX_SWBT_ADAPTER = "usb:0"
 $env:NYX_SWBT_CONTROLLER_TYPE = "pro-controller"
-$env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/pro-controller-test-bond.json"
+$env:NYX_SWBT_PROFILE = ".nyxpy/swbt/pro-controller-test-profile.json"
 uv run pytest tests/hardware -m "realdevice and swbt"
 ```
 
@@ -181,15 +183,15 @@ $env:NYX_SWBT_OPERATOR_RESULTS = '{"test_swbt_pair_realdevice":"pass","test_swbt
 uv run pytest tests/hardware -m "realdevice and swbt" -s
 ```
 
-Joy-Con は key store を分ける。
+Joy-Con は pairing profile を分ける。
 
 ```console
 $env:NYX_SWBT_CONTROLLER_TYPE = "joy-con-l"
-$env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/joy-con-l-test-bond.json"
+$env:NYX_SWBT_PROFILE = ".nyxpy/swbt/joy-con-l-test-profile.json"
 uv run pytest tests/hardware -m "realdevice and swbt" -s
 
 $env:NYX_SWBT_CONTROLLER_TYPE = "joy-con-r"
-$env:NYX_SWBT_KEY_STORE = ".nyxpy/swbt/joy-con-r-test-bond.json"
+$env:NYX_SWBT_PROFILE = ".nyxpy/swbt/joy-con-r-test-profile.json"
 uv run pytest tests/hardware -m "realdevice and swbt" -s
 ```
 
@@ -198,10 +200,10 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | docs | 追加内容 |
 |------|----------|
 | `installation.md` | swbt は通常依存であるため extra 導入手順を書かない |
-| `device-setup.md` | 専用 adapter、adapter discovery、key store、CLI pair/reconnect、GUI disconnect |
+| `device-setup.md` | 専用 adapter、adapter discovery、pairing profile、CLI pair/reconnect、GUI disconnect |
 | `cli.md` | `nyxpy swbt adapters/pair/reconnect`、`nyxpy run --controller swbt` |
 | `gui.md` | backend selector、Refresh adapters、Pair、Reconnect、Disconnect |
-| `troubleshooting.md` | adapter 未選択、不検出、timeout、key store 不正、unsupported input、disconnect の限界、short press |
+| `troubleshooting.md` | adapter 未選択、不検出、timeout、pairing profile 不正、unsupported input、disconnect の限界、short press |
 | `command-api.md` | `Command.imu(...)`、IMU frame 数、非対応 backend |
 | `docs/architecture/swbt-integration/` | optional dependency、adapter 自動採用、session start、button 名、diagnostics path 前提を修正 |
 | `testing-rollout.md` | stick Y 軸、short press、public flush 要否 |
@@ -211,8 +213,8 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | 条件 | 記録 |
 |------|------|
 | adapter 不検出 | adapter 名、aliases、VID/PID の有無 |
-| pair timeout | Switch 側状態、controller type、key store path |
-| reconnect 失敗 | key store の有無、不正判定、controller type 不一致 |
+| pair timeout | Switch 側状態、controller type、pairing profile path |
+| reconnect 失敗 | pairing profile の有無、不正判定、controller type 不一致 |
 | unsupported input | controller type、入力名、error code |
 | short press 失敗 | duration、pressed report 有無、neutral report 有無、画面観察 |
 
@@ -232,7 +234,7 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | 結合 | `test_swbt_docs_examples_match_cli_parser` | docs の CLI 例が parser と一致 |
 | 結合 | `test_mkdocs_build_includes_swbt_pages` | swbt docs 追加後の `mkdocs build --strict` |
 | ハードウェア | `test_swbt_adapter_discovery_realdevice` | adapter discovery |
-| ハードウェア | `test_swbt_pair_realdevice` | pairing と key store 作成 |
+| ハードウェア | `test_swbt_pair_realdevice` | pairing と pairing profile 作成 |
 | ハードウェア | `test_swbt_reconnect_realdevice` | reconnect |
 | ハードウェア | `test_swbt_button_dpad_manual_realdevice` | Button / D-pad |
 | ハードウェア | `test_swbt_stick_manual_realdevice` | stick と Y 軸 |
@@ -279,7 +281,7 @@ uv run mkdocs build --strict
 - `tests/hardware/swbt_realdevice_support.py`: 環境変数から `SwbtRealDeviceOptions` を構築し、`run-metadata.json`、`swbt-trace.jsonl`、`operator-confirmation.jsonl`、`summary.md` を evidence directory に出力する。
 - `tests/hardware/test_swbt_controller_backend_realdevice.py`: adapter discovery、pair、reconnect、button / D-pad、stick、`Command.imu(...)`、close neutral、`Command.press(..., dur=...)` short press を分けて検証する。
 - `conftest.py`: swbt 実機テストだけは `NYX_REALDEVICE=1` と `NYX_SWBT=1` で `--realdevice` なしでも環境変数 gate へ進める。
-- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.2 系の lifecycle / input API は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
+- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.5.3 の `create_profile()` と lifecycle / input API は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
 - 利用者 docs: installation、device setup、CLI、GUI、troubleshooting に swbt backend を追加した。
 - macro development docs: `Command.imu(...)` と swbt 非対応入力を追加した。
 - architecture docs: swbt 通常依存、adapter 自動採用なし、diagnostics path 非公開、現行 public API 前提へ更新した。
@@ -288,7 +290,7 @@ uv run mkdocs build --strict
 
 ## 8. 2026-07-10 統合監査追補
 
-非実機監査で stick 座標変換、status 判定、GUI worker、adapter 正規化、relative key store、production diagnostics、CLI surface、operator result を修正した。`uv run mkdocs build --strict` と docs integration test は非実機環境で実行するが、これらを実機検証の代替にはしない。
+非実機監査で stick 座標変換、status 判定、GUI worker、adapter 正規化、relative pairing profile、production diagnostics、CLI surface、operator result を修正した。`uv run mkdocs build --strict` と docs integration test は非実機環境で実行するが、これらを実機検証の代替にはしない。
 
 未検証のまま残す項目:
 

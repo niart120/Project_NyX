@@ -21,6 +21,13 @@ from nyxpy.framework.core.hardware.swbt.errors import (
 from nyxpy.framework.core.macro.exceptions import ConfigurationError, DeviceError
 
 type SwbtControllerFactory = Callable[[SwbtControllerConfig, DiagnosticsWriter | None], object]
+type SwbtProfileCreator = Callable[
+    [SwbtControllerConfig, DiagnosticsWriter | None, float],
+    object,
+]
+
+_INPUT_REPORT_ID = 0x30
+_DEFAULT_REPORT_PERIOD_US = 8000
 
 
 class SwbtControllerSessionProtocol(Protocol):
@@ -68,11 +75,13 @@ class SwbtControllerSession:
         config: SwbtControllerConfig,
         *,
         controller_factory: SwbtControllerFactory | None = None,
+        profile_creator: SwbtProfileCreator | None = None,
         diagnostics_writer: DiagnosticsWriter | None = None,
     ) -> None:
         """config、controller factory、diagnostics writer を保持する。"""
         self.config = config
         self._controller_factory = controller_factory or create_swbt_controller
+        self._profile_creator = profile_creator or create_swbt_profile
         self._diagnostics_writer = diagnostics_writer
         self._controller: object | None = None
         self._lock = RLock()
@@ -130,17 +139,27 @@ class SwbtControllerSession:
     def pair(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
         """明示 pairing を実行する。"""
         with self._lock:
-            self.open()
-            controller = self._require_controller()
             try:
-                self._call_controller(
-                    controller,
-                    "pair",
-                    timeout=timeout_sec,
-                    _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
-                    _cancellation_event=cancellation_event,
-                    _cancellation_code="NYX_SWBT_PAIR_CANCELLED",
-                )
+                if self._profile_exists():
+                    self.open()
+                    controller = self._require_controller()
+                    self._call_controller(
+                        controller,
+                        "pair",
+                        timeout=timeout_sec,
+                        _wait_timeout_sec=self._connection_wait_timeout(timeout_sec),
+                        _cancellation_event=cancellation_event,
+                        _cancellation_code="NYX_SWBT_PAIR_CANCELLED",
+                    )
+                else:
+                    self._require_adapter()
+                    controller = self._create_profile_controller(
+                        timeout_sec=timeout_sec,
+                        cancellation_event=cancellation_event,
+                    )
+                    self._controller = controller
+                    self._opened = True
+                    self._closed = False
                 status = self._call_controller(controller, "status")
             except (ConfigurationError, DeviceError):
                 raise
@@ -149,9 +168,16 @@ class SwbtControllerSession:
             self._connected = is_swbt_status_connected(status)
             if not self._connected:
                 raise swbt_not_connected(type(self).__name__)
+            self._wait_for_input_reporting(
+                controller,
+                status,
+                timeout_sec=timeout_sec,
+                cancellation_event=cancellation_event,
+                cancellation_code="NYX_SWBT_PAIR_CANCELLED",
+            )
 
     def reconnect(self, *, timeout_sec: float, cancellation_event: Event | None = None) -> None:
-        """保存済み pairing key に基づく reconnect を実行する。"""
+        """保存済み pairing profile に基づく reconnect を実行する。"""
         with self._lock:
             self.open()
             controller = self._require_controller()
@@ -172,6 +198,13 @@ class SwbtControllerSession:
             self._connected = is_swbt_status_connected(status)
             if not self._connected:
                 raise swbt_not_connected(type(self).__name__)
+            self._wait_for_input_reporting(
+                controller,
+                status,
+                timeout_sec=timeout_sec,
+                cancellation_event=cancellation_event,
+                cancellation_code="NYX_SWBT_RECONNECT_CANCELLED",
+            )
 
     def apply(self, state: object) -> None:
         """完全な swbt InputState を controller へ適用する。"""
@@ -252,6 +285,81 @@ class SwbtControllerSession:
         if self._controller is None:
             raise swbt_not_connected(type(self).__name__)
         return self._controller
+
+    def _require_adapter(self) -> str:
+        if not self.config.adapter:
+            raise swbt_configuration_error(
+                "swbt adapter is not selected",
+                code="NYX_SWBT_ADAPTER_NOT_SELECTED",
+                component=type(self).__name__,
+            )
+        return self.config.adapter
+
+    def _profile_exists(self) -> bool:
+        return self.config.profile_path.is_file()
+
+    def _create_profile_controller(
+        self,
+        *,
+        timeout_sec: float,
+        cancellation_event: Event | None,
+    ) -> object:
+        result = self._profile_creator(
+            self.config,
+            self._diagnostics_writer,
+            timeout_sec,
+        )
+        if not inspect.isawaitable(result):
+            return result
+        self._ensure_loop_locked()
+        return self._run_awaitable(
+            result,
+            timeout_sec=self._connection_wait_timeout(timeout_sec),
+            cancellation_event=cancellation_event,
+            cancellation_code="NYX_SWBT_PAIR_CANCELLED",
+        )
+
+    def _wait_for_input_reporting(
+        self,
+        controller: object,
+        status: object,
+        *,
+        timeout_sec: float,
+        cancellation_event: Event | None,
+        cancellation_code: str,
+    ) -> None:
+        """接続完了後に最初の周期 input report が送信されるまで待つ。"""
+        initial_count = _input_report_count(status)
+        if initial_count is None:
+            return
+        period_sec = (self.config.report_period_us or _DEFAULT_REPORT_PERIOD_US) / 1_000_000
+        readiness_timeout_sec = min(
+            max(1.0, period_sec * 4),
+            max(1.0, timeout_sec),
+        )
+        deadline = time.monotonic() + readiness_timeout_sec
+        poll_interval_sec = min(max(period_sec, 0.001), 0.05)
+        while time.monotonic() < deadline:
+            if cancellation_event is not None and cancellation_event.is_set():
+                raise DeviceError(
+                    "swbt connection operation was cancelled",
+                    code=cancellation_code,
+                    component=type(self).__name__,
+                    recoverable=True,
+                )
+            time.sleep(poll_interval_sec)
+            current_status = self._call_controller(controller, "status")
+            if not is_swbt_status_connected(current_status):
+                self._connected = False
+                raise swbt_not_connected(type(self).__name__)
+            current_count = _input_report_count(current_status)
+            if current_count is not None and current_count > initial_count:
+                return
+        raise swbt_configuration_error(
+            "swbt periodic input reporting did not become ready",
+            code="NYX_SWBT_INPUT_REPORT_NOT_READY",
+            component=type(self).__name__,
+        )
 
     def _require_connected_controller(self) -> object:
         if not self.connected:
@@ -430,6 +538,14 @@ async def _await_result(awaitable: Awaitable[object], completed: Event) -> objec
         completed.set()
 
 
+def _input_report_count(status: object) -> int | None:
+    counters = getattr(status, "report_counters", None)
+    if not isinstance(counters, dict):
+        return None
+    count = counters.get(_INPUT_REPORT_ID)
+    return count if isinstance(count, int) else None
+
+
 class DummySwbtControllerSession:
     """実機なしテストで InputState を記録する session double。"""
 
@@ -490,17 +606,43 @@ def create_swbt_controller(
 ) -> object:
     """SwbtControllerConfig から swbt controller instance を作る。"""
     controller_cls = resolve_swbt_controller_class(config.model.controller_type)
-    diagnostics = None
-    if diagnostics_writer is not None:
-        from swbt import DiagnosticsConfig
-
-        diagnostics = DiagnosticsConfig(trace_writer=cast(TextIO, diagnostics_writer))
     return controller_cls(
         adapter=config.adapter,
-        key_store_path=str(config.key_store_path),
+        profile_path=str(config.profile_path),
         report_period_us=config.report_period_us,
-        diagnostics=diagnostics,
+        diagnostics=_create_diagnostics_config(diagnostics_writer),
     )
+
+
+def create_swbt_profile(
+    config: SwbtControllerConfig,
+    diagnostics_writer: DiagnosticsWriter | None,
+    timeout_sec: float,
+) -> object:
+    """新しい v2 profile を作成し、接続済み controller を返す。"""
+    if not config.adapter:
+        raise swbt_configuration_error(
+            "swbt adapter is not selected",
+            code="NYX_SWBT_ADAPTER_NOT_SELECTED",
+            component="SwbtControllerSession",
+        )
+    controller_cls = resolve_swbt_controller_class(config.model.controller_type)
+    return controller_cls.create_profile(
+        adapter=config.adapter,
+        profile_path=str(config.profile_path),
+        local_address=None,
+        pair_timeout=timeout_sec,
+        report_period_us=config.report_period_us,
+        diagnostics=_create_diagnostics_config(diagnostics_writer),
+    )
+
+
+def _create_diagnostics_config(diagnostics_writer: DiagnosticsWriter | None) -> object | None:
+    if diagnostics_writer is None:
+        return None
+    from swbt import DiagnosticsConfig
+
+    return DiagnosticsConfig(trace_writer=cast(TextIO, diagnostics_writer))
 
 
 def resolve_swbt_controller_class(controller_type: SwbtControllerType):

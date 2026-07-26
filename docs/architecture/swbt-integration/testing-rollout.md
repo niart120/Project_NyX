@@ -4,7 +4,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 
 ## 導入順序
 
-1. `swbt-python>=0.2.0,<0.3.0` を通常依存として追加する。
+1. `swbt-python==0.5.3` を通常依存として固定する。
 2. `nyxpy.framework.core.hardware.swbt` package を追加する。
 3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
 4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。
@@ -46,8 +46,8 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 [ ] close 時に neutral を試みる
 [ ] swbt が通常依存であり、`[project.optional-dependencies].swbt` がない
 [ ] adapter 未指定時に自動採用せず `NYX_SWBT_ADAPTER_NOT_SELECTED` になる
-[ ] key store 未指定時に `.nyxpy/swbt/<controller>-bond.json` を使う
-[ ] 相対 key store path が workspace root 基準で解決される
+[ ] pairing profile 未指定時に `.nyxpy/swbt/<controller>-profile.json` を使う
+[ ] 相対 pairing profile path が workspace root 基準で解決される
 [ ] pair / reconnect 後の接続判定が `GamepadStatus.connection_state` に基づく
 [ ] GUI の swbt lifecycle と macro start が worker thread で実行される
 [ ] GUI manual input が port なし、macro 実行中、lifecycle 操作中に無効になる
@@ -61,7 +61,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 | リスク | 対策 |
 |---|---|
 | adapter 名が接続状態で変わる | `list_adapters()` の結果で `aliases` と VID/PID も表示する |
-| key store に複数候補が入る | controller type と対象機器ごとに file を分け、`InvalidKeyStoreError` を明示表示する |
+| pairing profile に複数候補が入る | controller type と対象機器ごとに file を分け、`InvalidKeyStoreError` を明示表示する |
 | GUI manual input と macro runtime が競合する | macro start 前に GUI lifetime port を release/close する |
 | IMU command が非対応 backend で silent no-op になる | 共通 default を `NotImplementedError` にする |
 | Joy-Con type で存在しない入力を送る | `SwbtControllerModel.capabilities` で mapper が拒否する |
@@ -77,20 +77,20 @@ Adapter discovery
   [ ] refresh だけでは pairing 待ち受けが開始されない
 
 Pair / reconnect
-  [ ] Pro Controller で pair 成功
-  [ ] 同じ key store で reconnect 成功
-  [ ] Joy-Con L で pair/reconnect 成功
-  [ ] Joy-Con R で pair/reconnect 成功
-  [ ] invalid key store が明確に表示される
+  [x] Pro Controller で pair 成功
+  [x] 同じ pairing profile で reconnect 成功
+  [x] Joy-Con L で pair/reconnect 成功
+  [x] Joy-Con R で pair/reconnect 成功
+  [ ] invalid pairing profile が明確に表示される
   [ ] GUI Disconnect が factory-managed cached session を閉じる
 
 Macro input
-  [ ] Button.A press/release
-  [ ] 16ms / 33ms / 50ms の短い押下を確認
-  [ ] D-pad diagonal
-  [ ] left stick / right stick
-  [ ] Command.imu(...) による IMU neutral / gyro frame
-  [ ] release all / close neutral
+  [x] Button.A press/release
+  [x] 16ms / 33ms / 50ms の短い押下を確認
+  [x] D-pad input を確認（観察画面は斜め方向を上として表示するため、右上の方向区別は未確認）
+  [x] left stick / right stick
+  [x] Command.imu(...) による IMU neutral / gyro frame を送信し、切断・想定外入力がないことを確認（gyro 値自体の画面上の反映は未確認）
+  [x] release all / close neutral
 
 GUI manual input
   [ ] reconnect 後に virtual controller が有効になる
@@ -106,12 +106,12 @@ GUI manual input
 unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認できる。次の項目は Switch、専用 USB Bluetooth adapter、operator がそろった環境で確定するまで未検証として扱う。
 
 ```text
-[ ] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
+[x] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
 [ ] NyX `0..255`、Y-down から `Stick.normalized`、Y-up への変換が実機で期待方向に反映されること
-[ ] 16ms / 33ms / 50ms short press の安定性
+[x] 16ms / 33ms / 50ms short press の反映
 [ ] public flush / send_current 相当 API が必要かどうか
 ```
 
-座標変換規則自体は単体テストで固定する。Switch 画面上の方向は実機未検証であり、完了扱いにしない。
+座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向を確認した。D-pad の `UPRIGHT` は上として反映されたが、観察画面が斜め方向を区別しないため、右成分を含むことは未確認である。
 
 実機で short press が取りこぼされる場合、この文書と利用者向け docs に最小推奨 duration を反映する。実機確認前の段階では、NyX は swbt backend 固有の最小押下時間を保証しない。

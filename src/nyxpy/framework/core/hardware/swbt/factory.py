@@ -27,7 +27,7 @@ class SwbtSessionKey:
 
     controller_type: SwbtControllerType
     adapter: str | None
-    key_store_path: Path
+    profile_path: Path
     report_period_us: int | None
 
 
@@ -109,7 +109,6 @@ class SwbtControllerOutputPortFactory:
             self._prepare_active_port_replacement(key)
             session = self._session_for(config)
             try:
-                session.open()
                 effective_timeout = timeout_sec or config.connect_timeout_sec
                 if cancellation_event is None:
                     session.pair(timeout_sec=effective_timeout)
@@ -360,7 +359,7 @@ def session_key(config: SwbtControllerConfig) -> SwbtSessionKey:
     return SwbtSessionKey(
         controller_type=config.model.controller_type,
         adapter=config.adapter,
-        key_store_path=config.key_store_path,
+        profile_path=config.profile_path,
         report_period_us=config.report_period_us,
     )
 

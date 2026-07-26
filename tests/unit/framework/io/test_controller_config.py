@@ -43,7 +43,7 @@ def test_controller_config_rejects_legacy_serial_flat_keys() -> None:
     assert exc_info.value.code == "NYX_CONTROLLER_LEGACY_SERIAL_SETTINGS_UNSUPPORTED"
 
 
-def test_swbt_controller_config_resolves_model_and_default_key_store(tmp_path: Path) -> None:
+def test_swbt_controller_config_resolves_model_and_default_profile(tmp_path: Path) -> None:
     config = controller_config_from_settings(
         {
             "controller": {
@@ -62,7 +62,7 @@ def test_swbt_controller_config_resolves_model_and_default_key_store(tmp_path: P
     assert isinstance(config, SwbtControllerConfig)
     assert config.model.controller_type is SwbtControllerType.JOY_CON_L
     assert config.adapter is None
-    assert config.key_store_path == tmp_path / ".nyxpy" / "swbt" / "joy-con-l-bond.json"
+    assert config.profile_path == tmp_path / ".nyxpy" / "swbt" / "joy-con-l-profile.json"
     assert config.connect_timeout_sec == 12.0
     assert config.report_period_us is None
 
@@ -75,7 +75,7 @@ def test_swbt_controller_config_does_not_keep_controller_type_string() -> None:
                 "swbt": {
                     "controller_type": "pro-controller",
                     "adapter": "usb:0",
-                    "key_store_path": ".nyxpy/swbt/pro.json",
+                    "profile_path": ".nyxpy/swbt/pro.json",
                 },
             }
         }
@@ -85,17 +85,17 @@ def test_swbt_controller_config_does_not_keep_controller_type_string() -> None:
     assert not hasattr(config, "controller_type")
     assert config.model.controller_type is SwbtControllerType.PRO_CONTROLLER
     assert config.adapter == "usb:0"
-    assert config.key_store_path == Path(".nyxpy/swbt/pro.json")
+    assert config.profile_path == Path(".nyxpy/swbt/pro.json")
 
 
-def test_swbt_relative_key_store_is_resolved_from_workspace_root(tmp_path: Path) -> None:
+def test_swbt_relative_profile_is_resolved_from_workspace_root(tmp_path: Path) -> None:
     config = controller_config_from_settings(
         {
             "controller": {
                 "backend": "swbt",
                 "swbt": {
                     "adapter": "usb:0",
-                    "key_store_path": ".nyxpy/swbt/pro.json",
+                    "profile_path": ".nyxpy/swbt/pro.json",
                 },
             }
         },
@@ -103,7 +103,7 @@ def test_swbt_relative_key_store_is_resolved_from_workspace_root(tmp_path: Path)
     )
 
     assert isinstance(config, SwbtControllerConfig)
-    assert config.key_store_path == tmp_path / ".nyxpy" / "swbt" / "pro.json"
+    assert config.profile_path == tmp_path / ".nyxpy" / "swbt" / "pro.json"
 
 
 def test_controller_config_overrides_do_not_mutate_settings(tmp_path: Path) -> None:
