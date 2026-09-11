@@ -174,8 +174,8 @@ def test_device_tab_orders_swbt_fields_like_controller_menu(qtbot):
     ] == ["タイプ:", "デバイス:"]
     assert form.itemAt(2, QFormLayout.ItemRole.LabelRole) is None
     operations = form.itemAt(2, QFormLayout.ItemRole.SpanningRole).layout()
-    assert operations.itemAt(0).widget() is tab.swbt_pair_btn
-    assert operations.itemAt(1).spacerItem() is not None
+    assert operations.itemAt(0).spacerItem() is not None
+    assert operations.itemAt(1).widget() is tab.swbt_pair_btn
     assert operations.itemAt(2).widget() is tab.swbt_connection_btn
 
 
