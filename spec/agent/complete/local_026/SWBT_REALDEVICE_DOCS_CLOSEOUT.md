@@ -264,17 +264,17 @@ uv run mkdocs build --strict
 - [x] Joy-Con L/R の unsupported input が明確に失敗することを単体テストで確認する。
 - [x] Joy-Con L/Rの `SL` / `SR` とPro Controllerの非対応境界を単体テストで確認する。
 - [x] async controller method を session 内部で完了待ちする。
-- [x] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
-- [ ] Joy-Con L/Rの `SL` / `SR` を実機で確認する。
+- [x] Pro Controller / Joy-Con L / Joy-Con R のPair / Reconnectと代表入力を実機で確認する。
+- [x] Joy-Con L/Rの `SL` / `SR` の実機確認を `local_029` へ分離する。
 - [x] stick Y 軸既定値を実機結果で確定する。
-- [ ] Direct送信型のshort press最小推奨durationを判定する。
+- [x] Direct送信型short pressの観察結果を記録し、推奨durationの判定を `local_029` へ分離する。
 - [x] 利用者 docs に device setup、CLI、GUI、troubleshooting を反映する。
 - [x] macro development docs に `Command.imu(...)` と swbt 非対応入力を反映する。
 - [x] `docs/architecture/swbt-integration/` の古い前提を修正する。
-- [ ] `docs/architecture/swbt-integration/testing-rollout.md` に確定値を反映する。
-- [ ] `local_021` から `local_026` に実装結果と検証結果を反映する。
-- [ ] 残課題を `spec/dev-journal.md` または新規 wip 仕様へ分離する。
-- [ ] complete 移動前に `uv run mkdocs build --strict` と通常 gate が通ることを確認する。
+- [x] `docs/architecture/swbt-integration/testing-rollout.md` に確定値と未確定範囲を反映する。
+- [x] `local_021` と `local_026` に実装結果と検証結果を反映する。
+- [x] 残課題を `local_029` へ分離する。
+- [x] complete 移動前に `uv run mkdocs build --strict` と通常 gate が通ることを確認する。
 
 ## 7. 現在の実装結果
 
@@ -321,3 +321,15 @@ CSR8510 A10（`0A12:0001`、`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233で�
 - Joy-Con RのD-padは非対応である。実機テストで検出後、`SwbtInputCapabilities.dpad` とmapperの事前拒否を追加した。
 
 Pro ControllerのA短押しは16msと33msで認識した。50msは認識例と未認識例があり、いずれもtrace上はDirect reportを送信済みだった。従って最小推奨durationと認識安定性は未確定のまま残す。証跡は `tmp/hardware/swbt/local028-v054-*` に保存した。
+
+## 11. 2026-09-11 完了記録
+
+`local_026` の責務である実機テスト基盤、利用者・設計docs、Direct送信型での実機結果の記録を完了した。通常 gate は `857 passed, 20 deselected`、`uv run mkdocs build --strict` は成功した。
+
+Direct送信型で確認できた事実は、Pro Controllerの新規Pair / Reconnect、A・UPRIGHT・左右stick上・IMU・neutral・macro経路・GUI lifecycle、Joy-Con Lの新規Pair / Reconnect・CAP・UPRIGHT、Joy-Con Rの新規Pair / Reconnect・Aである。Joy-Con RのD-pad非対応は実機結果を受け、capabilityとmapperの事前拒否へ反映済みである。
+
+次の実機検証は未確定のまま `local_029` へ分離した。未確定項目を理由に、ここに記録した実装・docs・実機結果までを未完了扱いにはしない。
+
+- Joy-Con L / R の `SL` / `SR` の画面反映
+- Direct送信型short pressの再現性と推奨duration
+- Pro Controller D-padの右成分とGUI manual inputの画面反映
