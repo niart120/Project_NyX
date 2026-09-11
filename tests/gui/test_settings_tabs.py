@@ -117,7 +117,8 @@ def test_swbt_operation_locks_apply_and_preserves_executed_selection(qtbot, tmp_
     callbacks["succeeded"](SimpleNamespace(connected=True))
     assert buttons["OK"].isEnabled()
     assert buttons["適用"].isEnabled()
-    assert tab.swbt_disconnect_btn.isEnabled()
+    assert tab.swbt_connection_btn.text() == "切断"
+    assert tab.swbt_connection_btn.isEnabled()
     assert not tab.swbt_pair_btn.isEnabled()
     assert not tab.controller_backend.isEnabled()
     assert not tab.swbt_adapter.isEnabled()

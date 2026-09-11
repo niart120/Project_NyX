@@ -70,7 +70,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.swbt_connection import (
     resolve_swbt_selection,
-    swbt_action_availability,
+    swbt_actions,
     swbt_error_message,
     swbt_type_updates,
 )
@@ -351,10 +351,10 @@ class MainWindow(QMainWindow):
             return
 
         adapters = self._swbt_adapter_views
-        self.swbt_device_menu = menu.addMenu("デバイス")
-        adapter_available = self._populate_swbt_device_menu(self.swbt_device_menu, adapters)
         self.swbt_type_menu = menu.addMenu("タイプ")
         self._populate_swbt_type_menu(self.swbt_type_menu)
+        self.swbt_device_menu = menu.addMenu("デバイス")
+        adapter_available = self._populate_swbt_device_menu(self.swbt_device_menu, adapters)
         menu.addSeparator()
         lifecycle_enabled = (
             current == "swbt"
@@ -365,23 +365,18 @@ class MainWindow(QMainWindow):
         connected = self._swbt_is_connected()
         self.swbt_device_menu.setEnabled(lifecycle_enabled and not connected)
         self.swbt_type_menu.setEnabled(lifecycle_enabled and not connected)
-        view = swbt_action_availability(
+        view = swbt_actions(
             connected=connected,
             registered=self._swbt_profile_exists(),
             available=lifecycle_enabled and (connected or adapter_available),
             operation=self._swbt_operation,
             cancelling=self._swbt_cancelling,
         )
-        for operation, label, enabled in (
-            ("pair", "ペアリング", view.pair),
-            ("reconnect", "接続", view.reconnect),
-            ("disconnect", "切断", view.disconnect),
-            ("cancel", "キャンセル", view.cancel),
-        ):
-            action = QAction(label, menu)
-            action.setEnabled(enabled)
+        for item in view:
+            action = QAction(item.label, menu)
+            action.setEnabled(item.enabled)
             action.triggered.connect(
-                lambda _checked=False, selected=operation: self._invoke_swbt_action(selected)
+                lambda _checked=False, selected=item.operation: self._invoke_swbt_action(selected)
             )
             menu.addAction(action)
 

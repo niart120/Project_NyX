@@ -145,7 +145,6 @@ def test_device_tab_uses_consistent_controller_terms(qtbot):
         "プロトコル:",
         "ボーレート:",
         "タイプ:",
-        "接続:",
     }
     assert labels.isdisjoint(
         {
@@ -171,8 +170,13 @@ def test_device_tab_orders_swbt_fields_like_controller_menu(qtbot):
     assert isinstance(form, QFormLayout)
     assert [
         form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()
-        for row in range(form.rowCount())
-    ] == ["デバイス:", "タイプ:", "接続:"]
+        for row in range(form.rowCount() - 1)
+    ] == ["タイプ:", "デバイス:"]
+    assert form.itemAt(2, QFormLayout.ItemRole.LabelRole) is None
+    operations = form.itemAt(2, QFormLayout.ItemRole.SpanningRole).layout()
+    assert operations.itemAt(0).widget() is tab.swbt_pair_btn
+    assert operations.itemAt(1).spacerItem() is not None
+    assert operations.itemAt(2).widget() is tab.swbt_connection_btn
 
 
 def test_device_tab_selects_3ds_default_baudrate(qtbot):
@@ -474,7 +478,7 @@ def test_profile_and_status_fields_are_absent(qtbot) -> None:
     qtbot.addWidget(tab)
     assert not hasattr(tab, "swbt_profile")
     assert not hasattr(tab, "swbt_status_label")
-    assert set(_label_texts(tab.swbt_group)) == {"デバイス:", "タイプ:", "接続:"}
+    assert set(_label_texts(tab.swbt_group)) == {"デバイス:", "タイプ:"}
 
 
 def test_profile_model_change_updates_default_but_preserves_custom_path(qtbot) -> None:
@@ -575,14 +579,14 @@ def test_pair_disables_operation_buttons_and_enables_cancel(qtbot) -> None:
     tab.swbt_adapter.setEditText("usb-1")
 
     tab.swbt_pair_btn.click()
-    assert tab.swbt_pair_btn.text() == "ペアリング"
-    assert not tab.swbt_pair_btn.isEnabled()
-    assert tab.swbt_cancel_btn.isEnabled()
+    assert tab.swbt_pair_btn.text() == "キャンセル"
+    assert not tab.swbt_connection_btn.isEnabled()
+    assert tab.swbt_pair_btn.isEnabled()
 
-    tab.swbt_cancel_btn.click()
+    tab.swbt_pair_btn.click()
     assert cancelled.is_set()
-    assert tab.swbt_cancel_btn.text() == "キャンセル"
-    assert not tab.swbt_cancel_btn.isEnabled()
+    assert tab.swbt_pair_btn.text() == "キャンセル"
+    assert not tab.swbt_pair_btn.isEnabled()
 
     callbacks["failed"](
         ExceptionGroup(
@@ -653,16 +657,16 @@ def test_reconnect_disables_operations_and_restores_after_nested_cancellation(
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
     tab.swbt_adapter.setEditText("usb-1")
 
-    tab.swbt_reconnect_btn.click()
+    tab.swbt_connection_btn.click()
     assert tab.swbt_pair_btn.text() == "ペアリング"
     assert not tab.swbt_pair_btn.isEnabled()
-    assert tab.swbt_cancel_btn.isEnabled()
+    assert tab.swbt_connection_btn.isEnabled()
     assert not tab.swbt_pair_btn.isEnabled()
 
-    tab.swbt_cancel_btn.click()
+    tab.swbt_connection_btn.click()
     assert cancelled.is_set()
-    assert tab.swbt_cancel_btn.text() == "キャンセル"
-    assert not tab.swbt_cancel_btn.isEnabled()
+    assert tab.swbt_connection_btn.text() == "キャンセル"
+    assert not tab.swbt_connection_btn.isEnabled()
 
     callbacks["failed"](
         ExceptionGroup(
@@ -692,11 +696,11 @@ def test_reconnect_requires_existing_profile_file(qtbot, tmp_path) -> None:
     assert tab.swbt_pair_btn.isEnabled()
     assert tab.swbt_pair_btn.text() == "ペアリング"
 
-    assert not tab.swbt_reconnect_btn.isEnabled()
+    assert not tab.swbt_connection_btn.isEnabled()
     profile_path.touch()
     tab._update_controller_field_state()
     assert tab.swbt_pair_btn.isEnabled()
-    assert tab.swbt_reconnect_btn.isEnabled()
+    assert tab.swbt_connection_btn.isEnabled()
 
 
 def test_adapter_refresh_resolves_saved_alias_without_auto_selecting_other(qtbot) -> None:

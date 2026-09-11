@@ -74,7 +74,7 @@ GUI の swbt 設定画面に置く機能は、実機運用に必要なものに�
 | pairing key に基づく reconnect | 保存済み pairing profile を使って reconnect する |
 | 仮想コントローラー manual input | 既存 `VirtualControllerModel` から `ControllerOutputPort` へ button / D-pad / stick を送る |
 
-プロファイルパスと接続状態の専用表示欄は設けない。「ペアリング」「接続」「切断」「キャンセル」を常設し、有効・無効だけを変更する。失敗理由とコードは既存ツールログへ記録する。
+プロファイルパスと接続状態の専用表示欄は設けない。タイプとデバイスの下に、行ラベルなしで2個の操作ボタンを置く。左はペアリング／キャンセル、右は接続／切断／キャンセルに切り替える。失敗理由とコードは既存ツールログへ記録する。
 
 GUI と CLI の間で値を受け渡すための clipboard 機能、CLI command 生成、CLI 実行履歴との連携、diagnostics folder を開く導線、controller color editor は持たせない。
 

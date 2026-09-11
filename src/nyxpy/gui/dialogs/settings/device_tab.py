@@ -28,7 +28,7 @@ from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
 from nyxpy.gui.swbt_connection import (
     resolve_swbt_selection,
-    swbt_action_availability,
+    swbt_actions,
     swbt_type_updates,
 )
 
@@ -263,29 +263,21 @@ class DeviceSettingsTab(QWidget):
         self.refresh_swbt_btn.clicked.connect(self.refresh_swbt_adapters)
         adapter_row.addWidget(self.swbt_adapter)
         adapter_row.addWidget(self.refresh_swbt_btn)
-        swbt_form.addRow(QLabel("デバイス:"), adapter_row)
         swbt_form.addRow(QLabel("タイプ:"), self.swbt_controller_type)
+        swbt_form.addRow(QLabel("デバイス:"), adapter_row)
 
         self.swbt_controller_type.currentIndexChanged.connect(
             lambda _index: self._update_controller_field_state()
         )
         lifecycle_row = QHBoxLayout()
         self.swbt_pair_btn = QPushButton("ペアリング")
-        self.swbt_reconnect_btn = QPushButton("接続")
-        self.swbt_disconnect_btn = QPushButton("切断")
-        self.swbt_cancel_btn = QPushButton("キャンセル")
-        self.swbt_pair_btn.clicked.connect(self._pair_swbt)
-        self.swbt_reconnect_btn.clicked.connect(self._reconnect_swbt)
-        self.swbt_disconnect_btn.clicked.connect(self._disconnect_swbt)
-        self.swbt_cancel_btn.clicked.connect(self._cancel_swbt_operation)
-        for button in (
-            self.swbt_pair_btn,
-            self.swbt_reconnect_btn,
-            self.swbt_disconnect_btn,
-            self.swbt_cancel_btn,
-        ):
-            lifecycle_row.addWidget(button)
-        swbt_form.addRow(QLabel("接続:"), lifecycle_row)
+        self.swbt_connection_btn = QPushButton("接続")
+        self.swbt_pair_btn.clicked.connect(lambda: self._activate_swbt(0))
+        self.swbt_connection_btn.clicked.connect(lambda: self._activate_swbt(1))
+        lifecycle_row.addWidget(self.swbt_pair_btn)
+        lifecycle_row.addStretch(1)
+        lifecycle_row.addWidget(self.swbt_connection_btn)
+        swbt_form.addRow(lifecycle_row)
         swbt_group_layout.addLayout(swbt_form)
         controller_group_layout.addWidget(self.swbt_group)
         layout.addWidget(self.controller_group)
@@ -508,17 +500,29 @@ class DeviceSettingsTab(QWidget):
         self.swbt_controller_type.setEnabled(editable)
         self.swbt_adapter.setEnabled(editable)
         self.refresh_swbt_btn.setEnabled(is_swbt and editable)
-        view = self._swbt_action()
-        for button, enabled in (
-            (self.swbt_pair_btn, view.pair),
-            (self.swbt_reconnect_btn, view.reconnect),
-            (self.swbt_disconnect_btn, view.disconnect),
-            (self.swbt_cancel_btn, view.cancel),
+        for button, action in zip(
+            (self.swbt_pair_btn, self.swbt_connection_btn),
+            self._swbt_actions(),
+            strict=True,
         ):
-            button.setEnabled(is_swbt and enabled and self.swbt_actions_enabled)
+            button.setText(action.label)
+            button.setEnabled(is_swbt and action.enabled and self.swbt_actions_enabled)
 
-    def _swbt_action(self):
-        return swbt_action_availability(
+    def _activate_swbt(self, index: int) -> None:
+        action = self._swbt_actions()[index]
+        if not action.enabled:
+            return
+        if action.operation == "cancel":
+            self._cancel_swbt_operation()
+        elif action.operation == "pair":
+            self._pair_swbt()
+        elif action.operation == "disconnect":
+            self._disconnect_swbt()
+        else:
+            self._reconnect_swbt()
+
+    def _swbt_actions(self):
+        return swbt_actions(
             connected=self._swbt_connected,
             registered=self._swbt_profile_exists(),
             available=self.swbt_actions_enabled
