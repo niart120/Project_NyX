@@ -300,12 +300,6 @@ class MainWindow(QMainWindow):
         if refresh_discovery and self.global_settings.get("controller.backend", "serial") == "swbt":
             self._refresh_swbt_adapters_async()
 
-    def _ponkan_capture_available(self) -> bool:
-        value = getattr(self.services, "ponkan_capture_available", False)
-        if callable(value):
-            return bool(value())
-        return bool(value)
-
     def _populate_controller_backend_menu(
         self,
         menu: QMenu,
@@ -570,10 +564,9 @@ class MainWindow(QMainWindow):
         menu.addMenu(self.window_source_menu)
         self._populate_camera_source_menu(self.camera_source_menu, devices)
         self._populate_window_source_menu(self.window_source_menu, windows)
-        if self._ponkan_capture_available():
-            self.capture_source_menu = QMenu("キャプチャ", menu)
-            menu.addMenu(self.capture_source_menu)
-            self._populate_direct_capture_source_menu(self.capture_source_menu)
+        self.capture_source_menu = QMenu("キャプチャ", menu)
+        menu.addMenu(self.capture_source_menu)
+        self._populate_direct_capture_source_menu(self.capture_source_menu)
 
     def _populate_direct_capture_source_menu(self, menu: QMenu) -> None:
         menu.clear()
@@ -1454,7 +1447,6 @@ class MainWindow(QMainWindow):
             self.global_settings,
             self.secrets_settings,
             device_discovery=self.device_discovery,
-            ponkan_capture_available=self._ponkan_capture_available(),
             swbt_adapter_provider=self.services.refresh_swbt_adapters,
             swbt_pair=self._pair_swbt_controller_async,
             swbt_reconnect=self._reconnect_swbt_controller_async,

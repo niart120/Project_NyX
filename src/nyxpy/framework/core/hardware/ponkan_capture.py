@@ -5,10 +5,11 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from importlib import import_module
-from typing import Protocol, cast, override
+from typing import Literal, Protocol, cast, override
 
 import cv2
+from ponkan import CaptureConfig, CaptureOutput, get_capture_profile, open_capture
+from ponkan.errors import CaptureError, DependencyUnavailableError
 
 from nyxpy.framework.core.hardware.camera_capture import (
     CaptureDeviceInterface,
@@ -142,26 +143,8 @@ class PonkanCaptureDevice(CaptureDeviceInterface):
 
 def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
     try:
-        ponkan = import_module("ponkan")
-        ponkan_errors = import_module("ponkan.errors")
-    except ImportError as exc:
-        raise ConfigurationError(
-            "ponkan-python is required for capture source",
-            code="NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING",
-            component="PonkanCaptureDevice",
-            details={"extra": "ponkan", "provider": config.provider},
-            cause=exc,
-        ) from exc
-
-    capture_config = getattr(ponkan, "CaptureConfig")
-    get_capture_profile = getattr(ponkan, "get_capture_profile")
-    open_capture = getattr(ponkan, "open_capture")
-    capture_error = getattr(ponkan_errors, "CaptureError")
-    dependency_unavailable_error = getattr(ponkan_errors, "DependencyUnavailableError")
-
-    try:
         profile = get_capture_profile(config.device_profile)
-    except capture_error as exc:
+    except CaptureError as exc:
         raise ConfigurationError(
             "invalid ponkan capture profile",
             code="NYX_PONKAN_CAPTURE_PROFILE_INVALID",
@@ -175,11 +158,11 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             cause=exc,
         ) from exc
 
-    ponkan_config = capture_config(
+    ponkan_config = CaptureConfig(
         source=getattr(profile, "model", "new_3ds_xl"),
         model=getattr(profile, "model", "new_3ds_xl"),
         backend=config.ponkan_backend,
-        output=getattr(profile, "default_output", "both_vertical"),
+        output=CaptureOutput(str(getattr(profile, "default_output", CaptureOutput.BOTH_VERTICAL))),
         colorspace=_opencv_colorspace(profile),
         raw_slots=config.raw_slots,
         output_queue_size=config.output_queue_size,
@@ -190,7 +173,7 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
     )
     try:
         return cast(PonkanReader, open_capture(config=ponkan_config))
-    except dependency_unavailable_error as exc:
+    except DependencyUnavailableError as exc:
         raise ConfigurationError(
             "ponkan capture dependency is unavailable",
             code="NYX_PONKAN_CAPTURE_DEPENDENCY_UNAVAILABLE",
@@ -203,7 +186,7 @@ def _open_ponkan_capture(config: PonkanCaptureSourceConfig) -> PonkanReader:
             ),
             cause=exc,
         ) from exc
-    except capture_error as exc:
+    except CaptureError as exc:
         raise ConfigurationError(
             "failed to open ponkan capture source",
             code="NYX_PONKAN_CAPTURE_OPEN_FAILED",
@@ -240,7 +223,7 @@ def _upstream_recoverable(exc: BaseException) -> bool:
     return bool(value)
 
 
-def _opencv_colorspace(profile: object) -> str:
+def _opencv_colorspace(profile: object) -> Literal["BGR"]:
     supported = tuple(str(value) for value in getattr(profile, "supported_colorspaces", ()))
     if supported and "BGR" not in supported:
         raise ConfigurationError(

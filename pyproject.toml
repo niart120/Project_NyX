@@ -32,6 +32,7 @@ dependencies = [
     "numpy>=2.3.5,<2.4.0",
     "mss>=10.2.0",
     "swbt-python==0.6.0",
+    "ponkan-python>=0.2.0,<0.3.0",
 ]
 
 [dependency-groups]
@@ -57,9 +58,6 @@ nyx-gui = "nyxpy.__main__:gui_app"
 [project.optional-dependencies]
 windows = [
     "windows-capture>=2.0.0,<3.0.0 ; sys_platform == 'win32'",
-]
-ponkan = [
-    "ponkan-python>=0.2.0,<0.3.0 ; sys_platform == 'win32'",
 ]
 
 [project.urls]

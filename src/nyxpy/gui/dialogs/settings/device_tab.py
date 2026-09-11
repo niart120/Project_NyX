@@ -24,7 +24,6 @@ from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.gui.background_task import BackgroundTask
-from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
 from nyxpy.gui.swbt_connection import (
     resolve_swbt_selection,
@@ -56,7 +55,6 @@ class DeviceSettingsTab(QWidget):
         parent=None,
         *,
         device_discovery: DeviceDiscoveryService | None = None,
-        ponkan_capture_available: bool | None = None,
         swbt_adapter_provider: Callable[[], tuple[SwbtAdapterView, ...]] | None = None,
         swbt_pair: SwbtLifecycleAction | None = None,
         swbt_reconnect: SwbtLifecycleAction | None = None,
@@ -81,11 +79,6 @@ class DeviceSettingsTab(QWidget):
         self._swbt_connect_operation: str | None = None
         self._swbt_cancelling = False
         self._background_tasks: set[BackgroundTask] = set()
-        self.ponkan_capture_available = (
-            is_ponkan_capture_available()
-            if ponkan_capture_available is None
-            else bool(ponkan_capture_available)
-        )
         layout = QVBoxLayout(self)
 
         self.cap_group = QGroupBox("キャプチャ入力")
@@ -97,8 +90,7 @@ class DeviceSettingsTab(QWidget):
         self.capture_source_type = QComboBox()
         for label, value in _CAPTURE_SOURCE_OPTIONS:
             self.capture_source_type.addItem(label, value)
-        if self.ponkan_capture_available:
-            self.capture_source_type.addItem(*_CAPTURE_SOURCE_OPTION)
+        self.capture_source_type.addItem(*_CAPTURE_SOURCE_OPTION)
         self._set_capture_source_type(self.settings.get("capture_source_type", "camera"))
         self.capture_source_type.currentIndexChanged.connect(
             lambda _index: self._update_source_field_state(self._capture_source_type())
@@ -123,6 +115,15 @@ class DeviceSettingsTab(QWidget):
         self.camera_label = QLabel("Camera:")
         self.camera_row = _layout_container(cap_row)
         cap_form.addRow(self.camera_label, self.camera_row)
+
+        self.capture_device_profile = QComboBox()
+        self.capture_device_profile.addItem("N3DSXL (ponkan-python)", "n3dsxl")
+        self._set_combo_data(
+            self.capture_device_profile,
+            self.settings.get("capture_device_profile", "n3dsxl"),
+        )
+        self.capture_device_profile_label = QLabel("Capture Device:")
+        cap_form.addRow(self.capture_device_profile_label, self.capture_device_profile)
 
         window_row = QHBoxLayout()
         self.window_source = QComboBox()
@@ -171,6 +172,7 @@ class DeviceSettingsTab(QWidget):
             self.n3dsxl_hd_aspect_box_enabled,
         )
         self.capture_setting_rows = (
+            (self.capture_device_profile_label, self.capture_device_profile),
             (self.n3dsxl_hd_aspect_box_enabled_label, self.n3dsxl_hd_aspect_box_enabled),
         )
 
@@ -422,7 +424,10 @@ class DeviceSettingsTab(QWidget):
             self.settings.set("capture_aspect_box_enabled", self.aspect_box_enabled.isChecked())
         elif source_type == "capture":
             self.settings.set("capture_provider", "ponkan")
-            self.settings.set("capture_device_profile", "n3dsxl")
+            self.settings.set(
+                "capture_device_profile",
+                str(self.capture_device_profile.currentData() or "n3dsxl"),
+            )
             self.settings.set(
                 "n3dsxl_hd_aspect_box_enabled",
                 self.n3dsxl_hd_aspect_box_enabled.isChecked(),

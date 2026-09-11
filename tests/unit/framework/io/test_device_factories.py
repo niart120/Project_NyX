@@ -264,8 +264,8 @@ def test_frame_source_factory_does_not_dummy_fallback_for_ponkan_configuration_e
     class FailingPonkanCaptureDevice(PonkanCaptureDevice):
         def initialize(self) -> None:
             raise ConfigurationError(
-                "ponkan missing",
-                code="NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING",
+                "ponkan capture could not open",
+                code="NYX_PONKAN_CAPTURE_OPEN_FAILED",
                 component="PonkanCaptureDevice",
             )
 
@@ -283,7 +283,7 @@ def test_frame_source_factory_does_not_dummy_fallback_for_ponkan_configuration_e
     with pytest.raises(ConfigurationError) as exc_info:
         port.initialize()
 
-    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING"
+    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_OPEN_FAILED"
 
 
 def test_frame_source_factory_falls_back_to_dummy_when_window_not_selected() -> None:

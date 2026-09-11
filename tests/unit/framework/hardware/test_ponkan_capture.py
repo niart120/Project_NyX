@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import sys
 import time
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -124,16 +123,6 @@ def test_ponkan_capture_device_reports_reader_failure() -> None:
     device.release()
 
 
-def test_ponkan_capture_missing_dependency_is_configuration_error(monkeypatch) -> None:
-    monkeypatch.setitem(sys.modules, "ponkan", None)
-
-    with pytest.raises(ConfigurationError) as exc_info:
-        _open_ponkan_capture(PonkanCaptureSourceConfig())
-
-    assert exc_info.value.code == "NYX_PONKAN_CAPTURE_DEPENDENCY_MISSING"
-    assert exc_info.value.details["extra"] == "ponkan"
-
-
 def test_ponkan_capture_dependency_unavailable_is_configuration_error(monkeypatch) -> None:
     class CaptureError(Exception):
         pass
@@ -160,12 +149,14 @@ def test_ponkan_capture_invalid_profile_is_configuration_error(monkeypatch) -> N
         pass
 
     calls = _install_fake_ponkan(monkeypatch, CaptureError, DependencyUnavailableError)
-    ponkan = sys.modules["ponkan"]
 
     def get_capture_profile(_profile):
         raise CaptureError("unknown profile")
 
-    ponkan.get_capture_profile = get_capture_profile
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.ponkan_capture.get_capture_profile",
+        get_capture_profile,
+    )
 
     with pytest.raises(ConfigurationError) as exc_info:
         _open_ponkan_capture(PonkanCaptureSourceConfig(device_profile="future_profile"))
@@ -221,12 +212,14 @@ def test_ponkan_capture_rejects_profile_without_bgr_colorspace(monkeypatch) -> N
         pass
 
     calls = _install_fake_ponkan(monkeypatch, CaptureError, DependencyUnavailableError)
-    ponkan = sys.modules["ponkan"]
-    ponkan.get_capture_profile = lambda _profile: SimpleNamespace(
-        id="future_profile",
-        model="future_model",
-        default_output="both_vertical",
-        supported_colorspaces=("RGB",),
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.ponkan_capture.get_capture_profile",
+        lambda _profile: SimpleNamespace(
+            id="future_profile",
+            model="future_model",
+            default_output="both_vertical",
+            supported_colorspaces=("RGB",),
+        ),
     )
 
     with pytest.raises(ConfigurationError) as exc_info:
@@ -257,20 +250,18 @@ def _install_fake_ponkan(
             raise open_error
         return FakeReader()
 
-    ponkan = ModuleType("ponkan")
-    ponkan.CaptureConfig = CaptureConfig
-    ponkan.get_capture_profile = lambda _profile: SimpleNamespace(
-        id="n3dsxl",
-        model="new_3ds_xl",
-        default_output="both_vertical",
-        supported_colorspaces=("RGB", "BGR"),
+    module = "nyxpy.framework.core.hardware.ponkan_capture"
+    monkeypatch.setattr(f"{module}.CaptureConfig", CaptureConfig)
+    monkeypatch.setattr(
+        f"{module}.get_capture_profile",
+        lambda _profile: SimpleNamespace(
+            id="n3dsxl",
+            model="new_3ds_xl",
+            default_output="both_vertical",
+            supported_colorspaces=("RGB", "BGR"),
+        ),
     )
-    ponkan.open_capture = open_capture
-
-    errors = ModuleType("ponkan.errors")
-    errors.CaptureError = capture_error_type
-    errors.DependencyUnavailableError = dependency_unavailable_type
-
-    monkeypatch.setitem(sys.modules, "ponkan", ponkan)
-    monkeypatch.setitem(sys.modules, "ponkan.errors", errors)
+    monkeypatch.setattr(f"{module}.open_capture", open_capture)
+    monkeypatch.setattr(f"{module}.CaptureError", capture_error_type)
+    monkeypatch.setattr(f"{module}.DependencyUnavailableError", dependency_unavailable_type)
     return calls

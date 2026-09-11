@@ -157,7 +157,6 @@ def make_services(
     *,
     previous_builder_settings=None,
     device_discovery=None,
-    ponkan_capture_available=True,
 ):
     services = object.__new__(GuiAppServices)
     services.project_root = None
@@ -169,7 +168,6 @@ def make_services(
         capture=("Camera1",),
         windows=(WindowInfo("Viewer", "hwnd-1", None),),
     )
-    services.ponkan_capture_available = ponkan_capture_available
     services.runtime_builder = FakeBuilder()
     services.swbt_adapter_discovery = FakeSwbtDiscovery()
     services._last_settings = dict(settings)
@@ -696,64 +694,3 @@ def test_app_services_keeps_camera_window_settings_for_capture_source() -> None:
     assert services.global_settings.get("capture_device") == "Missing Camera"
     assert services.global_settings.get("capture_window_title") == "Closed Viewer"
     assert services.global_settings.get("capture_window_identifier") == "hwnd-old"
-
-
-def test_app_services_falls_back_from_capture_when_ponkan_unavailable() -> None:
-    settings = {
-        "capture_source_type": "capture",
-        "capture_device": "Camera1",
-        "capture_provider": "ponkan",
-        "capture_device_profile": "n3dsxl",
-        "controller.serial.device": "COM1",
-    }
-    services = make_services(
-        settings,
-        device_discovery=FakeDiscovery(serial=("COM1",), capture=("Camera1",)),
-        ponkan_capture_available=False,
-    )
-
-    outcome = services.apply_settings(is_run_active=False)
-
-    assert services.global_settings.get("capture_source_type") == "camera"
-    assert "capture_source_type" in outcome.changed_keys
-    assert outcome.builder_replaced is True
-    assert services.logger.user_events[0][1]["extra"] == {
-        "keys": "capture_source_type",
-        "reason": "ponkan_unavailable",
-    }
-
-
-def test_app_services_preserves_hidden_ponkan_settings_on_fallback() -> None:
-    settings = {
-        "capture_source_type": "capture",
-        "capture_provider": "ponkan",
-        "capture_device_profile": "n3dsxl",
-        "ponkan_backend": "d3xx-native",
-        "ponkan_raw_slots": 3,
-        "ponkan_output_queue_size": 4,
-        "ponkan_drop_policy": "block",
-        "ponkan_poll_interval": 0.01,
-        "ponkan_read_timeout": 0.5,
-        "ponkan_collect_timing": True,
-        "n3dsxl_hd_aspect_box_enabled": False,
-        "controller.serial.device": "COM1",
-    }
-    services = make_services(
-        settings,
-        device_discovery=FakeDiscovery(serial=("COM1",), capture=()),
-        ponkan_capture_available=False,
-    )
-
-    services.apply_settings(is_run_active=False)
-
-    assert services.global_settings.get("capture_source_type") == "camera"
-    assert services.global_settings.get("capture_provider") == "ponkan"
-    assert services.global_settings.get("capture_device_profile") == "n3dsxl"
-    assert services.global_settings.get("ponkan_backend") == "d3xx-native"
-    assert services.global_settings.get("ponkan_raw_slots") == 3
-    assert services.global_settings.get("ponkan_output_queue_size") == 4
-    assert services.global_settings.get("ponkan_drop_policy") == "block"
-    assert services.global_settings.get("ponkan_poll_interval") == 0.01
-    assert services.global_settings.get("ponkan_read_timeout") == 0.5
-    assert services.global_settings.get("ponkan_collect_timing") is True
-    assert services.global_settings.get("n3dsxl_hd_aspect_box_enabled") is False
