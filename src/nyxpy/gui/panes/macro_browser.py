@@ -307,7 +307,10 @@ class MacroBrowserPane(QWidget):
         if self._macro_id_from_tree_item(item) == macro_id:
             return item
         for index in range(item.childCount()):
-            found = self._find_tree_item_recursive(item.child(index), macro_id)
+            child = item.child(index)
+            if child is None:
+                continue
+            found = self._find_tree_item_recursive(child, macro_id)
             if found is not None:
                 return found
         return None
