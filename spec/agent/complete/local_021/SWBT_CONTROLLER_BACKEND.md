@@ -169,4 +169,4 @@ uv run pytest tests -m "not realdevice and not swbt"
 
 本仕様を complete へ移した後の統合監査で、swbt-python 0.2 の async API、stick 座標系、GUI status、CLI process lifetime に不整合が見つかった。`local_022` から `local_025` の完了記録は当時の作業結果として維持し、監査修正は各仕様の追補へ記録する。
 
-Pro Controller、Joy-Con L、Joy-Con R を使う実機検証は未実施である。`local_026` と rollout 全体は未完了のままとする。
+Direct送信型でのPro Controller、Joy-Con L、Joy-Con RのPair / Reconnectと代表入力は`local_026`で確認済みである。`local_026`は実機テスト基盤、docs、結果記録を完了した。Joy-Con L / Rの`SL` / `SR`、short pressの再現性、GUI manual inputなどの追加確認は`local_029`へ分離する。
