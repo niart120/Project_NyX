@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from importlib import import_module
 from typing import Protocol, cast
+
+from ponkan import list_capture_devices
 
 
 class _UpstreamCaptureDevice(Protocol):
@@ -83,20 +84,9 @@ def list_ponkan_capture_devices(
     lister: PonkanListCaptureDevices | None = None,
 ) -> PonkanCaptureDiscoverySnapshot:
     """List ponkan capture devices without exposing ponkan objects to callers."""
-    if lister is None:
-        try:
-            ponkan = import_module("ponkan")
-        except ImportError as exc:
-            return PonkanCaptureDiscoverySnapshot(
-                profile_id=profile,
-                backend_preference=backend,
-                reason="missing_package",
-                remediation="Install the ponkan optional dependency for NyX.",
-                errors=(f"ponkan: {type(exc).__name__}: {exc}",),
-            )
     try:
         if lister is None:
-            lister = cast(PonkanListCaptureDevices, getattr(ponkan, "list_capture_devices"))
+            lister = cast(PonkanListCaptureDevices, list_capture_devices)
         discovery = lister(profile=profile, backend=backend, include_rejected=include_rejected)
     except Exception as exc:
         return PonkanCaptureDiscoverySnapshot(

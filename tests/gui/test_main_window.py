@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
@@ -211,7 +210,6 @@ class FakeServices:
         self.secrets_settings = FakeSecrets()
         self.device_discovery = FakeDiscovery()
         self.macro_catalog = FakeCatalog()
-        self.ponkan_capture_available = True
         self.builder = FakeBuilder()
         self.discarded_manual_controllers = []
         self.swbt_calls = []
@@ -622,27 +620,7 @@ def test_capture_input_menu_lists_source_candidates_directly(window: MainWindow)
     assert window.capture_source_type_menu is None
 
 
-def test_connection_menu_hides_capture_when_ponkan_unavailable(
-    qtbot,
-    services: FakeServices,
-) -> None:
-    services.ponkan_capture_available = False
-    w = MainWindow(services=services)
-    qtbot.addWidget(w)
-
-    assert w.capture_input_menu is not None
-    source_menus = [
-        action.menu().title()
-        for action in w.capture_input_menu.actions()
-        if action.menu() is not None
-    ]
-
-    assert source_menus == ["カメラ", "ウィンドウ", "FPS"]
-    assert w.capture_source_menu is None
-    w.preview_pane.timer.stop()
-
-
-def test_connection_menu_shows_n3dsxl_action_under_capture_when_ponkan_available(
+def test_connection_menu_shows_n3dsxl_action_under_capture(
     window: MainWindow,
 ) -> None:
     assert window.capture_source_menu is not None
@@ -700,16 +678,6 @@ def test_connection_menu_does_not_list_physical_ponkan_devices(window: MainWindo
 
     assert len(actions) == 1
     assert actions[0].text() == "N3DSXL (ponkan-python)"
-
-
-def test_connection_menu_does_not_import_ponkan_when_populating_capture_actions(
-    window: MainWindow,
-) -> None:
-    sys.modules.pop("ponkan", None)
-
-    window._refresh_connection_menu()
-
-    assert "ponkan" not in sys.modules
 
 
 def test_connection_menu_lists_snapshot_without_detecting(window: MainWindow) -> None:

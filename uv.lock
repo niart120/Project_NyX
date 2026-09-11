@@ -909,6 +909,7 @@ dependencies = [
     { name = "paddleocr" },
     { name = "paddlepaddle" },
     { name = "pillow" },
+    { name = "ponkan-python" },
     { name = "pyserial" },
     { name = "pyside6" },
     { name = "requests" },
@@ -918,9 +919,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-ponkan = [
-    { name = "ponkan-python", marker = "sys_platform == 'win32'" },
-]
 windows = [
     { name = "windows-capture", marker = "sys_platform == 'win32'" },
 ]
@@ -950,7 +948,7 @@ requires-dist = [
     { name = "paddleocr", specifier = ">=3.5.0,<3.6.0" },
     { name = "paddlepaddle", specifier = ">=3.2.2,<3.3.0" },
     { name = "pillow", specifier = ">=12.2.0,<13.0.0" },
-    { name = "ponkan-python", marker = "sys_platform == 'win32' and extra == 'ponkan'", specifier = ">=0.2.0,<0.3.0" },
+    { name = "ponkan-python", specifier = ">=0.2.0,<0.3.0" },
     { name = "pyserial", specifier = ">=3.5,<4.0" },
     { name = "pyside6", specifier = ">=6.11.0,<7.0.0" },
     { name = "requests", specifier = ">=2.34.0,<3.0.0" },
@@ -959,7 +957,7 @@ requires-dist = [
     { name = "tomlkit", specifier = ">=0.15.1,<0.16.0" },
     { name = "windows-capture", marker = "sys_platform == 'win32' and extra == 'windows'", specifier = ">=2.0.0,<3.0.0" },
 ]
-provides-extras = ["windows", "ponkan"]
+provides-extras = ["windows"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1455,11 +1453,11 @@ name = "pyobjc-framework-avfoundation"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-coreaudio", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-coremedia", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-quartz", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
+    { name = "pyobjc-core", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-coreaudio", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-coremedia", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/19/48/917494d86ea02372e922bc96ffb76a6161f847db21ae7885fe7e0c3d7755/pyobjc_framework_avfoundation-12.2.2.tar.gz", hash = "sha256:5b9f33bf382af9a84b2394c98e3603a8abf03f29b0d2036e29698806ea22851a", size = 411684, upload-time = "2026-08-11T19:43:51.652Z" }
 wheels = [
@@ -1472,7 +1470,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
+    { name = "pyobjc-core", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/75/76/49c6da2c6a831020b4854ba20079d5a1030474bffc776b7b73c2eeff8c15/pyobjc_framework_cocoa-12.2.2.tar.gz", hash = "sha256:c96c0ef69a71afbbb0e6a7d594b455c5fe47d62e0db376ee7a2b4b828c16ace9", size = 3132831, upload-time = "2026-08-11T19:44:02.288Z" }
 wheels = [
@@ -1485,8 +1483,8 @@ name = "pyobjc-framework-coreaudio"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
+    { name = "pyobjc-core", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/71/bfbf1dffe9f08f31b444685e9d194e25cc3506db9f7a9d6ffdb56cc4408e/pyobjc_framework_coreaudio-12.2.2.tar.gz", hash = "sha256:880214f7328d6502a0c60ee744fa1eabe77a0d0c9ae276009453b69474eacf38", size = 79573, upload-time = "2026-08-11T19:44:07.04Z" }
 wheels = [
@@ -1499,8 +1497,8 @@ name = "pyobjc-framework-coremedia"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
+    { name = "pyobjc-core", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f0/12/0b3896ea04f0fbbe3f2cb37802cadce334f9aef204d911a81934013eba8c/pyobjc_framework_coremedia-12.2.2.tar.gz", hash = "sha256:fe9f972438674893e941e9db5b62f8ba99a33f94a7f1c2ce49b14416f154cd10", size = 98580, upload-time = "2026-08-11T19:44:11.651Z" }
 wheels = [
@@ -1513,8 +1511,8 @@ name = "pyobjc-framework-quartz"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'android' and sys_platform != 'emscripten'" },
+    { name = "pyobjc-core", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/35/b1/426a37c7ae37280b3ffca2571fb48f211946aee2f4ca31a603ed1943c4a7/pyobjc_framework_quartz-12.2.2.tar.gz", hash = "sha256:810f97b210cfd93704d240860286dfd6df09f9f1c52525fc5c2166723aea3f9e", size = 3218295, upload-time = "2026-08-11T19:45:15.189Z" }
 wheels = [
@@ -2066,8 +2064,8 @@ name = "windows-capture"
 version = "2.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "opencv-python" },
+    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'android' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux')" },
+    { name = "opencv-python", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'android' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/85/00/326a51bc2b27bc53e2a3e6d0c8f320af7e65f8315fb0d1d149699ca45995/windows_capture-2.0.1.tar.gz", hash = "sha256:2c2b394f4587b067cf520456f7f64c11b00380851b077a4d061fe5356a9a7645", size = 148413, upload-time = "2026-08-08T16:07:07.162Z" }
 wheels = [

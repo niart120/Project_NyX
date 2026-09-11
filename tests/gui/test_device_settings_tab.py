@@ -112,14 +112,6 @@ class FakeSwbtAdapterProvider:
         )
 
 
-@pytest.fixture(autouse=True)
-def _default_ponkan_available(monkeypatch):
-    monkeypatch.setattr(
-        "nyxpy.gui.dialogs.settings.device_tab.is_ponkan_capture_available",
-        lambda: True,
-    )
-
-
 def test_device_tab_protocol_options_include_3ds(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
@@ -188,7 +180,7 @@ def test_device_tab_selects_3ds_default_baudrate(qtbot):
     assert tab.ser_baud.currentText() == "115200"
 
 
-def test_device_settings_tab_shows_simple_capture_option_when_ponkan_available(qtbot):
+def test_device_settings_tab_shows_capture_option(qtbot):
     tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
@@ -206,26 +198,6 @@ def test_device_settings_tab_shows_simple_capture_option_when_ponkan_available(q
         "ウィンドウ",
         "キャプチャ",
     ]
-
-
-def test_device_settings_tab_hides_capture_option_when_ponkan_unavailable(qtbot):
-    settings = FakeSettings()
-    settings.data["capture_source_type"] = "capture"
-    tab = DeviceSettingsTab(
-        settings,
-        None,
-        device_discovery=FakeDiscovery(),
-        ponkan_capture_available=False,
-    )
-    qtbot.addWidget(tab)
-
-    assert [
-        tab.capture_source_type.itemData(i) for i in range(tab.capture_source_type.count())
-    ] == [
-        "camera",
-        "window",
-    ]
-    assert tab.capture_source_type.currentData() == "camera"
 
 
 def test_device_settings_tab_applies_window_capture_settings(qtbot):
@@ -315,6 +287,7 @@ def test_device_settings_tab_shows_only_hd_aspect_for_capture(qtbot):
     _set_capture_source(tab, "camera")
     assert not tab.cap_device.isHidden()
     assert tab.window_row.isHidden()
+    assert tab.capture_device_profile.isHidden()
     assert tab.n3dsxl_hd_aspect_box_enabled.isHidden()
 
     _set_capture_source(tab, "capture")
@@ -324,17 +297,24 @@ def test_device_settings_tab_shows_only_hd_aspect_for_capture(qtbot):
     assert tab.capture_backend.isHidden()
     assert tab.capture_fps.isHidden()
     assert tab.aspect_box_enabled.isHidden()
+    assert not tab.capture_device_profile.isHidden()
+    assert tab.capture_device_profile_label.text() == "Capture Device:"
+    assert [
+        tab.capture_device_profile.itemText(index)
+        for index in range(tab.capture_device_profile.count())
+    ] == ["N3DSXL (ponkan-python)"]
     assert not tab.n3dsxl_hd_aspect_box_enabled.isHidden()
     assert not tab.n3dsxl_hd_aspect_box_enabled_label.isHidden()
     assert advanced_labels.isdisjoint(_label_texts(tab.cap_group))
 
 
-def test_device_settings_tab_applies_fixed_ponkan_capture_settings(qtbot):
+def test_device_settings_tab_applies_selected_ponkan_capture_device(qtbot):
     settings = FakeSettings()
     tab = DeviceSettingsTab(settings, None, device_discovery=FakeDiscovery())
     qtbot.addWidget(tab)
 
     _set_capture_source(tab, "capture")
+    assert tab.capture_device_profile.currentData() == "n3dsxl"
     tab.n3dsxl_hd_aspect_box_enabled.setChecked(False)
     tab.apply()
 

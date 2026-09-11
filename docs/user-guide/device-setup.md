@@ -99,12 +99,13 @@ nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-
 
 ## キャプチャ方式
 
-`capture_source_type` は `camera` または `window` を指定できます。通常のキャプチャカードは `camera` を使います。ウィンドウキャプチャを使う場合は、対象ウィンドウ名と backend の設定も必要です。
+設定ダイアログでは、映像入力として「カメラ」「ウィンドウ」「キャプチャ」を選べます。`capture_source_type` にはそれぞれ `camera`、`window`、`capture` を保存します。「キャプチャ」を選ぶと、入力デバイスのリストから `N3DSXL (ponkan-python)` を選べます。通常のキャプチャカードは `camera` を使います。ウィンドウキャプチャを使う場合は、対象ウィンドウ名と backend の設定も必要です。
 
 | 設定 | 用途 |
 |------|------|
 | `camera` | USB キャプチャカードなど、カメラデバイスとして認識される入力 |
 | `window` | OS 上の特定ウィンドウを取り込む入力 |
+| `capture` | N3DSXL capture board を `ponkan-python` で直接取り込む入力 |
 | `auto` backend | NyX が利用可能な方式を選ぶ |
 | `mss` backend | OS 横断の画面キャプチャ方式 |
 | `windows_graphics_capture` backend | Windows のウィンドウキャプチャ方式 |
