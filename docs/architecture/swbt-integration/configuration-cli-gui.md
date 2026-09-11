@@ -79,7 +79,7 @@ nyxpy run sample_macro --controller swbt --swbt-adapter usb:0 --swbt-controller-
 
 `--serial` と `--capture` は parser 上の必須 option にしない。未指定時は settings に fallback し、解決後の設定を検証する。
 
-`swbt` の CLI に `status` と `disconnect` は提供しない。CLI は command ごとに fresh factory を作る別 process であり、前回 process の cached session を disconnect できない。接続を閉じる操作は同じ factory lifetime を持つ GUI の `Disconnect` で行う。
+`swbt` の CLI に `status` と `disconnect` は提供しない。CLI は command ごとに fresh factory を作る別 process であり、前回 process の cached session を disconnect できない。接続を閉じる操作は同じ factory lifetime を持つ GUI の「切断」 で行う。
 
 失敗時は利用者向け本文と `NYX_SWBT_*` error code の両方をコンソールへ出す。
 
@@ -95,11 +95,12 @@ GUI swbt panel に置く項目:
 | controller type | yes | Pro Controller / Joy-Con L / Joy-Con R |
 | adapter combo | yes | `list_adapters()` の結果 |
 | refresh adapters | yes | adapter 列挙だけ行う |
-| pairing profile path | yes | pairing key JSON path |
-| pair button | yes | 明示 pairing |
-| reconnect button | yes | 保存済み key で reconnect |
-| disconnect button | yes | GUI lifetime port を release/close し、factory-managed session を disconnect |
-| connection status | yes | `GamepadStatus.connection_state` に基づく状態表示 |
+| 接続操作 | yes | 未登録は「ペアリング」、登録済みは「接続」、接続中は「切断」 |
+| ペアリングし直す | 登録済み・未接続時 | 保存済みプロファイルで明示的に再ペアリングする |
+
+プロファイルの選択欄と独立した状態行は設けない。GUI は設定の `profile_path` を使用し、未指定ならタイプごとの既定パスへ保存する。タイプ変更時は既定パスだけを追従させ、明示されたカスタムパスは保持する。CLI の `--profile` は引き続き操作対象の指定に使用できる。
+
+設定画面と接続メニューは同じ操作判定を使う。ペアリング・再接続の処理中は「キャンセル」、キャンセル要求後は「キャンセル中…」、切断処理中は「切断中…」とする。後二者は無効にする。失敗・キャンセル後は接続状態とプロファイルの存在を再評価し、操作を戻す。再接続失敗から自動でペアリングへ切り替えない。
 
 capture backend / capture source の選択 UI は controller backend と独立させる。controller backend を変更しても preview frame source は再作成しない。capture backend を変更しても manual controller port は再作成しない。
 
@@ -119,15 +120,18 @@ GUI に置かない項目:
 
 | operation | enabled when | success | failure |
 |---|---|---|---|
-| Refresh adapters | macro 未実行中 | combo を更新。settings は変更しない | error 表示 |
-| Pair | backend `swbt`、adapter、controller type、pairing profile が有効 | status connected、manual controller を注入 | controller `None`、error 表示 |
-| Reconnect | backend `swbt`、pairing profile が存在 | status connected、manual controller を注入 | controller `None`、error 表示 |
-| Disconnect | connected | `release()` 後に `close()`、factory session を閉じ、controller `None` | error log、controller `None` |
+| アダプター再検索 | 未接続・操作中でなく macro 未実行 | combo を更新。settings は変更しない | 選択を保持しツールログへ記録 |
+| ペアリング / 接続 | backend `swbt`、adapter 選択済み、未接続、操作中でなく macro 未実行 | manual controller を注入し「切断」へ切り替え | 操作を戻しツールログへ記録 |
+| 切断 | connected、操作中でなく macro 未実行 | `release()` 後に `close()`、factory session を閉じ、controller `None` | controller を外しツールログへ記録 |
 | Macro run start | not pairing/reconnecting | `VirtualControllerModel.set_controller(None)` 後に旧 manual port を release/close して runtime start | close 失敗時は実行を止める |
 
-adapter refresh、pair、reconnect、disconnect、manual port 作成、macro start は worker thread で実行する。widget 更新は main thread に戻す。`pair()` / `reconnect()` の戻り値は `None` なので、成功表示には操作後の `status.connection_state == "connected"` を使う。
+adapter refresh、pair、reconnect、disconnect、manual port 作成、macro start は worker thread で実行する。widget 更新は main thread に戻す。`pair()` / `reconnect()` の戻り値は `None` なので、成功は操作後の `status.connection_state == "connected"` と manual port の準備完了で判断する。
 
-adapter refresh の候補が 1 件でも combo で自動選択しない。保存済み adapter が discovery 結果の alias に一致する場合は代表 `name` へ正規化する。discovery が失敗した場合は保存値と現在の選択を消さず、error を表示する。
+接続済み・接続操作中・macro 実行中は backend、adapter、controller type の変更を禁止する。接続操作中は設定画面の「適用」「OK」も無効にする。接続ボタンを押すと現在の選択を保存して即時実行する。設定画面の「キャンセル」は実行済みの接続操作と保存を巻き戻さない。接続操作をせずに設定画面をキャンセルした場合は編集値を保存しない。
+
+adapter refresh の候補が 1 件でも combo で自動選択しない。保存済み adapter が discovery 結果の alias に一致する場合は代表 `name` へ正規化する。
+
+接続操作の失敗理由・エラーコードは既存ツールログへ一度だけ記録し、状態行・ステータスバー・エラーダイアログに重複表示しない。複合例外は各原因を本文へ含める。キャンセルは失敗として記録しない。ペアリング開始時の Switch 側の「持ちかた／順番を変える」を開く案内もツールログに出す。
 
 ## GUI manual input
 
@@ -155,7 +159,7 @@ manual input widget は controller port が存在し、macro 非実行、lifecyc
 
 旧 flat key の `serial_device`、`serial_baud`、`serial_protocol` は廃止する。settings parser は新しい `[controller.serial]` を正とし、旧 key への fallback は持たない。
 
-## error display
+## エラー案内（GUI はツールログ、CLI はコンソール）
 
 | code | 表示 |
 |---|---|
@@ -164,7 +168,7 @@ manual input widget は controller port が存在し、macro 非実行、lifecyc
 | `NYX_SWBT_ADAPTER_NOT_FOUND` | 選択 adapter が見つからない |
 | `NYX_SWBT_ADAPTER_AMBIGUOUS` | adapter alias が複数候補に一致している |
 | `NYX_SWBT_CONTROLLER_TYPE_UNSUPPORTED` | controller type を選択させる |
-| `NYX_SWBT_PROFILE_NOT_FOUND` | Pair で profile を新規作成させる |
+| `NYX_SWBT_PROFILE_NOT_FOUND` | 「ペアリング」で profile を新規作成する |
 | `NYX_SWBT_PROFILE_ALREADY_EXISTS` | 既存 profile で Pair を再試行するか path を変更させる |
 | `NYX_SWBT_PROFILE_INVALID` | schema と profile path を確認させる |
 | `NYX_SWBT_PROFILE_CONTROLLER_MISMATCH` | controller type と profile の対応を確認させる |

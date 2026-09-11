@@ -1,6 +1,6 @@
 # swbt 接続 UI 簡素化仕様書
 
-> **状態**: 設計済み・未実装
+> **状態**: 実装・検証完了（2026-09-12）
 > **対象**: GUI の swbt 設定、接続操作、ツールログ
 > **関連**: [既存 GUI 実装記録](../../complete/local_025/SWBT_GUI_SHARED_SERVICE.md)、[現行の設定・CLI・GUI 仕様](../../../../docs/architecture/swbt-integration/configuration-cli-gui.md)
 
@@ -47,11 +47,15 @@
 | `src/nyxpy/gui/dialogs/app_settings_dialog.py` | 変更 | 削除する状態ラベルへの参照を除去、接続中の設定適用制御 |
 | `src/nyxpy/gui/main_window.py` | 変更 | 接続メニューの操作切り替え、エラーの重複表示整理 |
 | `src/nyxpy/gui/app_services.py` | 変更 | 必要な設定解決とログ経路の共通化 |
+| `src/nyxpy/gui/swbt_connection.py` | 新規 | GUI の設定解決・操作判定・複合例外の本文生成 |
 | `tests/gui/test_device_settings_tab.py` | 変更 | 項目・保存・ボタン遷移の検証 |
 | `tests/gui/test_settings_dialog.py` | 変更 | 設定適用・キャンセルの検証 |
 | `tests/gui/test_main_window.py` | 変更 | 接続メニュー、失敗、キャンセル、ログ到達の検証 |
 | `tests/gui/test_app_services.py` | 変更 | 設定解決・ログ経路の検証 |
 | `docs/architecture/swbt-integration/configuration-cli-gui.md` | 変更 | 実装と同時に GUI 項目・操作・エラー案内を更新 |
+| `docs/architecture/swbt-integration/index.md` | 変更 | GUI の概要を更新 |
+
+設定適用・キャンセルの追加テストは、実際の `AppSettingsDialog` を扱う `tests/gui/test_settings_tabs.py` に配置した。`test_settings_dialog.py` は `MacroParamsDialog` の既存テストであるため変更していない。
 
 ## 3. 設計方針
 
@@ -133,8 +137,27 @@ swbt 接続操作のエラー本文をステータスバーへ重複表示しな
 
 - [x] 現行の UI・接続処理・ログ呼び出しの確認
 - [x] 変更範囲と操作仕様の記載
-- [ ] プロファイル欄と状態行の削除
-- [ ] 設定画面と接続メニューの操作遷移統一
-- [ ] 全失敗経路のツールログ到達・重複排除の確認
-- [ ] GUI テスト・ruff・ty による検証
-- [ ] 現行 docs 更新とビルド
+- [x] プロファイル欄と状態行の削除
+- [x] 設定画面と接続メニューの操作遷移統一
+- [x] 全失敗経路のツールログ到達・重複排除の確認
+- [x] GUI テスト・ruff・ty による検証
+- [x] 現行 docs 更新とビルド
+
+### 検証結果
+
+2026-09-12、`codex/swbt-connection-ui` で次を確認した。
+
+| 検証 | 結果 |
+|---|---|
+| `uv run pytest tests/gui -q --tb=short --basetemp tmp/local030-gui-final` | 251 passed |
+| `uv run ruff check src/nyxpy/gui tests/gui` | 成功 |
+| `uv run ruff format --check src/nyxpy/gui tests/gui` | 48 files already formatted |
+| `uv run ty check src/nyxpy --output-format concise --no-progress` | 成功 |
+| `uv run mkdocs build --strict` | 成功 |
+| 設定画面の描画確認 | `tmp/local030-ui.png` でプロファイル欄・状態行の削除とレイアウトを確認 |
+
+接続・切断・アダプター検索の失敗について、`DefaultLogger` → dispatcher → GUI sink → 既存ツールログ欄の到達と一回表示をテストした。接続前のアダプター検索は単独検索のログ処理を経由させず、接続処理側で一度だけ記録する。
+
+既定パス・カスタム相対パス・絶対パスのそれぞれについて、タイプ変更後の表示判定と実接続に渡す設定の一致を検証した。接続中の設定変更禁止、設定を実行せずキャンセルした場合の非保存、即時接続後の保存維持、設定画面破棄後の成功・失敗 callback も検証済みである。
+
+実機へのペアリング・再接続は今回実行していない。GUI テストと描画確認は機器へ接続しない代替実装を使用した。
