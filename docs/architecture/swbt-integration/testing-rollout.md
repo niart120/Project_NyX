@@ -81,12 +81,11 @@ Pair / reconnect
   [x] 同じ pairing profile で reconnect 成功
   [x] Joy-Con L で pair/reconnect 成功
   [x] Joy-Con R で pair/reconnect 成功
-  [ ] invalid pairing profile が明確に表示される
-  [ ] GUI Disconnect が factory-managed cached session を閉じる
+  [x] invalid pairing profile が明確に表示される
+  [x] GUI Disconnect が factory-managed cached session を閉じる
 
 Macro input
   [x] Button.A press/release
-  [x] 16ms / 33ms の短い押下を確認
   [x] 16ms / 33ms / 50ms のA短押しを各5回確認（同一構成での最小確認値は16ms。一般保証ではない）
   [x] D-pad input を確認（`UPRIGHT` は右上として反映）
   [x] left stick / right stick
@@ -102,9 +101,9 @@ GUI manual input
   [x] GUI に IMU 操作 UI がない
 ```
 
-## local_029 へ分離した実機未確定項目
+## local_029 実機確認結果
 
-unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認できる。次の項目は Switch、専用 USB Bluetooth adapter、operator がそろった環境で確定するまで未検証として扱う。
+unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認する。次の項目は Switch、専用 USB Bluetooth adapter、operatorを使って確認した。
 
 ```text
 [x] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
@@ -112,8 +111,9 @@ unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認�
 [x] Joy-Con L / Rの`SL` / `SR` とPro Controller D-padの右成分
 [x] Direct送信型short pressの再現性（16ms / 33ms / 50msを各5回）
 [x] GUI manual inputの画面反映
+[x] schema v1 pairing profileで `NYX_SWBT_PROFILE_INVALID` が表示され、manual inputが無効のままになること
 ```
 
-座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向を確認した。D-pad の `UPRIGHT` は上として反映されたが、観察画面が斜め方向を区別しないため、右成分を含むことは未確認である。
+座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向と、D-padの`UPRIGHT`が右上として反映されることを確認した。
 
 Direct送信型の実機確認では、CSR8510 A10、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で16ms・33ms・50msのA短押しを各5回認識した。16msはこの構成での最小確認値だが、Bluetooth環境や画面状態をまたぐ最小値としては保証しない。

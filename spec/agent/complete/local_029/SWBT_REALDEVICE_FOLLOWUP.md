@@ -41,6 +41,8 @@ CSR8510 A10（`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で確�
 
 この構成では16msを最小の確認済みdurationとする。ただしBluetooth環境やSwitch画面の状態をまたぐ一般保証ではないため、利用者向けdocsで固定の最小値として保証しない。
 
-破損したpairing profileに対する利用者向けエラー表示は未確認である。
+GUI manual inputは、Reconnect後の有効化、button / D-pad / stickの画面反映、macro開始前のGUI lifetime port解放をoperatorが確認した。IMU操作UIは存在しない。
 
-GUI manual inputは、Reconnect後の有効化、button / D-pad / stickの画面反映、macro開始前のGUI lifetime port解放をoperatorが確認した。IMU操作UIは存在しない。破損したpairing profileに対する利用者向けエラー表示だけを残す。
+GUIにschema v1の一時profileを指定してReconnectしたところ、`NYX_SWBT_PROFILE_INVALID` が表示され、manual inputは無効のままになった。既存profileには触れず、検証用fileは確認後に削除した。
+
+以上により、この仕様の確定対象と完了条件を満たした。
