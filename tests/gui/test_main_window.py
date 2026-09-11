@@ -2021,3 +2021,44 @@ def test_connect_menu_cancellation_and_return_to_connect(qtbot, window, services
     assert not any(
         event[3] == "swbt.lifecycle_failed" for event in services.logger.technical_events
     )
+
+
+@pytest.mark.parametrize(
+    "profile", [None, ".nyxpy/swbt/pro-controller-profile.json", "keys/custom.json", "absolute"]
+)
+def test_swbt_displayed_profile_matches_connection_request(qtbot, services, profile):
+    from nyxpy.gui.app_services import GuiAppServices
+    from nyxpy.gui.dialogs.settings.device_tab import DeviceSettingsTab
+    from tests.gui.test_device_settings_tab import FakeDiscovery as TabDiscovery
+
+    settings = services.global_settings
+    settings.config_dir = services.project_root / ".nyxpy"
+    if profile == "absolute":
+        profile = str(services.project_root / "external.json")
+    settings.set("controller.swbt.profile_path", profile)
+    expected = services.project_root / (
+        ".nyxpy/swbt/joy-con-l-profile.json"
+        if profile is None or profile.startswith(".nyxpy/")
+        else profile
+    )
+    expected.parent.mkdir(parents=True, exist_ok=True)
+    expected.touch()
+    captured = []
+
+    def reconnect(succeeded, failed):
+        captured.append(GuiAppServices._swbt_controller_config(services))
+        succeeded(SimpleNamespace(connected=True))
+
+    tab = DeviceSettingsTab(
+        settings, None, device_discovery=TabDiscovery(), swbt_reconnect=reconnect
+    )
+    qtbot.addWidget(tab)
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb:0")
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
+    assert tab.swbt_connect_btn.text() == "接続"
+    tab.swbt_connect_btn.click()
+    assert len(captured) == 1
+    assert captured[0].profile_path == expected
+    assert captured[0].model.settings_value == "joy-con-l"
+    assert captured[0].adapter == "usb:0"

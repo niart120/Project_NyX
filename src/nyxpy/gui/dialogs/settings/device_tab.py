@@ -549,18 +549,11 @@ class DeviceSettingsTab(QWidget):
 
     def _pair_swbt(self) -> None:
         self._save_swbt_settings(select_backend=True)
-        self._start_or_cancel_swbt_connect("pair", self.swbt_pair)
+        self._run_swbt_lifecycle(self.swbt_pair, connect_operation="pair")
 
     def _reconnect_swbt(self) -> None:
         self._save_swbt_settings(select_backend=True)
-        self._start_or_cancel_swbt_connect("reconnect", self.swbt_reconnect)
-
-    def _start_or_cancel_swbt_connect(
-        self,
-        operation: str,
-        action: SwbtLifecycleAction | None,
-    ) -> None:
-        self._run_swbt_lifecycle(action, connect_operation=operation)
+        self._run_swbt_lifecycle(self.swbt_reconnect, connect_operation="reconnect")
 
     def _disconnect_swbt(self) -> None:
         self._run_swbt_lifecycle(self.swbt_disconnect, disconnect=True)

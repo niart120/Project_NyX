@@ -787,3 +787,26 @@ def _set_capture_source(tab: DeviceSettingsTab, source_type: str) -> None:
     index = tab.capture_source_type.findData(source_type)
     assert index >= 0
     tab.capture_source_type.setCurrentIndex(index)
+
+
+@pytest.mark.parametrize("result", ["succeeded", "failed"])
+def test_lifecycle_callback_is_safe_after_tab_deletion(qtbot, result):
+    from types import SimpleNamespace
+
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from shiboken6 import isValid
+
+    callbacks = {}
+
+    def pair(succeeded, failed):
+        callbacks.update(succeeded=succeeded, failed=failed)
+        return lambda: None
+
+    tab = DeviceSettingsTab(FakeSettings(), None, device_discovery=FakeDiscovery(), swbt_pair=pair)
+    tab._pair_swbt()
+    tab.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert not isValid(tab)
+    callbacks[result](
+        SimpleNamespace(connected=True) if result == "succeeded" else RuntimeError("failed")
+    )
