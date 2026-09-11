@@ -4,7 +4,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 
 ## 導入順序
 
-1. `swbt-python==0.5.4` を通常依存として固定する。
+1. `swbt-python==0.6.0` を通常依存として固定する。
 2. `nyxpy.framework.core.hardware.swbt` package を追加する。
 3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
 4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。
@@ -116,4 +116,4 @@ unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認�
 
 座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向と、D-padの`UPRIGHT`が右上として反映されることを確認した。
 
-Direct送信型の実機確認では、CSR8510 A10、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で16ms・33ms・50msのA短押しを各5回認識した。16msはこの構成での最小確認値だが、Bluetooth環境や画面状態をまたぐ最小値としては保証しない。
+Direct送信型の旧版実機確認では、CSR8510 A10、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で16ms・33ms・50msのA短押しを各5回認識した。16msはこの構成での最小確認値だが、Bluetooth環境や画面状態をまたぐ最小値としては保証しない。0.6.0 では同じ実機確認を別途実施するまで、旧版の結果を互換性の根拠に使わない。

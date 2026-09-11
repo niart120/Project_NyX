@@ -35,7 +35,7 @@ nyxpy gui
 | Baud Rate | protocol の既定値を使う。CH552 の既定値は `9600` |
 | swbt Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` から選ぶ |
 | swbt Adapter | `リロード` で候補を取得し、使う adapter を明示的に選ぶ。候補が 1 件でも自動選択しない |
-| swbt Pairing Profile | swbt-python 0.5.4 の pairing profile 保存先。未指定時は `.nyxpy/swbt/<controller>-profile.json`。相対 path は workspace root 基準 |
+| swbt Pairing Profile | swbt-python 0.6.0 の pairing profile 保存先。未指定時は `.nyxpy/swbt/<controller>-profile.json`。相対 path は workspace root 基準 |
 | swbt Connection | `Pair`、`Reconnect`、`Disconnect` を実行する |
 | Preview FPS | GUI プレビューの更新頻度 |
 

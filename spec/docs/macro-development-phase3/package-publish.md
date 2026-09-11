@@ -29,7 +29,7 @@ PyPI 配布名 `nyxpy-fw` と import package 名 `nyxpy` の構成で、build �
 | authors | 現行値を維持する |
 | license | MIT を維持する。build warning が出る場合は PEP 639 形式へ寄せる |
 | readme | `README.md` |
-| requires-python | 現行の `>=3.12,<3.14` を維持する |
+| requires-python | 現行の `>=3.13,<3.14` を維持する |
 | scripts | `nyxpy` を主導線にし、`nyx-cli`, `nyx-gui` を alias として維持する |
 | URLs | GitHub repository、GitHub Pages、Issues を PyPI metadata に含める |
 

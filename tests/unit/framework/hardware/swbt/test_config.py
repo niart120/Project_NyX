@@ -18,7 +18,7 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 def test_swbt_dependency_declared_as_runtime_dependency() -> None:
     data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert "swbt-python==0.5.4" in data["project"]["dependencies"]
+    assert "swbt-python==0.6.0" in data["project"]["dependencies"]
     assert "swbt" not in data["project"].get("optional-dependencies", {})
     assert any(
         marker.startswith("swbt:") for marker in data["tool"]["pytest"]["ini_options"]["markers"]
@@ -29,7 +29,7 @@ def test_swbt_lock_resolves_expected_swbt_and_bumble_versions() -> None:
     data = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
     locked_versions = {package["name"]: package["version"] for package in data["package"]}
 
-    assert locked_versions["swbt-python"] == "0.5.4"
+    assert locked_versions["swbt-python"] == "0.6.0"
     assert locked_versions["bumble"] == "0.0.233"
 
 
