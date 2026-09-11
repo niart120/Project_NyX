@@ -106,7 +106,7 @@ def test_swbt_operation_locks_apply_and_preserves_executed_selection(qtbot, tmp_
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
     tab.swbt_adapter.setEditText("usb:0")
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
-    tab.swbt_connect_btn.click()
+    tab.swbt_pair_btn.click()
     buttons = {button.text(): button for button in dialog.findChildren(QPushButton)}
     assert not buttons["OK"].isEnabled()
     assert not buttons["適用"].isEnabled()
@@ -117,7 +117,8 @@ def test_swbt_operation_locks_apply_and_preserves_executed_selection(qtbot, tmp_
     callbacks["succeeded"](SimpleNamespace(connected=True))
     assert buttons["OK"].isEnabled()
     assert buttons["適用"].isEnabled()
-    assert tab.swbt_connect_btn.text() == "切断"
+    assert tab.swbt_disconnect_btn.isEnabled()
+    assert not tab.swbt_pair_btn.isEnabled()
     assert not tab.controller_backend.isEnabled()
     assert not tab.swbt_adapter.isEnabled()
     dialog.reject()

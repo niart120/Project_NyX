@@ -26,7 +26,11 @@ from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.gui.background_task import BackgroundTask
 from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
-from nyxpy.gui.swbt_connection import resolve_swbt_selection, swbt_action_view, swbt_type_updates
+from nyxpy.gui.swbt_connection import (
+    resolve_swbt_selection,
+    swbt_action_availability,
+    swbt_type_updates,
+)
 
 _CAPTURE_SOURCE_OPTIONS = (
     ("カメラ", "camera"),
@@ -266,12 +270,21 @@ class DeviceSettingsTab(QWidget):
             lambda _index: self._update_controller_field_state()
         )
         lifecycle_row = QHBoxLayout()
-        self.swbt_connect_btn = QPushButton("ペアリング")
-        self.swbt_repair_btn = QPushButton("ペアリングし直す")
-        self.swbt_connect_btn.clicked.connect(self._activate_swbt)
-        self.swbt_repair_btn.clicked.connect(self._pair_swbt)
-        lifecycle_row.addWidget(self.swbt_connect_btn)
-        lifecycle_row.addWidget(self.swbt_repair_btn)
+        self.swbt_pair_btn = QPushButton("ペアリング")
+        self.swbt_reconnect_btn = QPushButton("接続")
+        self.swbt_disconnect_btn = QPushButton("切断")
+        self.swbt_cancel_btn = QPushButton("キャンセル")
+        self.swbt_pair_btn.clicked.connect(self._pair_swbt)
+        self.swbt_reconnect_btn.clicked.connect(self._reconnect_swbt)
+        self.swbt_disconnect_btn.clicked.connect(self._disconnect_swbt)
+        self.swbt_cancel_btn.clicked.connect(self._cancel_swbt_operation)
+        for button in (
+            self.swbt_pair_btn,
+            self.swbt_reconnect_btn,
+            self.swbt_disconnect_btn,
+            self.swbt_cancel_btn,
+        ):
+            lifecycle_row.addWidget(button)
         swbt_form.addRow(QLabel("接続:"), lifecycle_row)
         swbt_group_layout.addLayout(swbt_form)
         controller_group_layout.addWidget(self.swbt_group)
@@ -496,13 +509,16 @@ class DeviceSettingsTab(QWidget):
         self.swbt_adapter.setEnabled(editable)
         self.refresh_swbt_btn.setEnabled(is_swbt and editable)
         view = self._swbt_action()
-        self.swbt_connect_btn.setText(view.label)
-        self.swbt_connect_btn.setEnabled(is_swbt and view.enabled and self.swbt_actions_enabled)
-        self.swbt_repair_btn.setVisible(view.repair)
-        self.swbt_repair_btn.setEnabled(is_swbt and view.enabled and self.swbt_actions_enabled)
+        for button, enabled in (
+            (self.swbt_pair_btn, view.pair),
+            (self.swbt_reconnect_btn, view.reconnect),
+            (self.swbt_disconnect_btn, view.disconnect),
+            (self.swbt_cancel_btn, view.cancel),
+        ):
+            button.setEnabled(is_swbt and enabled and self.swbt_actions_enabled)
 
     def _swbt_action(self):
-        return swbt_action_view(
+        return swbt_action_availability(
             connected=self._swbt_connected,
             registered=self._swbt_profile_exists(),
             available=self.swbt_actions_enabled
@@ -526,21 +542,13 @@ class DeviceSettingsTab(QWidget):
         )
         return config.profile_path.is_file()
 
-    def _activate_swbt(self) -> None:
-        operation = self._swbt_action().operation
-        if operation == "cancel":
-            if self._cancel_swbt_connect is not None:
-                cancel = self._cancel_swbt_connect
-                self._cancel_swbt_connect = None
-                self._swbt_cancelling = True
-                self._update_controller_field_state()
-                cancel()
-        elif operation == "disconnect":
-            self._disconnect_swbt()
-        elif operation == "pair":
-            self._pair_swbt()
-        else:
-            self._reconnect_swbt()
+    def _cancel_swbt_operation(self) -> None:
+        if self._cancel_swbt_connect is not None:
+            cancel = self._cancel_swbt_connect
+            self._cancel_swbt_connect = None
+            self._swbt_cancelling = True
+            self._update_controller_field_state()
+            cancel()
 
     @property
     def swbt_lifecycle_busy(self) -> bool:

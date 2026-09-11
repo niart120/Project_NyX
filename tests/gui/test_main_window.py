@@ -444,7 +444,12 @@ def test_controller_menu_shows_only_swbt_settings_for_swbt_backend(
     actions = window.controller_backend_menu.actions()
     child_menus = [action.menu().title() for action in actions if action.menu() is not None]
     assert child_menus == ["デバイス", "タイプ"]
-    assert actions[-1].text() == "ペアリング"
+    assert [action.text() for action in actions[-4:]] == [
+        "ペアリング",
+        "接続",
+        "切断",
+        "キャンセル",
+    ]
     assert window.serial_device_menu is None
     assert window.protocol_menu is None
     assert window.serial_baud_menu is None
@@ -465,7 +470,7 @@ def test_swbt_reconnect_menu_requires_existing_profile(
     assert window.controller_backend_menu is not None
     lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
     assert lifecycle["ペアリング"].isEnabled()
-    assert "接続" not in lifecycle
+    assert not lifecycle["接続"].isEnabled()
 
     profile_path = services.project_root / ".nyxpy" / "swbt" / "pro-controller-profile.json"
     profile_path.parent.mkdir(parents=True)
@@ -549,7 +554,7 @@ def test_swbt_device_menu_keeps_missing_saved_adapter_visible_and_disables_conne
     assert window.controller_backend_menu is not None
     lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
     assert not lifecycle["ペアリング"].isEnabled()
-    assert "接続" not in lifecycle
+    assert not lifecycle["接続"].isEnabled()
 
 
 def test_swbt_device_refresh_runs_in_background_and_updates_cached_menu(
@@ -1987,7 +1992,7 @@ def test_connected_swbt_menu_locks_selection_and_offers_disconnect(window, servi
     window.global_settings.set("controller.swbt.adapter", "usb:0")
     services.swbt_status = lambda: SimpleNamespace(connected=True)
     window._refresh_connection_menu()
-    assert window.controller_backend_menu.actions()[-1].text() == "切断"
+    assert window.controller_backend_menu.actions()[-2].isEnabled()
     assert not window.swbt_device_menu.isEnabled()
     assert not window.swbt_type_menu.isEnabled()
     window._apply_connection_settings({"controller.swbt.adapter": "usb:9"})
@@ -2013,11 +2018,12 @@ def test_connect_menu_cancellation_and_return_to_connect(qtbot, window, services
     assert action.text() == "キャンセル"
     action.trigger()
     action = window.controller_backend_menu.actions()[-1]
-    assert action.text() == "キャンセル中…"
+    assert action.text() == "キャンセル"
     assert not action.isEnabled()
     release.set()
     qtbot.waitUntil(lambda: not window._swbt_lifecycle_busy)
-    assert window.controller_backend_menu.actions()[-1].text() == "ペアリング"
+    assert window.controller_backend_menu.actions()[-4].isEnabled()
+    assert not window.controller_backend_menu.actions()[-1].isEnabled()
     assert not any(
         event[3] == "swbt.lifecycle_failed" for event in services.logger.technical_events
     )
@@ -2056,8 +2062,8 @@ def test_swbt_displayed_profile_matches_connection_request(qtbot, services, prof
     tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
     tab.swbt_adapter.setEditText("usb:0")
     tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
-    assert tab.swbt_connect_btn.text() == "接続"
-    tab.swbt_connect_btn.click()
+    assert tab.swbt_reconnect_btn.isEnabled()
+    tab.swbt_reconnect_btn.click()
     assert len(captured) == 1
     assert captured[0].profile_path == expected
     assert captured[0].model.settings_value == "joy-con-l"

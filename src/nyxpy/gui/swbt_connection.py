@@ -66,35 +66,31 @@ def resolve_swbt_selection(
 
 
 @dataclass(frozen=True)
-class SwbtActionView:
-    """接続状態から決まる主操作と副操作。"""
+class SwbtActionAvailability:
+    """常設操作の有効状態。"""
 
-    operation: str
-    label: str
-    enabled: bool
-    repair: bool = False
+    pair: bool
+    reconnect: bool
+    disconnect: bool
+    cancel: bool
 
 
-def swbt_action_view(
+def swbt_action_availability(
     *,
     connected: bool,
     registered: bool,
     available: bool,
     operation: str | None = None,
     cancelling: bool = False,
-) -> SwbtActionView:
-    """設定画面と接続メニューで同じ操作を選択する。"""
-    if operation == "disconnect":
-        return SwbtActionView("disconnect", "切断中…", False)
-    if operation is not None:
-        return SwbtActionView(
-            "cancel", "キャンセル中…" if cancelling else "キャンセル", not cancelling
-        )
-    if connected:
-        return SwbtActionView("disconnect", "切断", available)
-    if registered:
-        return SwbtActionView("reconnect", "接続", available, repair=True)
-    return SwbtActionView("pair", "ペアリング", available)
+) -> SwbtActionAvailability:
+    """操作を変更せず、接続状態に応じて有効・無効を決める。"""
+    idle = available and operation is None
+    return SwbtActionAvailability(
+        pair=idle and not connected,
+        reconnect=idle and not connected and registered,
+        disconnect=idle and connected,
+        cancel=operation in {"pair", "reconnect", "connect"} and not cancelling,
+    )
 
 
 def swbt_error_message(error: BaseException) -> str:

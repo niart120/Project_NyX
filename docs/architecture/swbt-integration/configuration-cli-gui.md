@@ -95,12 +95,13 @@ GUI swbt panel に置く項目:
 | controller type | yes | Pro Controller / Joy-Con L / Joy-Con R |
 | adapter combo | yes | `list_adapters()` の結果 |
 | refresh adapters | yes | adapter 列挙だけ行う |
-| 接続操作 | yes | 未登録は「ペアリング」、登録済みは「接続」、接続中は「切断」 |
-| ペアリングし直す | 登録済み・未接続時 | 保存済みプロファイルで明示的に再ペアリングする |
+| 接続操作 | yes | 「ペアリング」「接続」「切断」「キャンセル」を常設し、有効・無効だけを変更 |
 
 プロファイルの選択欄と独立した状態行は設けない。GUI は設定の `profile_path` を使用し、未指定ならタイプごとの既定パスへ保存する。タイプ変更時は既定パスだけを追従させ、明示されたカスタムパスは保持する。CLI の `--profile` は引き続き操作対象の指定に使用できる。
 
-設定画面と接続メニューは同じ操作判定を使う。ペアリング・再接続の処理中は「キャンセル」、キャンセル要求後は「キャンセル中…」、切断処理中は「切断中…」とする。後二者は無効にする。失敗・キャンセル後は接続状態とプロファイルの存在を再評価し、操作を戻す。再接続失敗から自動でペアリングへ切り替えない。
+設定画面と接続メニューは同じ有効状態の判定を使う。未接続時は「ペアリング」を有効にし、プロファイルがあれば「接続」も有効にする。接続中は「切断」、ペアリング・再接続処理中は「キャンセル」だけを有効にする。キャンセル要求後と切断処理中は全操作を無効にする。ラベルや操作の並びは変更しない。
+
+登録済みでも「ペアリング」は同じパスのプロファイルを更新し、別名ファイルを増やさない。失敗・キャンセル後は接続状態とプロファイルの存在を再評価する。再接続失敗から自動でペアリングへ切り替えない。
 
 capture backend / capture source の選択 UI は controller backend と独立させる。controller backend を変更しても preview frame source は再作成しない。capture backend を変更しても manual controller port は再作成しない。
 
@@ -121,7 +122,7 @@ GUI に置かない項目:
 | operation | enabled when | success | failure |
 |---|---|---|---|
 | アダプター再検索 | 未接続・操作中でなく macro 未実行 | combo を更新。settings は変更しない | 選択を保持しツールログへ記録 |
-| ペアリング / 接続 | backend `swbt`、adapter 選択済み、未接続、操作中でなく macro 未実行 | manual controller を注入し「切断」へ切り替え | 操作を戻しツールログへ記録 |
+| ペアリング / 接続 | backend `swbt`、adapter 選択済み、未接続、操作中でなく macro 未実行 | manual controller を注入し「切断」を有効化 | 操作を戻しツールログへ記録 |
 | 切断 | connected、操作中でなく macro 未実行 | `release()` 後に `close()`、factory session を閉じ、controller `None` | controller を外しツールログへ記録 |
 | Macro run start | not pairing/reconnecting | `VirtualControllerModel.set_controller(None)` 後に旧 manual port を release/close して runtime start | close 失敗時は実行を止める |
 

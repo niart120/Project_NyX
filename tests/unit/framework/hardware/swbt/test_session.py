@@ -662,3 +662,42 @@ def test_dummy_session_records_state_without_bluetooth_transport() -> None:
     assert session.neutral_calls == 1
     assert session.closed is True
     assert session.status().connection_state == "closed"
+
+
+def test_repeated_pair_reuses_profile_without_creating_additional_files(tmp_path, monkeypatch):
+    profile = tmp_path / "pro-controller-profile.json"
+    controller_config = replace(config(), profile_path=profile)
+    creations = []
+
+    class UpdatingController(FakeSwbtController):
+        def pair(self, *, timeout):
+            super().pair(timeout=timeout)
+            profile.write_text('{"paired": true}', encoding="utf-8")
+
+    controller = UpdatingController()
+
+    def create_profile(selected_config, _writer, _timeout):
+        creations.append(selected_config.profile_path)
+        selected_config.profile_path.write_text("{}", encoding="utf-8")
+        controller.connection_state = "connected"
+        return controller
+
+    session = SwbtControllerSession(
+        controller_config,
+        profile_creator=create_profile,
+        controller_factory=lambda _config, _writer: controller,
+    )
+    monkeypatch.setattr(session, "_profile_exists", profile.is_file)
+    try:
+        session.pair(timeout_sec=1)
+        session.pair(timeout_sec=1)
+        session.pair(timeout_sec=1)
+        assert creations == [profile]
+        assert [call for call in controller.calls if call[0] == "pair"] == [
+            ("pair", 1),
+            ("pair", 1),
+        ]
+        assert list(tmp_path.iterdir()) == [profile]
+        assert json.loads(profile.read_text(encoding="utf-8")) == {"paired": True}
+    finally:
+        session.close()

@@ -70,7 +70,7 @@ from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
 from nyxpy.gui.swbt_connection import (
     resolve_swbt_selection,
-    swbt_action_view,
+    swbt_action_availability,
     swbt_error_message,
     swbt_type_updates,
 )
@@ -365,22 +365,25 @@ class MainWindow(QMainWindow):
         connected = self._swbt_is_connected()
         self.swbt_device_menu.setEnabled(lifecycle_enabled and not connected)
         self.swbt_type_menu.setEnabled(lifecycle_enabled and not connected)
-        view = swbt_action_view(
+        view = swbt_action_availability(
             connected=connected,
             registered=self._swbt_profile_exists(),
             available=lifecycle_enabled and (connected or adapter_available),
             operation=self._swbt_operation,
             cancelling=self._swbt_cancelling,
         )
-        action = QAction(view.label, menu)
-        action.setEnabled(view.enabled)
-        action.triggered.connect(lambda _checked=False: self._invoke_swbt_action(view.operation))
-        menu.addAction(action)
-        if view.repair:
-            repair = QAction("ペアリングし直す", menu)
-            repair.setEnabled(view.enabled)
-            repair.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
-            menu.addAction(repair)
+        for operation, label, enabled in (
+            ("pair", "ペアリング", view.pair),
+            ("reconnect", "接続", view.reconnect),
+            ("disconnect", "切断", view.disconnect),
+            ("cancel", "キャンセル", view.cancel),
+        ):
+            action = QAction(label, menu)
+            action.setEnabled(enabled)
+            action.triggered.connect(
+                lambda _checked=False, selected=operation: self._invoke_swbt_action(selected)
+            )
+            menu.addAction(action)
 
     def _dispose_controller_submenus(self) -> None:
         for name in (
