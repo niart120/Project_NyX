@@ -33,7 +33,6 @@ from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.swbt.errors import (
     is_swbt_connect_cancelled,
     swbt_connect_cancel_code,
-    swbt_user_error_message,
 )
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
 from nyxpy.framework.core.io.ports import ControllerOutputPort
@@ -69,6 +68,12 @@ from nyxpy.gui.panes.log_pane import LogPane
 from nyxpy.gui.panes.macro_browser import MacroBrowserPane
 from nyxpy.gui.panes.preview_pane import PreviewPane
 from nyxpy.gui.panes.virtual_controller_pane import VirtualControllerPane
+from nyxpy.gui.swbt_connection import (
+    resolve_swbt_selection,
+    swbt_action_view,
+    swbt_error_message,
+    swbt_type_updates,
+)
 from nyxpy.gui.typography import PANE_TITLE_HEIGHT, apply_pane_title_font
 
 _UNBOUNDED_WIDGET_HEIGHT = 16777215
@@ -189,6 +194,9 @@ class MainWindow(QMainWindow):
         self.manual_controller_error: BaseException | None = None
         self._preview_touch_active = False
         self._swbt_lifecycle_busy = False
+        self._swbt_operation = None
+        self._swbt_cancel = None
+        self._swbt_cancelling = False
         self._macro_starting = False
         self._manual_controller_restoring = False
         self._manual_controller_restore_backend: str | None = None
@@ -318,6 +326,7 @@ class MainWindow(QMainWindow):
                 not self._is_run_active()
                 and not self._swbt_lifecycle_busy
                 and not self._manual_controller_restoring
+                and not (current == "swbt" and self._swbt_is_connected())
             )
             action.triggered.connect(
                 lambda _checked=False, value=backend: self._apply_connection_settings(
@@ -353,24 +362,25 @@ class MainWindow(QMainWindow):
             and not self._swbt_lifecycle_busy
             and not self._manual_controller_restoring
         )
-        pair_action = QAction("Pair", menu)
-        reconnect_action = QAction("Reconnect", menu)
-        disconnect_action = QAction("Disconnect", menu)
-        pair_action.setEnabled(lifecycle_enabled and adapter_available)
-        reconnect_action.setEnabled(
-            lifecycle_enabled and adapter_available and self._swbt_profile_exists()
+        connected = self._swbt_is_connected()
+        self.swbt_device_menu.setEnabled(lifecycle_enabled and not connected)
+        self.swbt_type_menu.setEnabled(lifecycle_enabled and not connected)
+        view = swbt_action_view(
+            connected=connected,
+            registered=self._swbt_profile_exists(),
+            available=lifecycle_enabled and (connected or adapter_available),
+            operation=self._swbt_operation,
+            cancelling=self._swbt_cancelling,
         )
-        disconnect_action.setEnabled(lifecycle_enabled and self._swbt_is_connected())
-        pair_action.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
-        reconnect_action.triggered.connect(
-            lambda _checked=False: self._invoke_swbt_action("reconnect")
-        )
-        disconnect_action.triggered.connect(
-            lambda _checked=False: self._invoke_swbt_action("disconnect")
-        )
-        menu.addAction(pair_action)
-        menu.addAction(reconnect_action)
-        menu.addAction(disconnect_action)
+        action = QAction(view.label, menu)
+        action.setEnabled(view.enabled)
+        action.triggered.connect(lambda _checked=False: self._invoke_swbt_action(view.operation))
+        menu.addAction(action)
+        if view.repair:
+            repair = QAction("ペアリングし直す", menu)
+            repair.setEnabled(view.enabled)
+            repair.triggered.connect(lambda _checked=False: self._invoke_swbt_action("pair"))
+            menu.addAction(repair)
 
     def _dispose_controller_submenus(self) -> None:
         for name in (
@@ -411,13 +421,6 @@ class MainWindow(QMainWindow):
 
     def _fail_swbt_adapter_refresh(self, error: BaseException) -> None:
         self._swbt_adapter_refreshing = False
-        self.logger.technical(
-            "WARNING",
-            "swbt adapter refresh failed while building connection menu.",
-            component="MainWindow",
-            event="swbt.adapter_refresh_failed",
-            exc=error,
-        )
         self._refresh_connection_menu()
 
     def _populate_swbt_device_menu(
@@ -491,23 +494,7 @@ class MainWindow(QMainWindow):
             menu.addAction(action)
 
     def _swbt_type_updates(self, controller_type: str) -> dict[str, SettingValue]:
-        updates: dict[str, SettingValue] = {
-            "controller.backend": "swbt",
-            "controller.swbt.controller_type": controller_type,
-        }
-        current_profile = str(
-            self.global_settings.get("controller.swbt.profile_path", "") or ""
-        ).replace("\\", "/")
-        models = supported_controller_models()
-        defaults = {str(model.default_profile_path()).replace("\\", "/") for model in models}
-        if not current_profile or current_profile in defaults:
-            selected_model = next(
-                model for model in models if model.settings_value == controller_type
-            )
-            updates["controller.swbt.profile_path"] = str(
-                selected_model.default_profile_path()
-            ).replace("\\", "/")
-        return updates
+        return swbt_type_updates(self.global_settings, controller_type)
 
     def _populate_capture_input_menu(
         self,
@@ -792,7 +779,13 @@ class MainWindow(QMainWindow):
         if (
             _controller_settings_changed(frozenset(updates)) or "controller.backend" in updates
         ) and (
-            self._is_run_active() or self._swbt_lifecycle_busy or self._manual_controller_restoring
+            self._is_run_active()
+            or self._swbt_lifecycle_busy
+            or self._manual_controller_restoring
+            or (
+                self.global_settings.get("controller.backend") == "swbt"
+                and self._swbt_is_connected()
+            )
         ):
             self.status_label.setText("実行中または接続操作中はコントローラー設定を変更できません")
             return
@@ -803,7 +796,9 @@ class MainWindow(QMainWindow):
         self._refresh_connection_menu()
 
     def _invoke_swbt_action(self, action: str) -> None:
-        if action == "pair":
+        if action == "cancel":
+            self._cancel_swbt_operation()
+        elif action == "pair":
             self._pair_swbt_controller_async()
         elif action == "reconnect":
             self._reconnect_swbt_controller_async()
@@ -866,12 +861,11 @@ class MainWindow(QMainWindow):
             self.virtual_controller.model.set_controller(None)
             self.logger.technical(
                 "ERROR",
-                "swbt lifecycle operation failed.",
+                f"swbt 接続操作に失敗しました: {swbt_error_message(exc)}",
                 component="MainWindow",
                 event="swbt.lifecycle_failed",
                 exc=exc,
             )
-            self.status_label.setText("エラー: swbt 接続操作に失敗しました")
             self._update_connection_status()
             raise
         self.manual_controller_error = None
@@ -912,6 +906,17 @@ class MainWindow(QMainWindow):
         if not prepared:
             return None
         cancellation_event = Event()
+        self._swbt_operation = operation
+        self._swbt_cancel = cancellation_event.set
+        self._swbt_cancelling = False
+        self._refresh_connection_menu()
+        if operation == "pair":
+            self.logger.technical(
+                "INFO",
+                "Switch の『持ちかた／順番を変える』を開いてください。",
+                component="MainWindow",
+                event="swbt.pairing_started",
+            )
         task = BackgroundTask(
             lambda: self._execute_swbt_connect(
                 operation,
@@ -926,7 +931,16 @@ class MainWindow(QMainWindow):
         )
         self._track_background_task(task)
         task.start()
-        return cancellation_event.set
+        return self._cancel_swbt_operation
+
+    def _cancel_swbt_operation(self) -> None:
+        if self._swbt_cancel is None:
+            return
+        cancel = self._swbt_cancel
+        self._swbt_cancel = None
+        self._swbt_cancelling = True
+        self._refresh_connection_menu()
+        cancel()
 
     def _prepare_swbt_lifecycle(
         self,
@@ -946,11 +960,18 @@ class MainWindow(QMainWindow):
             return False, None
         if operation == "connect" and not self.global_settings.get("controller.swbt.adapter"):
             error = RuntimeError("swbt adapter is not selected")
-            self.status_label.setText("エラー: swbt adapter を選択してください")
+            self.logger.technical(
+                "ERROR",
+                "swbt adapter を選択してください [NYX_SWBT_ADAPTER_NOT_SELECTED]",
+                component="MainWindow",
+                event="swbt.lifecycle_rejected",
+                exc=error,
+            )
             self._notify_async_callback(failed, error)
             return False, None
         previous = self._detach_manual_controller()
         self._swbt_lifecycle_busy = True
+        self._swbt_operation = operation
         self.status_label.setText(
             "swbt 接続操作中..." if operation == "connect" else "swbt 切断中..."
         )
@@ -1030,6 +1051,9 @@ class MainWindow(QMainWindow):
             self.manual_controller_error = None
             self.virtual_controller.model.set_controller(result.manual_controller)
             self._swbt_lifecycle_busy = False
+            self._swbt_operation = None
+            self._swbt_cancel = None
+            self._swbt_cancelling = False
             self.status_label.setText("swbt 接続完了")
             self._sync_manual_input_state()
             self._update_connection_status()
@@ -1057,6 +1081,9 @@ class MainWindow(QMainWindow):
             self.manual_controller_error = None
             self.virtual_controller.model.set_controller(None)
             self._swbt_lifecycle_busy = False
+            self._swbt_operation = None
+            self._swbt_cancel = None
+            self._swbt_cancelling = False
             self.status_label.setText("swbt を切断しました")
             self._sync_manual_input_state()
             self._update_connection_status()
@@ -1071,6 +1098,9 @@ class MainWindow(QMainWindow):
             self.manual_controller_error = None
             self.virtual_controller.model.set_controller(None)
             self._swbt_lifecycle_busy = False
+            self._swbt_operation = None
+            self._swbt_cancel = None
+            self._swbt_cancelling = False
             error_code = swbt_connect_cancel_code(error)
             self.status_label.setText(
                 "swbt 再接続をキャンセルしました"
@@ -1085,21 +1115,20 @@ class MainWindow(QMainWindow):
         self.manual_controller_error = error
         self.virtual_controller.model.set_controller(None)
         self._swbt_lifecycle_busy = False
+        self._swbt_operation = None
+        self._swbt_cancel = None
+        self._swbt_cancelling = False
         self.logger.technical(
             "ERROR",
-            "swbt lifecycle operation failed.",
+            f"swbt 接続操作に失敗しました: {swbt_error_message(error)}",
             component="MainWindow",
             event="swbt.lifecycle_failed",
             exc=error,
         )
-        self.status_label.setText(
-            "エラー: swbt を切断できません"
-            if operation == "disconnect"
-            else f"エラー: {swbt_user_error_message(error)}"
-        )
         self._sync_manual_input_state()
         self._update_connection_status()
         self._refresh_connection_menu()
+        self.status_label.setText("準備完了")
         self._notify_async_callback(failed, error)
 
     def _notify_async_callback(self, callback, value: object) -> None:
@@ -1129,29 +1158,10 @@ class MainWindow(QMainWindow):
         return bool(status is not None and status.connected)
 
     def _swbt_profile_exists(self) -> bool:
-        value = str(self.global_settings.get("controller.swbt.profile_path", "") or "").strip()
-        if not value:
-            controller_type = str(
-                self.global_settings.get(
-                    "controller.swbt.controller_type",
-                    "pro-controller",
-                )
-            )
-            model = next(
-                (
-                    candidate
-                    for candidate in supported_controller_models()
-                    if candidate.settings_value == controller_type
-                ),
-                None,
-            )
-            if model is None:
-                return False
-            value = str(model.default_profile_path())
-        path = Path(value)
-        if not path.is_absolute():
-            path = self.project_root / path
-        return path.is_file()
+        return resolve_swbt_selection(
+            self.global_settings,
+            workspace_root=self.project_root,
+        ).profile_path.is_file()
 
     def apply_window_size_preset(self, key: object, *, save: bool = True) -> None:
         preset_key = normalize_window_size_preset_key(key)
@@ -1344,7 +1354,7 @@ class MainWindow(QMainWindow):
         controller_backend = str(self.global_settings.get("controller.backend", "serial"))
         if controller_backend == "swbt":
             if self.manual_controller_error is not None:
-                serial_status = f"swbt: 接続失敗 ({self.manual_controller_error})"
+                serial_status = "swbt: 未接続"
             else:
                 serial_status = self._format_swbt_connection_status()
         else:

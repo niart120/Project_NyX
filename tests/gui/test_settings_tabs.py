@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+from PySide6.QtWidgets import QPushButton
+
 from nyxpy.framework.core.hardware.device_discovery import DeviceInfo
 from nyxpy.gui.dialogs.app_settings_dialog import AppSettingsDialog
 from nyxpy.gui.dialogs.settings.notification_tab import NotificationSettingsTab
@@ -79,6 +83,58 @@ def test_settings_dialog_title_is_settings(qtbot) -> None:
     qtbot.addWidget(dialog)
 
     assert dialog.windowTitle() == "設定"
+
+
+def test_swbt_operation_locks_apply_and_preserves_executed_selection(qtbot, tmp_path):
+    settings = FakeSettings()
+    settings.config_dir = tmp_path / ".nyxpy"
+    callbacks = {}
+
+    def pair(succeeded, failed):
+        callbacks["succeeded"] = succeeded
+        return lambda: None
+
+    dialog = AppSettingsDialog(
+        None,
+        settings,
+        FakeSecrets(),
+        device_discovery=FakeDiscovery(),
+        swbt_pair=pair,
+    )
+    qtbot.addWidget(dialog)
+    tab = dialog.tab_widget.device_tab
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb:0")
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-l"))
+    tab.swbt_connect_btn.click()
+    buttons = {button.text(): button for button in dialog.findChildren(QPushButton)}
+    assert not buttons["OK"].isEnabled()
+    assert not buttons["適用"].isEnabled()
+    assert not tab.swbt_adapter.isEnabled()
+    assert not tab.swbt_controller_type.isEnabled()
+    assert settings.get("controller.swbt.adapter") == "usb:0"
+    assert settings.get("controller.swbt.controller_type") == "joy-con-l"
+    callbacks["succeeded"](SimpleNamespace(connected=True))
+    assert buttons["OK"].isEnabled()
+    assert buttons["適用"].isEnabled()
+    assert tab.swbt_connect_btn.text() == "切断"
+    assert not tab.controller_backend.isEnabled()
+    assert not tab.swbt_adapter.isEnabled()
+    dialog.reject()
+    assert settings.get("controller.swbt.adapter") == "usb:0"
+
+
+def test_cancel_settings_does_not_save_unexecuted_swbt_selection(qtbot):
+    settings = FakeSettings()
+    before = dict(settings.data)
+    dialog = AppSettingsDialog(None, settings, FakeSecrets(), device_discovery=FakeDiscovery())
+    qtbot.addWidget(dialog)
+    tab = dialog.tab_widget.device_tab
+    tab.controller_backend.setCurrentIndex(tab.controller_backend.findData("swbt"))
+    tab.swbt_adapter.setEditText("usb:9")
+    tab.swbt_controller_type.setCurrentIndex(tab.swbt_controller_type.findData("joy-con-r"))
+    dialog.reject()
+    assert settings.data == before
 
 
 def test_settings_dialog_rejects_accept_while_swbt_lifecycle_is_busy(qtbot) -> None:

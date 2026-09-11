@@ -444,7 +444,7 @@ def test_controller_menu_shows_only_swbt_settings_for_swbt_backend(
     actions = window.controller_backend_menu.actions()
     child_menus = [action.menu().title() for action in actions if action.menu() is not None]
     assert child_menus == ["デバイス", "タイプ"]
-    assert [action.text() for action in actions[-3:]] == ["Pair", "Reconnect", "Disconnect"]
+    assert actions[-1].text() == "ペアリング"
     assert window.serial_device_menu is None
     assert window.protocol_menu is None
     assert window.serial_baud_menu is None
@@ -464,8 +464,8 @@ def test_swbt_reconnect_menu_requires_existing_profile(
 
     assert window.controller_backend_menu is not None
     lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
-    assert lifecycle["Pair"].isEnabled()
-    assert not lifecycle["Reconnect"].isEnabled()
+    assert lifecycle["ペアリング"].isEnabled()
+    assert "接続" not in lifecycle
 
     profile_path = services.project_root / ".nyxpy" / "swbt" / "pro-controller-profile.json"
     profile_path.parent.mkdir(parents=True)
@@ -474,7 +474,7 @@ def test_swbt_reconnect_menu_requires_existing_profile(
 
     assert window.controller_backend_menu is not None
     lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
-    assert lifecycle["Reconnect"].isEnabled()
+    assert lifecycle["接続"].isEnabled()
 
 
 def test_swbt_device_menu_canonicalizes_alias_selection(window: MainWindow) -> None:
@@ -548,8 +548,8 @@ def test_swbt_device_menu_keeps_missing_saved_adapter_visible_and_disables_conne
     assert not missing.isEnabled()
     assert window.controller_backend_menu is not None
     lifecycle = {action.text(): action for action in window.controller_backend_menu.actions()}
-    assert not lifecycle["Pair"].isEnabled()
-    assert not lifecycle["Reconnect"].isEnabled()
+    assert not lifecycle["ペアリング"].isEnabled()
+    assert "接続" not in lifecycle
 
 
 def test_swbt_device_refresh_runs_in_background_and_updates_cached_menu(
@@ -1390,9 +1390,11 @@ def test_connect_failure_displays_profile_error_code(
 
     window._fail_swbt_lifecycle(error, failed.append, operation="connect")
 
-    assert window.status_label.text() == (
-        "エラー: NYX_SWBT_PROFILE_CONTROLLER_MISMATCH: "
+    assert "NYX_SWBT_PROFILE_CONTROLLER_MISMATCH" not in window.status_label.text()
+    assert "NYX_SWBT_PROFILE_CONTROLLER_MISMATCH" in services.logger.technical_events[-1][1]
+    assert (
         "pairing profile belongs to a different controller type"
+        in services.logger.technical_events[-1][1]
     )
     assert failed == [error]
     assert services.logger.technical_events[-1][3] == "swbt.lifecycle_failed"
@@ -1467,7 +1469,7 @@ def test_async_disconnect_groups_controller_and_factory_failures(
         "factory disconnect failed",
     ]
     assert window._swbt_lifecycle_busy is False
-    assert window.status_label.text() == "エラー: swbt を切断できません"
+    assert "エラー" not in window.status_label.text()
     assert services.logger.technical_events[-1][3] == "swbt.lifecycle_failed"
 
 
@@ -1943,3 +1945,79 @@ def test_gui_does_not_import_removed_runtime_apis():
     assert "DefaultCommand" not in source
     assert "LogManager" not in source
     assert "set_running" not in source
+
+
+@pytest.mark.parametrize("operation", ["connect", "disconnect"])
+def test_swbt_failure_reaches_tool_log_once(qtbot, window, operation):
+    from nyxpy.framework.core.logger.default_logger import DefaultLogger
+
+    logger = DefaultLogger(window.tool_log_pane.dispatcher, LogSanitizer())
+    window.logger = logger
+    error = ConfigurationError("test reason", code="NYX_SWBT_CONNECTION_FAILED", component="test")
+    window._fail_swbt_lifecycle(error, None, operation=operation)
+    qtbot.waitUntil(lambda: "test reason" in window.tool_log_pane.view.toPlainText())
+    content = window.tool_log_pane.view.toPlainText()
+    assert content.count("test reason") == 1
+    assert content.count("NYX_SWBT_CONNECTION_FAILED") == 1
+    assert "test reason" not in window.status_label.text()
+
+
+def test_swbt_discovery_failure_reaches_tool_log_once(qtbot, window):
+    from nyxpy.framework.core.logger.default_logger import DefaultLogger
+    from nyxpy.gui.app_services import GuiAppServices
+
+    logger = DefaultLogger(window.tool_log_pane.dispatcher, LogSanitizer())
+    error = ConfigurationError(
+        "adapter unavailable", code="NYX_SWBT_ADAPTER_DISCOVERY_FAILED", component="test"
+    )
+    discovery = SimpleNamespace(list_adapters=MagicMock(side_effect=error))
+    service = SimpleNamespace(logger=logger, swbt_adapter_discovery=discovery)
+    window.logger = logger
+    with pytest.raises(ConfigurationError):
+        GuiAppServices.refresh_swbt_adapters(service)
+    window._fail_swbt_adapter_refresh(error)
+    qtbot.waitUntil(lambda: "adapter unavailable" in window.tool_log_pane.view.toPlainText())
+    content = window.tool_log_pane.view.toPlainText()
+    assert content.count("adapter unavailable") == 1
+    assert content.count("NYX_SWBT_ADAPTER_DISCOVERY_FAILED") == 1
+
+
+def test_connected_swbt_menu_locks_selection_and_offers_disconnect(window, services):
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:0")
+    services.swbt_status = lambda: SimpleNamespace(connected=True)
+    window._refresh_connection_menu()
+    assert window.controller_backend_menu.actions()[-1].text() == "切断"
+    assert not window.swbt_device_menu.isEnabled()
+    assert not window.swbt_type_menu.isEnabled()
+    window._apply_connection_settings({"controller.swbt.adapter": "usb:9"})
+    assert window.global_settings.get("controller.swbt.adapter") == "usb:0"
+
+
+def test_connect_menu_cancellation_and_return_to_connect(qtbot, window, services):
+    window.global_settings.set("controller.backend", "swbt")
+    window.global_settings.set("controller.swbt.adapter", "usb:0")
+    window._swbt_adapter_views = services.refresh_swbt_adapters()
+    started = Event()
+    release = Event()
+
+    def reconnect():
+        started.set()
+        release.wait(2)
+        raise ConfigurationError("cancelled", code="NYX_SWBT_RECONNECT_CANCELLED", component="test")
+
+    services.reconnect_swbt = reconnect
+    window._reconnect_swbt_controller_async()
+    qtbot.waitUntil(started.is_set)
+    action = window.controller_backend_menu.actions()[-1]
+    assert action.text() == "キャンセル"
+    action.trigger()
+    action = window.controller_backend_menu.actions()[-1]
+    assert action.text() == "キャンセル中…"
+    assert not action.isEnabled()
+    release.set()
+    qtbot.waitUntil(lambda: not window._swbt_lifecycle_busy)
+    assert window.controller_backend_menu.actions()[-1].text() == "ペアリング"
+    assert not any(
+        event[3] == "swbt.lifecycle_failed" for event in services.logger.technical_events
+    )

@@ -71,12 +71,12 @@ class AppSettingsDialog(QDialog):
         btn_layout.addWidget(cancel_btn)
         btn_layout.addWidget(apply_btn)
         layout.addLayout(btn_layout)
+        self.tab_widget.device_tab.lifecycle_busy_changed.connect(
+            lambda busy: (ok_btn.setEnabled(not busy), apply_btn.setEnabled(not busy))
+        )
 
     def apply_settings(self):
         if self.tab_widget.device_tab.swbt_lifecycle_busy:
-            self.tab_widget.device_tab.swbt_status_label.setText(
-                "接続操作の完了後に設定を反映してください"
-            )
             return False
         self.tab_widget.device_tab.apply()
         self.tab_widget.notification_tab.apply()
