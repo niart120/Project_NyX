@@ -27,3 +27,20 @@
 - 推奨durationを保証できない場合、その結論と条件をdocsへ明記する。
 - `docs/architecture/swbt-integration/testing-rollout.md` の実機チェックリストを結果と一致させる。
 - `uv run pytest tests -m "not realdevice and not swbt"` と `uv run mkdocs build --strict` が成功する。
+
+## 2026-09-11 実機結果
+
+CSR8510 A10（`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で確認した。PairはHOMEの「コントローラー」から「持ちかた/順番を変える」を開いている間に実行する。単にコントローラー画面を開いているだけではSwitchから接続要求が来ず、Pairはtimeoutする。
+
+| 対象 | 結果 | 証跡 |
+|---|---|---|
+| Joy-Con Lの`SL` / `SR` | pass | `local029-joy-con-l-side-buttons-confirmed` |
+| Joy-Con Rの`SL` / `SR` | pass | `local029-joy-con-r-side-buttons-confirmed` |
+| Pro Controllerの`UPRIGHT` | pass。右上として反映 | `local029-pro-controller-dpad-short-press-confirm` |
+| Pro ControllerのA短押し | 16ms、33ms、50msを各5回送信し、各5回を認識 | `local029-pro-controller-dpad-short-press-confirm` |
+
+この構成では16msを最小の確認済みdurationとする。ただしBluetooth環境やSwitch画面の状態をまたぐ一般保証ではないため、利用者向けdocsで固定の最小値として保証しない。
+
+破損したpairing profileに対する利用者向けエラー表示は未確認である。
+
+GUI manual inputは、Reconnect後の有効化、button / D-pad / stickの画面反映、macro開始前のGUI lifetime port解放をoperatorが確認した。IMU操作UIは存在しない。破損したpairing profileに対する利用者向けエラー表示だけを残す。

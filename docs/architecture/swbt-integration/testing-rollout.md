@@ -87,19 +87,19 @@ Pair / reconnect
 Macro input
   [x] Button.A press/release
   [x] 16ms / 33ms の短い押下を確認
-  [ ] 50msを含む短い押下の再現性と推奨durationを確認
-  [x] D-pad input を確認（観察画面は斜め方向を上として表示するため、右上の方向区別は未確認）
+  [x] 16ms / 33ms / 50ms のA短押しを各5回確認（同一構成での最小確認値は16ms。一般保証ではない）
+  [x] D-pad input を確認（`UPRIGHT` は右上として反映）
   [x] left stick / right stick
   [x] Command.imu(...) による IMU neutral / gyro frame を送信し、切断・想定外入力がないことを確認（gyro 値自体の画面上の反映は未確認）
   [x] release all / close neutral
 
 GUI manual input
-  [ ] reconnect 後に virtual controller が有効になる
-  [ ] button down/up が反映される
-  [ ] D-pad が反映される
-  [ ] stick が反映される
-  [ ] macro start 前に GUI lifetime port が閉じられる
-  [ ] GUI に IMU 操作 UI がない
+  [x] reconnect 後に virtual controller が有効になる
+  [x] button down/up が反映される
+  [x] D-pad が反映される
+  [x] stick が反映される
+  [x] macro start 前に GUI lifetime port が閉じられる
+  [x] GUI に IMU 操作 UI がない
 ```
 
 ## local_029 へ分離した実機未確定項目
@@ -109,10 +109,11 @@ unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認�
 ```text
 [x] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
 [x] NyX `0..255`、Y-down から `Stick.normalized`、Y-up への変換が実機で上方向に反映されること
-[ ] Joy-Con L / Rの`SL` / `SR`、Pro Controller D-padの右成分、GUI manual inputの画面反映
-[ ] Direct送信型short pressの再現性と推奨duration
+[x] Joy-Con L / Rの`SL` / `SR` とPro Controller D-padの右成分
+[x] Direct送信型short pressの再現性（16ms / 33ms / 50msを各5回）
+[x] GUI manual inputの画面反映
 ```
 
 座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向を確認した。D-pad の `UPRIGHT` は上として反映されたが、観察画面が斜め方向を区別しないため、右成分を含むことは未確認である。
 
-Direct送信型の実機確認結果をこの文書と利用者向けdocsへ反映する。16msと33msのA短押しは認識した一方、50msは認識例と未認識例があり、送信traceだけでは画面反映を保証できなかった。推奨durationは`local_029`で再試行結果を集計するまで保証しない。
+Direct送信型の実機確認では、CSR8510 A10、swbt-python 0.5.4、Bumble 0.0.233、Switch 2で16ms・33ms・50msのA短押しを各5回認識した。16msはこの構成での最小確認値だが、Bluetooth環境や画面状態をまたぐ最小値としては保証しない。
