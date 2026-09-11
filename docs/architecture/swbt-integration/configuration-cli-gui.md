@@ -6,7 +6,7 @@
 
 ## 依存関係
 
-`swbt-python==0.5.3` は通常依存として固定する。`[project.optional-dependencies].swbt` は作らない。lockfile 上の Bumble は `0.0.233` とする。
+`swbt-python==0.5.4` は通常依存として固定する。`[project.optional-dependencies].swbt` は作らない。lockfile 上の Bumble は `0.0.233` とする。
 
 NyX はすでに serial backend のために PySerial を通常依存として持つ。swbt backend も controller backend の正式な選択肢として扱い、利用者に swbt 用の extra 指定や追加同期手順を要求しない。
 
@@ -35,7 +35,6 @@ controller_type = "pro-controller"
 adapter = "usb:0"
 profile_path = ".nyxpy/swbt/pro-controller-profile.json"
 connect_timeout_sec = 30.0
-report_period_us = 8000
 ```
 
 `controller.backend` は `serial` または `swbt` を指定する。capture backend / capture source とは独立して扱う。
@@ -52,7 +51,7 @@ report_period_us = 8000
 .nyxpy/swbt/joy-con-r-profile.json
 ```
 
-`connect_timeout_sec` は接続操作ごとの timeout である。`report_period_us` は swbt report loop の周期で、既定値は `8000`、値は `None` または正の整数に限る。
+`connect_timeout_sec` は接続操作ごとのtimeoutである。swbt backendは直接送信型へ統一し、送信周期の設定は持たない。
 
 `operation_timeout_sec` と `reset_on_port_create` は settings に出さない。operation timeout は session / factory の内部既定値とし、port 作成時の neutral は常に試みる。
 
@@ -153,7 +152,6 @@ manual input widget は controller port が存在し、macro 非実行、lifecyc
 | `controller.swbt.adapter` | 保存時は空を許容する。接続操作時に空なら `NYX_SWBT_ADAPTER_NOT_SELECTED` |
 | `controller.swbt.profile_path` | `Path | None`。`None` なら controller type から既定値を補う。親 directory は pair 前に作成 |
 | `connect_timeout_sec` | `> 0` |
-| `report_period_us` | `None` or `> 0` |
 
 旧 flat key の `serial_device`、`serial_baud`、`serial_protocol` は廃止する。settings parser は新しい `[controller.serial]` を正とし、旧 key への fallback は持たない。
 

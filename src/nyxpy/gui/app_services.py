@@ -113,7 +113,6 @@ CONTROLLER_SETTING_KEYS = frozenset(
         "controller.swbt.controller_type",
         "controller.swbt.profile_path",
         "controller.swbt.connect_timeout_sec",
-        "controller.swbt.report_period_us",
     }
 )
 
@@ -151,7 +150,7 @@ class GuiAppServices:
         )
         self.logger = self.logging.logger
         for notice in self.global_settings.migration_notices:
-            self.logger.user(
+            self.logger.technical(
                 "WARNING",
                 notice,
                 component="GuiAppServices",

@@ -44,6 +44,7 @@ class SwbtControllerType(str, Enum):
 @dataclass(frozen=True)
 class SwbtInputCapabilities:
     buttons: frozenset[Button]
+    dpad: bool
     left_stick: bool
     right_stick: bool
     imu: bool
@@ -110,7 +111,6 @@ class SwbtControllerConfig:
     adapter: str | None = None
     profile_path: Path
     connect_timeout_sec: float = 30.0
-    report_period_us: int | None = 8000
 ```
 
 `SwbtControllerConfig` は `controller_type: str` を持たない。設定 parser が `model` へ正規化する。
@@ -125,11 +125,15 @@ Joy-Con L/R では存在しない input がある。mapper は `SwbtControllerMo
 
 | input | Pro Controller | Joy-Con L | Joy-Con R |
 |---|---:|---:|---:|
-| A/B/X/Y | yes | subset | subset |
+| A/B/X/Y | yes | no | yes |
 | L/ZL | yes | yes | no |
 | R/ZR | yes | no | yes |
+| MINUS/LS/CAPTURE | yes | yes | no |
+| PLUS/RS/HOME | yes | no | yes |
+| SL/SR | no | yes | yes |
+| D-pad | yes | yes | no |
 | left stick | yes | yes | no |
 | right stick | yes | no | yes |
 | IMU | yes | yes | yes |
 
-具体的な対応 button は Project_NyX 側の capabilities を正とする。swbt profile から `UnsupportedInputError` が返った場合も `NYX_SWBT_INPUT_UNSUPPORTED` に map する。
+この表はswbt-python 0.5.4のcontroller profileとbutton mapに基づく。具体的な対応buttonはProject_NyX側のcapabilitiesを正とする。swbt profileから `UnsupportedInputError` が返った場合も `NYX_SWBT_INPUT_UNSUPPORTED` にmapする。

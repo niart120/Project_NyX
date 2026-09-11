@@ -5,14 +5,17 @@ from pathlib import Path
 from threading import Event, Thread
 
 import pytest
-from swbt import GamepadStatus
+from swbt import DirectJoyConL, DirectJoyConR, DirectProController, GamepadStatus
 
 from nyxpy.framework.core.hardware.swbt.config import SwbtControllerConfig, resolve_controller_model
 from nyxpy.framework.core.hardware.swbt.errors import swbt_configuration_error
 from nyxpy.framework.core.hardware.swbt.session import (
     DummySwbtControllerSession,
     SwbtControllerSession,
+    create_swbt_controller,
+    create_swbt_profile,
     is_swbt_status_connected,
+    resolve_swbt_controller_class,
 )
 
 
@@ -44,8 +47,8 @@ class FakeSwbtController:
         self.calls.append(("reconnect", timeout))
         self.connection_state = "connected"
 
-    def apply(self, state) -> None:
-        self.calls.append(("apply", state))
+    def send(self, state) -> None:
+        self.calls.append(("send", state))
 
     def neutral(self) -> None:
         self.calls.append(("neutral", None))
@@ -75,8 +78,8 @@ class AwaitableFakeSwbtController(FakeSwbtController):
         self.calls.append(("reconnect", timeout))
         self.connection_state = "connected"
 
-    async def apply(self, state) -> None:
-        self.calls.append(("apply", state))
+    async def send(self, state) -> None:
+        self.calls.append(("send", state))
 
     async def neutral(self) -> None:
         self.calls.append(("neutral", None))
@@ -117,8 +120,8 @@ class HangingReconnectFakeSwbtController(AwaitableFakeSwbtController):
 
 
 class CancellationAwareFakeSwbtController(AwaitableFakeSwbtController):
-    async def apply(self, state) -> None:
-        self.calls.append(("apply-start", state))
+    async def send(self, state) -> None:
+        self.calls.append(("send-start", state))
         try:
             await asyncio.sleep(3600)
         except asyncio.CancelledError:
@@ -128,7 +131,7 @@ class CancellationAwareFakeSwbtController(AwaitableFakeSwbtController):
             raise
 
 
-class ReportingReadyFakeSwbtController(FakeSwbtController):
+class NonReportingDirectFakeSwbtController(FakeSwbtController):
     def __init__(self) -> None:
         super().__init__()
         self.status_calls = 0
@@ -136,10 +139,9 @@ class ReportingReadyFakeSwbtController(FakeSwbtController):
     def status(self) -> GamepadStatus:
         self.calls.append(("status", None))
         self.status_calls += 1
-        report_count = 15 if self.status_calls == 1 else 16
         return GamepadStatus(
             connection_state=self.connection_state,
-            report_counters={0x30: report_count},
+            report_counters={0x30: 15},
             last_subcommand_id=None,
             raw_rumble=None,
             last_error=None,
@@ -310,7 +312,7 @@ def test_session_reconnect_cancels_after_awaitable_started() -> None:
     assert getattr(errors[0], "code", None) == "NYX_SWBT_RECONNECT_CANCELLED"
 
 
-def test_session_pair_reconnect_apply_status_and_close() -> None:
+def test_session_pair_reconnect_send_status_and_close() -> None:
     fake = FakeSwbtController()
     session = SwbtControllerSession(config(), controller_factory=lambda _config, _writer: fake)
 
@@ -324,23 +326,22 @@ def test_session_pair_reconnect_apply_status_and_close() -> None:
     session.close()
 
     assert fake.calls[0:3] == [("open", None), ("pair", 10.0), ("status", None)]
-    assert ("apply", "state") in fake.calls
+    assert ("send", "state") in fake.calls
     assert ("reconnect", 20.0) in fake.calls
     assert fake.calls[-1] == ("close", True)
     assert fake.closed is True
 
 
-def test_session_waits_for_periodic_input_report_after_reconnect() -> None:
-    fake = ReportingReadyFakeSwbtController()
+def test_session_reconnect_does_not_wait_for_periodic_input_report() -> None:
+    fake = NonReportingDirectFakeSwbtController()
     session = SwbtControllerSession(config(), controller_factory=lambda _config, _writer: fake)
 
     session.reconnect(timeout_sec=1.0)
 
-    assert fake.status_calls == 2
-    assert fake.calls[:4] == [
+    assert fake.status_calls == 1
+    assert fake.calls[:3] == [
         ("open", None),
         ("reconnect", 1.0),
-        ("status", None),
         ("status", None),
     ]
 
@@ -355,7 +356,7 @@ def test_session_waits_for_awaitable_controller_methods() -> None:
     session.close()
 
     assert fake.calls[0:3] == [("open", None), ("pair", 10.0), ("status", None)]
-    assert ("apply", "state") in fake.calls
+    assert ("send", "state") in fake.calls
     assert fake.calls[-1] == ("close", True)
     assert fake.closed is True
 
@@ -370,7 +371,7 @@ def test_session_connection_state_is_refreshed_after_remote_disconnect() -> None
     with pytest.raises(Exception) as exc_info:
         session.apply("state")
     assert getattr(exc_info.value, "code", None) == "NYX_SWBT_NOT_CONNECTED"
-    assert ("apply", "state") not in fake.calls
+    assert ("send", "state") not in fake.calls
 
 
 def test_session_connection_timeout_does_not_race_longer_pair_timeout() -> None:
@@ -441,8 +442,8 @@ def test_session_preserves_internal_event_loop_stop_error(monkeypatch) -> None:
     session.reconnect(timeout_sec=1.0)
     original_call = session._call_controller
 
-    def fail_apply(controller, method_name, *args, **kwargs):
-        if method_name == "apply":
+    def fail_send(controller, method_name, *args, **kwargs):
+        if method_name == "send":
             raise swbt_configuration_error(
                 "swbt event loop did not stop",
                 code="NYX_SWBT_EVENT_LOOP_DID_NOT_STOP",
@@ -450,7 +451,7 @@ def test_session_preserves_internal_event_loop_stop_error(monkeypatch) -> None:
             )
         return original_call(controller, method_name, *args, **kwargs)
 
-    monkeypatch.setattr(session, "_call_controller", fail_apply)
+    monkeypatch.setattr(session, "_call_controller", fail_send)
 
     with pytest.raises(Exception) as exc_info:
         session.apply("state")
@@ -504,6 +505,70 @@ def test_session_close_preserves_controller_and_loop_stop_errors(monkeypatch) ->
 )
 def test_status_connected_helper_uses_real_api_shape(connection_state: str, expected: bool) -> None:
     assert is_swbt_status_connected(gamepad_status(connection_state)) is expected
+
+
+@pytest.mark.parametrize(
+    ("controller_type", "expected"),
+    [
+        ("pro-controller", DirectProController),
+        ("joy-con-l", DirectJoyConL),
+        ("joy-con-r", DirectJoyConR),
+    ],
+)
+def test_resolve_swbt_controller_class_returns_direct_class(controller_type, expected) -> None:
+    model = resolve_controller_model(controller_type)
+
+    assert resolve_swbt_controller_class(model.controller_type) is expected
+
+
+def test_create_swbt_controller_omits_report_period(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeDirectController:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.swbt.session.resolve_swbt_controller_class",
+        lambda _controller_type: FakeDirectController,
+    )
+
+    controller_config = config()
+    create_swbt_controller(controller_config)
+
+    assert captured == {
+        "adapter": "usb:0",
+        "profile_path": str(controller_config.profile_path),
+        "diagnostics": None,
+    }
+
+
+def test_create_swbt_profile_omits_report_period(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    controller = object()
+
+    class FakeDirectController:
+        @classmethod
+        def create_profile(cls, **kwargs):
+            captured.update(kwargs)
+            return controller
+
+    monkeypatch.setattr(
+        "nyxpy.framework.core.hardware.swbt.session.resolve_swbt_controller_class",
+        lambda _controller_type: FakeDirectController,
+    )
+
+    controller_config = config()
+    result = create_swbt_profile(controller_config, None, 12.0)
+
+    assert result is controller
+    assert captured == {
+        "adapter": "usb:0",
+        "profile_path": str(controller_config.profile_path),
+        "local_address": None,
+        "pair_timeout": 12.0,
+        "diagnostics": None,
+    }
 
 
 def test_session_requires_adapter_before_open() -> None:

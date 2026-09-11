@@ -21,6 +21,7 @@ class SwbtInputCapabilities:
     """NyX 入力単位で見た swbt controller の対応範囲。"""
 
     buttons: frozenset[Button]
+    dpad: bool
     left_stick: bool
     right_stick: bool
     imu: bool
@@ -53,10 +54,26 @@ class SwbtControllerConfig:
     adapter: str | None
     profile_path: Path
     connect_timeout_sec: float = 30.0
-    report_period_us: int | None = 8000
 
 
-_PRO_BUTTONS = frozenset(Button)
+_PRO_BUTTONS = frozenset(
+    {
+        Button.A,
+        Button.B,
+        Button.X,
+        Button.Y,
+        Button.L,
+        Button.R,
+        Button.ZL,
+        Button.ZR,
+        Button.MINUS,
+        Button.PLUS,
+        Button.LS,
+        Button.RS,
+        Button.HOME,
+        Button.CAP,
+    }
+)
 _JOY_CON_L_BUTTONS = frozenset(
     {
         Button.L,
@@ -64,6 +81,8 @@ _JOY_CON_L_BUTTONS = frozenset(
         Button.MINUS,
         Button.LS,
         Button.CAP,
+        Button.SL,
+        Button.SR,
     }
 )
 _JOY_CON_R_BUTTONS = frozenset(
@@ -77,6 +96,8 @@ _JOY_CON_R_BUTTONS = frozenset(
         Button.PLUS,
         Button.RS,
         Button.HOME,
+        Button.SL,
+        Button.SR,
     }
 )
 
@@ -87,6 +108,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="pro-controller-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_PRO_BUTTONS,
+            dpad=True,
             left_stick=True,
             right_stick=True,
             imu=True,
@@ -98,6 +120,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="joy-con-l-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_L_BUTTONS,
+            dpad=True,
             left_stick=True,
             right_stick=False,
             imu=True,
@@ -109,6 +132,7 @@ SUPPORTED_CONTROLLER_MODELS: dict[SwbtControllerType, SwbtControllerModel] = {
         default_profile_name="joy-con-r-profile.json",
         capabilities=SwbtInputCapabilities(
             buttons=_JOY_CON_R_BUTTONS,
+            dpad=False,
             left_stick=False,
             right_stick=True,
             imu=True,

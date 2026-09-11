@@ -45,10 +45,14 @@ Project_NyX `Button` を swbt `Button` へ変換する。
 | `Button.CAP` | `swbt.Button.CAPTURE` |
 | `Button.LS` | `swbt.Button.LEFT_STICK` |
 | `Button.RS` | `swbt.Button.RIGHT_STICK` |
+| `Button.SL` | `swbt.Button.SL` |
+| `Button.SR` | `swbt.Button.SR` |
 
 Project_NyX 側に backend 固有ではないが swbt が扱えない button がある場合は `NYX_SWBT_INPUT_UNSUPPORTED` にする。
 
 `Button.CAPTURE`、`Button.LCLICK`、`Button.RCLICK` の alias は追加しない。Project_NyX 既存定数を直接 swbt 定数へ対応付ける。
+
+`Button.SL` と `Button.SR` はJoy-Con L/Rだけが扱う。Pro Controllerのswbt backendでは `NYX_SWBT_INPUT_UNSUPPORTED`、CH552 / PokeCon / 3DS serial protocolでは `UnsupportedKeyError` にする。
 
 ## Hat
 
@@ -67,6 +71,8 @@ D-pad は button set として扱う。
 | `CENTER` | no D-pad button |
 
 `VirtualControllerModel` は `CENTER` に戻ると previous direction を release する。swbt port 側は release に従って state を更新する。
+
+Pro ControllerとJoy-Con LはD-padを扱う。Joy-Con RはD-padを持たないため、mapperは `SwbtControllerModel.capabilities.dpad` を見て `NYX_SWBT_INPUT_UNSUPPORTED` とする。
 
 ## Stick
 
@@ -154,7 +160,7 @@ def to_input_state(self, state: NyxSwbtState) -> InputState:
     )
 ```
 
-button、stick、IMU を同一 report に入れる必要がある場合は、port が完全 state を作って `apply(state)` する。
+button、stick、IMUを同一reportに入れる必要がある場合は、portが完全stateを作り、session adapterを通じて `send(state)` する。
 
 ## Unsupported input
 
@@ -162,6 +168,7 @@ button、stick、IMU を同一 report に入れる必要がある場合は、por
 |---|---|
 | Joy-Con L で right stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | Joy-Con R で left stick | `NYX_SWBT_INPUT_UNSUPPORTED` |
+| Joy-Con R で D-pad | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | unsupported button | `NYX_SWBT_INPUT_UNSUPPORTED` |
 | invalid input type / value | `NYX_SWBT_INPUT_INVALID` |
 | touch input | `NotImplementedError` |

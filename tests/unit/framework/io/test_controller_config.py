@@ -52,7 +52,6 @@ def test_swbt_controller_config_resolves_model_and_default_profile(tmp_path: Pat
                     "controller_type": "joy-con-l",
                     "adapter": "",
                     "connect_timeout_sec": 12,
-                    "report_period_us": None,
                 },
             }
         },
@@ -64,7 +63,7 @@ def test_swbt_controller_config_resolves_model_and_default_profile(tmp_path: Pat
     assert config.adapter is None
     assert config.profile_path == tmp_path / ".nyxpy" / "swbt" / "joy-con-l-profile.json"
     assert config.connect_timeout_sec == 12.0
-    assert config.report_period_us is None
+    assert not hasattr(config, "report_period_us")
 
 
 def test_swbt_controller_config_does_not_keep_controller_type_string() -> None:

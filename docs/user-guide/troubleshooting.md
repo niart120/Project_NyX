@@ -99,7 +99,7 @@ NyX は旧キーストア、schema v1 profile、破損 profile を自動変換�
 
 - 送っている入力が controller type の capability に含まれている。
 - swbt backend が扱うのは Switch controller の button / D-pad / stick / IMU であり、3DS touch や keyboard は代替しない。
-- 16ms など短い押下は実機・adapter・report 周期の影響を受ける。安定しない場合は `dur=0.05` 以上から確認する。
+- swbt backendは押下と解放を操作ごとに直接送信する。ただし送信APIの完了はSwitch画面への反映完了を保証しない。短い押下が安定しない場合は `dur=0.05` 以上から確認する。
 - マクロ実行中は GUI の手動入力用 controller が解放される。実行後に GUI から手動入力する場合は `Reconnect` を実行する。
 - GUI で入力エラーが表示された場合、失敗した controller port は切り離される。接続状態を確認して `Reconnect` する。
 - GUI の `Disconnect` は NyX の同一プロセスが管理している session を閉じる操作であり、Switch 側の接続一覧を必ず消す操作ではない。

@@ -4,7 +4,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 
 ## 導入順序
 
-1. `swbt-python==0.5.3` を通常依存として固定する。
+1. `swbt-python==0.5.4` を通常依存として固定する。
 2. `nyxpy.framework.core.hardware.swbt` package を追加する。
 3. `SwbtControllerType` / `SwbtControllerModel` / capabilities / `SwbtControllerConfig` を `config.py` に定義する。
 4. `ControllerOutputPort.imu(...)` と `Command.imu(...)` を既定 unsupported として追加する。
@@ -31,7 +31,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 [ ] Literal による controller 種別分岐がない
 [ ] CLI / GUI choices が supported_controller_models() から導出される
 [ ] list_adapters() が GUI / CLI から使える
-[ ] adapter refresh が pairing / reconnect / report loop を開始しない
+[ ] adapter refresh が controller の open / pairing / reconnect を開始しない
 [ ] macro run で pairing が暗黙実行されない
 [ ] Command.imu(...) が追加されている
 [ ] 非対応 backend の imu(...) が NotImplementedError になる
@@ -65,7 +65,7 @@ swbt backend は、設定 model、adapter discovery、session、port、runtime i
 | GUI manual input と macro runtime が競合する | macro start 前に GUI lifetime port を release/close する |
 | IMU command が非対応 backend で silent no-op になる | 共通 default を `NotImplementedError` にする |
 | Joy-Con type で存在しない入力を送る | `SwbtControllerModel.capabilities` で mapper が拒否する |
-| 短い押下が report loop に載らない | 実機 test で最小 dur を確認し、ドキュメントへ反映する |
+| 短い押下がSwitch側で認識されない | Direct送信のtraceと画面観察を分け、確認済みの最小durを文書へ反映する |
 | diagnostics が GUI の通常機能として肥大化する | production composition root から writer を注入して `LoggerPort.technical(...)` に流し、GUI / CLI / settings には path を出さない |
 
 ## 実機確認 checklist
@@ -108,10 +108,9 @@ unit、CLI、GUI の非実機 gate では mapping と lifecycle 境界を確認�
 ```text
 [x] Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
 [ ] NyX `0..255`、Y-down から `Stick.normalized`、Y-up への変換が実機で期待方向に反映されること
-[x] 16ms / 33ms / 50ms short press の反映
-[ ] public flush / send_current 相当 API が必要かどうか
+[ ] Direct送信型で16ms / 33ms / 50ms short pressが反映されること
 ```
 
 座標変換規則自体は単体テストで固定する。Switch 画面では左右 stick の上方向を確認した。D-pad の `UPRIGHT` は上として反映されたが、観察画面が斜め方向を区別しないため、右成分を含むことは未確認である。
 
-実機で short press が取りこぼされる場合、この文書と利用者向け docs に最小推奨 duration を反映する。実機確認前の段階では、NyX は swbt backend 固有の最小押下時間を保証しない。
+Direct送信型の実機確認結果をこの文書と利用者向けdocsへ反映する。送信APIの完了とSwitch画面上の認識を分けて記録し、実機確認前はswbt backend固有の最小押下時間を保証しない。

@@ -35,7 +35,7 @@ nyxpy gui
 | Baud Rate | protocol の既定値を使う。CH552 の既定値は `9600` |
 | swbt Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` から選ぶ |
 | swbt Adapter | `リロード` で候補を取得し、使う adapter を明示的に選ぶ。候補が 1 件でも自動選択しない |
-| swbt Pairing Profile | swbt-python 0.5.3 の pairing profile 保存先。未指定時は `.nyxpy/swbt/<controller>-profile.json`。相対 path は workspace root 基準 |
+| swbt Pairing Profile | swbt-python 0.5.4 の pairing profile 保存先。未指定時は `.nyxpy/swbt/<controller>-profile.json`。相対 path は workspace root 基準 |
 | swbt Connection | `Pair`、`Reconnect`、`Disconnect` を実行する |
 | Preview FPS | GUI プレビューの更新頻度 |
 
@@ -43,7 +43,11 @@ nyxpy gui
 
 `Pair` は初回 pairing で pairing profile を作ります。2 回目以降は `Reconnect` を使います。接続状態は操作後の実際の status で判定されます。`Disconnect` は GUI と同じプロセスが管理している swbt session を閉じる操作で、Switch 側や別プロセスの接続状態までは保証しません。
 
+swbt backendは直接送信型を使い、ボタン、D-pad、stick、IMUの完全な入力状態を操作ごとに送ります。送信周期の設定はありません。
+
 swbt-python 0.2 系の旧キーストアと schema v1 profile は読み込めません。NyX は旧ファイルを変換・削除・上書きせず、新しい既定 path へ切り替えます。更新後は `Pair` を実行して schema v2 profile を作成してください。
+
+旧 `controller.swbt.report_period_us` が `global.toml` に残っている場合、初回読み込み時に削除し、直接送信型への切り替えで不要になったことをtechnical logへ記録します。
 
 ## CLI で指定する
 

@@ -7,6 +7,7 @@ import pytest
 from nyxpy.framework.core.constants import Button
 from nyxpy.framework.core.hardware.swbt.config import (
     SwbtControllerType,
+    SwbtInputCapabilities,
     parse_controller_type,
     resolve_controller_model,
     supported_controller_models,
@@ -17,7 +18,7 @@ from nyxpy.framework.core.macro.exceptions import ConfigurationError
 def test_swbt_dependency_declared_as_runtime_dependency() -> None:
     data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert "swbt-python==0.5.3" in data["project"]["dependencies"]
+    assert "swbt-python==0.5.4" in data["project"]["dependencies"]
     assert "swbt" not in data["project"].get("optional-dependencies", {})
     assert any(
         marker.startswith("swbt:") for marker in data["tool"]["pytest"]["ini_options"]["markers"]
@@ -28,7 +29,7 @@ def test_swbt_lock_resolves_expected_swbt_and_bumble_versions() -> None:
     data = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
     locked_versions = {package["name"]: package["version"] for package in data["package"]}
 
-    assert locked_versions["swbt-python"] == "0.5.3"
+    assert locked_versions["swbt-python"] == "0.5.4"
     assert locked_versions["bumble"] == "0.0.233"
 
 
@@ -76,13 +77,65 @@ def test_controller_models_hold_nyx_capabilities() -> None:
     left = resolve_controller_model("joy-con-l")
     right = resolve_controller_model("joy-con-r")
 
-    assert Button.A in pro.capabilities.buttons
-    assert Button.ZL in left.capabilities.buttons
-    assert Button.A not in left.capabilities.buttons
-    assert Button.R in right.capabilities.buttons
-    assert Button.L not in right.capabilities.buttons
-    assert left.capabilities.left_stick is True
-    assert left.capabilities.right_stick is False
-    assert right.capabilities.left_stick is False
-    assert right.capabilities.right_stick is True
-    assert pro.capabilities.imu is True
+    assert pro.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.A,
+                Button.B,
+                Button.X,
+                Button.Y,
+                Button.L,
+                Button.R,
+                Button.ZL,
+                Button.ZR,
+                Button.MINUS,
+                Button.PLUS,
+                Button.LS,
+                Button.RS,
+                Button.HOME,
+                Button.CAP,
+            }
+        ),
+        dpad=True,
+        left_stick=True,
+        right_stick=True,
+        imu=True,
+    )
+    assert left.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.L,
+                Button.ZL,
+                Button.MINUS,
+                Button.LS,
+                Button.CAP,
+                Button.SL,
+                Button.SR,
+            }
+        ),
+        dpad=True,
+        left_stick=True,
+        right_stick=False,
+        imu=True,
+    )
+    assert right.capabilities == SwbtInputCapabilities(
+        buttons=frozenset(
+            {
+                Button.A,
+                Button.B,
+                Button.X,
+                Button.Y,
+                Button.R,
+                Button.ZR,
+                Button.PLUS,
+                Button.RS,
+                Button.HOME,
+                Button.SL,
+                Button.SR,
+            }
+        ),
+        dpad=False,
+        left_stick=False,
+        right_stick=True,
+        imu=True,
+    )

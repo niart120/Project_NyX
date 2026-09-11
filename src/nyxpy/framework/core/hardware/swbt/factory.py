@@ -28,7 +28,6 @@ class SwbtSessionKey:
     controller_type: SwbtControllerType
     adapter: str | None
     profile_path: Path
-    report_period_us: int | None
 
 
 class SwbtControllerOutputPortFactory:
@@ -360,7 +359,6 @@ def session_key(config: SwbtControllerConfig) -> SwbtSessionKey:
         controller_type=config.model.controller_type,
         adapter=config.adapter,
         profile_path=config.profile_path,
-        report_period_us=config.report_period_us,
     )
 
 

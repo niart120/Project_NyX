@@ -1082,7 +1082,7 @@ requires-dist = [
     { name = "pyside6", specifier = ">=6.11.0,<7.0.0" },
     { name = "requests", specifier = ">=2.34.0,<3.0.0" },
     { name = "setuptools", specifier = ">=82.0.1" },
-    { name = "swbt-python", specifier = "==0.5.3" },
+    { name = "swbt-python", specifier = "==0.5.4" },
     { name = "tomlkit", specifier = ">=0.15.1,<0.16.0" },
     { name = "windows-capture", marker = "sys_platform == 'win32' and extra == 'windows'", specifier = ">=2.0.0,<3.0.0" },
 ]
@@ -2095,14 +2095,14 @@ wheels = [
 
 [[package]]
 name = "swbt-python"
-version = "0.5.3"
+version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bumble" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/a3/7218a82585e42fa9f5436a6de45c213ccd7b8de06614862ff0537c80ac92/swbt_python-0.5.3.tar.gz", hash = "sha256:507ebe03971b774fda7fce078a5ffd026d3af02882971e07d6da0a31214ad38a", size = 584292, upload-time = "2026-07-25T07:24:52.163Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/b6/291cab46a6f58898e8b8d4a77bb12f5b1ed0453a451230175f53e821911a/swbt_python-0.5.4.tar.gz", hash = "sha256:de7d35fe9c3976f04cf945001e13ec946373ef4bf9cea36be06a0a9870ac713f", size = 597831, upload-time = "2026-07-26T12:55:25.511Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/c1/165aa0eef20bc0fe8257473ac58fa22e1521560c773b0ce1b1504d5a58bf/swbt_python-0.5.3-py3-none-any.whl", hash = "sha256:ce1cbaccaae043490833500592d5395e5808e5a295f4981114c73e1de805a85a", size = 83482, upload-time = "2026-07-25T07:24:50.524Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/b8/420def599ac351e59cd360ca4efc045eb0cc0bf33bfabf63074ce127b696/swbt_python-0.5.4-py3-none-any.whl", hash = "sha256:41fe3ae8a3bb461629528d230b404de313502f55427dba373bfed80d9b914c18", size = 84112, upload-time = "2026-07-26T12:55:23.929Z" },
 ]
 
 [[package]]

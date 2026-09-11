@@ -14,7 +14,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 | evidence directory | 実機検証の metadata、trace、operator confirmation、summary を保存する temporary directory |
 | diagnostics trace | swbt diagnostics writer から出る接続、pair/reconnect、report、neutral、disconnect の JSONL 証跡 |
 | operator confirmation | Switch 画面を人が見て入力反映を `pass` / `fail` / `skip` で記録する確認 |
-| short press | `Command.press(..., dur=...)` が swbt report loop に載る最小 duration の確認 |
+| short press | Direct送信型の押下・解放がSwitch側で認識される最小durationの確認 |
 | closeout | 実装結果、検証結果、docs、残課題を整理し、wip 仕様を complete へ移せる状態にする作業 |
 
 ### 1.3 背景・問題
@@ -28,7 +28,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 | 実機検証 | 未整備 | `realdevice` と `swbt` marker で通常 gate から分離 |
 | controller 種別 | Pro Controller だけに偏り得る | Pro Controller / Joy-Con L / Joy-Con R を分けて記録 |
 | IMU | 未確認 | `Command.imu(...)` の neutral / gyro frame を trace と必要な観察で確認 |
-| short press | 未確認 | 16ms、33ms、50ms の反映と public flush 要否を判定 |
+| short press | 周期型で確認済み、Direct送信型は未確認 | 16ms、33ms、50msの送信traceと画面反映を分けて判定 |
 | docs | serial 前提 | device setup、CLI、GUI、command API、troubleshooting に swbt を反映 |
 | closeout | wip に残る | 検証結果と残課題を反映して complete 移動可能にする |
 
@@ -58,7 +58,7 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 | `docs/user-guide/troubleshooting.md` | 変更 | adapter 未選択、不検出、pair timeout、reconnect 失敗、unsupported input、disconnect の限界、short press を追加する |
 | `docs/macro-development/command-api.md` | 変更 | `Command.imu(...)` と swbt 非対応入力を説明する |
 | `docs/architecture/swbt-integration/` | 変更 | optional dependency、adapter 自動採用、session start、button 名、diagnostics path 前提を修正する |
-| `docs/architecture/swbt-integration/testing-rollout.md` | 変更 | 実機で確定した stick Y 軸、short press、flush 要否を反映する |
+| `docs/architecture/swbt-integration/testing-rollout.md` | 変更 | 実機で確定したstick Y軸とDirect送信型のshort press結果を反映する |
 | `spec/agent/complete/local_021` から `local_025`、`spec/agent/wip/local_026` | 変更 | 監査追補、検証結果、残課題を反映する |
 
 ## 3. 設計方針
@@ -84,13 +84,13 @@ swbt backend の実機検証、利用者向け docs 反映、完了記録を定�
 
 ### controller type 別確認
 
-Pro Controller、Joy-Con L、Joy-Con R は別 pairing profile を使う。Joy-Con L は right stick、Joy-Con R は left stick を unsupported として明確に失敗させる。unsupported input は実機確認の前に単体テストで固定し、実機では選択 controller type に存在する入力だけを確認する。
+Pro Controller、Joy-Con L、Joy-Con R は別 pairing profile を使う。Joy-Con L は right stick、Joy-Con R は left stickとD-pad、Pro Controllerは `SL` / `SR` をunsupportedとして明確に失敗させる。unsupported inputは実機確認の前に単体テストで固定し、実機では選択controller typeに存在する入力だけを確認する。Joy-Con L/Rでは `SL` と `SR` を個別に確認する。
 
 ### stick Y 軸と short press
 
 NyX `0..255`、Y-down の `LStick.UP` / `RStick.UP` を `Stick.normalized`、Y-up へ変換した結果が Switch 画面で上方向として観察されるか確認する。変換規則は単体テスト済みだが、画面上の方向は実機結果が得られるまで未確定とする。
 
-`report_period_us=8000` では 16ms、33ms、50ms の Button.A short press を確認する。実機検証前は swbt backend 固有の最小押下時間を docs で保証しない。pressed report が trace に出ない、または画面反映が安定しない場合、`swbt-python` 側の public flush / send_current 相当を残課題として記録する。
+Direct送信型で16ms、33ms、50msのButton.A short pressを確認する。押下と解放がそれぞれ `reason="direct"` のreportとして記録されたか、Switch画面で認識されたかを分けて記録する。送信APIの完了はHCI完了やSwitch側の反映完了を保証しないため、実機検証前はswbt backend固有の最小押下時間をdocsで保証しない。
 
 ### docs 反映方針
 
@@ -142,6 +142,7 @@ class SwbtRealDeviceOptions:
 | `test_swbt_macro_reconnect_realdevice` | あり | 必須 | runtime factory と `DefaultCommand` を通した reconnect / input |
 | `test_swbt_gui_lifecycle_realdevice` | あり | 必須 | GUI service の Pair / Disconnect / Reconnect / Disconnect |
 | `test_swbt_button_dpad_manual_realdevice` | trace は自動 | 必須 | Button、D-pad の反映 |
+| `test_swbt_joycon_side_buttons_manual_realdevice` | trace は自動 | 必須 | Joy-Con L/RのSL、SR |
 | `test_swbt_stick_manual_realdevice` | trace は自動 | 必須 | left / right stick と Y 軸 |
 | `test_swbt_imu_realdevice` | trace は自動 | 必要に応じて必須 | `Command.imu(IMUFrame.neutral())` と gyro frame |
 | `test_swbt_neutral_after_close_realdevice` | trace は自動 | 必須 | close / cancel / failure 後に neutral |
@@ -206,7 +207,7 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | `troubleshooting.md` | adapter 未選択、不検出、timeout、pairing profile 不正、unsupported input、disconnect の限界、short press |
 | `command-api.md` | `Command.imu(...)`、IMU frame 数、非対応 backend |
 | `docs/architecture/swbt-integration/` | optional dependency、adapter 自動採用、session start、button 名、diagnostics path 前提を修正 |
-| `testing-rollout.md` | stick Y 軸、short press、public flush 要否 |
+| `testing-rollout.md` | stick Y軸、Direct送信型のshort press、送信完了の保証範囲 |
 
 ### エラーハンドリング
 
@@ -216,7 +217,7 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | pair timeout | Switch 側状態、controller type、pairing profile path |
 | reconnect 失敗 | pairing profile の有無、不正判定、controller type 不一致 |
 | unsupported input | controller type、入力名、error code |
-| short press 失敗 | duration、pressed report 有無、neutral report 有無、画面観察 |
+| short press 失敗 | duration、direct pressed report、direct neutral report、画面観察 |
 
 ### シングルトン管理
 
@@ -237,10 +238,11 @@ uv run pytest tests/hardware -m "realdevice and swbt" -s
 | ハードウェア | `test_swbt_pair_realdevice` | pairing と pairing profile 作成 |
 | ハードウェア | `test_swbt_reconnect_realdevice` | reconnect |
 | ハードウェア | `test_swbt_button_dpad_manual_realdevice` | Button / D-pad |
+| ハードウェア | `test_swbt_joycon_side_buttons_manual_realdevice` | Joy-Con L/RのSL / SR |
 | ハードウェア | `test_swbt_stick_manual_realdevice` | stick と Y 軸 |
 | ハードウェア | `test_swbt_imu_realdevice` | IMU neutral / gyro |
 | ハードウェア | `test_swbt_neutral_after_close_realdevice` | close 後 neutral |
-| ハードウェア | `test_swbt_short_press_duration_realdevice` | short press と flush 要否 |
+| ハードウェア | `test_swbt_short_press_duration_realdevice` | Direct送信型のshort pressとSwitch側の認識 |
 
 通常検証:
 
@@ -260,10 +262,12 @@ uv run mkdocs build --strict
 - [x] controller type ごとの pair / reconnect 実機テストを追加する。
 - [x] Button / D-pad / stick / IMU / neutral / short press の実機テストを追加する。
 - [x] Joy-Con L/R の unsupported input が明確に失敗することを単体テストで確認する。
+- [x] Joy-Con L/Rの `SL` / `SR` とPro Controllerの非対応境界を単体テストで確認する。
 - [x] async controller method を session 内部で完了待ちする。
-- [ ] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
-- [ ] stick Y 軸既定値を実機結果で確定する。
-- [ ] short press の最小推奨 duration と public flush 要否を判定する。
+- [x] Pro Controller / Joy-Con L / Joy-Con R の実機検証をすべて完了する。
+- [ ] Joy-Con L/Rの `SL` / `SR` を実機で確認する。
+- [x] stick Y 軸既定値を実機結果で確定する。
+- [ ] Direct送信型のshort press最小推奨durationを判定する。
 - [x] 利用者 docs に device setup、CLI、GUI、troubleshooting を反映する。
 - [x] macro development docs に `Command.imu(...)` と swbt 非対応入力を反映する。
 - [x] `docs/architecture/swbt-integration/` の古い前提を修正する。
@@ -281,12 +285,12 @@ uv run mkdocs build --strict
 - `tests/hardware/swbt_realdevice_support.py`: 環境変数から `SwbtRealDeviceOptions` を構築し、`run-metadata.json`、`swbt-trace.jsonl`、`operator-confirmation.jsonl`、`summary.md` を evidence directory に出力する。
 - `tests/hardware/test_swbt_controller_backend_realdevice.py`: adapter discovery、pair、reconnect、button / D-pad、stick、`Command.imu(...)`、close neutral、`Command.press(..., dur=...)` short press を分けて検証する。
 - `conftest.py`: swbt 実機テストだけは `NYX_REALDEVICE=1` と `NYX_SWBT=1` で `--realdevice` なしでも環境変数 gate へ進める。
-- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.5.3 の `create_profile()` と lifecycle / input API は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
+- `src/nyxpy/framework/core/hardware/swbt/session.py`: swbt-python 0.5.4 の `create_profile()` と lifecycle / Direct `send()` は async、status は同期 API として扱い、session 内部の event loop thread で完了待ちする。
 - 利用者 docs: installation、device setup、CLI、GUI、troubleshooting に swbt backend を追加した。
 - macro development docs: `Command.imu(...)` と swbt 非対応入力を追加した。
 - architecture docs: swbt 通常依存、adapter 自動採用なし、diagnostics path 非公開、現行 public API 前提へ更新した。
 
-現環境では `NYX_REALDEVICE`、`NYX_SWBT`、`NYX_SWBT_ADAPTER` が未設定のため、Pro Controller / Joy-Con L / Joy-Con R の実機検証は未実行である。従って `local_026` と rollout 全体を完了扱いにしない。
+2026-07-26にDirect送信型でPro Controller / Joy-Con L / Joy-Con RのPair、Reconnect、対応入力を確認した。実行ごとに環境変数を明示し、通常gateでは未設定のまま実機テストをskipする。
 
 ## 8. 2026-07-10 統合監査追補
 
@@ -296,7 +300,24 @@ uv run mkdocs build --strict
 
 - Pro Controller / Joy-Con L / Joy-Con R の pair / reconnect
 - stick が Switch 画面上で期待方向に反映されること
-- 16ms / 33ms / 50ms short press の安定性と public flush の要否
+- Direct送信型における16ms / 33ms / 50ms short pressの安定性
 - GUI manual input、macro 排他、close neutral の実機挙動
 
 これらが完了するまでチェックリストの実機項目、`local_026`、rollout 全体を完了扱いにしない。
+
+## 9. 2026-07-26 Direct送信型追補
+
+`local_028/SWBT_DIRECT_REPORTING.md` でswbt backendを `DirectProController` / `DirectJoyConL` / `DirectJoyConR` へ変更した。非実機gateでは操作ごとに完全な入力状態を `send()` へ渡すこと、送信成功後だけNyX側状態を確定すること、Pair / Reconnect後に周期reportを待たないことを確認した。
+
+`local_027` で実施したPair、Reconnect、short press、GUI、macroの結果は周期送信型に対する証拠である。Direct送信型については、同じschema v2 profileの再利用、`reason="direct"` のreport trace、Switch画面上の認識を再確認するまで未検証として扱う。
+
+## 10. 2026-07-26 Direct送信型実機結果
+
+CSR8510 A10（`0A12:0001`、`usb:0`）、swbt-python 0.5.4、Bumble 0.0.233で次を確認した。
+
+- Pro Controller: 新規Pair、同一profileでReconnect、A、UPRIGHT、左右stick上、IMU、close neutral、macro経路、GUI Pair / Disconnect / Reconnect / Disconnect
+- Joy-Con L: 新規Pair、同一profileでReconnect、CAP、UPRIGHT
+- Joy-Con R: 新規Pair、同一profileでReconnect、A
+- Joy-Con RのD-padは非対応である。実機テストで検出後、`SwbtInputCapabilities.dpad` とmapperの事前拒否を追加した。
+
+Pro ControllerのA短押しは16msと33msで認識した。50msは認識例と未認識例があり、いずれもtrace上はDirect reportを送信済みだった。従って最小推奨durationと認識安定性は未確定のまま残す。証跡は `tmp/hardware/swbt/local028-v054-*` に保存した。

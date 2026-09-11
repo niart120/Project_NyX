@@ -48,7 +48,6 @@ class SwbtControllerConfig:
     adapter: str | None = None
     profile_path: Path | None = None
     connect_timeout_sec: float = 30.0
-    report_period_us: int | None = 8000
 
 
 ControllerConfig = SerialControllerConfig | SwbtControllerConfig
@@ -127,7 +126,7 @@ VirtualControllerModel
 
 ## SwbtControllerOutputPortFactory
 
-swbt factory は session と active port を cache する。同じ adapter / controller model / pairing profile / report period の transport resource は `SwbtControllerSession` に集約する。同一物理 adapter は controller model や pairing profile が違っても同時に開かず、有効な `SwbtControllerOutputPort` を 1 つだけにする。
+swbt factory はsessionとactive portをcacheする。同じadapter、controller model、pairing profileのtransport resourceは `SwbtControllerSession` に集約する。同一物理adapterはcontroller modelやpairing profileが違っても同時に開かず、有効な `SwbtControllerOutputPort` を1つだけにする。
 
 ```text
 SwbtControllerOutputPortFactory
@@ -151,7 +150,6 @@ session key に含める値:
 model.controller_type
 adapter
 profile_path
-report_period_us
 ```
 
 session key に含めない値:

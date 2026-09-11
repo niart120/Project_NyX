@@ -24,6 +24,8 @@ class Button(IntEnum):
     RS = 0x0800
     HOME = 0x1000
     CAP = 0x2000
+    SL = 0x4000
+    SR = 0x8000
 
     def __repr__(self):
         """列挙値名を含む表現を返します。"""
