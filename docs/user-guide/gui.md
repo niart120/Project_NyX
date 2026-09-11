@@ -60,7 +60,7 @@ uv run nyxpy gui
 |------|------|
 | Controller | `Pro Controller`、`Joy-Con L`、`Joy-Con R` |
 | Adapter | `リロード` で候補を取得し、使う adapter を選ぶ |
-| Pairing Profile | swbt-python 0.5.4 schema v2 profile の保存先 |
+| Pairing Profile | swbt-python 0.6.0 schema v2 profile の保存先 |
 | Pair | 初回 pairing を実行する |
 | Reconnect | 保存済み pairing profile で再接続する |
 | Disconnect | GUI が管理する swbt session を閉じる |

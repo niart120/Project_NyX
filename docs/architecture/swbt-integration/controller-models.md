@@ -136,4 +136,4 @@ Joy-Con L/R では存在しない input がある。mapper は `SwbtControllerMo
 | right stick | yes | no | yes |
 | IMU | yes | yes | yes |
 
-この表はswbt-python 0.5.4のcontroller profileとbutton mapに基づく。具体的な対応buttonはProject_NyX側のcapabilitiesを正とする。swbt profileから `UnsupportedInputError` が返った場合も `NYX_SWBT_INPUT_UNSUPPORTED` にmapする。
+この表はswbt-python 0.6.0のcontroller profileとbutton mapに基づく。具体的な対応buttonはProject_NyX側のcapabilitiesを正とする。swbt profileから `UnsupportedInputError` が返った場合も `NYX_SWBT_INPUT_UNSUPPORTED` にmapする。

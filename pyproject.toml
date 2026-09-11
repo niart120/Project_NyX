@@ -7,13 +7,12 @@ authors = [
 ]
 license = {text = "MIT License"}
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.13,<3.14"
 keywords = ["automation", "macro", "capture", "serial", "gui"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
@@ -32,7 +31,7 @@ dependencies = [
     "paddleocr>=3.5.0,<3.6.0",
     "numpy>=2.3.5,<2.4.0",
     "mss>=10.2.0",
-    "swbt-python==0.5.4",
+    "swbt-python==0.6.0",
 ]
 
 [dependency-groups]
@@ -109,6 +108,7 @@ constraint-dependencies = [
     "urllib3>=2.7.0",  # CVE-2026-21441 / CVE-2026-44432 対策
     "ujson>=5.12.0",  # CVE-2026-32875 / CVE-2026-32874 対策
     "idna>=3.15",  # CVE-2026-45409 対策
+    "cryptography>=50.0.0",  # PYSEC-2026-3552 対策
 ]
 
 [tool.ruff.lint]

@@ -6,7 +6,7 @@
 
 ## 依存関係
 
-`swbt-python==0.5.4` は通常依存として固定する。`[project.optional-dependencies].swbt` は作らない。lockfile 上の Bumble は `0.0.233` とする。
+`swbt-python==0.6.0` は通常依存として固定する。`[project.optional-dependencies].swbt` は作らない。lockfile 上の Bumble は `0.0.233` とする。
 
 NyX はすでに serial backend のために PySerial を通常依存として持つ。swbt backend も controller backend の正式な選択肢として扱い、利用者に swbt 用の extra 指定や追加同期手順を要求しない。
 
