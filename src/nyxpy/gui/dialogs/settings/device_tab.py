@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,16 +21,16 @@ from nyxpy.framework.core.hardware.device_discovery import DeviceDiscoveryServic
 from nyxpy.framework.core.hardware.protocol_factory import ProtocolFactory
 from nyxpy.framework.core.hardware.swbt.config import supported_controller_models
 from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
-from nyxpy.framework.core.hardware.swbt.errors import (
-    is_swbt_connect_cancelled,
-    swbt_connect_cancel_code,
-    swbt_user_error_message,
-)
 from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.gui.background_task import BackgroundTask
 from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.layout import WINDOW_SIZE_PRESETS, normalize_window_size_preset_key
+from nyxpy.gui.swbt_connection import (
+    resolve_swbt_selection,
+    swbt_actions,
+    swbt_type_updates,
+)
 
 _CAPTURE_SOURCE_OPTIONS = (
     ("カメラ", "camera"),
@@ -45,6 +46,8 @@ type SwbtLifecycleAction = Callable[
 
 class DeviceSettingsTab(QWidget):
     """Capture device と serial controller の設定 tab。"""
+
+    lifecycle_busy_changed = Signal(bool)
 
     def __init__(
         self,
@@ -76,6 +79,7 @@ class DeviceSettingsTab(QWidget):
         self._swbt_connected = False
         self._cancel_swbt_connect: Callable[[], None] | None = None
         self._swbt_connect_operation: str | None = None
+        self._swbt_cancelling = False
         self._background_tasks: set[BackgroundTask] = set()
         self.ponkan_capture_available = (
             is_ponkan_capture_available()
@@ -259,34 +263,21 @@ class DeviceSettingsTab(QWidget):
         self.refresh_swbt_btn.clicked.connect(self.refresh_swbt_adapters)
         adapter_row.addWidget(self.swbt_adapter)
         adapter_row.addWidget(self.refresh_swbt_btn)
-        swbt_form.addRow(QLabel("デバイス:"), adapter_row)
         swbt_form.addRow(QLabel("タイプ:"), self.swbt_controller_type)
+        swbt_form.addRow(QLabel("デバイス:"), adapter_row)
 
-        self.swbt_profile = QComboBox()
-        self.swbt_profile.setEditable(True)
-        current_profile = str(self.settings.get("controller.swbt.profile_path", "") or "")
-        for profile_path in self._swbt_profile_candidates(current_profile):
-            self.swbt_profile.addItem(profile_path, profile_path)
-        self.swbt_profile.setCurrentText(current_profile or self._default_swbt_profile_path())
         self.swbt_controller_type.currentIndexChanged.connect(
-            self._update_swbt_profile_for_controller
+            lambda _index: self._update_controller_field_state()
         )
-        swbt_form.addRow(QLabel("ペアリングプロファイル:"), self.swbt_profile)
-
         lifecycle_row = QHBoxLayout()
-        self.swbt_pair_btn = QPushButton("Pair")
-        self.swbt_reconnect_btn = QPushButton("Reconnect")
-        self.swbt_disconnect_btn = QPushButton("Disconnect")
-        self.swbt_pair_btn.clicked.connect(self._pair_swbt)
-        self.swbt_reconnect_btn.clicked.connect(self._reconnect_swbt)
-        self.swbt_disconnect_btn.clicked.connect(self._disconnect_swbt)
+        self.swbt_pair_btn = QPushButton("ペアリング")
+        self.swbt_connection_btn = QPushButton("接続")
+        self.swbt_pair_btn.clicked.connect(lambda: self._activate_swbt(0))
+        self.swbt_connection_btn.clicked.connect(lambda: self._activate_swbt(1))
+        lifecycle_row.addStretch(1)
         lifecycle_row.addWidget(self.swbt_pair_btn)
-        lifecycle_row.addWidget(self.swbt_reconnect_btn)
-        lifecycle_row.addWidget(self.swbt_disconnect_btn)
-        swbt_form.addRow(QLabel("接続:"), lifecycle_row)
-
-        self.swbt_status_label = QLabel("disconnected")
-        swbt_form.addRow(QLabel("状態:"), self.swbt_status_label)
+        lifecycle_row.addWidget(self.swbt_connection_btn)
+        swbt_form.addRow(lifecycle_row)
         swbt_group_layout.addLayout(swbt_form)
         controller_group_layout.addWidget(self.swbt_group)
         layout.addWidget(self.controller_group)
@@ -371,15 +362,11 @@ class DeviceSettingsTab(QWidget):
             self.settings.get("controller.swbt.adapter", "") or ""
         )
         self._set_swbt_busy(True)
-        self.swbt_status_label.setText("adapter を検索中...")
         task = BackgroundTask(self.swbt_adapter_provider, parent=self)
         task.succeeded.connect(
             lambda adapters: (
                 self._replace_swbt_adapters(tuple(adapters), selected) if isValid(self) else None
             )
-        )
-        task.failed.connect(
-            lambda error: self._on_swbt_adapter_refresh_failed(error) if isValid(self) else None
         )
         task.finished.connect(lambda: self._set_swbt_busy(False) if isValid(self) else None)
         self._track_background_task(task)
@@ -404,13 +391,6 @@ class DeviceSettingsTab(QWidget):
         self.swbt_adapter.setCurrentIndex(selected_index)
         if selected_index < 0:
             self.swbt_adapter.setEditText(selected)
-        if adapters:
-            self.swbt_status_label.setText(f"adapter {len(adapters)} 件")
-        else:
-            self.swbt_status_label.setText("利用可能な swbt adapter がありません")
-
-    def _on_swbt_adapter_refresh_failed(self, error: BaseException) -> None:
-        self.swbt_status_label.setText(f"adapter refresh failed: {error}")
 
     def _track_background_task(self, task: BackgroundTask) -> None:
         self._background_tasks.add(task)
@@ -461,43 +441,13 @@ class DeviceSettingsTab(QWidget):
     def _save_swbt_settings(self, *, select_backend: bool = False) -> None:
         if select_backend:
             self.settings.set("controller.backend", "swbt")
+        selected_type = str(self.swbt_controller_type.currentData())
+        for key, value in swbt_type_updates(self.settings, selected_type).items():
+            if key != "controller.backend":
+                self.settings.set(key, value)
         self.settings.set(
-            "controller.swbt.controller_type",
-            self.swbt_controller_type.currentData() or self.swbt_controller_type.currentText(),
+            "controller.swbt.adapter", _editable_combo_value(self.swbt_adapter) or None
         )
-        swbt_adapter = _editable_combo_value(self.swbt_adapter)
-        self.settings.set("controller.swbt.adapter", swbt_adapter or None)
-        swbt_profile = self.swbt_profile.currentText().strip()
-        self.settings.set("controller.swbt.profile_path", swbt_profile or None)
-
-    def _swbt_profile_candidates(self, current: str) -> tuple[str, ...]:
-        candidates = [
-            str(model.default_profile_path()).replace("\\", "/")
-            for model in supported_controller_models()
-        ]
-        config_dir = getattr(self.settings, "config_dir", None)
-        if config_dir is not None:
-            for path in sorted((Path(config_dir) / "swbt").glob("*.json")):
-                candidates.append(f".nyxpy/swbt/{path.name}")
-        if current:
-            candidates.append(current)
-        return tuple(dict.fromkeys(candidates))
-
-    def _default_swbt_profile_path(self) -> str:
-        controller_type = self.swbt_controller_type.currentData()
-        for model in supported_controller_models():
-            if model.settings_value == controller_type:
-                return str(model.default_profile_path()).replace("\\", "/")
-        return ""
-
-    def _update_swbt_profile_for_controller(self) -> None:
-        current = self.swbt_profile.currentText().strip()
-        defaults = {
-            str(model.default_profile_path()).replace("\\", "/")
-            for model in supported_controller_models()
-        }
-        if not current or current in defaults:
-            self.swbt_profile.setCurrentText(self._default_swbt_profile_path())
 
     def _capture_source_type(self) -> str:
         value = self.capture_source_type.currentData()
@@ -541,44 +491,68 @@ class DeviceSettingsTab(QWidget):
 
     def _update_controller_field_state(self) -> None:
         is_swbt = self._controller_backend() == "swbt"
-        settings_enabled = self.swbt_actions_enabled and not self._swbt_busy
-        self.controller_backend.setEnabled(self.swbt_actions_enabled and not self._swbt_busy)
+        editable = self.swbt_actions_enabled and not self._swbt_busy and not self._swbt_connected
+        self.controller_backend.setEnabled(editable)
         self.ser_group.setVisible(not is_swbt)
-        self.ser_group.setEnabled(settings_enabled)
+        self.ser_group.setEnabled(editable)
         self.swbt_group.setVisible(is_swbt)
         self.swbt_group.setEnabled(self.swbt_actions_enabled)
-        self.swbt_controller_type.setEnabled(settings_enabled)
-        self.swbt_adapter.setEnabled(settings_enabled)
-        self.swbt_profile.setEnabled(settings_enabled)
-        adapter_selected = bool(_editable_combo_value(self.swbt_adapter))
-        connect_enabled = is_swbt and settings_enabled and adapter_selected
-        cancelling_pair = (
-            self._cancel_swbt_connect is not None and self._swbt_connect_operation == "pair"
+        self.swbt_controller_type.setEnabled(editable)
+        self.swbt_adapter.setEnabled(editable)
+        self.refresh_swbt_btn.setEnabled(is_swbt and editable)
+        for button, action in zip(
+            (self.swbt_pair_btn, self.swbt_connection_btn),
+            self._swbt_actions(),
+            strict=True,
+        ):
+            button.setText(action.label)
+            button.setEnabled(is_swbt and action.enabled and self.swbt_actions_enabled)
+
+    def _activate_swbt(self, index: int) -> None:
+        action = self._swbt_actions()[index]
+        if not action.enabled:
+            return
+        if action.operation == "cancel":
+            self._cancel_swbt_operation()
+        elif action.operation == "pair":
+            self._pair_swbt()
+        elif action.operation == "disconnect":
+            self._disconnect_swbt()
+        else:
+            self._reconnect_swbt()
+
+    def _swbt_actions(self):
+        return swbt_actions(
+            connected=self._swbt_connected,
+            registered=self._swbt_profile_exists(),
+            available=self.swbt_actions_enabled
+            and not self._swbt_busy
+            and (self._swbt_connected or bool(_editable_combo_value(self.swbt_adapter))),
+            operation=self._swbt_connect_operation,
+            cancelling=self._swbt_cancelling,
         )
-        cancelling_reconnect = (
-            self._cancel_swbt_connect is not None and self._swbt_connect_operation == "reconnect"
-        )
-        self.swbt_pair_btn.setEnabled(cancelling_pair or connect_enabled)
-        self.swbt_reconnect_btn.setEnabled(
-            cancelling_reconnect or (connect_enabled and self._swbt_profile_exists())
-        )
-        self.swbt_disconnect_btn.setEnabled(is_swbt and settings_enabled and self._swbt_connected)
-        self.refresh_swbt_btn.setEnabled(is_swbt and settings_enabled)
 
     def _set_swbt_busy(self, busy: bool) -> None:
         self._swbt_busy = bool(busy)
         self._update_controller_field_state()
 
     def _swbt_profile_exists(self) -> bool:
-        value = self.swbt_profile.currentText().strip()
-        if not value:
-            return False
-        path = Path(value)
-        if not path.is_absolute():
-            config_dir = getattr(self.settings, "config_dir", None)
-            if config_dir is not None:
-                path = Path(config_dir).parent / path
-        return path.is_file()
+        config_dir = getattr(self.settings, "config_dir", None)
+        config = resolve_swbt_selection(
+            self.settings,
+            workspace_root=Path(config_dir).parent if config_dir is not None else None,
+            controller_type=str(self.swbt_controller_type.currentData()),
+            adapter=_editable_combo_value(self.swbt_adapter),
+        )
+        return config.profile_path.is_file()
+
+    def _cancel_swbt_operation(self) -> None:
+        if self._cancel_swbt_connect is not None:
+            cancel = self._cancel_swbt_connect
+            self._cancel_swbt_connect = None
+            self._swbt_cancelling = True
+            self._update_controller_field_state()
+            cancel()
 
     @property
     def swbt_lifecycle_busy(self) -> bool:
@@ -587,30 +561,11 @@ class DeviceSettingsTab(QWidget):
 
     def _pair_swbt(self) -> None:
         self._save_swbt_settings(select_backend=True)
-        self._start_or_cancel_swbt_connect("pair", self.swbt_pair)
+        self._run_swbt_lifecycle(self.swbt_pair, connect_operation="pair")
 
     def _reconnect_swbt(self) -> None:
         self._save_swbt_settings(select_backend=True)
-        self._start_or_cancel_swbt_connect("reconnect", self.swbt_reconnect)
-
-    def _start_or_cancel_swbt_connect(
-        self,
-        operation: str,
-        action: SwbtLifecycleAction | None,
-    ) -> None:
-        if self._cancel_swbt_connect is not None and self._swbt_connect_operation == operation:
-            self._cancel_swbt_connect()
-            self._cancel_swbt_connect = None
-            button = self.swbt_pair_btn if operation == "pair" else self.swbt_reconnect_btn
-            button.setText("Cancelling...")
-            button.setEnabled(False)
-            self.swbt_status_label.setText(
-                "pairing をキャンセル中..."
-                if operation == "pair"
-                else "reconnect をキャンセル中..."
-            )
-            return
-        self._run_swbt_lifecycle(action, connect_operation=operation)
+        self._run_swbt_lifecycle(self.swbt_reconnect, connect_operation="reconnect")
 
     def _disconnect_swbt(self) -> None:
         self._run_swbt_lifecycle(self.swbt_disconnect, disconnect=True)
@@ -623,98 +578,55 @@ class DeviceSettingsTab(QWidget):
         connect_operation: str | None = None,
     ) -> None:
         if action is None:
-            self.swbt_status_label.setText("swbt lifecycle is unavailable")
             return
-        self._set_swbt_busy(True)
         self._swbt_lifecycle_running = True
-        self.swbt_status_label.setText("disconnecting..." if disconnect else "connecting...")
+        self._swbt_connect_operation = "disconnect" if disconnect else connect_operation
+        self._set_swbt_busy(True)
+        self.lifecycle_busy_changed.emit(True)
+
+        def finished() -> None:
+            self._swbt_lifecycle_running = False
+            self._cancel_swbt_connect = None
+            self._swbt_connect_operation = None
+            self._swbt_cancelling = False
+            self._set_swbt_busy(False)
+            self.lifecycle_busy_changed.emit(False)
 
         def succeeded(status: object) -> None:
             if not isValid(self):
                 return
-            if disconnect:
-                self._swbt_connected = False
-                self.swbt_status_label.setText("disconnected")
-            else:
-                self._set_swbt_status(status)
-            self._swbt_lifecycle_running = False
-            self._reset_swbt_connect_action()
-            self._set_swbt_busy(False)
+            self._set_swbt_status(None if disconnect else status)
+            finished()
 
         def failed(error: BaseException) -> None:
             if not isValid(self):
                 return
             self._swbt_connected = False
-            if connect_operation is not None and is_swbt_connect_cancelled(error):
-                self.swbt_status_label.setText(
-                    "再接続をキャンセルしました"
-                    if swbt_connect_cancel_code(error) == "NYX_SWBT_RECONNECT_CANCELLED"
-                    else "ペアリングをキャンセルしました"
-                )
-            else:
-                operation = "disconnect" if disconnect else "connection"
-                self.swbt_status_label.setText(
-                    f"{operation} failed: {swbt_user_error_message(error)}"
-                )
-            self._swbt_lifecycle_running = False
-            self._reset_swbt_connect_action()
-            self._set_swbt_busy(False)
+            self._refresh_swbt_status()
+            finished()
 
         try:
             cancel = action(succeeded, failed)
-            if (
-                connect_operation is not None
-                and self._swbt_lifecycle_running
-                and cancel is not None
-            ):
+            if connect_operation is not None and self._swbt_lifecycle_running:
                 self._cancel_swbt_connect = cancel
-                self._swbt_connect_operation = connect_operation
-                button = (
-                    self.swbt_pair_btn if connect_operation == "pair" else self.swbt_reconnect_btn
-                )
-                button.setText("Cancel")
-                self._update_controller_field_state()
         except Exception as exc:
             failed(exc)
-
-    def _reset_swbt_connect_action(self) -> None:
-        self._cancel_swbt_connect = None
-        self._swbt_connect_operation = None
-        self.swbt_pair_btn.setText("Pair")
-        self.swbt_reconnect_btn.setText("Reconnect")
 
     def _refresh_swbt_status(self) -> None:
         if self.swbt_status is None:
             return
-        if self._controller_backend() != "swbt":
-            self.swbt_status_label.setText("disconnected")
-            return
         try:
             self._set_swbt_status(self.swbt_status())
-        except Exception as exc:
-            self.swbt_status_label.setText(f"status failed: {exc}")
+        except Exception:
+            self._swbt_connected = False
 
     def _set_swbt_status(self, status: object | None) -> None:
-        if status is None:
-            self._swbt_connected = False
-            self.swbt_status_label.setText("disconnected")
-            self._update_controller_field_state()
-            return
         self._swbt_connected = bool(getattr(status, "connected", False))
-        message = str(getattr(status, "message", "connected"))
-        controller_type = str(getattr(status, "controller_type", ""))
-        adapter = str(getattr(status, "adapter", ""))
+        adapter = str(getattr(status, "adapter", "") or "")
         if self._swbt_connected and adapter:
-            adapter_index = self.swbt_adapter.findData(adapter)
-            self.swbt_adapter.setCurrentIndex(adapter_index)
-            if adapter_index < 0:
+            self.swbt_adapter.setCurrentIndex(self.swbt_adapter.findData(adapter))
+            if self.swbt_adapter.currentIndex() < 0:
                 self.swbt_adapter.setEditText(adapter)
-        parts = [message]
-        if controller_type:
-            parts.append(controller_type)
-        if adapter:
-            parts.append(adapter)
-        self.swbt_status_label.setText(" / ".join(parts))
         self._update_controller_field_state()
 
 

@@ -46,6 +46,7 @@ from nyxpy.framework.core.settings.global_settings import GlobalSettings
 from nyxpy.framework.core.settings.secrets_settings import SecretsSettings
 from nyxpy.gui.capture_availability import is_ponkan_capture_available
 from nyxpy.gui.macro_catalog import MacroCatalog
+from nyxpy.gui.swbt_connection import swbt_error_message
 
 
 @dataclass(frozen=True)
@@ -381,7 +382,7 @@ class GuiAppServices:
         except Exception as exc:
             self.logger.technical(
                 "WARNING",
-                "swbt adapter refresh failed.",
+                f"swbt adapter 検索に失敗しました: {swbt_error_message(exc)}",
                 component="GuiAppServices",
                 event="swbt.adapter_refresh_failed",
                 exc=exc,
@@ -465,7 +466,8 @@ class GuiAppServices:
     def canonicalize_swbt_adapter(self) -> SwbtControllerConfig:
         """現在の adapter name/alias を列挙結果の canonical name へ正規化する。"""
         config = self._swbt_controller_config()
-        resolved = resolve_adapter(config.adapter, self.refresh_swbt_adapters())
+        # 接続中の失敗は呼び出し元が記録する。検索単独操作のログと重複させない。
+        resolved = resolve_adapter(config.adapter, self.swbt_adapter_discovery.list_adapters())
         if resolved.name == config.adapter:
             return config
         self.global_settings.set("controller.swbt.adapter", resolved.name)

@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 from types import MethodType
 
@@ -525,8 +526,11 @@ def test_gui_services_injects_logger_diagnostics_writer(monkeypatch, tmp_path) -
 def test_gui_does_not_import_swbt_python() -> None:
     for source_path in (Path("src") / "nyxpy" / "gui").rglob("*.py"):
         source = source_path.read_text(encoding="utf-8")
-        assert "from swbt" not in source
-        assert "import swbt" not in source
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                assert all(alias.name.split(".")[0] != "swbt" for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                assert (node.module or "").split(".")[0] != "swbt"
 
 
 def test_app_services_reports_preview_start_failure_without_failing_settings() -> None:

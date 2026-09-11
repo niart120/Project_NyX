@@ -70,9 +70,11 @@ GUI の swbt 設定画面に置く機能は、実機運用に必要なものに�
 |---|---|
 | デバイス一覧取得 / 更新 | `list_adapters()` で利用可能な dedicated USB Bluetooth adapter 候補を表示する |
 | コントローラー種別指定 | Pro Controller / Joy-Con L / Joy-Con R を選ぶ |
-| ペアリング | 選択した adapter、controller type、pairing profile path で pairing する |
+| ペアリング | 選択した adapter と controller type、設定から解決した profile で pairing する |
 | pairing key に基づく reconnect | 保存済み pairing profile を使って reconnect する |
 | 仮想コントローラー manual input | 既存 `VirtualControllerModel` から `ControllerOutputPort` へ button / D-pad / stick を送る |
+
+プロファイルパスと接続状態の専用表示欄は設けない。タイプとデバイスの下に、行ラベルなしで2個の操作ボタンを置く。左はペアリング／キャンセル、右は接続／切断／キャンセルに切り替える。失敗理由とコードは既存ツールログへ記録する。
 
 GUI と CLI の間で値を受け渡すための clipboard 機能、CLI command 生成、CLI 実行履歴との連携、diagnostics folder を開く導線、controller color editor は持たせない。
 
