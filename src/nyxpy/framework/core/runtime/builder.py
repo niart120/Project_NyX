@@ -213,7 +213,7 @@ class MacroRuntimeBuilder:
             self._manual_controller = None
 
     def detach_preview_frame_source(self) -> FrameSourcePort | None:
-        """GUI lifetime preview port を builder shutdown 対象から外す。"""
+        """共有 factory と GUI preview port をこの builder の終了処理から外す。"""
         port = self._preview_frame_source
         self._preview_frame_source = None
         self._frame_source_shutdown_callbacks = ()
@@ -223,21 +223,8 @@ class MacroRuntimeBuilder:
         """既存 GUI lifetime preview port をこの builder の管理下へ移す。"""
         self._preview_frame_source = port
 
-    def detach_frame_source_shutdown_callbacks(self) -> tuple[ShutdownCallback, ...]:
-        """Preview port が依存する shutdown callback を builder shutdown 対象から外す。"""
-        callbacks = self._frame_source_shutdown_callbacks
-        self._frame_source_shutdown_callbacks = ()
-        return callbacks
-
-    def extend_frame_source_shutdown_callbacks(
-        self,
-        callbacks: tuple[ShutdownCallback, ...],
-    ) -> None:
-        """移管された preview port 用の shutdown callback を追加する。"""
-        self._frame_source_shutdown_callbacks += callbacks
-
     def detach_manual_controller(self) -> ControllerOutputPort | None:
-        """GUI lifetime manual controller port を builder shutdown 対象から外す。"""
+        """共有 factory と GUI manual controller port をこの builder の終了処理から外す。"""
         port = self._manual_controller
         self._manual_controller = None
         self._controller_shutdown_callbacks = ()
@@ -246,19 +233,6 @@ class MacroRuntimeBuilder:
     def attach_manual_controller(self, port: ControllerOutputPort | None) -> None:
         """既存 GUI lifetime manual controller port をこの builder の管理下へ移す。"""
         self._manual_controller = port
-
-    def detach_controller_shutdown_callbacks(self) -> tuple[ShutdownCallback, ...]:
-        """Manual controller port が依存する shutdown callback を builder shutdown 対象から外す。"""
-        callbacks = self._controller_shutdown_callbacks
-        self._controller_shutdown_callbacks = ()
-        return callbacks
-
-    def extend_controller_shutdown_callbacks(
-        self,
-        callbacks: tuple[ShutdownCallback, ...],
-    ) -> None:
-        """移管された manual controller 用の shutdown callback を追加する。"""
-        self._controller_shutdown_callbacks += callbacks
 
     def shutdown(self) -> None:
         errors: list[Exception] = []

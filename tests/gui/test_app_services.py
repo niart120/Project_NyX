@@ -2,6 +2,9 @@ import ast
 from pathlib import Path
 from types import MethodType
 
+import numpy as np
+import pytest
+
 from nyxpy.framework.core.hardware.device_discovery import (
     DeviceDiscoveryResult,
     DeviceInfo,
@@ -9,6 +12,11 @@ from nyxpy.framework.core.hardware.device_discovery import (
 )
 from nyxpy.framework.core.hardware.swbt.discovery import SwbtAdapterView
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo
+from nyxpy.framework.core.io.device_factories import (
+    FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
+)
+from nyxpy.framework.core.runtime.context import RuntimeBuildRequest
 from nyxpy.gui.app_services import GuiAppServices, _frame_source_key
 
 
@@ -500,6 +508,106 @@ def test_notification_change_reuses_gui_lifetime_ports() -> None:
     assert outcome.builder_replaced is True
     assert outcome.preview_frame_source is None
     assert outcome.manual_controller is None
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected_opens"),
+    [
+        ("controller.serial.protocol", "3DS", {"capture": 1, "serial": 2}),
+        ("ponkan_collect_timing", True, {"capture": 2, "serial": 1}),
+    ],
+)
+def test_macro_reuses_unchanged_device_after_settings_change(
+    monkeypatch, tmp_path: Path, key: str, value: str | bool, expected_opens: dict[str, int]
+) -> None:
+    opened: set[str] = set()
+    opens = {"capture": 0, "serial": 0}
+    closes = {"capture": 0, "serial": 0}
+
+    def open_device(kind: str) -> None:
+        if kind in opened:
+            raise OSError(f"{kind} already open")
+        opened.add(kind)
+        opens[kind] += 1
+
+    def close_device(kind: str) -> None:
+        opened.remove(kind)
+        closes[kind] += 1
+
+    class Capture:
+        def initialize(self) -> None:
+            open_device("capture")
+
+        def get_frame(self):
+            return np.zeros((480, 400, 3), dtype=np.uint8)
+
+        def release(self) -> None:
+            close_device("capture")
+
+    class Serial:
+        def open(self, _baudrate: int) -> None:
+            open_device("serial")
+
+        def send(self, _data: bytes) -> None:
+            assert "serial" in opened
+
+        def close(self) -> None:
+            close_device("serial")
+
+    serial_factory_init = SerialControllerOutputPortFactory.__init__
+
+    def init_serial_factory(self, **kwargs):
+        serial_factory_init(self, serial_factory=lambda _port: Serial(), **kwargs)
+
+    monkeypatch.setattr(SerialControllerOutputPortFactory, "__init__", init_serial_factory)
+    monkeypatch.setattr(
+        "nyxpy.gui.app_services.FrameSourcePortFactory",
+        lambda **kwargs: FrameSourcePortFactory(
+            ponkan_capture_factory=lambda *_a, **_kw: Capture(), **kwargs
+        ),
+    )
+
+    macros = tmp_path / "macros"
+    macros.mkdir()
+    (macros / "sample.py").write_text(
+        "from nyxpy.framework.core.macro.base import MacroBase\n"
+        "class SampleMacro(MacroBase):\n"
+        "    def initialize(self, cmd, args): pass\n"
+        "    def run(self, cmd): cmd.capture()\n"
+        "    def finalize(self, cmd): pass\n",
+        encoding="utf-8",
+    )
+    services = GuiAppServices(project_root=tmp_path)
+    try:
+        services.device_discovery = FakeDiscovery(serial=("COM3",))
+        services.registry.reload()
+        services.global_settings.set("capture_source_type", "capture")
+        services.global_settings.set("controller.serial.device", "COM3")
+        initial = services.apply_settings()
+        assert initial.preview_error is None
+        assert initial.manual_controller_error is None
+        assert opened == {"capture", "serial"}
+
+        services.global_settings.set(key, value)
+        outcome = services.apply_settings()
+        assert outcome.preview_error is None
+        assert outcome.manual_controller_error is None
+
+        builder = services.create_runtime_builder()
+        manual = builder.controller_output_for_manual_input()
+        assert manual is not None
+        services.discard_manual_controller(manual)
+        manual.release()
+        manual.close()
+        result = builder.run(RuntimeBuildRequest(macro_id="sample", entrypoint="gui"))
+        assert result.ok, result.error
+        assert opens == expected_opens
+        assert opened == {"capture", "serial"}
+    finally:
+        services.close()
+
+    assert not opened
+    assert closes == opens
 
 
 def test_gui_services_injects_logger_diagnostics_writer(monkeypatch, tmp_path) -> None:
