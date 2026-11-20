@@ -27,9 +27,13 @@ from nyxpy.framework.core.hardware.swbt.discovery import (
 from nyxpy.framework.core.hardware.swbt.factory import SwbtControllerOutputPortFactory
 from nyxpy.framework.core.hardware.swbt.session import is_swbt_status_connected
 from nyxpy.framework.core.hardware.window_discovery import WindowInfo, resolve_window
-from nyxpy.framework.core.io.controller_config import controller_config_from_settings
+from nyxpy.framework.core.io.controller_config import (
+    SerialControllerConfig,
+    controller_config_from_settings,
+)
 from nyxpy.framework.core.io.device_factories import (
     FrameSourcePortFactory,
+    SerialControllerOutputPortFactory,
 )
 from nyxpy.framework.core.io.ports import ControllerOutputPort, FrameSourcePort
 from nyxpy.framework.core.logger import create_default_logging
@@ -164,6 +168,8 @@ class GuiAppServices:
         self.registry = MacroRegistry(project_root=self.project_root)
         self.macro_catalog = MacroCatalog(self.registry)
         self.runtime_builder: MacroRuntimeBuilder | None = None
+        self._frame_source_factory: FrameSourcePortFactory | None = None
+        self._serial_controller_factory: SerialControllerOutputPortFactory | None = None
         self._last_settings: dict[str, Any] | None = None
         self._last_secrets: dict[str, Any] | None = None
         self._builder_settings: dict[str, Any] | None = None
@@ -216,8 +222,9 @@ class GuiAppServices:
             _changed_keys(self._builder_settings, current_settings) & RUNTIME_BUILDER_SETTING_KEYS
         ) | _changed_keys(self._builder_secrets, current_secrets)
         builder_needs_update = self.runtime_builder is None or bool(builder_changed_keys)
-        frame_source_needs_update = self.runtime_builder is None or bool(
-            FRAME_SOURCE_SETTING_KEYS & builder_changed_keys
+        frame_source_needs_update = (
+            self.runtime_builder is None
+            or self._active_frame_source_key != _frame_source_key(current_settings)
         )
         manual_controller_needs_update = self.runtime_builder is None or bool(
             CONTROLLER_SETTING_KEYS & builder_changed_keys
@@ -237,7 +244,6 @@ class GuiAppServices:
             )
 
         previous_builder_exists = self.runtime_builder is not None
-        previous_frame_source_key = self._active_frame_source_key
         preview_frame_source: FrameSourcePort | None = None
         manual_controller: ControllerOutputPort | None = None
         preview_error: BaseException | None = None
@@ -285,11 +291,7 @@ class GuiAppServices:
         self._builder_settings = current_settings
         self._builder_secrets = current_secrets
         self._pending_settings_apply = False
-        frame_source_changed = (
-            previous_builder_exists
-            and previous_frame_source_key != self._active_frame_source_key
-            and bool(FRAME_SOURCE_SETTING_KEYS & builder_changed_keys)
-        )
+        frame_source_changed = previous_builder_exists and frame_source_needs_update
         return SettingsApplyOutcome(
             changed_keys=frozenset(changed_keys),
             builder_replaced=builder_replaced,
@@ -342,19 +344,29 @@ class GuiAppServices:
             self.global_settings.data,
             workspace_root=self.project_root,
         )
-        frame_factory = FrameSourcePortFactory(
-            discovery=self.device_discovery,
-            logger=self.logger,
-        )
+        frame_factory = self._frame_source_factory if keep_preview_frame_source else None
+        if frame_factory is None:
+            frame_factory = FrameSourcePortFactory(
+                discovery=self.device_discovery, logger=self.logger
+            )
+        serial_factory = None
+        if isinstance(controller_config, SerialControllerConfig):
+            serial_factory = self._serial_controller_factory if keep_manual_controller else None
+            if serial_factory is None:
+                serial_factory = SerialControllerOutputPortFactory(
+                    discovery=self.device_discovery,
+                    protocol=ProtocolFactory.create_protocol(controller_config.protocol),
+                )
         notification_handler = create_notification_handler_from_settings(
             self.secrets_settings.snapshot(),
             logger=self.logger,
         )
-        self.runtime_builder = create_device_runtime_builder(
+        next_builder = create_device_runtime_builder(
             project_root=self.project_root,
             registry=self.registry,
             device_discovery=self.device_discovery,
             controller_config=controller_config,
+            serial_controller_factory=serial_factory,
             swbt_controller_factory=self.swbt_controller_factory,
             frame_source_factory=frame_factory,
             capture_name=self.global_settings.get("capture_device"),
@@ -363,14 +375,17 @@ class GuiAppServices:
             settings=self.global_settings.data,
             lifetime_allow_dummy=True,
         )
+        self.runtime_builder = next_builder
+        self._frame_source_factory = frame_factory
+        self._serial_controller_factory = serial_factory
         self._active_frame_source_key = _frame_source_key(self.global_settings.data)
         if previous_builder is not None:
-            _transfer_lifetime_resources(
-                previous_builder,
-                self.runtime_builder,
-                keep_preview_frame_source=keep_preview_frame_source,
-                keep_manual_controller=keep_manual_controller,
-            )
+            if keep_preview_frame_source:
+                next_builder.attach_preview_frame_source(
+                    previous_builder.detach_preview_frame_source()
+                )
+            if keep_manual_controller:
+                next_builder.attach_manual_controller(previous_builder.detach_manual_controller())
             self._shutdown_builder(previous_builder)
 
     def refresh_swbt_adapters(self) -> tuple[SwbtAdapterView, ...]:
@@ -789,23 +804,6 @@ def _frame_source_key(settings: Mapping[str, Any]) -> tuple[object, ...]:
         capture_fps,
         aspect_box_enabled,
     )
-
-
-def _transfer_lifetime_resources(
-    previous_builder: MacroRuntimeBuilder,
-    next_builder: MacroRuntimeBuilder,
-    *,
-    keep_preview_frame_source: bool,
-    keep_manual_controller: bool,
-) -> None:
-    if keep_preview_frame_source and getattr(previous_builder, "_preview_frame_source", None):
-        callbacks = previous_builder.detach_frame_source_shutdown_callbacks()
-        next_builder.attach_preview_frame_source(previous_builder.detach_preview_frame_source())
-        next_builder.extend_frame_source_shutdown_callbacks(callbacks)
-    if keep_manual_controller and getattr(previous_builder, "_manual_controller", None):
-        callbacks = previous_builder.detach_controller_shutdown_callbacks()
-        next_builder.attach_manual_controller(previous_builder.detach_manual_controller())
-        next_builder.extend_controller_shutdown_callbacks(callbacks)
 
 
 def _swbt_status_view(
