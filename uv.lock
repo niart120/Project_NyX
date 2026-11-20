@@ -953,7 +953,7 @@ requires-dist = [
     { name = "paddleocr", specifier = ">=3.5.0,<3.6.0" },
     { name = "paddlepaddle", specifier = ">=3.2.2,<3.3.0" },
     { name = "pillow", specifier = ">=13.0.0,<14.0.0" },
-    { name = "ponkan-python", specifier = ">=0.2.0,<0.3.0" },
+    { name = "ponkan-python", specifier = ">=0.2.1,<0.3.0" },
     { name = "pyserial", specifier = ">=3.5,<4.0" },
     { name = "pyside6", specifier = ">=6.11.0,<7.0.0" },
     { name = "requests", specifier = ">=2.34.0,<3.0.0" },
@@ -1181,16 +1181,16 @@ wheels = [
 
 [[package]]
 name = "ponkan-python"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "libusb1" },
     { name = "numpy" },
     { name = "pyd3xx", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/16/e7da562982fd996f19957498182b9337f4f08e43e584bd73058f13725dc3/ponkan_python-0.2.0.tar.gz", hash = "sha256:08d01565a989265564fcfce77a7bdee995ed1ebf2eee6ee00c3948a1ad8de18a", size = 87727, upload-time = "2026-06-15T14:12:48.78Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/e7/3447a367b8ee28c478af0c8d40da56f0b49ff75670d369db7a115b2dd8b3/ponkan_python-0.2.1.tar.gz", hash = "sha256:838d9450b6427338138ed9fe22ffd8cc5e30bc6ffb570784d6488dd20dfad323", size = 87962, upload-time = "2026-11-20T11:17:04.683Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/6e/ebdb4c79f465723c921460459750b4df0aecc92f7cfe9cdab3c242fd60e5/ponkan_python-0.2.0-py3-none-any.whl", hash = "sha256:cff5992b7d6c8ea9e23066c08d3d6b5bcc18c4cd938bebfb821001b3c6785de1", size = 70153, upload-time = "2026-06-15T14:12:47.602Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/0d/5947e116ed7d38c701defeb1d78711f73c7a845a2ac59d9d11925cb82673/ponkan_python-0.2.1-py3-none-any.whl", hash = "sha256:8dbea73641047941f8985001919e2dce690e07d789d2dfc66b340177e7bb7360", size = 70210, upload-time = "2026-11-20T11:17:02.552Z" },
 ]
 
 [[package]]
